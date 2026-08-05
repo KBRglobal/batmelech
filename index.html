@@ -156,12 +156,45 @@ table.sum .num.gold{color:var(--gold)}
 
 .storage-warn{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:10px 14px;margin:12px 0;font-size:.9rem}
 
+/* bon (kitchen/customer ticket) */
+#printArea{display:none;direction:rtl}
+body.printing #app{display:none!important}
+body.printing #printArea{display:block}
+.bon{
+  max-width:420px;margin:0 auto 16px;background:#fff;color:#222;
+  border:1.5px solid #b09a8e;border-radius:8px;padding:20px 22px;font-size:.95rem;
+}
+.bon-bsd{font-size:.7rem;color:#777;margin-bottom:2px}
+.bon-brand{font-size:1.5rem;font-weight:800;text-align:center;margin:0;color:#4a2c2a}
+.bon-sub{text-align:center;color:#8a6b5f;font-size:.8rem;border-bottom:1px dashed #cbb5a8;padding-bottom:10px;margin-bottom:12px}
+.bon-body{white-space:pre-wrap;line-height:1.65}
+.bon-total{border-top:1px dashed #cbb5a8;margin-top:12px;padding-top:10px;font-weight:800;font-size:1.15rem;text-align:center;font-variant-numeric:tabular-nums}
+.bon-foot{text-align:center;font-size:.8rem;color:#8a6b5f;margin-top:10px}
+
+/* bag labels */
+.labels-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0}
+@media(max-width:420px){.labels-grid{grid-template-columns:1fr}}
+.label{
+  border:2px dashed var(--accent);border-radius:14px;padding:18px 12px;
+  text-align:center;background:var(--surface);break-inside:avoid;
+}
+.label .lb-brand{font-weight:800;color:var(--accent);font-size:.9rem;letter-spacing:.04em}
+.label .lb-kosher{font-size:.72rem;color:var(--muted)}
+.label .lb-name{font-size:1.4rem;font-weight:800;margin:8px 0 3px;text-wrap:balance}
+.label .lb-meta{font-size:.86rem;color:var(--muted)}
+
 @media print{
   .top,.savebar,.no-print{display:none!important}
   body{background:#fff;color:#000}
   .card,.stat{box-shadow:none;border-color:#bbb;break-inside:avoid}
   .wrap{max-width:none;padding:0}
   .order-text{border-color:#bbb}
+  .bon{border-color:#000;page-break-inside:avoid}
+  .bon+.bon{page-break-before:always}
+  .labels-grid{grid-template-columns:repeat(2,1fr)}
+  .label{border-color:#333;background:#fff;color:#000}
+  .label .lb-brand{color:#000}
+  .label .lb-meta,.label .lb-kosher{color:#333}
 }
 </style>
 
@@ -177,6 +210,7 @@ table.sum .num.gold{color:var(--gold)}
   </header>
   <main class="wrap" id="view"></main>
 </div>
+<div id="printArea" dir="rtl" lang="he"></div>
 
 <script>
 'use strict';
@@ -219,6 +253,7 @@ const MENU = {
   couplePrice:230, challahPrice:10, includedChallot:2, includedSalads:4, includedFish:2
 };
 const HEAT_OPTIONS = ['','לא חריף','חריף','מעורב — חלק חריף וחלק לא'];
+const STATUS_OPTIONS = ['חדשה','אושרה','מוכנה','נמסרה'];
 const PAY_METHODS = ['','מזומן','ביט','פייבוקס','לינק','העברה'];
 const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 
@@ -226,7 +261,7 @@ const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 const LS_KEY='batmelech-orders-v1';
 let store={orders:[]};
 let storageOK=true;
-let view={tab:'orders', summaryDate:null, search:''};
+let view={tab:'orders', summaryDate:null, search:'', labelCopies:{}};
 let draft=null;
 
 function loadStore(){
@@ -296,7 +331,7 @@ function toast(msg){
 /* ================= draft ================= */
 function newDraft(){
   return {
-    id:null, date:'', name:'', phone:'', place:'', time:'', pickup:false,
+    id:null, date:'', name:'', phone:'', place:'', address:'', time:'', pickup:false, status:'חדשה',
     meals:1, aricha:0, challot:MENU.includedChallot,
     salads:{},               // name -> {o,p}
     firsts:{}, heat:'', firstsNote:'',
@@ -335,6 +370,13 @@ function countSaladsPinuk(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.
 function countFish(d){ return Object.values(d.firsts).reduce((s,x)=>s+(x||0),0); }
 
 /* ================= order text (like the Word card) ================= */
+function waLink(phone){
+  let p=String(phone||'').replace(/\D/g,'');
+  if(!p) return '';
+  if(p.startsWith('00')) p=p.slice(2);
+  if(p.startsWith('0')) p='972'+p.slice(1);
+  return 'https://wa.me/'+p;
+}
 function orderShortDest(o){
   if(o.pickup) return 'איסוף עצמי';
   return (o.place||'—') + (o.time?` · ${o.time}`:'');
@@ -345,6 +387,7 @@ function buildOrderText(o){
   L.push(`שם מלא: ${o.name||'—'}`);
   if(o.phone) L.push(`מס' טלפון: ${o.phone}`);
   L.push(`לאן המשלוח? ${o.pickup?'איסוף עצמי':(o.place||'—')}${(!o.pickup&&o.time)?` (הגעה: ${o.time})`:''}`);
+  if(!o.pickup&&o.address) L.push(`כתובת: ${o.address}`);
   if(o.meals>0) L.push(`ארוחה זוגית ×${o.meals}`);
   const saladLines=[];
   for(const name of Object.keys(o.salads)){
@@ -392,6 +435,85 @@ function buildOrderText(o){
   return L.join('\n');
 }
 
+/* ================= bon + labels printing ================= */
+let printCleanupTimer=null;
+function printHtml(html){
+  const pa=$('#printArea'); if(!pa) return;
+  pa.innerHTML=html;
+  document.body.classList.add('printing');
+  const done=()=>{
+    document.body.classList.remove('printing');
+    pa.innerHTML='';
+    window.removeEventListener('afterprint',done);
+    clearTimeout(printCleanupTimer);
+  };
+  window.addEventListener('afterprint',done);
+  printCleanupTimer=setTimeout(done,3000);
+  window.print();
+}
+function bonHtml(o){
+  return `<div class="bon">
+    <div class="bon-bsd">בס"ד</div>
+    <div class="bon-brand">מטעמי בת מלך</div>
+    <div class="bon-sub">מטבח ביתי אותנטי · כשר</div>
+    <div class="bon-body">${esc(buildOrderText(o))}</div>
+    ${o.total?`<div class="bon-total">סך לתשלום: ${money(parseMoney(o.total))}</div>`:''}
+    <div class="bon-foot">בשם השם נעשה ונצליח! 🕯️</div>
+  </div>`;
+}
+function labelHtml(o){
+  return `<div class="label">
+    <div class="lb-brand">✿ מטעמי בת מלך ✿</div>
+    <div class="lb-kosher">מטבח ביתי אותנטי · כשר</div>
+    <div class="lb-name">${esc(o.name||'')}</div>
+    <div class="lb-meta">${esc(fmtDate(o.date))}</div>
+    <div class="lb-meta">${esc(o.pickup?'איסוף עצמי':(o.place||''))}${(!o.pickup&&o.time)?' · '+esc(o.time):''}</div>
+    ${(!o.pickup&&o.address)?`<div class="lb-meta">${esc(o.address)}</div>`:''}
+    ${o.phone?`<div class="lb-meta">📞 ${esc(o.phone)}</div>`:''}
+  </div>`;
+}
+function labelsHtml(list){
+  const cells=[];
+  for(const o of list){
+    const c=view.labelCopies[o.id]===undefined?1:view.labelCopies[o.id];
+    for(let j=0;j<c;j++) cells.push(labelHtml(o));
+  }
+  if(!cells.length) return `<div class="empty"><p>אין מדבקות להדפסה — כל הכמויות על 0.</p></div>`;
+  return `<div class="labels-grid">${cells.join('')}</div>`;
+}
+function renderLabels(){
+  const sc=summaryScope();
+  const list=sc.list;
+  if(!list.length){
+    $('#view').innerHTML=`<div class="empty"><div class="big">🏷️</div><p>אין הזמנות בתקופה שנבחרה.</p></div>
+      <div class="row no-print" style="justify-content:center"><button type="button" class="btn" data-act="labelsBack">→ חזרה לסיכום</button></div>`;
+    return;
+  }
+  const rows=list.map(o=>{
+    const c=view.labelCopies[o.id]===undefined?1:view.labelCopies[o.id];
+    return `<div class="item-row">
+      <span class="item-name"><b>${esc(o.name)}</b> <span class="hint">${esc(fmtShort(o.date||''))} · ${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}</span></span>
+      <div class="stepper">
+        <button type="button" class="st-btn" data-act="lbBump" data-id="${o.id}" data-d="-1" aria-label="פחות">−</button>
+        <span class="st-qty${c>0?' has':''}" data-lb="${o.id}">${c}</span>
+        <button type="button" class="st-btn" data-act="lbBump" data-id="${o.id}" data-d="1" aria-label="עוד">+</button>
+      </div>
+    </div>`;
+  }).join('');
+  $('#view').innerHTML=`
+  <div class="row no-print" style="margin:16px 0 4px">
+    <button type="button" class="btn" data-act="labelsBack">→ חזרה לסיכום</button>
+    <button type="button" class="btn primary" data-act="printLabels" style="margin-inline-start:auto">🖨️ הדפסת המדבקות</button>
+  </div>
+  <h2 style="margin:10px 0 0;font-size:1.15rem">🏷️ מדבקות לשקיות — ${esc(sc.title)}</h2>
+  <div class="card no-print">
+    <div class="sec-h">כמה מדבקות לכל לקוח?</div>
+    <p class="hint">לקוח עם כמה שקיות? מעלים את המספר. 0 = בלי מדבקה.</p>
+    ${rows}
+  </div>
+  <div id="lbPreview">${labelsHtml(list)}</div>`;
+}
+
 /* ================= render: tabs ================= */
 const TABS=[
   {id:'orders', label:'📋 הזמנות'},
@@ -400,14 +522,20 @@ const TABS=[
   {id:'backup', label:'💾 גיבוי'}
 ];
 function renderTabs(){
+  const activeTab=view.tab==='labels'?'summary':view.tab;
   $('#tabs').innerHTML=TABS.map(t=>
-    `<button type="button" class="tab${view.tab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">${t.label}</button>`
+    `<button type="button" class="tab${activeTab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">${t.label}</button>`
   ).join('');
 }
 
 /* ================= render: orders list ================= */
 function sortOrders(list){
   return [...list].sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')||(a.time||'99').localeCompare(b.time||'99'));
+}
+function statusPill(o){
+  const st=o.status||'חדשה';
+  const cls=st==='נמסרה'?'mut':(st==='מוכנה'?'ok':(st==='אושרה'?'mid':'no'));
+  return `<span class="pill ${cls}">${esc(st)}</span>`;
 }
 function orderCard(o){
   const paidCls=o.paid==='כן'?'ok':(o.paid==='מקדמה'?'mid':(o.paid==='שת"פ'?'mut':'no'));
@@ -423,6 +551,7 @@ function orderCard(o){
   return `<div class="card order-card" data-oid="${o.id}">
     <div class="oc-top">
       <span class="oc-name">${esc(o.name||'ללא שם')}</span>
+      ${statusPill(o)}
       <span class="pill ${paidCls}">${esc(o.paid==='כן'?'שולם':(o.paid==='לא'?'לא שולם':o.paid))}</span>
       <span class="oc-total">${o.total?money(parseMoney(o.total)):''}</span>
     </div>
@@ -433,7 +562,9 @@ function orderCard(o){
     <div class="oc-actions no-print">
       <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">✏️ עריכה</button>
       <button type="button" class="btn sm" data-act="toggleText" data-id="${o.id}">📄 כרטיס הזמנה</button>
+      <button type="button" class="btn sm" data-act="bon" data-id="${o.id}">🖨️ בון</button>
       <button type="button" class="btn sm" data-act="copyText" data-id="${o.id}">📋 העתקה</button>
+      ${o.phone?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(o.phone)}?text=${encodeURIComponent(buildOrderText(o))}">💬 וואטסאפ</a>`:''}
       <button type="button" class="btn sm" data-act="dup" data-id="${o.id}">🔁 שכפול</button>
       <button type="button" class="btn sm danger" data-act="del" data-id="${o.id}">🗑️ מחיקה</button>
     </div>
@@ -444,10 +575,12 @@ function groupHtml(dates,obj){
   return dates.map(dk=>{
     const list=obj[dk];
     const tot=list.reduce((s,o)=>s+parseMoney(o.total),0);
+    const meals=list.reduce((s,o)=>s+(o.meals||0),0);
     return `<section>
       <div class="date-h">
         <span class="d">📅 ${esc(fmtDate(dk==='ללא תאריך'?'':dk))}</span>
         <span class="badge">${list.length} הזמנות</span>
+        ${meals>0?`<span class="badge">${meals} זוגיות</span>`:''}
         ${tot>0?`<span class="badge gold">${money(tot)}</span>`:''}
         ${dk!=='ללא תאריך'?`<button type="button" class="btn sm no-print" data-act="daySummary" data-date="${dk}">🍲 לסיכום ההכנות</button>`:''}
       </div>
@@ -572,6 +705,8 @@ function renderForm(){
       <div class="field"><label>עריכה ל־כמה איש</label>${stepperHtml('aricha',0,d.aricha)}</div>
       <div class="field"><label>חלות (יח') <span class="hint" data-badge="challot"></span></label>${stepperHtml('challot',0,d.challot)}</div>
     </div>
+    <div class="field"><label>סטטוס ההזמנה</label>
+      <select data-bind="status">${STATUS_OPTIONS.map(s=>`<option value="${esc(s)}"${(d.status||'חדשה')===s?' selected':''}>${s}</option>`).join('')}</select></div>
   </div>
 
   <div class="card">
@@ -583,9 +718,12 @@ function renderForm(){
     <label class="row" style="margin:6px 0;gap:8px;cursor:pointer">
       <input type="checkbox" style="width:auto" data-bind="pickup" ${d.pickup?'checked':''}> איסוף עצמי
     </label>
-    <div class="grid2" id="deliveryFields" ${d.pickup?'hidden':''}>
-      <div class="field"><label>לאן המשלוח? (בית מלון / כתובת)</label><input data-bind="place" value="${esc(d.place)}" placeholder="שם המלון או כתובת"></div>
-      <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" value="${esc(d.time)}" placeholder="לדוגמה: 16:30"></div>
+    <div id="deliveryFields" ${d.pickup?'hidden':''}>
+      <div class="grid2">
+        <div class="field"><label>לאן המשלוח? (בית מלון / אזור)</label><input data-bind="place" value="${esc(d.place)}" placeholder="שם המלון או האזור"></div>
+        <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" value="${esc(d.time)}" placeholder="לדוגמה: 16:30"></div>
+      </div>
+      <div class="field"><label>כתובת מדויקת / הוראות הגעה (לא חובה)</label><input data-bind="address" value="${esc(d.address||'')}" placeholder="רחוב, בניין, קומה, למסור בקבלה..."></div>
     </div>
   </div>
 
@@ -833,7 +971,7 @@ function renderSummary(){
   const dateTd=o=>multi?`<td class="num">${esc(fmtShort(o.date))}</td>`:'';
   const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים</div><div class="tbl-wrap"><table class="sum">
       <tr>${dateTh}<th>שעה</th><th>שם</th><th>לאן</th><th>טלפון</th><th>תשלום</th></tr>
-      ${list.map(o=>`<tr>${dateTd(o)}<td class="num">${esc(o.pickup?'—':(o.time||'—'))}</td><td>${esc(o.name)}</td><td>${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${payCell(o)}</td></tr>`).join('')}
+      ${list.map(o=>`<tr>${dateTd(o)}<td class="num">${esc(o.pickup?'—':(o.time||'—'))}</td><td>${esc(o.name)}<div class="hint">${statusPill(o)}</div></td><td>${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}${(!o.pickup&&o.address)?`<div class="hint">${esc(o.address)}</div>`:''}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${payCell(o)}</td></tr>`).join('')}
     </table></div></div>`:'';
 
   const extrasHtml=agg.extras.length?`<div class="card"><div class="sec-h">✨ אקסטרות</div><div class="tbl-wrap"><table class="sum">
@@ -856,6 +994,10 @@ function renderSummary(){
       <select data-bind="summaryDate">${dateOpts}</select></div>
     <button type="button" class="btn" data-act="print" style="align-self:flex-end">🖨️ הדפסה</button>
     <button type="button" class="btn" data-act="copyDay" style="align-self:flex-end">📋 העתקת הסיכום</button>
+  </div>
+  <div class="row no-print" style="margin:6px 0 0">
+    <button type="button" class="btn" data-act="printBons">🧾 הדפסת בונים לכל ההזמנות</button>
+    <button type="button" class="btn" data-act="labels">🏷️ מדבקות לשקיות</button>
   </div>
   <h2 style="margin:10px 0 0;font-size:1.15rem">🍲 סיכום הכנות — ${esc(title)}</h2>
   ${multi?`<p class="hint" style="margin:2px 2px 0">מתחת לכל מנה מופיע הפירוט לפי ימים — כמה לכל יום.</p>`:''}
@@ -994,6 +1136,7 @@ function render(){
   if(view.tab==='orders') renderOrders();
   else if(view.tab==='form') renderForm();
   else if(view.tab==='summary') renderSummary();
+  else if(view.tab==='labels') renderLabels();
   else renderBackup();
   window.scrollTo(0,0);
 }
@@ -1077,6 +1220,36 @@ document.addEventListener('click', e=>{
   }
   if(act==='print'){ window.print(); return; }
   if(act==='copyDay'){ copyText(buildDayText()); return; }
+  if(act==='bon'){
+    const o=store.orders.find(x=>x.id===btn.dataset.id);
+    if(o) printHtml(bonHtml(o));
+    return;
+  }
+  if(act==='printBons'){
+    const sc=summaryScope();
+    if(!sc.list.length){ toast('אין הזמנות להדפסה'); return; }
+    printHtml(sc.list.map(bonHtml).join(''));
+    return;
+  }
+  if(act==='labels'){ view.tab='labels'; render(); return; }
+  if(act==='labelsBack'){ view.tab='summary'; render(); return; }
+  if(act==='lbBump'){
+    const id=btn.dataset.id, dd=Number(btn.dataset.d);
+    const cur=view.labelCopies[id]===undefined?1:view.labelCopies[id];
+    const nv=Math.max(0,cur+dd);
+    view.labelCopies[id]=nv;
+    const cell=document.querySelector(`[data-lb="${id}"]`);
+    if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
+    const pv=$('#lbPreview');
+    if(pv) pv.innerHTML=labelsHtml(summaryScope().list);
+    return;
+  }
+  if(act==='printLabels'){
+    const html=labelsHtml(summaryScope().list);
+    if(html.includes('labels-grid')) printHtml(html);
+    else toast('אין מדבקות להדפסה — כל הכמויות על 0');
+    return;
+  }
   if(act==='exportFile'){ exportData(true); return; }
   if(act==='exportCopy'){ exportData(false); return; }
   if(act==='importApply'){ importApply(); return; }
@@ -1095,7 +1268,9 @@ function handleBind(e){
     case 'name': draft.name=v; break;
     case 'phone': draft.phone=v; break;
     case 'place': draft.place=v; break;
+    case 'address': draft.address=v; break;
     case 'time': draft.time=v; break;
+    case 'status': draft.status=v; break;
     case 'pickup': {
       draft.pickup=e.target.checked;
       const df=$('#deliveryFields'); if(df) df.hidden=draft.pickup;
