@@ -226,7 +226,7 @@ const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 const LS_KEY='batmelech-orders-v1';
 let store={orders:[]};
 let storageOK=true;
-let view={tab:'orders', summaryDate:null};
+let view={tab:'orders', summaryDate:null, search:''};
 let draft=null;
 
 function loadStore(){
@@ -257,6 +257,15 @@ function fmtDate(ds){
   const dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0');
   const yr=(d.getFullYear()!==new Date().getFullYear())?'.'+d.getFullYear():'';
   return `${wd} · ${dd}.${mm}${yr}`;
+}
+function fmtShort(ds){
+  const d=new Date(ds+'T00:00:00');
+  if(isNaN(d)) return ds;
+  return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+}
+function addDays(ds,n){
+  const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function uid(){ return 'o'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function copyText(t){
@@ -431,15 +440,8 @@ function orderCard(o){
     <div class="order-text" data-text-for="${o.id}" hidden>${esc(buildOrderText(o))}</div>
   </div>`;
 }
-function renderOrders(){
-  const t=todayStr();
-  const upcoming={}, past={};
-  for(const o of sortOrders(store.orders)){
-    const key=o.date||'ללא תאריך';
-    const bucket=(o.date && o.date<t)?past:upcoming;
-    (bucket[key]=bucket[key]||[]).push(o);
-  }
-  const groupHtml=(dates,obj)=>dates.map(dk=>{
+function groupHtml(dates,obj){
+  return dates.map(dk=>{
     const list=obj[dk];
     const tot=list.reduce((s,o)=>s+parseMoney(o.total),0);
     return `<section>
@@ -452,19 +454,58 @@ function renderOrders(){
       ${list.map(orderCard).join('')}
     </section>`;
   }).join('');
-  const upDates=Object.keys(upcoming).sort();
-  const pastDates=Object.keys(past).sort().reverse();
+}
+function matchOrder(o,q){
+  const hay=(o.name+' '+o.phone+' '+(o.place||'')+' '+(o.notes||'')+' '+buildOrderText(o)).toLowerCase();
+  return q.toLowerCase().trim().split(/\s+/).every(w=>hay.includes(w));
+}
+function renderOrders(){
   let html='';
   if(!storageOK) html+=`<div class="storage-warn">⚠️ שמירה אוטומטית לא זמינה בדפדפן הזה — הנתונים עלולים להימחק בסגירת החלון. מומלץ לייצא גיבוי מלשונית «גיבוי» בסוף כל שימוש.</div>`;
-  if(!store.orders.length){
-    html+=`<div class="empty"><div class="big">🕯️</div><p>עדיין אין הזמנות.<br>לוחצים על «➕ הזמנה חדשה» ומתחילים.</p></div>`;
-  } else {
-    html+=upDates.length?groupHtml(upDates,upcoming):`<div class="empty"><p>אין הזמנות קרובות.</p></div>`;
-    if(pastDates.length){
-      html+=`<details class="past"><summary>הזמנות שעברו (${pastDates.reduce((s,d)=>s+past[d].length,0)})</summary>${groupHtml(pastDates,past)}</details>`;
-    }
+  if(store.orders.length){
+    html+=`<div class="row no-print" style="margin:14px 0 0">
+      <input id="searchIn" type="search" style="flex:1" data-bind="search" value="${esc(view.search)}"
+        placeholder="🔍 חיפוש: שם, מלון, טלפון, סלט, כל דבר...">
+      <button type="button" class="btn sm" data-act="clearSearch">✕</button>
+    </div>`;
   }
+  html+=`<div id="ordersList"></div>`;
   $('#view').innerHTML=html;
+  renderOrdersList();
+}
+function renderOrdersList(){
+  const box=$('#ordersList'); if(!box) return;
+  if(!store.orders.length){
+    box.innerHTML=`<div class="empty"><div class="big">🕯️</div><p>עדיין אין הזמנות.<br>לוחצים על «➕ הזמנה חדשה» ומתחילים.</p></div>`;
+    return;
+  }
+  const q=view.search.trim();
+  if(q){
+    const found=sortOrders(store.orders).filter(o=>matchOrder(o,q));
+    if(!found.length){
+      box.innerHTML=`<div class="empty"><div class="big">🔍</div><p>לא נמצאו הזמנות שמתאימות ל־«${esc(q)}»</p></div>`;
+      return;
+    }
+    const groups={};
+    for(const o of found){ const k=o.date||'ללא תאריך'; (groups[k]=groups[k]||[]).push(o); }
+    box.innerHTML=`<p class="hint" style="margin:10px 2px 0">נמצאו ${found.length} הזמנות (כולל הזמנות שעברו)</p>`
+      + groupHtml(Object.keys(groups).sort(),groups);
+    return;
+  }
+  const t=todayStr();
+  const upcoming={}, past={};
+  for(const o of sortOrders(store.orders)){
+    const key=o.date||'ללא תאריך';
+    const bucket=(o.date && o.date<t)?past:upcoming;
+    (bucket[key]=bucket[key]||[]).push(o);
+  }
+  const upDates=Object.keys(upcoming).sort();
+  const pastDates=Object.keys(past).sort().reverse();
+  let html=upDates.length?groupHtml(upDates,upcoming):`<div class="empty"><p>אין הזמנות קרובות.</p></div>`;
+  if(pastDates.length){
+    html+=`<details class="past"><summary>הזמנות שעברו (${pastDates.reduce((s,d)=>s+past[d].length,0)})</summary>${groupHtml(pastDates,past)}</details>`;
+  }
+  box.innerHTML=html;
 }
 
 /* ================= render: form ================= */
@@ -699,118 +740,178 @@ function aggregate(list){
     for(const [n,q] of Object.entries(o.sides)) agg.sides[n]=(agg.sides[n]||0)+q;
     for(const [n,q] of Object.entries(o.desserts)) agg.desserts[n]=(agg.desserts[n]||0)+q;
     for(const [n,e] of Object.entries(o.extras)){
-      if(e.q>0) agg.extras.push({who:o.name, what:n, q:e.q, note:e.note});
+      if(e.q>0) agg.extras.push({who:o.name, what:n, q:e.q, note:e.note, date:o.date});
     }
-    for(const c of o.custom){ if(c.name&&(Number(c.qty)||0)>0) agg.extras.push({who:o.name, what:c.name, q:Number(c.qty)||0, note:c.price?`${parseMoney(c.price)}$`:''}); }
-    if(o.heat||o.firstsNote) agg.heatNotes.push({who:o.name, txt:[o.heat,o.firstsNote].filter(Boolean).join(' · ')});
-    if(o.mainsNote) agg.generalNotes.push({who:o.name, txt:'עיקרית: '+o.mainsNote});
-    if(o.notes) agg.generalNotes.push({who:o.name, txt:o.notes});
+    for(const c of o.custom){ if(c.name&&(Number(c.qty)||0)>0) agg.extras.push({who:o.name, what:c.name, q:Number(c.qty)||0, note:c.price?`${parseMoney(c.price)}$`:'', date:o.date}); }
+    if(o.heat||o.firstsNote) agg.heatNotes.push({who:o.name, txt:[o.heat,o.firstsNote].filter(Boolean).join(' · '), date:o.date});
+    if(o.mainsNote) agg.generalNotes.push({who:o.name, txt:'עיקרית: '+o.mainsNote, date:o.date});
+    if(o.notes) agg.generalNotes.push({who:o.name, txt:o.notes, date:o.date});
     const tot=parseMoney(o.total), dep=parseMoney(o.deposit);
     agg.revenue+=tot; agg.deposits+=dep;
     if(o.paid!=='כן'&&o.paid!=='שת"פ') agg.owed+=Math.max(0,tot-dep);
   }
   return agg;
 }
+function breakdowns(list){
+  const bd={salads:{},firsts:{},mains:{},sides:{},desserts:{},challot:{}};
+  const add=(cat,n,dt,q)=>{ const m=bd[cat][n]=bd[cat][n]||{}; m[dt]=(m[dt]||0)+q; };
+  for(const o of list){
+    const dt=o.date;
+    for(const [n,s] of Object.entries(o.salads)) add('salads',n,dt,(s.o||0)+(s.p||0));
+    for(const [n,q] of Object.entries(o.firsts)) add('firsts',n,dt,q);
+    for(const [n,q] of Object.entries(o.mains)) add('mains',n,dt,q);
+    for(const [n,q] of Object.entries(o.sides)) add('sides',n,dt,q);
+    for(const [n,q] of Object.entries(o.desserts)) add('desserts',n,dt,q);
+    if(o.challot>0) bd.challot[dt]=(bd.challot[dt]||0)+o.challot;
+  }
+  return bd;
+}
+function bdLine(bdMap,n){
+  if(!bdMap||!bdMap[n]) return '';
+  const parts=Object.entries(bdMap[n]).sort().map(([dt,q])=>`${fmtShort(dt)}: ${q}`);
+  return `<div class="hint">${esc(parts.join(' · '))}</div>`;
+}
 function sumTable(title, obj, opts){
+  opts=opts||{};
   const rows=Object.entries(obj).filter(([,v])=>(typeof v==='object'?(v.o||v.p):v)>0);
   if(!rows.length) return '';
-  if(opts&&opts.pinukCols){
+  const bd=opts.bd||null;
+  if(opts.pinukCols){
     return `<div class="card"><div class="sec-h">${title}</div><div class="tbl-wrap"><table class="sum">
       <tr><th>סלט</th><th class="num">הוזמן</th><th class="num">🎁 פינוק</th><th class="num">סה"כ</th></tr>
-      ${rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v.o||''}</td><td class="num gold">${v.p||''}</td><td class="num">${(v.o||0)+(v.p||0)}</td></tr>`).join('')}
+      ${rows.map(([n,v])=>`<tr><td>${esc(n)}${bdLine(bd,n)}</td><td class="num">${v.o||''}</td><td class="num gold">${v.p||''}</td><td class="num">${(v.o||0)+(v.p||0)}</td></tr>`).join('')}
       <tr><td><b>סה"כ סלטים</b></td><td class="num"><b>${rows.reduce((s,[,v])=>s+(v.o||0),0)}</b></td><td class="num gold"><b>${rows.reduce((s,[,v])=>s+(v.p||0),0)}</b></td><td class="num"><b>${rows.reduce((s,[,v])=>s+(v.o||0)+(v.p||0),0)}</b></td></tr>
     </table></div></div>`;
   }
   return `<div class="card"><div class="sec-h">${title}</div><div class="tbl-wrap"><table class="sum">
     <tr><th>מנה</th><th class="num">כמות</th></tr>
-    ${rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v}</td></tr>`).join('')}
+    ${rows.map(([n,v])=>`<tr><td>${esc(n)}${bdLine(bd,n)}</td><td class="num">${v}</td></tr>`).join('')}
   </table></div></div>`;
 }
-function renderSummary(){
+function summaryScope(){
   const dates=[...new Set(store.orders.map(o=>o.date).filter(Boolean))].sort();
-  if(!dates.length){
-    $('#view').innerHTML=`<div class="empty"><div class="big">🍲</div><p>אין עדיין הזמנות עם תאריך.<br>ברגע שיהיו — כאן יופיע סיכום ההכנות המלא לכל יום.</p></div>`;
+  const t=todayStr();
+  let sel=view.summaryDate;
+  if(!sel||(sel!=='next7'&&sel!=='upcoming'&&!dates.includes(sel))){
+    const hasNext7=store.orders.some(o=>o.date&&o.date>=t&&o.date<=addDays(t,7));
+    sel=view.summaryDate=hasNext7?'next7':(dates.find(d=>d>=t)||dates[dates.length-1]);
+  }
+  let list,title;
+  if(sel==='upcoming'){
+    list=store.orders.filter(o=>o.date&&o.date>=t);
+    title='כל ההזמנות הקרובות';
+  } else if(sel==='next7'){
+    const end=addDays(t,7);
+    list=store.orders.filter(o=>o.date&&o.date>=t&&o.date<=end);
+    title=`השבוע הקרוב (${fmtShort(t)}–${fmtShort(end)})`;
+  } else {
+    list=store.orders.filter(o=>o.date===sel);
+    title=fmtDate(sel);
+  }
+  list=sortOrders(list);
+  const scopeDates=[...new Set(list.map(o=>o.date))].sort();
+  return {sel, dates, list, title, multi:scopeDates.length>1, scopeDates};
+}
+function renderSummary(){
+  const sc=summaryScope();
+  if(!sc.dates.length){
+    $('#view').innerHTML=`<div class="empty"><div class="big">🍲</div><p>אין עדיין הזמנות עם תאריך.<br>ברגע שיהיו — כאן יופיע סיכום ההכנות המלא.</p></div>`;
     return;
   }
+  const {sel,list,title,multi}=sc;
   const t=todayStr();
-  if(!view.summaryDate||!dates.includes(view.summaryDate)){
-    view.summaryDate=dates.find(d=>d>=t)||dates[dates.length-1];
-  }
-  const sel=view.summaryDate;
-  const list=sortOrders(store.orders.filter(o=>o.date===sel));
   const agg=aggregate(list);
-  const dateOpts=dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d).length})</option>`).join('');
+  const bd=multi?breakdowns(list):null;
+  const countIn=(from,to)=>store.orders.filter(o=>o.date&&o.date>=from&&(!to||o.date<=to)).length;
+  const dateOpts=
+    `<option value="next7"${sel==='next7'?' selected':''}>📅 השבוע הקרוב (${countIn(t,addDays(t,7))})</option>`+
+    `<option value="upcoming"${sel==='upcoming'?' selected':''}>🔜 כל ההזמנות הקרובות (${countIn(t,null)})</option>`+
+    sc.dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d).length})</option>`).join('');
 
-  const deliveries=list.filter(o=>!o.pickup);
-  const pickups=list.filter(o=>o.pickup);
+  const payCell=o=>esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid));
+  const dateTh=multi?'<th>יום</th>':'';
+  const dateTd=o=>multi?`<td class="num">${esc(fmtShort(o.date))}</td>`:'';
   const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים</div><div class="tbl-wrap"><table class="sum">
-      <tr><th>שעה</th><th>שם</th><th>לאן</th><th>טלפון</th><th>תשלום</th></tr>
-      ${deliveries.map(o=>`<tr><td class="num">${esc(o.time||'—')}</td><td>${esc(o.name)}</td><td>${esc(o.place||'—')}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid))}</td></tr>`).join('')}
-      ${pickups.map(o=>`<tr><td class="num">—</td><td>${esc(o.name)}</td><td>איסוף עצמי</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid))}</td></tr>`).join('')}
+      <tr>${dateTh}<th>שעה</th><th>שם</th><th>לאן</th><th>טלפון</th><th>תשלום</th></tr>
+      ${list.map(o=>`<tr>${dateTd(o)}<td class="num">${esc(o.pickup?'—':(o.time||'—'))}</td><td>${esc(o.name)}</td><td>${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${payCell(o)}</td></tr>`).join('')}
     </table></div></div>`:'';
 
   const extrasHtml=agg.extras.length?`<div class="card"><div class="sec-h">✨ אקסטרות</div><div class="tbl-wrap"><table class="sum">
-      <tr><th>מה</th><th class="num">כמות</th><th>למי</th><th>הערה</th></tr>
-      ${agg.extras.map(e=>`<tr><td>${esc(e.what)}</td><td class="num">${e.q}</td><td>${esc(e.who)}</td><td>${esc(e.note||'')}</td></tr>`).join('')}
+      <tr><th>מה</th><th class="num">כמות</th><th>למי</th>${multi?'<th>יום</th>':''}<th>הערה</th></tr>
+      ${agg.extras.map(e=>`<tr><td>${esc(e.what)}</td><td class="num">${e.q}</td><td>${esc(e.who)}</td>${multi?`<td class="num">${esc(fmtShort(e.date))}</td>`:''}<td>${esc(e.note||'')}</td></tr>`).join('')}
     </table></div></div>`:'';
 
+  const noteWho=n=>`<b>${esc(n.who)}</b>${multi?` (${esc(fmtShort(n.date))})`:''}`;
   const notesHtml=(agg.heatNotes.length||agg.generalNotes.length)?`<div class="card"><div class="sec-h">📌 הערות חשובות</div>
-      ${agg.heatNotes.map(n=>`<div class="item-row"><span class="item-name"><b>${esc(n.who)}</b> — חריפות: ${esc(n.txt)}</span></div>`).join('')}
-      ${agg.generalNotes.map(n=>`<div class="item-row"><span class="item-name"><b>${esc(n.who)}</b> — ${esc(n.txt)}</span></div>`).join('')}
+      ${agg.heatNotes.map(n=>`<div class="item-row"><span class="item-name">${noteWho(n)} — חריפות: ${esc(n.txt)}</span></div>`).join('')}
+      ${agg.generalNotes.map(n=>`<div class="item-row"><span class="item-name">${noteWho(n)} — ${esc(n.txt)}</span></div>`).join('')}
     </div>`:'';
+
+  const challotBd=(multi&&Object.keys(breakdowns(list).challot).length>1)
+    ?`<p class="hint" style="margin:0 2px 8px">חלות לפי יום: ${esc(Object.entries(breakdowns(list).challot).sort().map(([d,q])=>`${fmtShort(d)}: ${q}`).join(' · '))}</p>`:'';
 
   $('#view').innerHTML=`
   <div class="row no-print" style="margin:16px 0 4px">
-    <div class="field" style="flex:1;margin:0"><label>סיכום הכנות ליום</label>
+    <div class="field" style="flex:1;margin:0"><label>מה מכינים? (יום אחד או תקופה)</label>
       <select data-bind="summaryDate">${dateOpts}</select></div>
     <button type="button" class="btn" data-act="print" style="align-self:flex-end">🖨️ הדפסה</button>
     <button type="button" class="btn" data-act="copyDay" style="align-self:flex-end">📋 העתקת הסיכום</button>
   </div>
-  <h2 style="margin:10px 0 0;font-size:1.15rem">🍲 סיכום הכנות — ${esc(fmtDate(sel))}</h2>
+  <h2 style="margin:10px 0 0;font-size:1.15rem">🍲 סיכום הכנות — ${esc(title)}</h2>
+  ${multi?`<p class="hint" style="margin:2px 2px 0">מתחת לכל מנה מופיע הפירוט לפי ימים — כמה לכל יום.</p>`:''}
   <div class="stats">
     <div class="stat"><div class="n">${agg.orders}</div><div class="l">הזמנות</div></div>
+    ${multi?`<div class="stat"><div class="n">${sc.scopeDates.length}</div><div class="l">ימי אספקה</div></div>`:''}
     <div class="stat"><div class="n">${agg.meals}</div><div class="l">ארוחות זוגיות</div></div>
     <div class="stat"><div class="n">${agg.challot}</div><div class="l">חלות</div></div>
     <div class="stat"><div class="n">${agg.aricha||'—'}</div><div class="l">עריכה (איש)</div></div>
     <div class="stat"><div class="n">${money(agg.revenue)}</div><div class="l">סה"כ הכנסות</div></div>
     <div class="stat"><div class="n">${money(agg.owed)}</div><div class="l">נשאר לגבות</div></div>
   </div>
-  ${sumTable('🥗 סלטים להכנה', agg.salads, {pinukCols:true})}
-  ${sumTable('🐟 מנות ראשונות', agg.firsts)}
-  ${sumTable('🍖 עיקריות', agg.mains)}
-  ${sumTable('🍚 תוספות', agg.sides)}
-  ${sumTable('🍫 קינוחים', agg.desserts)}
+  ${challotBd}
+  ${list.length?'':'<div class="empty"><p>אין הזמנות בתקופה הזאת.</p></div>'}
+  ${sumTable('🥗 סלטים להכנה', agg.salads, {pinukCols:true, bd:bd&&bd.salads})}
+  ${sumTable('🐟 מנות ראשונות', agg.firsts, {bd:bd&&bd.firsts})}
+  ${sumTable('🍖 עיקריות', agg.mains, {bd:bd&&bd.mains})}
+  ${sumTable('🍚 תוספות', agg.sides, {bd:bd&&bd.sides})}
+  ${sumTable('🍫 קינוחים', agg.desserts, {bd:bd&&bd.desserts})}
   ${extrasHtml}
   ${notesHtml}
   ${delivHtml}
-  <div class="card">
+  ${list.length?`<div class="card">
     <div class="sec-h">📄 כרטיסי הזמנה (${list.length})</div>
     <p class="hint no-print">כמו הכרטיסיות בקובץ הוורד — להדפסה או העתקה.</p>
     ${list.map(o=>`<div class="order-text" style="margin-bottom:10px">${esc(buildOrderText(o))}</div>`).join('')}
-  </div>`;
+  </div>`:''}`;
 }
-function buildDayText(sel){
-  const list=sortOrders(store.orders.filter(o=>o.date===sel));
+function buildDayText(){
+  const sc=summaryScope();
+  const {list,title,multi}=sc;
   const agg=aggregate(list);
-  const L=[`🍲 סיכום הכנות — ${fmtDate(sel)}`,
+  const bd=multi?breakdowns(list):null;
+  const bdTxt=(cat,n)=>{
+    if(!bd||!bd[cat][n]) return '';
+    return ' ('+Object.entries(bd[cat][n]).sort().map(([d,q])=>`${fmtShort(d)}: ${q}`).join(', ')+')';
+  };
+  const L=[`🍲 סיכום הכנות — ${title}`,
     `${agg.orders} הזמנות · ${agg.meals} ארוחות זוגיות · ${agg.challot} חלות${agg.aricha?` · עריכה ל־${agg.aricha} איש`:''}`,''];
   const sal=Object.entries(agg.salads).filter(([,v])=>v.o+v.p>0);
   if(sal.length){
     L.push('🥗 סלטים:');
-    for(const [n,v] of sal) L.push(`  • ${n}: ${(v.o||0)+(v.p||0)}${v.p?` (מתוכם ${v.p} פינוק 🎁)`:''}`);
+    for(const [n,v] of sal) L.push(`  • ${n}: ${(v.o||0)+(v.p||0)}${v.p?` (מתוכם ${v.p} פינוק 🎁)`:''}${bdTxt('salads',n)}`);
     L.push('');
   }
-  const block=(title,obj)=>{
+  const block=(bTitle,obj,cat)=>{
     const rows=Object.entries(obj).filter(([,v])=>v>0);
     if(!rows.length) return;
-    L.push(title);
-    for(const [n,q] of rows) L.push(`  • ${n}: ${q}`);
+    L.push(bTitle);
+    for(const [n,q] of rows) L.push(`  • ${n}: ${q}${bdTxt(cat,n)}`);
     L.push('');
   };
-  block('🐟 ראשונות:',agg.firsts);
-  block('🍖 עיקריות:',agg.mains);
-  block('🍚 תוספות:',agg.sides);
-  block('🍫 קינוחים:',agg.desserts);
+  block('🐟 ראשונות:',agg.firsts,'firsts');
+  block('🍖 עיקריות:',agg.mains,'mains');
+  block('🍚 תוספות:',agg.sides,'sides');
+  block('🍫 קינוחים:',agg.desserts,'desserts');
   if(agg.extras.length){
     L.push('✨ אקסטרות:');
     for(const e of agg.extras) L.push(`  • ${e.what} ×${e.q} (${e.who})${e.note?` — ${e.note}`:''}`);
@@ -823,7 +924,7 @@ function buildDayText(sel){
     L.push('');
   }
   L.push('🚚 משלוחים:');
-  for(const o of list) L.push(`  • ${o.time&&!o.pickup?o.time+' — ':''}${o.name} — ${o.pickup?'איסוף עצמי':(o.place||'—')}${o.phone?' — '+o.phone:''}`);
+  for(const o of list) L.push(`  • ${multi?fmtShort(o.date)+' — ':''}${o.time&&!o.pickup?o.time+' — ':''}${o.name} — ${o.pickup?'איסוף עצמי':(o.place||'—')}${o.phone?' — '+o.phone:''}`);
   L.push('');
   L.push(`💰 סה"כ: ${money(agg.revenue)} · נשאר לגבות: ${money(agg.owed)}`);
   return L.join('\n');
@@ -969,8 +1070,13 @@ document.addEventListener('click', e=>{
     return;
   }
   if(act==='daySummary'){ view.tab='summary'; view.summaryDate=btn.dataset.date; render(); return; }
+  if(act==='clearSearch'){
+    view.search='';
+    const si=$('#searchIn'); if(si){ si.value=''; si.focus(); }
+    renderOrdersList(); return;
+  }
   if(act==='print'){ window.print(); return; }
-  if(act==='copyDay'){ copyText(buildDayText(view.summaryDate)); return; }
+  if(act==='copyDay'){ copyText(buildDayText()); return; }
   if(act==='exportFile'){ exportData(true); return; }
   if(act==='exportCopy'){ exportData(false); return; }
   if(act==='importApply'){ importApply(); return; }
@@ -980,6 +1086,7 @@ function handleBind(e){
   const b=e.target.dataset.bind;
   if(!b) return;
   if(b==='summaryDate'){ view.summaryDate=e.target.value; renderSummary(); return; }
+  if(b==='search'){ view.search=e.target.value; renderOrdersList(); return; }
   if(!draft) return;
   const v=e.target.value;
   const i=Number(e.target.dataset.i);
