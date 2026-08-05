@@ -1,0 +1,316 @@
+<title>מטעמי בת מלך · טופס הזמנה</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#FDEFF0;color:#4a2c2a;
+  font-family:"Segoe UI","Noto Sans Hebrew","Arial Hebrew",Tahoma,Arial,sans-serif;
+  font-size:16px;line-height:1.55;
+}
+#page{direction:rtl;max-width:640px;margin:0 auto;padding:0 14px 120px}
+.head{
+  text-align:center;padding:26px 10px 14px;
+  border-bottom:3px dotted #EFB9C4;margin-bottom:6px;position:relative;
+}
+.head .bsd{position:absolute;top:8px;left:10px;font-size:.7rem;color:#a3838a}
+.head h1{margin:0;font-size:1.9rem;font-weight:800;color:#5a3033;letter-spacing:.02em}
+.head .sub{color:#a56a75;font-size:.9rem;font-weight:600}
+.head .kosher{display:inline-block;background:#F7DFE4;color:#B0446B;border-radius:999px;padding:2px 14px;font-size:.8rem;font-weight:800;margin-top:6px}
+h2.sec{
+  display:flex;align-items:center;gap:8px;font-size:1.02rem;font-weight:800;
+  color:#B0446B;margin:22px 0 8px;
+}
+h2.sec .badge{background:#F7DFE4;color:#B0446B;border-radius:999px;padding:1px 10px;font-size:.8rem;font-weight:700}
+.hint{color:#a3838a;font-size:.85rem}
+.card{background:#fff;border:1.5px solid #F2CDD6;border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(90,48,51,.06)}
+.field{margin:10px 0}
+.field>label{display:block;font-size:.82rem;font-weight:700;color:#a56a75;margin-bottom:4px}
+input,select,textarea{
+  font:inherit;color:#4a2c2a;background:#fff;border:1.5px solid #F2CDD6;border-radius:10px;
+  padding:9px 12px;width:100%;
+}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid #B0446B;outline-offset:1px}
+textarea{min-height:66px;resize:vertical}
+::placeholder{color:#c4a3ab}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.item-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed #F2CDD6;flex-wrap:wrap}
+.item-row:last-child{border-bottom:none}
+.item-name{flex:1 1 170px;min-width:140px}
+.item-price{color:#a56a75;font-size:.85rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stepper{display:inline-flex;align-items:center;gap:2px;background:#FDF3F5;border:1.5px solid #F2CDD6;border-radius:999px;padding:2px}
+.st-btn{width:34px;height:34px;border:none;background:none;border-radius:999px;font-size:1.15rem;line-height:1;color:#a56a75;font-weight:700;cursor:pointer;font-family:inherit}
+.st-btn:hover{background:#F7DFE4;color:#B0446B}
+.st-qty{min-width:26px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:#c4a3ab}
+.st-qty.has{color:#B0446B}
+.note-in{margin:4px 0 2px;font-size:.9rem}
+.note-in.hidden{display:none}
+.btn{border:1.5px solid #F2CDD6;background:#fff;border-radius:12px;padding:10px 18px;font-weight:800;cursor:pointer;font-family:inherit;font-size:1rem;color:#4a2c2a}
+.btn:hover{border-color:#B0446B;color:#B0446B}
+.btn.primary{background:#B0446B;border-color:#B0446B;color:#fff}
+.btn.primary:hover{filter:brightness(1.07);color:#fff}
+.sendbar{
+  position:fixed;bottom:0;right:0;left:0;background:#fff;border-top:2px solid #F2CDD6;
+  padding:10px 14px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;direction:rtl;z-index:9;
+}
+.sendbar .total{font-weight:800;font-size:1.05rem;color:#B0446B;font-variant-numeric:tabular-nums}
+.sendbar a{text-decoration:none;display:inline-block}
+#copyMsg{display:none}
+.foot{text-align:center;color:#a56a75;font-size:.85rem;margin-top:26px}
+</style>
+
+<div id="page" lang="he">
+  <header class="head">
+    <div class="bsd">בס"ד</div>
+    <h1>✿ מטעמי בת מלך ✿</h1>
+    <div class="sub">מטבח ביתי אותנטי · שבת קודש</div>
+    <div class="kosher">כשר</div>
+  </header>
+  <p class="hint" style="text-align:center">
+    ממלאים את ההזמנה, לוחצים על «שליחה בוואטסאפ» למטה — ואנחנו כבר מאשרים לך הכול חזרה 🌸
+  </p>
+
+  <h2 class="sec">🗓️ פרטי ההזמנה</h2>
+  <div class="card">
+    <div class="grid2">
+      <div class="field"><label>לאיזה תאריך? (שישי)</label><input type="date" data-bind="date"></div>
+      <div class="field"><label>ארוחות זוגיות (230$ לארוחה)</label><span id="mealsStep"></span></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>שם מלא</label><input data-bind="name" placeholder="השם שלך"></div>
+      <div class="field"><label>מס' טלפון</label><input inputmode="tel" data-bind="phone" placeholder="050-0000000"></div>
+    </div>
+    <label class="row" style="margin:6px 0;gap:8px;cursor:pointer">
+      <input type="checkbox" style="width:auto" data-bind="pickup"> איסוף עצמי
+    </label>
+    <div id="deliveryFields">
+      <div class="grid2">
+        <div class="field"><label>לאיזה מלון / אזור?</label><input data-bind="place" placeholder="שם המלון"></div>
+        <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" placeholder="לדוגמה: 16:30"></div>
+      </div>
+      <div class="field"><label>כתובת מדויקת / הוראות (לא חובה)</label><input data-bind="address" placeholder="מגדל, קומה, למסור בקבלה..."></div>
+    </div>
+  </div>
+
+  <h2 class="sec">🥗 סלטים <span class="badge" id="saladBadge"></span></h2>
+  <p class="hint">בכל ארוחה זוגית כלולים 4 סלטים לבחירה. אפשר להוסיף מעבר (תוספת 4 סלטים — 25$).</p>
+  <div class="card" id="saladList"></div>
+
+  <h2 class="sec">🐟 מנה ראשונה <span class="badge" id="fishBadge"></span></h2>
+  <p class="hint">בכל ארוחה זוגית כלולים 2 דגים — אפשר לפצל (למשל 1 מרוקאי + 1 חריימה).</p>
+  <div class="card" id="firstList"></div>
+  <div class="card" style="margin-top:10px">
+    <div class="field"><label>חריפות</label><select data-bind="heat">
+      <option value="">— בחרו רמת חריפות —</option>
+      <option>לא חריף</option><option>חריף</option><option>מעורב — חלק חריף וחלק לא</option>
+    </select></div>
+  </div>
+
+  <h2 class="sec">🍖 עיקרית</h2>
+  <p class="hint">בכל ארוחה זוגית כלולה עיקרית אחת לבחירה.</p>
+  <div class="card" id="mainList"></div>
+
+  <h2 class="sec">🍚 תוספת</h2>
+  <div class="card" id="sideList"></div>
+
+  <h2 class="sec">🍫 סיום מתוק</h2>
+  <div class="card" id="dessertList"></div>
+
+  <h2 class="sec">✨ משדרגים את השולחן</h2>
+  <div class="card" id="extraList"></div>
+
+  <h2 class="sec">🥖 חלות</h2>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span>כמה חלות? <span class="hint">(זוג חלות ביתיות כלול בכל ארוחה זוגית, חלה נוספת 10$)</span></span>
+      <span id="challotStep"></span>
+    </div>
+  </div>
+
+  <h2 class="sec">📝 הערות</h2>
+  <div class="card">
+    <textarea data-bind="notes" placeholder="אלרגיות, בקשות מיוחדות, כל דבר שחשוב שנדע..."></textarea>
+  </div>
+
+  <div class="foot">
+    מלאי ההזמנות מוגבל — למהרים מראש 🌸<br>
+    להזמנות ופרטים נוספים: 586288776 971+
+  </div>
+</div>
+
+<div class="sendbar">
+  <span class="total" id="totalEst">משוער: 0$</span>
+  <a id="waSend" class="btn primary" target="_blank" rel="noopener" href="#">💬 שליחת ההזמנה בוואטסאפ</a>
+  <button type="button" class="btn" id="copyBtn">📋 העתקה</button>
+  <span id="copyMsg" class="hint">הועתק ✓</span>
+</div>
+
+<script>
+'use strict';
+const WA_NUMBER='971586288776';
+const COUPLE_PRICE=230, CHALLAH_PRICE=10;
+const SALADS=['כרוב לבן קלאסי','כרוב סגול במיונז','קולסלאו','מטבוחה פיקנטית',"צ'ירשי טריפוליטאי",'משוויה מרוקאית','מסייר (חמוצים)','טחינה','סלק מבושל','גזר מרוקאי מבושל','חציל במיונז','חציל מטוגן','פלפלים קלויים','עגבניות שרי חריפות','פלפל חריף צלוי','סלט ביצים','סלט תפו"א'];
+const FIRSTS=['פילה דג ברוטב מרוקאי','פילה דג ברוטב חריימה','קציצות דגים ברוטב מרוקאי'];
+const MAINS=['קציצות בשר ברוטב אדום עשיר','קציצות בשר עם אפונה וארטישוק','קציצות בשר בריבת בצל וערמונים','טבחה עוף אדומה עם שעועית','תבשיל עוף מרוקאי עם חומוסים','טבחה עוף צהובה עם תפו"א','מגש שניצלים — במקום עיקרית','רולדת בשר — במקום עיקרית'];
+const SIDES=['אורז לבן','אורז מתובל / פרסי עם עשבי תיבול','קוסקוס עננים','פסטה נקיה','פסטה אדומה','מגש תפו"א'];
+const DESSERTS=['סופלה שוקולד','סוכריות בקלוואה'];
+const EXTRAS=[
+  {name:'תוספת 4 סלטים לבחירה', price:25},
+  {name:'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)', price:150},
+  {name:'מפרום ביתי של אמא (זוגי)', price:40},
+  {name:'טבחה בשר אדומה עם אפונה ותפו"א (ל־2־3 אנשים)', price:100},
+  {name:'רולדת בשר פריך ברוטב פטריות עשיר', price:100},
+  {name:'מגש שניצלים (זוגי, כ־13–15 יח\')', price:100},
+  {name:'מגש תפו"א קריספיים', price:30},
+  {name:'מגש אורז / קוסקוס / פסטה אדומה', price:25},
+  {name:'צלחת פתיחה (זיתים וחמוצים)', price:15},
+  {name:'צלחת חריפים', price:15},
+  {name:'תוספת חומוס ישראלי לניגוב', price:15},
+  {name:'מארז הבדלה', price:20},
+  {name:'סיר קובה סלק בתוספת אורז (ל־4 אנשים)', price:125},
+  {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
+  {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
+  {name:'משלוח', price:15}
+];
+const o={date:'',name:'',phone:'',place:'',address:'',time:'',pickup:false,
+  meals:1,challot:2,salads:{},firsts:{},heat:'',mains:{},sides:{},desserts:{},extras:{},notes:''};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function stepper(group,i,val){
+  return `<span class="stepper">
+    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}" data-d="-1" aria-label="פחות">−</button>
+    <span class="st-qty${val>0?' has':''}" data-cell="${group}|${i}">${val||0}</span>
+    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}" data-d="1" aria-label="עוד">+</button>
+  </span>`;
+}
+function rowList(el,group,arr){
+  $(el).innerHTML=arr.map((name,i)=>`<div class="item-row"><span class="item-name">${esc(name)}</span>${stepper(group,i,0)}</div>`).join('');
+}
+rowList('#saladList','salads',SALADS);
+rowList('#firstList','firsts',FIRSTS);
+rowList('#mainList','mains',MAINS);
+rowList('#sideList','sides',SIDES);
+rowList('#dessertList','desserts',DESSERTS);
+$('#extraList').innerHTML=EXTRAS.map((ex,i)=>`<div class="item-row" style="display:block">
+  <div class="row" style="justify-content:space-between">
+    <span class="item-name">${esc(ex.name)} <span class="item-price">${ex.price}$</span></span>
+    ${stepper('extras',i)}
+  </div>
+  <input class="note-in hidden" data-note-cell="extras|${i}" data-i="${i}" placeholder="הערה (מה בפנים, מה בצד...)">
+</div>`).join('');
+$('#mealsStep').innerHTML=stepper('meals',0,1);
+$('#challotStep').innerHTML=stepper('challot',0,2);
+
+function groupArr(g){ return {salads:SALADS,firsts:FIRSTS,mains:MAINS,sides:SIDES,desserts:DESSERTS}[g]; }
+function bump(g,i,d){
+  if(g==='meals'||g==='challot'){ o[g]=Math.max(0,o[g]+d); return o[g]; }
+  if(g==='extras'){
+    const name=EXTRAS[i].name;
+    const e=o.extras[name]||(o.extras[name]={q:0,note:''});
+    e.q=Math.max(0,e.q+d);
+    if(!e.q&&!e.note) delete o.extras[name];
+    return e.q;
+  }
+  const name=groupArr(g)[i];
+  const nv=Math.max(0,(o[g][name]||0)+d);
+  if(nv===0) delete o[g][name]; else o[g][name]=nv;
+  return nv;
+}
+function estTotal(){
+  let t=o.meals*COUPLE_PRICE;
+  for(const ex of EXTRAS){ const e=o.extras[ex.name]; if(e&&e.q) t+=e.q*ex.price; }
+  const extraCh=Math.max(0,o.challot-2*o.meals);
+  if(o.meals>0) t+=extraCh*CHALLAH_PRICE;
+  return t;
+}
+function fmtDateHe(ds){
+  if(!ds) return '';
+  const d=new Date(ds+'T00:00:00');
+  if(isNaN(d)) return ds;
+  const wd=new Intl.DateTimeFormat('he-IL',{weekday:'long'}).format(d);
+  return `${wd} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function buildText(){
+  const L=['היי! אשמח להזמין 🌸'];
+  if(o.date) L.push(`תאריך: ${fmtDateHe(o.date)}`);
+  if(o.name) L.push(`שם: ${o.name}`);
+  if(o.phone) L.push(`טלפון: ${o.phone}`);
+  L.push(o.pickup?'איסוף עצמי':`מלון: ${o.place||'—'}${o.time?` (הגעה ${o.time})`:''}`);
+  if(!o.pickup&&o.address) L.push(`כתובת: ${o.address}`);
+  if(o.meals) L.push(`ארוחה זוגית ×${o.meals}`);
+  const join=(obj)=>Object.entries(obj).map(([n,q])=>`${n}${q>1?` ×${q}`:''}`).join(', ');
+  if(Object.keys(o.salads).length) L.push(`סלטים: ${join(o.salads)}`);
+  if(Object.keys(o.firsts).length) L.push(`ראשונה: ${Object.entries(o.firsts).map(([n,q])=>`${n} ×${q}`).join(', ')}${o.heat?` (${o.heat})`:''}`);
+  if(Object.keys(o.mains).length) L.push(`עיקרית: ${join(o.mains)}`);
+  if(Object.keys(o.sides).length) L.push(`תוספת: ${join(o.sides)}`);
+  if(Object.keys(o.desserts).length) L.push(`קינוח: ${join(o.desserts)}`);
+  const exs=Object.entries(o.extras).filter(([,e])=>e.q>0).map(([n,e])=>`${n} ×${e.q}${e.note?` (${e.note})`:''}`);
+  if(exs.length) L.push(`אקסטרות: ${exs.join(', ')}`);
+  if(o.challot) L.push(`חלות: ${o.challot}`);
+  if(o.notes) L.push(`הערות: ${o.notes}`);
+  L.push(`מחיר משוער: ${estTotal()}$ (לאישור סופי)`);
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+  L.push('');
+  L.push(`#BM1#${code}#`);
+  return L.join('\n');
+}
+function refresh(){
+  const inclS=4*o.meals, nS=Object.values(o.salads).reduce((s,x)=>s+x,0);
+  $('#saladBadge').textContent=o.meals>0?`${nS}/${inclS} כלולים`:`${nS}`;
+  const inclF=2*o.meals, nF=Object.values(o.firsts).reduce((s,x)=>s+x,0);
+  $('#fishBadge').textContent=o.meals>0?`${nF}/${inclF} כלולים`:`${nF}`;
+  $('#totalEst').textContent=`משוער: ${estTotal()}$`;
+  $('#waSend').href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(buildText())}`;
+}
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('[data-act="bump"]');
+  if(!btn) return;
+  const g=btn.dataset.group, i=Number(btn.dataset.i), d=Number(btn.dataset.d);
+  const nv=bump(g,i,d);
+  const cell=document.querySelector(`[data-cell="${g}|${i}"]`);
+  if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
+  if(g==='extras'){
+    const note=document.querySelector(`[data-note-cell="extras|${i}"]`);
+    if(note) note.classList.toggle('hidden',nv===0);
+  }
+  refresh();
+});
+function handleBind(e){
+  const b=e.target.dataset.bind;
+  if(b){
+    if(b==='pickup'){ o.pickup=e.target.checked; $('#deliveryFields').style.display=o.pickup?'none':''; }
+    else o[b]=e.target.value;
+    refresh();
+    return;
+  }
+  const i=e.target.dataset.i;
+  if(e.target.matches('[data-note-cell]')){
+    const name=EXTRAS[Number(i)].name;
+    const ex=o.extras[name]||(o.extras[name]={q:0,note:''});
+    ex.note=e.target.value;
+    if(!ex.q&&!ex.note) delete o.extras[name];
+    refresh();
+  }
+}
+document.addEventListener('input',handleBind);
+document.addEventListener('change',e=>{
+  if(e.target.type==='checkbox'||e.target.tagName==='SELECT'||e.target.type==='date') handleBind(e);
+});
+$('#copyBtn').addEventListener('click',()=>{
+  const t=buildText();
+  const done=()=>{ const m=$('#copyMsg'); m.style.display='inline'; setTimeout(()=>m.style.display='none',1800); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done).catch(()=>{}); }
+  else{
+    const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(err){}
+    ta.remove();
+  }
+});
+document.documentElement.setAttribute('dir','rtl');
+document.documentElement.setAttribute('lang','he');
+refresh();
+</script>

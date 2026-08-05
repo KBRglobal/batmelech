@@ -254,7 +254,7 @@ const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 const LS_KEY='batmelech-orders-v1';
 let store={orders:[]};
 let storageOK=true;
-let view={tab:'orders', summaryDate:null, search:'', labelCopies:{}};
+let view={tab:'orders', summaryDate:null, search:'', custSearch:'', labelCopies:{}};
 let draft=null;
 
 function loadStore(){
@@ -512,6 +512,7 @@ const TABS=[
   {id:'orders', label:'📋 הזמנות'},
   {id:'form', label:'➕ הזמנה חדשה'},
   {id:'summary', label:'🍲 סיכום הכנות'},
+  {id:'customers', label:'👥 לקוחות'},
   {id:'backup', label:'💾 גיבוי'}
 ];
 function renderTabs(){
@@ -644,6 +645,44 @@ function stepperHtml(group,i,val,k,gold){
     <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}"${kAttr} data-d="1" aria-label="עוד">+</button>
   </div>`;
 }
+function parseOrderCode(txt){
+  const m=String(txt||'').match(/#BM1#([A-Za-z0-9+\/=]+)#/);
+  if(!m) return null;
+  try{ return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }catch(e){ return null; }
+}
+function applyImported(p){
+  const d=newDraft();
+  for(const k of ['date','name','phone','place','address','time','heat','firstsNote','mainsNote','notes']){
+    if(typeof p[k]==='string') d[k]=p[k];
+  }
+  if(typeof p.pickup==='boolean') d.pickup=p.pickup;
+  for(const k of ['meals','aricha','challot']){
+    if(typeof p[k]==='number'&&p[k]>=0) d[k]=Math.floor(p[k]);
+  }
+  const qtyMap=(src,allowed)=>{
+    const out={};
+    if(src&&typeof src==='object') for(const [n,q] of Object.entries(src)){
+      if(allowed.includes(n)&&typeof q==='number'&&q>0) out[n]=Math.floor(q);
+    }
+    return out;
+  };
+  if(p.salads&&typeof p.salads==='object'){
+    for(const [n,q] of Object.entries(p.salads)){
+      if(MENU.salads.includes(n)&&typeof q==='number'&&q>0) d.salads[n]={o:Math.floor(q),p:0};
+    }
+  }
+  d.firsts=qtyMap(p.firsts,MENU.firsts);
+  d.mains=qtyMap(p.mains,MENU.mains);
+  d.sides=qtyMap(p.sides,MENU.sides);
+  d.desserts=qtyMap(p.desserts,MENU.desserts);
+  if(p.extras&&typeof p.extras==='object'){
+    const names=MENU.extras.map(x=>x.name);
+    for(const [n,e] of Object.entries(p.extras)){
+      if(names.includes(n)&&e&&typeof e.q==='number'&&e.q>0) d.extras[n]={q:Math.floor(e.q),note:typeof e.note==='string'?e.note:''};
+    }
+  }
+  return d;
+}
 function renderForm(){
   const d=draft;
   const sug=computeSuggested(d);
@@ -687,6 +726,11 @@ function renderForm(){
   const paidOpts=PAID_OPTIONS.map(p=>`<option value="${esc(p)}"${d.paid===p?' selected':''}>${p}</option>`).join('');
 
   $('#view').innerHTML=`
+  ${d.id?'':`<div class="card no-print"><details>
+    <summary style="cursor:pointer;font-weight:700">📥 הלקוח שלח הזמנה מהטופס בוואטסאפ? הדביקי כאן</summary>
+    <textarea id="importOrderText" style="margin:10px 0 8px" placeholder="מדביקים את כל ההודעה שהגיעה בוואטסאפ — כולל הקוד שבסוף"></textarea>
+    <button type="button" class="btn" data-act="importOrder">✨ מילוי הטופס מההודעה</button>
+  </details></div>`}
   <div class="card">
     <div class="sec-h">🗓️ ${d.id?'עריכת הזמנה':'הזמנה חדשה'}</div>
     <div class="grid2">
@@ -1065,6 +1109,70 @@ function buildDayText(){
   return L.join('\n');
 }
 
+/* ================= render: customers ================= */
+function renderCustomers(){
+  let html='';
+  if(store.orders.length){
+    html+=`<div class="row no-print" style="margin:14px 0 0">
+      <input id="custSearchIn" type="search" style="flex:1" data-bind="custSearch" value="${esc(view.custSearch)}"
+        placeholder="🔍 חיפוש לקוח לפי שם או טלפון...">
+    </div>`;
+  }
+  html+=`<div id="custList"></div>`;
+  $('#view').innerHTML=html;
+  renderCustomersList();
+}
+function renderCustomersList(){
+  const box=$('#custList'); if(!box) return;
+  if(!store.orders.length){
+    box.innerHTML=`<div class="empty"><div class="big">👥</div><p>ספר הלקוחות נבנה לבד מההזמנות.<br>ברגע שתהיה הזמנה ראשונה — הלקוח יופיע כאן.</p></div>`;
+    return;
+  }
+  const map={};
+  for(const o of sortOrders(store.orders)){
+    const key=String(o.phone||'').replace(/\D/g,'')||('שם:'+(o.name||'').trim());
+    const c=map[key]=map[key]||{name:'',phone:'',orders:[]};
+    c.orders.push(o);
+    if(o.name) c.name=o.name;
+    if(o.phone) c.phone=o.phone;
+  }
+  let custs=Object.values(map);
+  const q=view.custSearch.trim().toLowerCase();
+  if(q) custs=custs.filter(c=>(c.name+' '+c.phone).toLowerCase().includes(q));
+  if(!custs.length){
+    box.innerHTML=`<div class="empty"><p>לא נמצא לקוח שמתאים ל־«${esc(q)}»</p></div>`;
+    return;
+  }
+  custs.sort((a,b)=>b.orders[b.orders.length-1].date<a.orders[a.orders.length-1].date?-1:1);
+  const t=todayStr();
+  box.innerHTML=custs.map(c=>{
+    const total=c.orders.reduce((s,o)=>s+parseMoney(o.total),0);
+    const last=c.orders[c.orders.length-1];
+    const hasUpcoming=c.orders.some(o=>o.date&&o.date>=t);
+    const histRows=[...c.orders].reverse().map(o=>`<div class="item-row">
+        <span class="item-name">${esc(fmtDate(o.date))} ${statusPill(o)} ${o.total?`<b>${money(parseMoney(o.total))}</b>`:''}
+          ${o.meals?`<span class="hint">· זוגית ×${o.meals}</span>`:''}</span>
+        <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">פתיחה</button>
+      </div>`).join('');
+    return `<div class="card order-card">
+      <div class="oc-top">
+        <span class="oc-name">${esc(c.name||'ללא שם')}</span>
+        ${hasUpcoming?`<span class="pill mid">הזמנה קרובה</span>`:''}
+        <span class="oc-total">${total>0?money(total):''}</span>
+      </div>
+      <div class="oc-meta">
+        ${c.orders.length} הזמנות · אחרונה: ${esc(fmtShort(last.date||''))}
+        ${c.phone?` · <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`:''}
+      </div>
+      <div class="oc-actions no-print" style="margin-bottom:8px">
+        <button type="button" class="btn sm primary" data-act="dup" data-id="${last.id}">🔁 הזמנה חדשה כמו הקודמת</button>
+        ${c.phone?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(c.phone)}">💬 וואטסאפ</a>`:''}
+      </div>
+      <details><summary class="hint" style="cursor:pointer">כל ההזמנות (${c.orders.length})</summary>${histRows}</details>
+    </div>`;
+  }).join('');
+}
+
 /* ================= render: backup ================= */
 function renderBackup(){
   const json=JSON.stringify(store,null,1);
@@ -1130,6 +1238,7 @@ function render(){
   else if(view.tab==='form') renderForm();
   else if(view.tab==='summary') renderSummary();
   else if(view.tab==='labels') renderLabels();
+  else if(view.tab==='customers') renderCustomers();
   else renderBackup();
   window.scrollTo(0,0);
 }
@@ -1170,6 +1279,15 @@ document.addEventListener('click', e=>{
     draft.total=btn.dataset.total;
     const el=document.querySelector('[data-bind="total"]'); if(el) el.value=draft.total;
     toast('המחיר עודכן ✓'); return;
+  }
+  if(act==='importOrder'){
+    const ta=$('#importOrderText');
+    const p=parseOrderCode(ta?ta.value:'');
+    if(!p){ toast('לא נמצא קוד הזמנה בהודעה — צריך להדביק את כל ההודעה'); return; }
+    draft=applyImported(p);
+    renderForm();
+    toast('הטופס מולא מההזמנה של הלקוח ✓ עכשיו רק לבדוק ולשמור');
+    return;
   }
   if(act==='addCustom'){ draft.custom.push({name:'',qty:1,price:''}); renderForm(); return; }
   if(act==='delCustom'){ draft.custom.splice(Number(btn.dataset.i),1); renderForm(); return; }
@@ -1253,6 +1371,7 @@ function handleBind(e){
   if(!b) return;
   if(b==='summaryDate'){ view.summaryDate=e.target.value; renderSummary(); return; }
   if(b==='search'){ view.search=e.target.value; renderOrdersList(); return; }
+  if(b==='custSearch'){ view.custSearch=e.target.value; renderCustomersList(); return; }
   if(!draft) return;
   const v=e.target.value;
   const i=Number(e.target.dataset.i);
