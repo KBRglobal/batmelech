@@ -1,0 +1,1030 @@
+<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>מטעמי בת מלך · ניהול הזמנות</title>
+<style>
+:root{
+  --bg:#FBF2EE; --surface:#FFFFFF; --surface2:#FDF8F6; --ink:#41262B; --muted:#96757C;
+  --accent:#B0446B; --accent-ink:#FFFFFF; --accent-soft:#F7E1E9;
+  --gold:#A0761F; --gold-soft:#F7EDD8; --line:#EDD9DC;
+  --ok:#3E7D4E; --ok-soft:#E2F0E5; --danger:#A63D3D; --danger-soft:#F6E2E2;
+  --radius:14px; --shadow:0 1px 3px rgba(65,38,43,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#221518; --surface:#2C1D21; --surface2:#271A1E; --ink:#F2E4E1; --muted:#B99BA2;
+    --accent:#E28AAC; --accent-ink:#3A1220; --accent-soft:#43242E;
+    --gold:#D9A94E; --gold-soft:#3D2F17; --line:#463138;
+    --ok:#7FC08D; --ok-soft:#23372A; --danger:#E09090; --danger-soft:#442525;
+    --shadow:0 1px 3px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#221518; --surface:#2C1D21; --surface2:#271A1E; --ink:#F2E4E1; --muted:#B99BA2;
+  --accent:#E28AAC; --accent-ink:#3A1220; --accent-soft:#43242E;
+  --gold:#D9A94E; --gold-soft:#3D2F17; --line:#463138;
+  --ok:#7FC08D; --ok-soft:#23372A; --danger:#E09090; --danger-soft:#442525;
+  --shadow:0 1px 3px rgba(0,0,0,.35);
+}
+:root[data-theme="light"]{
+  --bg:#FBF2EE; --surface:#FFFFFF; --surface2:#FDF8F6; --ink:#41262B; --muted:#96757C;
+  --accent:#B0446B; --accent-ink:#FFFFFF; --accent-soft:#F7E1E9;
+  --gold:#A0761F; --gold-soft:#F7EDD8; --line:#EDD9DC;
+  --ok:#3E7D4E; --ok-soft:#E2F0E5; --danger:#A63D3D; --danger-soft:#F6E2E2;
+  --shadow:0 1px 3px rgba(65,38,43,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Segoe UI","Noto Sans Hebrew","Arial Hebrew",Tahoma,Arial,sans-serif;
+  font-size:16px; line-height:1.55;
+}
+#app{direction:rtl}
+.wrap{max-width:860px;margin:0 auto;padding:0 14px 90px}
+a{color:var(--accent)}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{
+  font:inherit;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;padding:9px 12px;width:100%;
+}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+textarea{min-height:70px;resize:vertical}
+::placeholder{color:var(--muted);opacity:.8}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0 0}
+.top-in{max-width:860px;margin:0 auto;padding:0 14px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{font-size:1.25rem;margin:0;font-weight:800;letter-spacing:.02em}
+.brand .sub{color:var(--muted);font-size:.85rem}
+.tabs{display:flex;gap:4px;margin-top:8px;overflow-x:auto}
+.tab{
+  border:none;background:none;padding:9px 14px;border-radius:10px 10px 0 0;
+  color:var(--muted);font-weight:600;white-space:nowrap;border-bottom:3px solid transparent;
+}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin:14px 0}
+.sec-h{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.02rem;margin:0 0 10px}
+.sec-h .badge{font-weight:600}
+.hint{color:var(--muted);font-size:.85rem}
+.warn{color:var(--danger);font-size:.85rem;font-weight:600}
+
+.field{margin:10px 0}
+.field>label{display:block;font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.02em}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.grid2{grid-template-columns:1fr}}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* steppers + item rows */
+.stepper{display:inline-flex;align-items:center;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:2px}
+.st-btn{width:34px;height:34px;border:none;background:none;border-radius:999px;font-size:1.15rem;line-height:1;color:var(--muted);font-weight:700}
+.st-btn:hover{background:var(--accent-soft);color:var(--accent)}
+.st-qty{min-width:26px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}
+.st-qty.has{color:var(--accent)}
+.stepper.gold .st-btn:hover{background:var(--gold-soft);color:var(--gold)}
+.stepper.gold .st-qty.has{color:var(--gold)}
+
+.item-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap}
+.item-row:last-child{border-bottom:none}
+.item-name{flex:1 1 180px;min-width:150px}
+.item-price{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.col-labels{display:flex;justify-content:flex-end;gap:26px;color:var(--muted);font-size:.78rem;font-weight:700;padding:0 12px 4px}
+.pair{display:flex;gap:8px;align-items:center}
+.note-in{margin:4px 0 2px;font-size:.9rem}
+.note-in.hidden{display:none}
+
+/* chips + badges */
+.badge{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 10px;font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+.badge.gold{background:var(--gold-soft);color:var(--gold)}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.78rem;font-weight:700}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.no{background:var(--danger-soft);color:var(--danger)}
+.pill.mid{background:var(--gold-soft);color:var(--gold)}
+.pill.mut{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 16px;font-weight:700}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.06);color:var(--accent-ink)}
+.btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn.sm{padding:5px 11px;font-size:.85rem;border-radius:8px}
+.savebar{
+  position:fixed;bottom:0;right:0;left:0;z-index:30;background:var(--surface);
+  border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;justify-content:center;
+}
+.savebar .btn{min-width:130px}
+
+/* orders list */
+.date-h{display:flex;align-items:center;gap:10px;margin:20px 0 6px;flex-wrap:wrap}
+.date-h .d{font-weight:800;font-size:1.05rem}
+.order-card{padding:13px 16px}
+.order-card .oc-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.oc-name{font-weight:800;font-size:1.05rem}
+.oc-total{margin-inline-start:auto;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.oc-meta{color:var(--muted);font-size:.88rem;margin:2px 0 8px}
+.oc-lines{font-size:.9rem;margin:0 0 8px;color:var(--ink)}
+.oc-actions{display:flex;gap:6px;flex-wrap:wrap}
+.order-text{
+  background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+  padding:12px;white-space:pre-wrap;font-size:.92rem;margin:8px 0 0;
+}
+details.past{margin-top:26px}
+details.past>summary{cursor:pointer;font-weight:700;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:40px 0}
+.empty .big{font-size:2rem}
+
+/* summary */
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 16px;box-shadow:var(--shadow)}
+.stat .n{font-weight:800;font-size:1.25rem;font-variant-numeric:tabular-nums;color:var(--accent)}
+.stat .l{color:var(--muted);font-size:.8rem;font-weight:600}
+table.sum{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.sum th{font-size:.78rem;color:var(--muted);text-align:right;font-weight:700;padding:4px 6px;border-bottom:1px solid var(--line)}
+table.sum td{padding:6px;border-bottom:1px dashed var(--line);vertical-align:top}
+table.sum tr:last-child td{border-bottom:none}
+table.sum .num{text-align:center;width:64px;font-weight:700}
+table.sum .num.gold{color:var(--gold)}
+.tbl-wrap{overflow-x:auto}
+
+.storage-warn{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:10px 14px;margin:12px 0;font-size:.9rem}
+
+@media print{
+  .top,.savebar,.no-print{display:none!important}
+  body{background:#fff;color:#000}
+  .card,.stat{box-shadow:none;border-color:#bbb;break-inside:avoid}
+  .wrap{max-width:none;padding:0}
+  .order-text{border-color:#bbb}
+}
+</style>
+
+<div id="app" dir="rtl" lang="he">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">
+        <h1>מטעמי בת מלך</h1>
+        <span class="sub">ניהול הזמנות · מטבח ביתי אותנטי כשר</span>
+      </div>
+      <nav class="tabs" id="tabs"></nav>
+    </div>
+  </header>
+  <main class="wrap" id="view"></main>
+</div>
+
+<script>
+'use strict';
+/* ================= menu data ================= */
+const MENU = {
+  salads: [
+    'כרוב לבן קלאסי','כרוב סגול במיונז','קולסלאו','מטבוחה פיקנטית',
+    "צ'ירשי טריפוליטאי",'משוויה מרוקאית','מסייר (חמוצים)','טחינה',
+    'סלק מבושל','גזר מרוקאי מבושל','חציל במיונז','חציל מטוגן',
+    'פלפלים קלויים','עגבניות שרי חריפות','פלפל חריף צלוי','סלט ביצים','סלט תפו"א'
+  ],
+  firsts: ['פילה דג ברוטב מרוקאי','פילה דג ברוטב חריימה','קציצות דגים ברוטב מרוקאי'],
+  mains: [
+    'קציצות בשר ברוטב אדום עשיר','קציצות בשר עם אפונה וארטישוק','קציצות בשר בריבת בצל וערמונים',
+    'טבחה עוף אדומה עם שעועית','תבשיל עוף מרוקאי עם חומוסים','טבחה עוף צהובה עם תפו"א',
+    'מגש שניצלים — במקום עיקרית','רולדת בשר — במקום עיקרית'
+  ],
+  sides: ['אורז לבן','אורז מתובל / פרסי עם עשבי תיבול','קוסקוס עננים','פסטה נקיה','פסטה אדומה','מגש תפו"א'],
+  desserts: ['סופלה שוקולד','סוכריות בקלוואה'],
+  extras: [
+    {name:'תוספת 4 סלטים לבחירה', price:25},
+    {name:'תוספת חלה', price:10},
+    {name:'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)', price:150},
+    {name:'מפרום ביתי של אמא (זוגי)', price:40},
+    {name:'טבחה בשר אדומה עם אפונה ותפו"א (ל־2־3 אנשים)', price:100},
+    {name:'רולדת בשר פריך ברוטב פטריות עשיר', price:100},
+    {name:'מגש שניצלים (זוגי, כ־13–15 יח\')', price:100},
+    {name:'מגש תפו"א קריספיים', price:30},
+    {name:'מגש אורז / קוסקוס / פסטה אדומה', price:25},
+    {name:'צלחת פתיחה (זיתים וחמוצים)', price:15},
+    {name:'צלחת חריפים', price:15},
+    {name:'תוספת חומוס ישראלי לניגוב', price:15},
+    {name:'מארז הבדלה', price:20},
+    {name:'סיר קובה סלק בתוספת אורז (ל־4 אנשים)', price:125},
+    {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
+    {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
+    {name:'מנת מפרום ביתי (תוספת)', price:20},
+    {name:'משלוח', price:15}
+  ],
+  couplePrice:230, challahPrice:10, includedChallot:2, includedSalads:4, includedFish:2
+};
+const HEAT_OPTIONS = ['','לא חריף','חריף','מעורב — חלק חריף וחלק לא'];
+const PAY_METHODS = ['','מזומן','ביט','פייבוקס','לינק','העברה'];
+const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
+
+/* ================= state ================= */
+const LS_KEY='batmelech-orders-v1';
+let store={orders:[]};
+let storageOK=true;
+let view={tab:'orders', summaryDate:null};
+let draft=null;
+
+function loadStore(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){ const d=JSON.parse(raw); if(d && Array.isArray(d.orders)) store=d; }
+  }catch(e){ storageOK=false; }
+}
+function saveStore(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(store)); }
+  catch(e){ storageOK=false; renderTabs(); }
+}
+
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>(Math.round(n*100)/100).toLocaleString('en-US')+'$';
+const parseMoney=s=>{const n=parseFloat(String(s??'').replace(/[^\d.]/g,''));return isNaN(n)?0:n;};
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function fmtDate(ds){
+  if(!ds) return 'ללא תאריך';
+  const d=new Date(ds+'T00:00:00');
+  if(isNaN(d)) return ds;
+  const wd=new Intl.DateTimeFormat('he-IL',{weekday:'long'}).format(d);
+  const dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0');
+  const yr=(d.getFullYear()!==new Date().getFullYear())?'.'+d.getFullYear():'';
+  return `${wd} · ${dd}.${mm}${yr}`;
+}
+function uid(){ return 'o'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function copyText(t){
+  const done=()=>toast('הועתק ✓');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(()=>fallbackCopy(t)&&done());
+  } else { if(fallbackCopy(t)) done(); }
+}
+function fallbackCopy(t){
+  const ta=document.createElement('textarea');
+  ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta); return ok;
+}
+let toastTimer=null;
+function toast(msg){
+  let t=$('#toast');
+  if(!t){
+    t=document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;bottom:70px;right:50%;transform:translateX(50%);background:var(--ink);color:var(--bg);padding:8px 18px;border-radius:999px;z-index:99;font-weight:700;transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{t.style.opacity='0';},1800);
+}
+
+/* ================= draft ================= */
+function newDraft(){
+  return {
+    id:null, date:'', name:'', phone:'', place:'', time:'', pickup:false,
+    meals:1, aricha:0, challot:MENU.includedChallot,
+    salads:{},               // name -> {o,p}
+    firsts:{}, heat:'', firstsNote:'',
+    mains:{}, mainsNote:'',
+    sides:{}, desserts:{},
+    extras:{},               // name -> {q,note}
+    custom:[],               // [{name,qty,price}]
+    notes:'', total:'', deposit:'', payMethod:'', paid:'לא'
+  };
+}
+function draftFrom(o){
+  const d=Object.assign(newDraft(), JSON.parse(JSON.stringify(o)));
+  return d;
+}
+
+/* ================= price ================= */
+function computeSuggested(d){
+  const lines=[];
+  if(d.meals>0) lines.push({l:`ארוחה זוגית ×${d.meals}`, a:MENU.couplePrice*d.meals});
+  for(const ex of MENU.extras){
+    const e=d.extras[ex.name];
+    if(e && e.q>0) lines.push({l:`${ex.name} ×${e.q}`, a:ex.price*e.q});
+  }
+  for(const c of d.custom){
+    const q=Number(c.qty)||0, p=parseMoney(c.price);
+    if(c.name && q>0) lines.push({l:`${c.name} ×${q}`, a:p*q});
+  }
+  const included=MENU.includedChallot*(d.meals||0);
+  const extraCh=Math.max(0,(d.challot||0)-included);
+  if(extraCh>0 && d.meals>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:MENU.challahPrice*extraCh});
+  const total=lines.reduce((s,x)=>s+x.a,0);
+  return {lines,total};
+}
+function countSaladsOrdered(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.o||0),0); }
+function countSaladsPinuk(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.p||0),0); }
+function countFish(d){ return Object.values(d.firsts).reduce((s,x)=>s+(x||0),0); }
+
+/* ================= order text (like the Word card) ================= */
+function orderShortDest(o){
+  if(o.pickup) return 'איסוף עצמי';
+  return (o.place||'—') + (o.time?` · ${o.time}`:'');
+}
+function buildOrderText(o){
+  const L=[];
+  L.push(`ההזמנה לתאריך: ${fmtDate(o.date)}`);
+  L.push(`שם מלא: ${o.name||'—'}`);
+  if(o.phone) L.push(`מס' טלפון: ${o.phone}`);
+  L.push(`לאן המשלוח? ${o.pickup?'איסוף עצמי':(o.place||'—')}${(!o.pickup&&o.time)?` (הגעה: ${o.time})`:''}`);
+  if(o.meals>0) L.push(`ארוחה זוגית ×${o.meals}`);
+  const saladLines=[];
+  for(const name of Object.keys(o.salads)){
+    const s=o.salads[name];
+    if(s.o>0) saladLines.push(`${name}${s.o>1?` ×${s.o}`:''}`);
+  }
+  for(const name of Object.keys(o.salads)){
+    const s=o.salads[name];
+    if(s.p>0) saladLines.push(`${name}${s.p>1?` ×${s.p}`:''} — פינוק 🎁`);
+  }
+  if(saladLines.length){
+    L.push('סלטים:');
+    saladLines.forEach((s,i)=>L.push(`  ${i+1}. ${s}`));
+  }
+  const firstParts=Object.keys(o.firsts).filter(k=>o.firsts[k]>0).map(k=>`${k} ×${o.firsts[k]}`);
+  if(firstParts.length){
+    let line=`ראשונה: ${firstParts.join(', ')}`;
+    if(o.heat) line+=` (${o.heat})`;
+    L.push(line);
+    if(o.firstsNote) L.push(`  הערה: ${o.firstsNote}`);
+  }
+  const mainParts=Object.keys(o.mains).filter(k=>o.mains[k]>0).map(k=>`${k}${o.mains[k]>1?` ×${o.mains[k]}`:''}`);
+  if(mainParts.length){
+    L.push(`עיקרית: ${mainParts.join(', ')}`);
+    if(o.mainsNote) L.push(`  הערה: ${o.mainsNote}`);
+  }
+  const sideParts=Object.keys(o.sides).filter(k=>o.sides[k]>0).map(k=>`${k}${o.sides[k]>1?` ×${o.sides[k]}`:''}`);
+  if(sideParts.length) L.push(`תוספת: ${sideParts.join(', ')}`);
+  const desParts=Object.keys(o.desserts).filter(k=>o.desserts[k]>0).map(k=>`${k}${o.desserts[k]>1?` ×${o.desserts[k]}`:''}`);
+  if(desParts.length) L.push(`קינוח: ${desParts.join(', ')}`);
+  const exLines=[];
+  for(const name of Object.keys(o.extras)){
+    const e=o.extras[name];
+    if(e.q>0) exLines.push(`${name} ×${e.q}${e.note?` (${e.note})`:''}`);
+  }
+  for(const c of o.custom){ if(c.name && (Number(c.qty)||0)>0) exLines.push(`${c.name} ×${c.qty}${c.price?` (${parseMoney(c.price)}$)`:''}`); }
+  if(exLines.length){ L.push('אקסטרה:'); exLines.forEach(x=>L.push(`  • ${x}`)); }
+  if(o.aricha>0) L.push(`עריכה: ${o.aricha} איש`);
+  if(o.challot>0) L.push(`חלות: ${o.challot} יח'`);
+  if(o.total) L.push(`סך לתשלום: ${parseMoney(o.total)}$`);
+  if(o.deposit) L.push(`מקדמה: ${parseMoney(o.deposit)}$`);
+  if(o.payMethod) L.push(`דרך תשלום: ${o.payMethod}`);
+  L.push(`שולם: ${o.paid||'לא'}`);
+  if(o.notes) L.push(`הערות: ${o.notes}`);
+  return L.join('\n');
+}
+
+/* ================= render: tabs ================= */
+const TABS=[
+  {id:'orders', label:'📋 הזמנות'},
+  {id:'form', label:'➕ הזמנה חדשה'},
+  {id:'summary', label:'🍲 סיכום הכנות'},
+  {id:'backup', label:'💾 גיבוי'}
+];
+function renderTabs(){
+  $('#tabs').innerHTML=TABS.map(t=>
+    `<button type="button" class="tab${view.tab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">${t.label}</button>`
+  ).join('');
+}
+
+/* ================= render: orders list ================= */
+function sortOrders(list){
+  return [...list].sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')||(a.time||'99').localeCompare(b.time||'99'));
+}
+function orderCard(o){
+  const paidCls=o.paid==='כן'?'ok':(o.paid==='מקדמה'?'mid':(o.paid==='שת"פ'?'mut':'no'));
+  const bits=[];
+  if(o.meals>0) bits.push(`זוגית ×${o.meals}`);
+  const nSal=countSaladsOrdered(o), nPin=countSaladsPinuk(o);
+  if(nSal>0) bits.push(`${nSal} סלטים`);
+  if(nPin>0) bits.push(`🎁 ${nPin} פינוק`);
+  const nEx=Object.values(o.extras).filter(e=>e.q>0).length + o.custom.filter(c=>c.name&&(Number(c.qty)||0)>0).length;
+  if(nEx>0) bits.push(`${nEx} אקסטרות`);
+  if(o.aricha>0) bits.push(`עריכה ל־${o.aricha}`);
+  if(o.challot>0) bits.push(`${o.challot} חלות`);
+  return `<div class="card order-card" data-oid="${o.id}">
+    <div class="oc-top">
+      <span class="oc-name">${esc(o.name||'ללא שם')}</span>
+      <span class="pill ${paidCls}">${esc(o.paid==='כן'?'שולם':(o.paid==='לא'?'לא שולם':o.paid))}</span>
+      <span class="oc-total">${o.total?money(parseMoney(o.total)):''}</span>
+    </div>
+    <div class="oc-meta">
+      ${esc(orderShortDest(o))}${o.phone?` · <a href="tel:${esc(o.phone)}">${esc(o.phone)}</a>`:''}
+    </div>
+    ${bits.length?`<div class="oc-lines">${esc(bits.join(' · '))}</div>`:''}
+    <div class="oc-actions no-print">
+      <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">✏️ עריכה</button>
+      <button type="button" class="btn sm" data-act="toggleText" data-id="${o.id}">📄 כרטיס הזמנה</button>
+      <button type="button" class="btn sm" data-act="copyText" data-id="${o.id}">📋 העתקה</button>
+      <button type="button" class="btn sm" data-act="dup" data-id="${o.id}">🔁 שכפול</button>
+      <button type="button" class="btn sm danger" data-act="del" data-id="${o.id}">🗑️ מחיקה</button>
+    </div>
+    <div class="order-text" data-text-for="${o.id}" hidden>${esc(buildOrderText(o))}</div>
+  </div>`;
+}
+function renderOrders(){
+  const t=todayStr();
+  const upcoming={}, past={};
+  for(const o of sortOrders(store.orders)){
+    const key=o.date||'ללא תאריך';
+    const bucket=(o.date && o.date<t)?past:upcoming;
+    (bucket[key]=bucket[key]||[]).push(o);
+  }
+  const groupHtml=(dates,obj)=>dates.map(dk=>{
+    const list=obj[dk];
+    const tot=list.reduce((s,o)=>s+parseMoney(o.total),0);
+    return `<section>
+      <div class="date-h">
+        <span class="d">📅 ${esc(fmtDate(dk==='ללא תאריך'?'':dk))}</span>
+        <span class="badge">${list.length} הזמנות</span>
+        ${tot>0?`<span class="badge gold">${money(tot)}</span>`:''}
+        ${dk!=='ללא תאריך'?`<button type="button" class="btn sm no-print" data-act="daySummary" data-date="${dk}">🍲 לסיכום ההכנות</button>`:''}
+      </div>
+      ${list.map(orderCard).join('')}
+    </section>`;
+  }).join('');
+  const upDates=Object.keys(upcoming).sort();
+  const pastDates=Object.keys(past).sort().reverse();
+  let html='';
+  if(!storageOK) html+=`<div class="storage-warn">⚠️ שמירה אוטומטית לא זמינה בדפדפן הזה — הנתונים עלולים להימחק בסגירת החלון. מומלץ לייצא גיבוי מלשונית «גיבוי» בסוף כל שימוש.</div>`;
+  if(!store.orders.length){
+    html+=`<div class="empty"><div class="big">🕯️</div><p>עדיין אין הזמנות.<br>לוחצים על «➕ הזמנה חדשה» ומתחילים.</p></div>`;
+  } else {
+    html+=upDates.length?groupHtml(upDates,upcoming):`<div class="empty"><p>אין הזמנות קרובות.</p></div>`;
+    if(pastDates.length){
+      html+=`<details class="past"><summary>הזמנות שעברו (${pastDates.reduce((s,d)=>s+past[d].length,0)})</summary>${groupHtml(pastDates,past)}</details>`;
+    }
+  }
+  $('#view').innerHTML=html;
+}
+
+/* ================= render: form ================= */
+function stepperHtml(group,i,val,k,gold){
+  const kAttr=k?` data-k="${k}"`:'';
+  const cell=`${group}|${i}${k?'|'+k:''}`;
+  return `<div class="stepper${gold?' gold':''}">
+    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}"${kAttr} data-d="-1" aria-label="פחות">−</button>
+    <span class="st-qty${val>0?' has':''}" data-cell="${cell}">${val||0}</span>
+    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}"${kAttr} data-d="1" aria-label="עוד">+</button>
+  </div>`;
+}
+function renderForm(){
+  const d=draft;
+  const sug=computeSuggested(d);
+  const saladRows=MENU.salads.map((name,i)=>{
+    const s=d.salads[name]||{o:0,p:0};
+    return `<div class="item-row">
+      <span class="item-name">${esc(name)}</span>
+      <div class="pair">${stepperHtml('salads',i,s.o,'o')}${stepperHtml('salads',i,s.p,'p',true)}</div>
+    </div>`;
+  }).join('');
+  const firstRows=MENU.firsts.map((name,i)=>`<div class="item-row">
+      <span class="item-name">${esc(name)}</span>${stepperHtml('firsts',i,d.firsts[name]||0)}
+    </div>`).join('');
+  const mainRows=MENU.mains.map((name,i)=>`<div class="item-row">
+      <span class="item-name">${esc(name)}</span>${stepperHtml('mains',i,d.mains[name]||0)}
+    </div>`).join('');
+  const sideRows=MENU.sides.map((name,i)=>`<div class="item-row">
+      <span class="item-name">${esc(name)}</span>${stepperHtml('sides',i,d.sides[name]||0)}
+    </div>`).join('');
+  const desRows=MENU.desserts.map((name,i)=>`<div class="item-row">
+      <span class="item-name">${esc(name)}</span>${stepperHtml('desserts',i,d.desserts[name]||0)}
+    </div>`).join('');
+  const exRows=MENU.extras.map((ex,i)=>{
+    const e=d.extras[ex.name]||{q:0,note:''};
+    return `<div class="item-row" style="display:block">
+      <div class="row" style="justify-content:space-between">
+        <span class="item-name">${esc(ex.name)} <span class="item-price">${ex.price}$</span></span>
+        ${stepperHtml('extras',i,e.q)}
+      </div>
+      <input class="note-in${e.q>0?'':' hidden'}" data-note-cell="extras|${i}" data-bind="extra-note" data-i="${i}" value="${esc(e.note)}" placeholder="הערה (מה בפנים, מה בצד...)">
+    </div>`;
+  }).join('');
+  const customRows=d.custom.map((c,i)=>`<div class="row" style="margin:6px 0">
+      <input style="flex:2;min-width:140px" data-bind="custom-name" data-i="${i}" value="${esc(c.name)}" placeholder="פריט חופשי">
+      <input style="flex:0 0 74px" inputmode="numeric" data-bind="custom-qty" data-i="${i}" value="${esc(c.qty)}" placeholder="כמות">
+      <input style="flex:0 0 90px" inputmode="decimal" data-bind="custom-price" data-i="${i}" value="${esc(c.price)}" placeholder="מחיר $">
+      <button type="button" class="btn sm danger" data-act="delCustom" data-i="${i}">✕</button>
+    </div>`).join('');
+  const heatOpts=HEAT_OPTIONS.map(h=>`<option value="${esc(h)}"${d.heat===h?' selected':''}>${h||'— רמת חריפות —'}</option>`).join('');
+  const payOpts=PAY_METHODS.map(p=>`<option value="${esc(p)}"${d.payMethod===p?' selected':''}>${p||'— דרך תשלום —'}</option>`).join('');
+  const paidOpts=PAID_OPTIONS.map(p=>`<option value="${esc(p)}"${d.paid===p?' selected':''}>${p}</option>`).join('');
+
+  $('#view').innerHTML=`
+  <div class="card">
+    <div class="sec-h">🗓️ ${d.id?'עריכת הזמנה':'הזמנה חדשה'}</div>
+    <div class="grid2">
+      <div class="field"><label>לאיזה תאריך ההזמנה? (נשמר כמו יומן)</label>
+        <input type="date" data-bind="date" value="${esc(d.date)}"></div>
+      <div class="field"><label>ארוחות זוגיות (230$ לארוחה)</label>${stepperHtml('meals',0,d.meals)}</div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>עריכה ל־כמה איש</label>${stepperHtml('aricha',0,d.aricha)}</div>
+      <div class="field"><label>חלות (יח') <span class="hint" data-badge="challot"></span></label>${stepperHtml('challot',0,d.challot)}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h">👤 פרטי הלקוח</div>
+    <div class="grid2">
+      <div class="field"><label>שם מלא</label><input data-bind="name" value="${esc(d.name)}" placeholder="שם הלקוח"></div>
+      <div class="field"><label>מס' טלפון</label><input inputmode="tel" data-bind="phone" value="${esc(d.phone)}" placeholder="050-0000000"></div>
+    </div>
+    <label class="row" style="margin:6px 0;gap:8px;cursor:pointer">
+      <input type="checkbox" style="width:auto" data-bind="pickup" ${d.pickup?'checked':''}> איסוף עצמי
+    </label>
+    <div class="grid2" id="deliveryFields" ${d.pickup?'hidden':''}>
+      <div class="field"><label>לאן המשלוח? (בית מלון / כתובת)</label><input data-bind="place" value="${esc(d.place)}" placeholder="שם המלון או כתובת"></div>
+      <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" value="${esc(d.time)}" placeholder="לדוגמה: 16:30"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h">🥗 סלטים <span class="badge" data-badge="salads"></span></div>
+    <p class="hint">בכל ארוחה זוגית כלולים ${MENU.includedSalads} סלטים לבחירה. עמודת «פינוק» 🎁 — סלטים שאת מוסיפה ממך (אפשר להעביר או לשנות אם נתקעת בלי).</p>
+    <div class="col-labels"><span>הוזמן</span><span>🎁 פינוק</span></div>
+    ${saladRows}
+  </div>
+
+  <div class="card">
+    <div class="sec-h">🐟 מנות ראשונות <span class="badge" data-badge="firsts"></span></div>
+    <p class="hint">בכל ארוחה זוגית כלולים ${MENU.includedFish} דגים — אפשר לפצל (למשל 1 מרוקאי + 1 חריימה).</p>
+    ${firstRows}
+    <div class="grid2">
+      <div class="field"><label>חריפות</label><select data-bind="heat">${heatOpts}</select></div>
+      <div class="field"><label>הערה לראשונות</label><input data-bind="firstsNote" value="${esc(d.firstsNote)}" placeholder="למשל: חריימה חריף, מרוקאי לא"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h">🍖 עיקריות <span class="badge" data-badge="mains"></span></div>
+    <p class="hint">בכל ארוחה זוגית כלולה עיקרית אחת. אפשר להחליף למגש שניצלים או רולדת בשר.</p>
+    ${mainRows}
+    <div class="field"><label>הערה לעיקריות</label><input data-bind="mainsNote" value="${esc(d.mainsNote)}" placeholder="למשל: תוספת עוף"></div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h">🍚 תוספות <span class="badge" data-badge="sides"></span></div>
+    ${sideRows}
+  </div>
+
+  <div class="card">
+    <div class="sec-h">🍫 קינוחים <span class="badge" data-badge="desserts"></span></div>
+    ${desRows}
+  </div>
+
+  <div class="card">
+    <div class="sec-h">✨ אקסטרות בתשלום</div>
+    ${exRows}
+    <div style="margin-top:10px">
+      <div class="hint" style="margin-bottom:4px">פריטים חופשיים (כל דבר שלא ברשימה):</div>
+      ${customRows}
+      <button type="button" class="btn sm" data-act="addCustom">➕ הוספת פריט חופשי</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h">💰 תשלום</div>
+    <div id="priceHint"></div>
+    <div class="grid2">
+      <div class="field"><label>סך לתשלום ($)</label><input inputmode="decimal" data-bind="total" value="${esc(d.total)}" placeholder="0"></div>
+      <div class="field"><label>מקדמה ($)</label><input inputmode="decimal" data-bind="deposit" value="${esc(d.deposit)}" placeholder="0"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>דרך תשלום</label><select data-bind="payMethod">${payOpts}</select></div>
+      <div class="field"><label>שולם?</label><select data-bind="paid">${paidOpts}</select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h">📝 הערות כלליות</div>
+    <textarea data-bind="notes" placeholder="כל דבר שחשוב לזכור להזמנה הזאת...">${esc(d.notes)}</textarea>
+  </div>
+
+  <div class="savebar no-print">
+    <button type="button" class="btn" data-act="cancel">ביטול</button>
+    <button type="button" class="btn primary" data-act="save">💾 שמירת ההזמנה</button>
+  </div>`;
+  refreshFormDerived();
+}
+function refreshFormDerived(){
+  const d=draft; if(!d) return;
+  const inclS=MENU.includedSalads*(d.meals||0);
+  const nO=countSaladsOrdered(d), nP=countSaladsPinuk(d);
+  const bS=$('[data-badge="salads"]');
+  if(bS) bS.textContent=inclS>0?`${nO}/${inclS} כלולים · 🎁 ${nP}`:`${nO} הוזמנו · 🎁 ${nP}`;
+  const inclF=MENU.includedFish*(d.meals||0);
+  const nF=countFish(d);
+  const bF=$('[data-badge="firsts"]');
+  if(bF) bF.textContent=inclF>0?`${nF}/${inclF} כלולים`:`${nF}`;
+  const nM=Object.values(d.mains).reduce((s,x)=>s+x,0);
+  const bM=$('[data-badge="mains"]'); if(bM) bM.textContent=nM||'';
+  const nSd=Object.values(d.sides).reduce((s,x)=>s+x,0);
+  const bSd=$('[data-badge="sides"]'); if(bSd) bSd.textContent=nSd||'';
+  const nDs=Object.values(d.desserts).reduce((s,x)=>s+x,0);
+  const bDs=$('[data-badge="desserts"]'); if(bDs) bDs.textContent=nDs||'';
+  const bCh=$('[data-badge="challot"]');
+  if(bCh) bCh.textContent=d.meals>0?`(כלולות בזוגית: ${MENU.includedChallot*d.meals})`:'';
+  updatePriceHint();
+}
+function updatePriceHint(){
+  const el=$('#priceHint'); if(!el||!draft) return;
+  const sug=computeSuggested(draft);
+  const warns=[];
+  const inclS=MENU.includedSalads*(draft.meals||0);
+  const nO=countSaladsOrdered(draft);
+  if(draft.meals>0 && nO>inclS) warns.push(`הוזמנו ${nO-inclS} סלטים מעבר לכלול — לא לשכוח לחייב (תוספת 4 סלטים = 25$).`);
+  const inclF=MENU.includedFish*(draft.meals||0);
+  const nF=countFish(draft);
+  if(draft.meals>0 && nF>inclF) warns.push(`הוזמנו ${nF-inclF} דגים מעבר לכלול.`);
+  let html='';
+  if(sug.lines.length){
+    html+=`<div class="hint" style="margin-bottom:8px">מחיר מוצע לפי המחירון: `+
+      sug.lines.map(l=>`${esc(l.l)} = ${l.a}$`).join(' · ')+
+      ` · <b>סה"כ ${sug.total}$</b> <button type="button" class="btn sm" data-act="useSuggested" data-total="${sug.total}">להשתמש במחיר הזה</button></div>`;
+  }
+  html+=warns.map(w=>`<div class="warn">⚠️ ${esc(w)}</div>`).join('');
+  el.innerHTML=html;
+}
+
+/* ================= bump ================= */
+function bump(g,i,k,delta){
+  const d=draft; if(!d) return 0;
+  let nv=0;
+  if(g==='meals'||g==='challot'||g==='aricha'){
+    nv=Math.max(0,(d[g]||0)+delta); d[g]=nv;
+  } else if(g==='salads'){
+    const name=MENU.salads[i];
+    const s=d.salads[name]||(d.salads[name]={o:0,p:0});
+    s[k]=Math.max(0,(s[k]||0)+delta); nv=s[k];
+    if(!s.o&&!s.p) delete d.salads[name];
+  } else if(g==='firsts'||g==='mains'||g==='sides'||g==='desserts'){
+    const name=MENU[g][i];
+    nv=Math.max(0,(d[g][name]||0)+delta);
+    if(nv===0) delete d[g][name]; else d[g][name]=nv;
+  } else if(g==='extras'){
+    const name=MENU.extras[i].name;
+    const e=d.extras[name]||(d.extras[name]={q:0,note:''});
+    e.q=Math.max(0,e.q+delta); nv=e.q;
+    if(e.q===0&&!e.note) delete d.extras[name];
+  }
+  return nv;
+}
+
+/* ================= render: summary ================= */
+function aggregate(list){
+  const agg={
+    orders:list.length, meals:0, aricha:0, challot:0,
+    salads:{}, firsts:{}, mains:{}, sides:{}, desserts:{}, extras:[],
+    heatNotes:[], generalNotes:[],
+    revenue:0, deposits:0, owed:0
+  };
+  for(const o of list){
+    agg.meals+=o.meals||0; agg.aricha+=o.aricha||0; agg.challot+=o.challot||0;
+    for(const [n,s] of Object.entries(o.salads)){
+      const a=agg.salads[n]||(agg.salads[n]={o:0,p:0});
+      a.o+=s.o||0; a.p+=s.p||0;
+    }
+    for(const [n,q] of Object.entries(o.firsts)) agg.firsts[n]=(agg.firsts[n]||0)+q;
+    for(const [n,q] of Object.entries(o.mains)) agg.mains[n]=(agg.mains[n]||0)+q;
+    for(const [n,q] of Object.entries(o.sides)) agg.sides[n]=(agg.sides[n]||0)+q;
+    for(const [n,q] of Object.entries(o.desserts)) agg.desserts[n]=(agg.desserts[n]||0)+q;
+    for(const [n,e] of Object.entries(o.extras)){
+      if(e.q>0) agg.extras.push({who:o.name, what:n, q:e.q, note:e.note});
+    }
+    for(const c of o.custom){ if(c.name&&(Number(c.qty)||0)>0) agg.extras.push({who:o.name, what:c.name, q:Number(c.qty)||0, note:c.price?`${parseMoney(c.price)}$`:''}); }
+    if(o.heat||o.firstsNote) agg.heatNotes.push({who:o.name, txt:[o.heat,o.firstsNote].filter(Boolean).join(' · ')});
+    if(o.mainsNote) agg.generalNotes.push({who:o.name, txt:'עיקרית: '+o.mainsNote});
+    if(o.notes) agg.generalNotes.push({who:o.name, txt:o.notes});
+    const tot=parseMoney(o.total), dep=parseMoney(o.deposit);
+    agg.revenue+=tot; agg.deposits+=dep;
+    if(o.paid!=='כן'&&o.paid!=='שת"פ') agg.owed+=Math.max(0,tot-dep);
+  }
+  return agg;
+}
+function sumTable(title, obj, opts){
+  const rows=Object.entries(obj).filter(([,v])=>(typeof v==='object'?(v.o||v.p):v)>0);
+  if(!rows.length) return '';
+  if(opts&&opts.pinukCols){
+    return `<div class="card"><div class="sec-h">${title}</div><div class="tbl-wrap"><table class="sum">
+      <tr><th>סלט</th><th class="num">הוזמן</th><th class="num">🎁 פינוק</th><th class="num">סה"כ</th></tr>
+      ${rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v.o||''}</td><td class="num gold">${v.p||''}</td><td class="num">${(v.o||0)+(v.p||0)}</td></tr>`).join('')}
+      <tr><td><b>סה"כ סלטים</b></td><td class="num"><b>${rows.reduce((s,[,v])=>s+(v.o||0),0)}</b></td><td class="num gold"><b>${rows.reduce((s,[,v])=>s+(v.p||0),0)}</b></td><td class="num"><b>${rows.reduce((s,[,v])=>s+(v.o||0)+(v.p||0),0)}</b></td></tr>
+    </table></div></div>`;
+  }
+  return `<div class="card"><div class="sec-h">${title}</div><div class="tbl-wrap"><table class="sum">
+    <tr><th>מנה</th><th class="num">כמות</th></tr>
+    ${rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v}</td></tr>`).join('')}
+  </table></div></div>`;
+}
+function renderSummary(){
+  const dates=[...new Set(store.orders.map(o=>o.date).filter(Boolean))].sort();
+  if(!dates.length){
+    $('#view').innerHTML=`<div class="empty"><div class="big">🍲</div><p>אין עדיין הזמנות עם תאריך.<br>ברגע שיהיו — כאן יופיע סיכום ההכנות המלא לכל יום.</p></div>`;
+    return;
+  }
+  const t=todayStr();
+  if(!view.summaryDate||!dates.includes(view.summaryDate)){
+    view.summaryDate=dates.find(d=>d>=t)||dates[dates.length-1];
+  }
+  const sel=view.summaryDate;
+  const list=sortOrders(store.orders.filter(o=>o.date===sel));
+  const agg=aggregate(list);
+  const dateOpts=dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d).length})</option>`).join('');
+
+  const deliveries=list.filter(o=>!o.pickup);
+  const pickups=list.filter(o=>o.pickup);
+  const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים</div><div class="tbl-wrap"><table class="sum">
+      <tr><th>שעה</th><th>שם</th><th>לאן</th><th>טלפון</th><th>תשלום</th></tr>
+      ${deliveries.map(o=>`<tr><td class="num">${esc(o.time||'—')}</td><td>${esc(o.name)}</td><td>${esc(o.place||'—')}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid))}</td></tr>`).join('')}
+      ${pickups.map(o=>`<tr><td class="num">—</td><td>${esc(o.name)}</td><td>איסוף עצמי</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid))}</td></tr>`).join('')}
+    </table></div></div>`:'';
+
+  const extrasHtml=agg.extras.length?`<div class="card"><div class="sec-h">✨ אקסטרות</div><div class="tbl-wrap"><table class="sum">
+      <tr><th>מה</th><th class="num">כמות</th><th>למי</th><th>הערה</th></tr>
+      ${agg.extras.map(e=>`<tr><td>${esc(e.what)}</td><td class="num">${e.q}</td><td>${esc(e.who)}</td><td>${esc(e.note||'')}</td></tr>`).join('')}
+    </table></div></div>`:'';
+
+  const notesHtml=(agg.heatNotes.length||agg.generalNotes.length)?`<div class="card"><div class="sec-h">📌 הערות חשובות</div>
+      ${agg.heatNotes.map(n=>`<div class="item-row"><span class="item-name"><b>${esc(n.who)}</b> — חריפות: ${esc(n.txt)}</span></div>`).join('')}
+      ${agg.generalNotes.map(n=>`<div class="item-row"><span class="item-name"><b>${esc(n.who)}</b> — ${esc(n.txt)}</span></div>`).join('')}
+    </div>`:'';
+
+  $('#view').innerHTML=`
+  <div class="row no-print" style="margin:16px 0 4px">
+    <div class="field" style="flex:1;margin:0"><label>סיכום הכנות ליום</label>
+      <select data-bind="summaryDate">${dateOpts}</select></div>
+    <button type="button" class="btn" data-act="print" style="align-self:flex-end">🖨️ הדפסה</button>
+    <button type="button" class="btn" data-act="copyDay" style="align-self:flex-end">📋 העתקת הסיכום</button>
+  </div>
+  <h2 style="margin:10px 0 0;font-size:1.15rem">🍲 סיכום הכנות — ${esc(fmtDate(sel))}</h2>
+  <div class="stats">
+    <div class="stat"><div class="n">${agg.orders}</div><div class="l">הזמנות</div></div>
+    <div class="stat"><div class="n">${agg.meals}</div><div class="l">ארוחות זוגיות</div></div>
+    <div class="stat"><div class="n">${agg.challot}</div><div class="l">חלות</div></div>
+    <div class="stat"><div class="n">${agg.aricha||'—'}</div><div class="l">עריכה (איש)</div></div>
+    <div class="stat"><div class="n">${money(agg.revenue)}</div><div class="l">סה"כ הכנסות</div></div>
+    <div class="stat"><div class="n">${money(agg.owed)}</div><div class="l">נשאר לגבות</div></div>
+  </div>
+  ${sumTable('🥗 סלטים להכנה', agg.salads, {pinukCols:true})}
+  ${sumTable('🐟 מנות ראשונות', agg.firsts)}
+  ${sumTable('🍖 עיקריות', agg.mains)}
+  ${sumTable('🍚 תוספות', agg.sides)}
+  ${sumTable('🍫 קינוחים', agg.desserts)}
+  ${extrasHtml}
+  ${notesHtml}
+  ${delivHtml}
+  <div class="card">
+    <div class="sec-h">📄 כרטיסי הזמנה (${list.length})</div>
+    <p class="hint no-print">כמו הכרטיסיות בקובץ הוורד — להדפסה או העתקה.</p>
+    ${list.map(o=>`<div class="order-text" style="margin-bottom:10px">${esc(buildOrderText(o))}</div>`).join('')}
+  </div>`;
+}
+function buildDayText(sel){
+  const list=sortOrders(store.orders.filter(o=>o.date===sel));
+  const agg=aggregate(list);
+  const L=[`🍲 סיכום הכנות — ${fmtDate(sel)}`,
+    `${agg.orders} הזמנות · ${agg.meals} ארוחות זוגיות · ${agg.challot} חלות${agg.aricha?` · עריכה ל־${agg.aricha} איש`:''}`,''];
+  const sal=Object.entries(agg.salads).filter(([,v])=>v.o+v.p>0);
+  if(sal.length){
+    L.push('🥗 סלטים:');
+    for(const [n,v] of sal) L.push(`  • ${n}: ${(v.o||0)+(v.p||0)}${v.p?` (מתוכם ${v.p} פינוק 🎁)`:''}`);
+    L.push('');
+  }
+  const block=(title,obj)=>{
+    const rows=Object.entries(obj).filter(([,v])=>v>0);
+    if(!rows.length) return;
+    L.push(title);
+    for(const [n,q] of rows) L.push(`  • ${n}: ${q}`);
+    L.push('');
+  };
+  block('🐟 ראשונות:',agg.firsts);
+  block('🍖 עיקריות:',agg.mains);
+  block('🍚 תוספות:',agg.sides);
+  block('🍫 קינוחים:',agg.desserts);
+  if(agg.extras.length){
+    L.push('✨ אקסטרות:');
+    for(const e of agg.extras) L.push(`  • ${e.what} ×${e.q} (${e.who})${e.note?` — ${e.note}`:''}`);
+    L.push('');
+  }
+  if(agg.heatNotes.length||agg.generalNotes.length){
+    L.push('📌 הערות:');
+    for(const n of agg.heatNotes) L.push(`  • ${n.who} — חריפות: ${n.txt}`);
+    for(const n of agg.generalNotes) L.push(`  • ${n.who} — ${n.txt}`);
+    L.push('');
+  }
+  L.push('🚚 משלוחים:');
+  for(const o of list) L.push(`  • ${o.time&&!o.pickup?o.time+' — ':''}${o.name} — ${o.pickup?'איסוף עצמי':(o.place||'—')}${o.phone?' — '+o.phone:''}`);
+  L.push('');
+  L.push(`💰 סה"כ: ${money(agg.revenue)} · נשאר לגבות: ${money(agg.owed)}`);
+  return L.join('\n');
+}
+
+/* ================= render: backup ================= */
+function renderBackup(){
+  const json=JSON.stringify(store,null,1);
+  $('#view').innerHTML=`
+  <div class="card">
+    <div class="sec-h">💾 גיבוי ושחזור</div>
+    <p class="hint">הנתונים נשמרים אוטומטית בדפדפן הזה בלבד. כדי לא לאבד כלום (ולהעביר למכשיר אחר) — מומלץ לשמור קובץ גיבוי מדי פעם.</p>
+    <div class="row" style="margin-bottom:12px">
+      <button type="button" class="btn primary" data-act="exportFile">⬇️ שמירת קובץ גיבוי</button>
+      <button type="button" class="btn" data-act="exportCopy">📋 העתקת הגיבוי כטקסט</button>
+    </div>
+    <div class="field"><label>שחזור מגיבוי — בחרי קובץ או הדביקי כאן את הטקסט:</label>
+      <input type="file" id="importFile" accept=".json,application/json" style="margin-bottom:8px">
+      <textarea id="importText" style="min-height:110px;direction:ltr;font-family:monospace;font-size:.8rem" placeholder='{"orders":[...]}'></textarea>
+    </div>
+    <button type="button" class="btn danger" data-act="importApply">♻️ שחזור (מחליף את כל הנתונים הנוכחיים)</button>
+  </div>
+  <div class="card">
+    <div class="sec-h">ℹ️ מצב נוכחי</div>
+    <p>${store.orders.length} הזמנות שמורות${storageOK?'':' · ⚠️ שמירה אוטומטית לא פעילה בדפדפן זה'}</p>
+  </div>`;
+  const f=$('#importFile');
+  if(f) f.addEventListener('change',ev=>{
+    const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+    const r=new FileReader();
+    r.onload=()=>{ $('#importText').value=String(r.result||''); toast('הקובץ נטען — עכשיו ללחוץ «שחזור»'); };
+    r.readAsText(file);
+  });
+}
+function exportData(asFile){
+  const json=JSON.stringify(store,null,1);
+  const fname='batmelech-orders-'+todayStr()+'.json';
+  if(!asFile){ copyText(json); return; }
+  if(window.claude && window.claude.downloads){
+    window.claude.downloads.save({filename:fname, data:json})
+      .then(()=>toast('הגיבוי נשמר ✓'))
+      .catch(err=>{ if(err&&err.code==='declined') return; toast('השמירה לא הצליחה — אפשר להעתיק כטקסט'); });
+    return;
+  }
+  try{
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=fname;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},500);
+    toast('הגיבוי ירד ✓');
+  }catch(e){ toast('השמירה לא הצליחה — אפשר להעתיק כטקסט'); }
+}
+function importApply(){
+  const txt=($('#importText')||{}).value||'';
+  if(!txt.trim()){ toast('אין מה לשחזר — קודם לבחור קובץ או להדביק טקסט'); return; }
+  let d;
+  try{ d=JSON.parse(txt); }catch(e){ toast('הטקסט לא תקין — זה לא קובץ גיבוי'); return; }
+  if(!d||!Array.isArray(d.orders)){ toast('הקובץ לא נראה כמו גיבוי של המערכת'); return; }
+  if(!confirm(`לשחזר ${d.orders.length} הזמנות? זה יחליף את ${store.orders.length} ההזמנות הנוכחיות.`)) return;
+  store=d; saveStore(); view.tab='orders'; render(); toast('שוחזר ✓');
+}
+
+/* ================= actions ================= */
+function render(){
+  renderTabs();
+  if(view.tab==='orders') renderOrders();
+  else if(view.tab==='form') renderForm();
+  else if(view.tab==='summary') renderSummary();
+  else renderBackup();
+  window.scrollTo(0,0);
+}
+function saveDraft(){
+  if(!draft.date){ toast('חסר תאריך להזמנה 🗓️'); const el=document.querySelector('[data-bind="date"]'); if(el) el.focus(); return; }
+  if(!draft.name.trim()){ toast('חסר שם לקוח 👤'); const el=document.querySelector('[data-bind="name"]'); if(el) el.focus(); return; }
+  if(!draft.id){ draft.id=uid(); store.orders.push(draft); }
+  else {
+    const i=store.orders.findIndex(o=>o.id===draft.id);
+    if(i>=0) store.orders[i]=draft; else store.orders.push(draft);
+  }
+  saveStore();
+  draft=null; view.tab='orders'; render(); toast('ההזמנה נשמרה ✓');
+}
+
+document.addEventListener('click', e=>{
+  const btn=e.target.closest('[data-act]');
+  if(!btn) return;
+  const act=btn.dataset.act;
+  if(act==='tab'){
+    const t=btn.dataset.tab;
+    if(t==='form'){ draft=newDraft(); }
+    view.tab=t; render(); return;
+  }
+  if(act==='bump'){
+    const g=btn.dataset.group, i=Number(btn.dataset.i), k=btn.dataset.k||null, dd=Number(btn.dataset.d);
+    const nv=bump(g,i,k,dd);
+    const cell=document.querySelector(`[data-cell="${g}|${i}${k?'|'+k:''}"]`);
+    if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
+    if(g==='extras'){
+      const note=document.querySelector(`[data-note-cell="extras|${i}"]`);
+      if(note) note.classList.toggle('hidden',nv===0);
+    }
+    if(g==='pickup') return;
+    refreshFormDerived(); return;
+  }
+  if(act==='useSuggested'){
+    draft.total=btn.dataset.total;
+    const el=document.querySelector('[data-bind="total"]'); if(el) el.value=draft.total;
+    toast('המחיר עודכן ✓'); return;
+  }
+  if(act==='addCustom'){ draft.custom.push({name:'',qty:1,price:''}); renderForm(); return; }
+  if(act==='delCustom'){ draft.custom.splice(Number(btn.dataset.i),1); renderForm(); return; }
+  if(act==='save'){ saveDraft(); return; }
+  if(act==='cancel'){
+    draft=null; view.tab='orders'; render(); return;
+  }
+  if(act==='edit'){
+    const o=store.orders.find(x=>x.id===btn.dataset.id);
+    if(o){ draft=draftFrom(o); view.tab='form'; render(); }
+    return;
+  }
+  if(act==='dup'){
+    const o=store.orders.find(x=>x.id===btn.dataset.id);
+    if(o){ draft=draftFrom(o); draft.id=null; draft.paid='לא'; draft.deposit=''; view.tab='form'; render(); toast('הועתק — אפשר לערוך ולשמור כהזמנה חדשה'); }
+    return;
+  }
+  if(act==='del'){
+    const o=store.orders.find(x=>x.id===btn.dataset.id);
+    if(o && confirm(`למחוק את ההזמנה של ${o.name||'ללא שם'}?`)){
+      store.orders=store.orders.filter(x=>x.id!==o.id);
+      saveStore(); render(); toast('נמחק');
+    }
+    return;
+  }
+  if(act==='toggleText'){
+    const el=document.querySelector(`[data-text-for="${btn.dataset.id}"]`);
+    if(el) el.hidden=!el.hidden;
+    return;
+  }
+  if(act==='copyText'){
+    const o=store.orders.find(x=>x.id===btn.dataset.id);
+    if(o) copyText(buildOrderText(o));
+    return;
+  }
+  if(act==='daySummary'){ view.tab='summary'; view.summaryDate=btn.dataset.date; render(); return; }
+  if(act==='print'){ window.print(); return; }
+  if(act==='copyDay'){ copyText(buildDayText(view.summaryDate)); return; }
+  if(act==='exportFile'){ exportData(true); return; }
+  if(act==='exportCopy'){ exportData(false); return; }
+  if(act==='importApply'){ importApply(); return; }
+});
+
+function handleBind(e){
+  const b=e.target.dataset.bind;
+  if(!b) return;
+  if(b==='summaryDate'){ view.summaryDate=e.target.value; renderSummary(); return; }
+  if(!draft) return;
+  const v=e.target.value;
+  const i=Number(e.target.dataset.i);
+  switch(b){
+    case 'date': draft.date=v; break;
+    case 'name': draft.name=v; break;
+    case 'phone': draft.phone=v; break;
+    case 'place': draft.place=v; break;
+    case 'time': draft.time=v; break;
+    case 'pickup': {
+      draft.pickup=e.target.checked;
+      const df=$('#deliveryFields'); if(df) df.hidden=draft.pickup;
+      break;
+    }
+    case 'heat': draft.heat=v; break;
+    case 'firstsNote': draft.firstsNote=v; break;
+    case 'mainsNote': draft.mainsNote=v; break;
+    case 'notes': draft.notes=v; break;
+    case 'total': draft.total=v; break;
+    case 'deposit': draft.deposit=v; break;
+    case 'payMethod': draft.payMethod=v; break;
+    case 'paid': draft.paid=v; break;
+    case 'extra-note': {
+      const name=MENU.extras[i].name;
+      const ex=draft.extras[name]||(draft.extras[name]={q:0,note:''});
+      ex.note=v;
+      if(ex.q===0&&!ex.note) delete draft.extras[name];
+      break;
+    }
+    case 'custom-name': if(draft.custom[i]) draft.custom[i].name=v; break;
+    case 'custom-qty': if(draft.custom[i]){ draft.custom[i].qty=v; updatePriceHint(); } break;
+    case 'custom-price': if(draft.custom[i]){ draft.custom[i].price=v; updatePriceHint(); } break;
+  }
+}
+document.addEventListener('input', handleBind);
+document.addEventListener('change', e=>{
+  if(e.target.type==='checkbox'||e.target.tagName==='SELECT'||e.target.type==='date') handleBind(e);
+});
+
+/* ================= init ================= */
+document.documentElement.setAttribute('dir','rtl');
+document.documentElement.setAttribute('lang','he');
+loadStore();
+render();
+</script>
+
+</body>
+</html>
