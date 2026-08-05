@@ -71,6 +71,21 @@ textarea{min-height:66px;resize:vertical}
     ממלאים את ההזמנה, לוחצים על «שליחה בוואטסאפ» למטה — ואנחנו כבר מאשרים לך הכול חזרה 🌸
   </p>
 
+  <div class="card" style="border-width:2px;border-color:#EFA9BC">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+      <b style="font-size:1.05rem">✿ ארוחה זוגית לשבת</b>
+      <b style="color:#B0446B;font-size:1.2rem">230$</b>
+    </div>
+    <div style="font-size:.9rem;margin-top:6px;line-height:1.7">
+      כלול במחיר: <b>4 סלטים</b> לבחירה · <b>זוג דגי ראשונה</b> · <b>עיקרית</b> לבחירה ·
+      <b>תוספת</b> לבחירה · <b>קינוח</b> · <b>זוג חלות ביתיות</b> ·
+      ערכת אירוח מהודרת לשבת (נרות, כוס קידוש ומיץ ענבים, צלחות, סכו"ם ומפיות)
+    </div>
+    <div class="hint" style="margin-top:6px">
+      כל מה שמעבר לכלול מופיע עם מחיר ליד, ומסוכם למטה ב«סיכום מחיר» — בלי הפתעות 🌸
+    </div>
+  </div>
+
   <h2 class="sec">🗓️ פרטי ההזמנה</h2>
   <div class="card">
     <div class="grid2">
@@ -84,6 +99,7 @@ textarea{min-height:66px;resize:vertical}
     <label class="row" style="margin:6px 0;gap:8px;cursor:pointer">
       <input type="checkbox" style="width:auto" data-bind="pickup"> איסוף עצמי
     </label>
+    <p class="hint" style="margin:2px 0 6px">משלוח ברחבי דובאי — 15$ (50 דירהם) · באיסוף עצמי אין עלות משלוח</p>
     <div id="deliveryFields">
       <div class="grid2">
         <div class="field"><label>לאיזה מלון / אזור?</label><input data-bind="place" placeholder="שם המלון"></div>
@@ -94,11 +110,11 @@ textarea{min-height:66px;resize:vertical}
   </div>
 
   <h2 class="sec">🥗 סלטים <span class="badge" id="saladBadge"></span></h2>
-  <p class="hint">בכל ארוחה זוגית כלולים 4 סלטים לבחירה. אפשר להוסיף מעבר (תוספת 4 סלטים — 25$).</p>
+  <p class="hint"><b>4 סלטים כלולים</b> בכל ארוחה זוגית. סלטים מעבר לכך: <b>25$ לכל 4 סלטים נוספים</b> — התוספת מחושבת אוטומטית בסיכום המחיר למטה.</p>
   <div class="card" id="saladList"></div>
 
   <h2 class="sec">🐟 מנה ראשונה <span class="badge" id="fishBadge"></span></h2>
-  <p class="hint">בכל ארוחה זוגית כלולים 2 דגים — אפשר לפצל (למשל 1 מרוקאי + 1 חריימה).</p>
+  <p class="hint"><b>2 דגים כלולים</b> בכל ארוחה זוגית — אפשר לפצל (למשל 1 מרוקאי + 1 חריימה). דגים נוספים — המחיר יתואם בוואטסאפ.</p>
   <div class="card" id="firstList"></div>
   <div class="card" style="margin-top:10px">
     <div class="field"><label>חריפות</label><select data-bind="heat">
@@ -108,7 +124,7 @@ textarea{min-height:66px;resize:vertical}
   </div>
 
   <h2 class="sec">🍖 עיקרית</h2>
-  <p class="hint">בכל ארוחה זוגית כלולה עיקרית אחת לבחירה.</p>
+  <p class="hint"><b>עיקרית אחת כלולה</b> בכל ארוחה זוגית — אפשר גם להחליף למגש שניצלים או רולדת בשר (במקום העיקרית).</p>
   <div class="card" id="mainList"></div>
 
   <h2 class="sec">🍚 תוספת</h2>
@@ -127,6 +143,9 @@ textarea{min-height:66px;resize:vertical}
       <span id="challotStep"></span>
     </div>
   </div>
+
+  <h2 class="sec">💰 סיכום מחיר</h2>
+  <div class="card" id="priceBreakdown"></div>
 
   <h2 class="sec">📝 הערות</h2>
   <div class="card">
@@ -156,7 +175,6 @@ const MAINS=['קציצות בשר ברוטב אדום עשיר','קציצות ב
 const SIDES=['אורז לבן','אורז מתובל / פרסי עם עשבי תיבול','קוסקוס עננים','פסטה נקיה','פסטה אדומה','מגש תפו"א'];
 const DESSERTS=['סופלה שוקולד','סוכריות בקלוואה'];
 const EXTRAS=[
-  {name:'תוספת 4 סלטים לבחירה', price:25},
   {name:'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)', price:150},
   {name:'מפרום ביתי של אמא (זוגי)', price:40},
   {name:'טבחה בשר אדומה עם אפונה ותפו"א (ל־2־3 אנשים)', price:100},
@@ -170,9 +188,9 @@ const EXTRAS=[
   {name:'מארז הבדלה', price:20},
   {name:'סיר קובה סלק בתוספת אורז (ל־4 אנשים)', price:125},
   {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
-  {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
-  {name:'משלוח', price:15}
+  {name:'חלת שניצל (ספיישל סופ"ש)', price:28}
 ];
+const SALAD_BLOCK_PRICE=25, DELIVERY_PRICE=15;
 const o={date:'',name:'',phone:'',place:'',address:'',time:'',pickup:false,
   meals:1,challot:2,salads:{},firsts:{},heat:'',mains:{},sides:{},desserts:{},extras:{},notes:''};
 
@@ -219,13 +237,26 @@ function bump(g,i,d){
   if(nv===0) delete o[g][name]; else o[g][name]=nv;
   return nv;
 }
-function estTotal(){
-  let t=o.meals*COUPLE_PRICE;
-  for(const ex of EXTRAS){ const e=o.extras[ex.name]; if(e&&e.q) t+=e.q*ex.price; }
+function estLines(){
+  const lines=[], warns=[];
+  if(o.meals>0) lines.push({l:`ארוחה זוגית ×${o.meals}`, a:o.meals*COUPLE_PRICE});
+  const nS=Object.values(o.salads).reduce((s,x)=>s+x,0);
+  const inclS=4*o.meals;
+  const extraS=Math.max(0,nS-inclS);
+  const saladBlocks=Math.ceil(extraS/4);
+  if(extraS>0) lines.push({l:`סלטים נוספים (${extraS} מעבר לכלול)`, a:saladBlocks*SALAD_BLOCK_PRICE});
+  for(const ex of EXTRAS){ const e=o.extras[ex.name]; if(e&&e.q) lines.push({l:`${ex.name} ×${e.q}`, a:e.q*ex.price}); }
   const extraCh=Math.max(0,o.challot-2*o.meals);
-  if(o.meals>0) t+=extraCh*CHALLAH_PRICE;
-  return t;
+  if(extraCh>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:extraCh*CHALLAH_PRICE});
+  if(!o.pickup) lines.push({l:'משלוח ברחבי דובאי', a:DELIVERY_PRICE});
+  const nF=Object.values(o.firsts).reduce((s,x)=>s+x,0);
+  if(nF>2*o.meals) warns.push(`בחרת ${nF-2*o.meals} דגים מעבר לכלול — המחיר לדגים הנוספים יתואם בוואטסאפ`);
+  const nM=Object.values(o.mains).reduce((s,x)=>s+x,0);
+  if(o.meals>0&&nM>o.meals) warns.push('בחרת עיקריות מעבר לכלול — התוספת תתואם בוואטסאפ');
+  if(o.meals===0&&(nF>0||nM>0)) warns.push('בחרת מנות בלי ארוחה זוגית — המחיר יתואם בוואטסאפ');
+  return {lines, warns, saladBlocks, total:lines.reduce((s,x)=>s+x.a,0)};
 }
+function estTotal(){ return estLines().total; }
 function fmtDateHe(ds){
   if(!ds) return '';
   const d=new Date(ds+'T00:00:00');
@@ -251,8 +282,16 @@ function buildText(){
   if(exs.length) L.push(`אקסטרות: ${exs.join(', ')}`);
   if(o.challot) L.push(`חלות: ${o.challot}`);
   if(o.notes) L.push(`הערות: ${o.notes}`);
-  L.push(`מחיר משוער: ${estTotal()}$ (לאישור סופי)`);
-  const code=btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+  const est=estLines();
+  L.push('');
+  L.push('פירוט מחיר (משוער):');
+  for(const ln of est.lines) L.push(`• ${ln.l} — ${ln.a}$`);
+  L.push(`סה"כ משוער: ${est.total}$`);
+  for(const w of est.warns) L.push(`⚠️ ${w}`);
+  const exp=JSON.parse(JSON.stringify(o));
+  if(est.saladBlocks>0) exp.extras['תוספת 4 סלטים לבחירה']={q:est.saladBlocks,note:''};
+  if(!o.pickup) exp.extras['משלוח']={q:1,note:''};
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(exp))));
   L.push('');
   L.push(`#BM1#${code}#`);
   return L.join('\n');
@@ -262,7 +301,18 @@ function refresh(){
   $('#saladBadge').textContent=o.meals>0?`${nS}/${inclS} כלולים`:`${nS}`;
   const inclF=2*o.meals, nF=Object.values(o.firsts).reduce((s,x)=>s+x,0);
   $('#fishBadge').textContent=o.meals>0?`${nF}/${inclF} כלולים`:`${nF}`;
-  $('#totalEst').textContent=`משוער: ${estTotal()}$`;
+  const est=estLines();
+  $('#priceBreakdown').innerHTML=
+    (est.lines.length?est.lines.map(ln=>`<div class="item-row" style="justify-content:space-between">
+        <span class="item-name">${esc(ln.l)}</span>
+        <b style="font-variant-numeric:tabular-nums">${ln.a}$</b>
+      </div>`).join(''):`<p class="hint">עדיין לא נבחר כלום.</p>`)
+    +(est.lines.length?`<div class="item-row" style="justify-content:space-between;border-top:2px solid #F2CDD6;border-bottom:none;padding-top:10px">
+        <b>סה"כ משוער</b><b style="color:#B0446B;font-size:1.15rem;font-variant-numeric:tabular-nums">${est.total}$</b>
+      </div>`:'')
+    +est.warns.map(w=>`<p style="color:#B0446B;font-size:.88rem;font-weight:600;margin:8px 0 0">⚠️ ${esc(w)}</p>`).join('')
+    +`<p class="hint" style="margin:8px 0 0">המחיר משוער — מאושר סופית בהודעה חוזרת בוואטסאפ 🌸</p>`;
+  $('#totalEst').textContent=`סה"כ משוער: ${est.total}$`;
   $('#waSend').href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(buildText())}`;
 }
 document.addEventListener('click',e=>{
