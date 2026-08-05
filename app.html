@@ -149,6 +149,11 @@ table.sum .num.gold{color:var(--gold)}
 
 .storage-warn{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:10px 14px;margin:12px 0;font-size:.9rem}
 
+.badge.red{background:var(--danger-soft);color:var(--danger)}
+.cap-bar{height:8px;background:var(--surface2);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:4px}
+.cap-fill{height:100%;background:var(--accent);border-radius:999px}
+.cap-fill.full{background:var(--danger)}
+
 /* bon (kitchen/customer ticket) */
 #printArea{display:none;direction:rtl}
 body.printing #app{display:none!important}
@@ -252,9 +257,9 @@ const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 
 /* ================= state ================= */
 const LS_KEY='batmelech-orders-v1';
-let store={orders:[]};
+let store={orders:[],settings:{maxMeals:0}};
 let storageOK=true;
-let view={tab:'orders', summaryDate:null, search:'', custSearch:'', labelCopies:{}};
+let view={tab:'today', summaryDate:null, search:'', custSearch:'', labelCopies:{}};
 let draft=null;
 
 function loadStore(){
@@ -262,6 +267,7 @@ function loadStore(){
     const raw=localStorage.getItem(LS_KEY);
     if(raw){ const d=JSON.parse(raw); if(d && Array.isArray(d.orders)) store=d; }
   }catch(e){ storageOK=false; }
+  store.settings=Object.assign({maxMeals:0},store.settings||{});
 }
 function saveStore(){
   try{ localStorage.setItem(LS_KEY, JSON.stringify(store)); }
@@ -463,6 +469,9 @@ function labelHtml(o){
     <div class="lb-meta">${esc(o.pickup?'איסוף עצמי':(o.place||''))}${(!o.pickup&&o.time)?' · '+esc(o.time):''}</div>
     ${(!o.pickup&&o.address)?`<div class="lb-meta">${esc(o.address)}</div>`:''}
     ${o.phone?`<div class="lb-meta">📞 ${esc(o.phone)}</div>`:''}
+    <div class="lb-meta" style="margin-top:7px;padding-top:6px;border-top:1px dashed var(--line);font-size:.78rem">
+      לשמור בקירור עד החימום ❄️ · חימום בכלי מכוסה${o.date?` · הוכן בתאריך ${esc(fmtShort(o.date))}`:''}
+    </div>
   </div>`;
 }
 function labelsHtml(list){
@@ -509,6 +518,7 @@ function renderLabels(){
 
 /* ================= render: tabs ================= */
 const TABS=[
+  {id:'today', label:'🏠 היום'},
   {id:'orders', label:'📋 הזמנות'},
   {id:'form', label:'➕ הזמנה חדשה'},
   {id:'summary', label:'🍲 סיכום הכנות'},
@@ -570,11 +580,15 @@ function groupHtml(dates,obj){
     const list=obj[dk];
     const tot=list.reduce((s,o)=>s+parseMoney(o.total),0);
     const meals=list.reduce((s,o)=>s+(o.meals||0),0);
+    const max=store.settings.maxMeals||0;
+    const capBadge=(max>0&&dk!=='ללא תאריך')
+      ?`<span class="badge${meals>=max?' red':''}">${meals}/${max} זוגיות${meals>=max?' · מלא!':''}</span>`
+      :(meals>0?`<span class="badge">${meals} זוגיות</span>`:'');
     return `<section>
       <div class="date-h">
         <span class="d">📅 ${esc(fmtDate(dk==='ללא תאריך'?'':dk))}</span>
         <span class="badge">${list.length} הזמנות</span>
-        ${meals>0?`<span class="badge">${meals} זוגיות</span>`:''}
+        ${capBadge}
         ${tot>0?`<span class="badge gold">${money(tot)}</span>`:''}
         ${dk!=='ללא תאריך'?`<button type="button" class="btn sm no-print" data-act="daySummary" data-date="${dk}">🍲 לסיכום ההכנות</button>`:''}
       </div>
@@ -862,6 +876,13 @@ function updatePriceHint(){
   const inclF=MENU.includedFish*(draft.meals||0);
   const nF=countFish(draft);
   if(draft.meals>0 && nF>inclF) warns.push(`הוזמנו ${nF-inclF} דגים מעבר לכלול.`);
+  const max=store.settings.maxMeals||0;
+  if(max>0&&draft.date&&draft.meals>0){
+    const others=store.orders.filter(o=>o.date===draft.date&&o.id!==draft.id).reduce((s,o)=>s+(o.meals||0),0);
+    const tot=others+draft.meals;
+    if(tot>max) warns.push(`עומס! עם ההזמנה הזאת יהיו ${tot} זוגיות ב־${fmtShort(draft.date)} — מעבר לתקרה שקבעת (${max}).`);
+    else if(tot===max) warns.push(`התאריך ${fmtShort(draft.date)} מתמלא: ${tot}/${max} זוגיות.`);
+  }
   let html='';
   if(sug.lines.length){
     html+=`<div class="hint" style="margin-bottom:8px">מחיר מוצע לפי המחירון: `+
@@ -1109,6 +1130,72 @@ function buildDayText(){
   return L.join('\n');
 }
 
+/* ================= render: today ================= */
+function renderToday(){
+  const t=todayStr();
+  const up=sortOrders(store.orders.filter(o=>o.date&&o.date>=t));
+  const todayList=up.filter(o=>o.date===t);
+  const max=store.settings.maxMeals||0;
+  const hour=new Date().getHours();
+  const greet=hour<12?'בוקר טוב':(hour<18?'צהריים טובים':'ערב טוב');
+  let html=`<h2 style="margin:18px 0 2px;font-size:1.3rem">${greet} 🌸</h2>
+    <p class="hint" style="margin:0 0 4px">${esc(fmtDate(t))}</p>
+    <div class="row no-print" style="margin:12px 0">
+      <button type="button" class="btn primary" data-act="tab" data-tab="form">➕ הזמנה חדשה</button>
+      <button type="button" class="btn" data-act="tab" data-tab="summary">🍲 סיכום הכנות</button>
+    </div>`;
+  if(!storageOK) html+=`<div class="storage-warn">⚠️ שמירה אוטומטית לא זמינה בדפדפן הזה — מומלץ לייצא גיבוי בסוף כל שימוש.</div>`;
+  if(!store.orders.length){
+    html+=`<div class="empty"><div class="big">🕯️</div><p>עדיין אין הזמנות.<br>לוחצים על «➕ הזמנה חדשה» ומתחילים.</p></div>`;
+    $('#view').innerHTML=html; return;
+  }
+  if(todayList.length){
+    html+=`<div class="card"><div class="sec-h">🚚 אספקות היום <span class="badge">${todayList.length}</span></div>`+
+      todayList.map(o=>`<div class="item-row">
+        <span class="item-name"><b>${esc(o.name)}</b> — ${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}${o.time?` · ${esc(o.time)}`:''} ${statusPill(o)}</span>
+        <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">פתיחה</button>
+      </div>`).join('')+
+      `<div style="margin-top:8px"><button type="button" class="btn sm" data-act="daySummary" data-date="${t}">🍲 לסיכום ההכנות של היום</button></div></div>`;
+  }
+  const upDates=[...new Set(up.map(o=>o.date))].sort().slice(0,4);
+  if(upDates.length){
+    html+=`<div class="card"><div class="sec-h">📅 העומס הקרוב</div>`+
+      upDates.map(dk=>{
+        const list=up.filter(o=>o.date===dk);
+        const meals=list.reduce((s,o)=>s+(o.meals||0),0);
+        const pct=max>0?Math.min(100,Math.round(meals/max*100)):0;
+        const full=max>0&&meals>=max;
+        return `<div style="margin:10px 0">
+          <div class="row" style="justify-content:space-between">
+            <b>${esc(fmtDate(dk))}</b>
+            <span class="hint">${list.length} הזמנות · ${max>0?`${meals}/${max} זוגיות`:`${meals} זוגיות`}
+              ${full?'<span class="pill no">מלא!</span>':''}</span>
+          </div>
+          ${max>0?`<div class="cap-bar"><div class="cap-fill${full?' full':''}" style="width:${pct}%"></div></div>`:''}
+        </div>`;
+      }).join('')+
+      (max>0?'':`<p class="hint">טיפ: בלשונית «גיבוי» אפשר להגדיר תקרת זוגיות לשישי — ואז תראי כאן בדיוק כמה מקום נשאר.</p>`)+
+    `</div>`;
+  } else {
+    html+=`<div class="card"><p class="hint">אין הזמנות קרובות כרגע.</p></div>`;
+  }
+  const noDeposit=up.filter(o=>o.paid==='לא'&&!parseMoney(o.deposit)&&parseMoney(o.total)>0);
+  const pending=up.filter(o=>(o.status||'חדשה')==='חדשה');
+  const owed=up.reduce((s,o)=>(o.paid!=='כן'&&o.paid!=='שת"פ')?s+Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):s,0);
+  const alertRow=(txt,id)=>`<div class="item-row">
+    <span class="item-name">${txt}</span>
+    <button type="button" class="btn sm" data-act="edit" data-id="${id}">פתיחה</button>
+  </div>`;
+  let alerts='';
+  for(const o of noDeposit) alerts+=alertRow(`💸 <b>${esc(o.name)}</b> (${esc(fmtShort(o.date))}) — בלי מקדמה`,o.id);
+  for(const o of pending) alerts+=alertRow(`⏳ <b>${esc(o.name)}</b> (${esc(fmtShort(o.date))}) — ממתינה לאישור`,o.id);
+  html+=`<div class="card"><div class="sec-h">📌 דורש טיפול</div>`+
+    (alerts||`<p class="hint">הכול מסודר — אין התראות 🎉</p>`)+
+    (owed>0?`<p class="hint" style="margin-top:8px">סה"כ נשאר לגבות מהזמנות קרובות: <b>${money(owed)}</b></p>`:'')+
+  `</div>`;
+  $('#view').innerHTML=html;
+}
+
 /* ================= render: customers ================= */
 function renderCustomers(){
   let html='';
@@ -1191,6 +1278,12 @@ function renderBackup(){
     <button type="button" class="btn danger" data-act="importApply">♻️ שחזור (מחליף את כל הנתונים הנוכחיים)</button>
   </div>
   <div class="card">
+    <div class="sec-h">⚙️ הגדרות</div>
+    <div class="field"><label>מקסימום ארוחות זוגיות לשישי (0 = בלי הגבלה)</label>
+      <input inputmode="numeric" data-bind="maxMeals" value="${store.settings.maxMeals||0}" style="max-width:120px"></div>
+    <p class="hint">כשקובעים תקרה: במסך «היום» רואים כמה מקום נשאר לכל שישי, ליד כל תאריך מופיע ${'«'}X/Y זוגיות${'»'}, ובטופס יש התראה כשתאריך מתמלא.</p>
+  </div>
+  <div class="card">
     <div class="sec-h">ℹ️ מצב נוכחי</div>
     <p>${store.orders.length} הזמנות שמורות${storageOK?'':' · ⚠️ שמירה אוטומטית לא פעילה בדפדפן זה'}</p>
   </div>`;
@@ -1228,13 +1321,15 @@ function importApply(){
   try{ d=JSON.parse(txt); }catch(e){ toast('הטקסט לא תקין — זה לא קובץ גיבוי'); return; }
   if(!d||!Array.isArray(d.orders)){ toast('הקובץ לא נראה כמו גיבוי של המערכת'); return; }
   if(!confirm(`לשחזר ${d.orders.length} הזמנות? זה יחליף את ${store.orders.length} ההזמנות הנוכחיות.`)) return;
-  store=d; saveStore(); view.tab='orders'; render(); toast('שוחזר ✓');
+  store=d; store.settings=Object.assign({maxMeals:0},d.settings||{});
+  saveStore(); view.tab='orders'; render(); toast('שוחזר ✓');
 }
 
 /* ================= actions ================= */
 function render(){
   renderTabs();
-  if(view.tab==='orders') renderOrders();
+  if(view.tab==='today') renderToday();
+  else if(view.tab==='orders') renderOrders();
   else if(view.tab==='form') renderForm();
   else if(view.tab==='summary') renderSummary();
   else if(view.tab==='labels') renderLabels();
@@ -1372,11 +1467,15 @@ function handleBind(e){
   if(b==='summaryDate'){ view.summaryDate=e.target.value; renderSummary(); return; }
   if(b==='search'){ view.search=e.target.value; renderOrdersList(); return; }
   if(b==='custSearch'){ view.custSearch=e.target.value; renderCustomersList(); return; }
+  if(b==='maxMeals'){
+    store.settings.maxMeals=Math.max(0,parseInt(e.target.value,10)||0);
+    saveStore(); return;
+  }
   if(!draft) return;
   const v=e.target.value;
   const i=Number(e.target.dataset.i);
   switch(b){
-    case 'date': draft.date=v; break;
+    case 'date': draft.date=v; updatePriceHint(); break;
     case 'name': draft.name=v; break;
     case 'phone': draft.phone=v; break;
     case 'place': draft.place=v; break;
