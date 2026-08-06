@@ -8,6 +8,7 @@ const path = require('path');
 
   // ---- customer form page ----
   const cust = await browser.newPage({ viewport: { width: 420, height: 900 } });
+  await cust.addInitScript(() => { try { if (!localStorage.getItem('batmelech-orders-v1')) localStorage.setItem('batmelech-orders-v1', '{"orders":[]}'); } catch (e) {} });
   cust.on('pageerror', e => errors.push('CUST PAGEERROR: ' + e.message));
   cust.on('console', m => { if (m.type() === 'error') errors.push('CUST CONSOLE: ' + m.text()); });
   await cust.goto('file://' + path.resolve(__dirname, '../order-form.html'));
@@ -62,6 +63,7 @@ const path = require('path');
 
   // ---- paste into the manager app ----
   const app = await browser.newPage({ viewport: { width: 420, height: 900 } });
+  await app.addInitScript(() => { try { if (!localStorage.getItem('batmelech-orders-v1')) localStorage.setItem('batmelech-orders-v1', '{"orders":[]}'); } catch (e) {} });
   app.on('pageerror', e => errors.push('APP PAGEERROR: ' + e.message));
   app.on('console', m => { if (m.type() === 'error') errors.push('APP CONSOLE: ' + m.text()); });
   await app.goto('file://' + path.resolve(__dirname, '../index.html'));

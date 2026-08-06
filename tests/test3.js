@@ -4,6 +4,7 @@ const path = require('path');
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
+  await page.addInitScript(() => { try { if (!localStorage.getItem('batmelech-orders-v1')) localStorage.setItem('batmelech-orders-v1', '{"orders":[]}'); } catch (e) {} });
   const errors = [];
   page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text()); });

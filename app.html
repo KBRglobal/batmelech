@@ -1461,6 +1461,14 @@ function renderToday(){
     html+=`<div class="empty"><div class="big">🕯️</div><p>עדיין אין הזמנות.<br>לוחצים על «➕ הזמנה חדשה» ומתחילים.</p></div>`;
     $('#view').innerHTML=html; return;
   }
+  if(!store.introSeen&&store.orders.some(o=>String(o.id).startsWith('demo'))){
+    html+=`<div class="card" style="border-color:var(--accent)">
+      <div class="row" style="justify-content:space-between">
+        <span>🌸 ההזמנות של השבת הקרובה כבר הוזנו מהקובץ שלך — קטי, לילך, חיים וניר. הכול חי בכל המסכים: הכנות, משלוחים, לקוחות וכספים. ממשיכים לעבוד מכאן רגיל.</span>
+        <button type="button" class="btn sm" data-act="introSeen">הבנתי ✓</button>
+      </div>
+    </div>`;
+  }
   const lbDays=store.lastBackup?Math.floor((Date.now()-store.lastBackup)/86400000):null;
   if(lbDays===null||lbDays>=7){
     html+=`<div class="card" style="border-color:var(--gold)">
@@ -2069,6 +2077,7 @@ document.addEventListener('click', e=>{
     persistMenu(); renderBackup(); toast('נוסף לתפריט ✓');
     return;
   }
+  if(act==='introSeen'){ store.introSeen=true; saveStore(); renderToday(); return; }
   if(act==='loadDemo'){
     loadDemoData(); view.tab='today'; render();
     toast('נטענו 4 הזמנות לדוגמה — קטי, לילך, חיים וניר 🎭');
@@ -2192,7 +2201,10 @@ document.addEventListener('change', e=>{
 /* ================= init ================= */
 document.documentElement.setAttribute('dir','rtl');
 document.documentElement.setAttribute('lang','he');
+let firstRun=false;
+try{ firstRun=!localStorage.getItem(LS_KEY); }catch(e){}
 loadStore();
 buildMenu();
+if(firstRun&&storageOK&&!store.orders.length) loadDemoData();
 render();
 </script>
