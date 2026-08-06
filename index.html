@@ -45,7 +45,7 @@ body{
   font-size:16px; line-height:1.55;
 }
 #app{direction:rtl}
-.wrap{max-width:860px;margin:0 auto;padding:0 14px 90px}
+.wrap{max-width:860px;margin:0 auto;padding:0 14px 130px}
 a{color:var(--accent)}
 button{font:inherit;color:inherit;cursor:pointer}
 input,select,textarea{
@@ -57,17 +57,41 @@ textarea{min-height:70px;resize:vertical}
 ::placeholder{color:var(--muted);opacity:.8}
 
 /* header */
-.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0 0}
-.top-in{max-width:860px;margin:0 auto;padding:0 14px}
-.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.brand h1{font-size:1.25rem;margin:0;font-weight:800;letter-spacing:.02em}
-.brand .sub{color:var(--muted);font-size:.85rem}
-.tabs{display:flex;gap:4px;margin-top:8px;overflow-x:auto}
-.tab{
-  border:none;background:none;padding:9px 14px;border-radius:10px 10px 0 0;
-  color:var(--muted);font-weight:600;white-space:nowrap;border-bottom:3px solid transparent;
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0}
+.top-in{max-width:860px;margin:0 auto;padding:0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
+.brand h1{font-size:1.15rem;margin:0;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.brand .sub{color:var(--muted);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:560px){.brand .sub{display:none}}
+.top-icons{display:flex;gap:6px;flex-shrink:0}
+.icon-btn{
+  width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
+  font-size:1.15rem;display:flex;align-items:center;justify-content:center;
 }
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
+.icon-btn.active{background:var(--accent-soft);border-color:var(--accent)}
+
+/* bottom navigation */
+.bottomnav{
+  position:fixed;bottom:0;right:0;left:0;z-index:40;background:var(--surface);
+  border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:flex-end;
+  padding:6px 4px calc(7px + env(safe-area-inset-bottom));
+}
+.bn-item{
+  display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:none;
+  color:var(--muted);font-size:.68rem;font-weight:700;padding:4px 8px;border-radius:12px;min-width:56px;
+}
+.bn-item .ic{font-size:1.3rem;line-height:1}
+.bn-item.active{color:var(--accent)}
+.bn-item.active:not(.big){background:var(--accent-soft)}
+.bn-item.big .ic{
+  background:var(--accent);color:var(--accent-ink);width:42px;height:42px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-top:-18px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+
+/* form quick-jump */
+.jump{display:flex;gap:6px;overflow-x:auto;position:sticky;top:62px;z-index:15;background:var(--bg);padding:8px 0 8px;margin:0}
+.jump .btn.sm{white-space:nowrap;flex-shrink:0}
 
 /* cards */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin:14px 0}
@@ -117,8 +141,9 @@ textarea{min-height:70px;resize:vertical}
 .btn.danger:hover{border-color:var(--danger);color:var(--danger)}
 .btn.sm{padding:5px 11px;font-size:.85rem;border-radius:8px}
 .savebar{
-  position:fixed;bottom:0;right:0;left:0;z-index:30;background:var(--surface);
-  border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;justify-content:center;
+  position:fixed;bottom:0;right:0;left:0;z-index:45;background:var(--surface);
+  border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  display:flex;gap:10px;justify-content:center;
 }
 .savebar .btn{min-width:130px}
 
@@ -215,13 +240,14 @@ body.printing #printArea{display:block}
   <header class="top">
     <div class="top-in">
       <div class="brand">
-        <h1>מטעמי בת מלך</h1>
-        <span class="sub">ניהול הזמנות · מטבח ביתי אותנטי כשר</span>
+        <h1>✿ מטעמי בת מלך</h1>
+        <span class="sub">מטבח ביתי אותנטי · כשר</span>
       </div>
-      <nav class="tabs" id="tabs"></nav>
+      <div class="top-icons" id="topIcons"></div>
     </div>
   </header>
   <main class="wrap" id="view"></main>
+  <nav class="bottomnav no-print" id="tabs" aria-label="ניווט ראשי"></nav>
 </div>
 <div id="printArea" dir="rtl" lang="he"></div>
 
@@ -539,19 +565,25 @@ function renderLabels(){
 }
 
 /* ================= render: tabs ================= */
-const TABS=[
-  {id:'today', label:'🏠 היום'},
-  {id:'orders', label:'📋 הזמנות'},
-  {id:'form', label:'➕ הזמנה חדשה'},
-  {id:'summary', label:'🍲 סיכום הכנות'},
-  {id:'customers', label:'👥 לקוחות'},
-  {id:'backup', label:'💾 גיבוי'}
+const MAIN_TABS=[
+  {id:'today', ic:'🏠', label:'היום'},
+  {id:'orders', ic:'📋', label:'הזמנות'},
+  {id:'form', ic:'➕', label:'חדשה', big:true},
+  {id:'summary', ic:'🍳', label:'הכנות'},
+  {id:'delivery', ic:'🚚', label:'משלוחים'}
 ];
 function renderTabs(){
   const activeTab=view.tab==='labels'?'summary':view.tab;
-  $('#tabs').innerHTML=TABS.map(t=>
-    `<button type="button" class="tab${activeTab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">${t.label}</button>`
+  const nav=$('#tabs');
+  nav.innerHTML=MAIN_TABS.map(t=>
+    `<button type="button" class="bn-item${t.big?' big':''}${activeTab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">
+      <span class="ic">${t.ic}</span><span>${t.label}</span>
+    </button>`
   ).join('');
+  nav.style.display=view.tab==='form'?'none':'flex';
+  $('#topIcons').innerHTML=
+    `<button type="button" class="icon-btn${activeTab==='customers'?' active':''}" data-act="tab" data-tab="customers" title="לקוחות" aria-label="לקוחות">👥</button>`+
+    `<button type="button" class="icon-btn${activeTab==='backup'?' active':''}" data-act="tab" data-tab="backup" title="הגדרות וגיבוי" aria-label="הגדרות וגיבוי">⚙️</button>`;
 }
 
 /* ================= render: orders list ================= */
@@ -764,13 +796,17 @@ function renderForm(){
   const payOpts=PAY_METHODS.map(p=>`<option value="${esc(p)}"${d.payMethod===p?' selected':''}>${p||'— דרך תשלום —'}</option>`).join('');
   const paidOpts=PAID_OPTIONS.map(p=>`<option value="${esc(p)}"${d.paid===p?' selected':''}>${p}</option>`).join('');
 
+  const JUMPS=[['sec-details','🗓️ פרטים'],['sec-cust','👤 לקוח'],['sec-salads','🥗 סלטים'],['sec-firsts','🐟 ראשונות'],['sec-mains','🍖 עיקריות'],['sec-sides','🍚 תוספות'],['sec-desserts','🍫 קינוח'],['sec-extras','✨ אקסטרות'],['sec-pay','💰 תשלום']];
   $('#view').innerHTML=`
+  <div class="jump no-print">
+    ${JUMPS.map(([t,l])=>`<button type="button" class="btn sm" data-act="jump" data-target="${t}">${l}</button>`).join('')}
+  </div>
   ${d.id?'':`<div class="card no-print"><details>
     <summary style="cursor:pointer;font-weight:700">📥 הלקוח שלח הזמנה מהטופס בוואטסאפ? הדביקי כאן</summary>
     <textarea id="importOrderText" style="margin:10px 0 8px" placeholder="מדביקים את כל ההודעה שהגיעה בוואטסאפ — כולל הקוד שבסוף"></textarea>
     <button type="button" class="btn" data-act="importOrder">✨ מילוי הטופס מההודעה</button>
   </details></div>`}
-  <div class="card">
+  <div class="card" id="sec-details">
     <div class="sec-h">🗓️ ${d.id?'עריכת הזמנה':'הזמנה חדשה'}</div>
     <div class="grid2">
       <div class="field"><label>לאיזה תאריך ההזמנה? (נשמר כמו יומן)</label>
@@ -785,7 +821,7 @@ function renderForm(){
       <select data-bind="status">${STATUS_OPTIONS.map(s=>`<option value="${esc(s)}"${(d.status||'חדשה')===s?' selected':''}>${s}</option>`).join('')}</select></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-cust">
     <div class="sec-h">👤 פרטי הלקוח</div>
     <div class="grid2">
       <div class="field"><label>שם מלא</label><input data-bind="name" value="${esc(d.name)}" placeholder="שם הלקוח"></div>
@@ -806,14 +842,14 @@ function renderForm(){
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-salads">
     <div class="sec-h">🥗 סלטים <span class="badge" data-badge="salads"></span></div>
     <p class="hint">בכל ארוחה זוגית כלולים ${MENU.includedSalads} סלטים לבחירה. עמודת «פינוק» 🎁 — סלטים שאת מוסיפה ממך (אפשר להעביר או לשנות אם נתקעת בלי).</p>
     <div class="col-labels"><span>הוזמן</span><span>🎁 פינוק</span></div>
     ${saladRows}
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-firsts">
     <div class="sec-h">🐟 מנות ראשונות <span class="badge" data-badge="firsts"></span></div>
     <p class="hint">בכל ארוחה זוגית כלולים ${MENU.includedFish} דגים — אפשר לפצל (למשל 1 מרוקאי + 1 חריימה).</p>
     ${firstRows}
@@ -823,24 +859,24 @@ function renderForm(){
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-mains">
     <div class="sec-h">🍖 עיקריות <span class="badge" data-badge="mains"></span></div>
     <p class="hint">בכל ארוחה זוגית כלולה עיקרית אחת. אפשר להחליף למגש שניצלים או רולדת בשר.</p>
     ${mainRows}
     <div class="field"><label>הערה לעיקריות</label><input data-bind="mainsNote" value="${esc(d.mainsNote)}" placeholder="למשל: תוספת עוף"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-sides">
     <div class="sec-h">🍚 תוספות <span class="badge" data-badge="sides"></span></div>
     ${sideRows}
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-desserts">
     <div class="sec-h">🍫 קינוחים <span class="badge" data-badge="desserts"></span></div>
     ${desRows}
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-extras">
     <div class="sec-h">✨ אקסטרות בתשלום</div>
     ${exRows}
     <div style="margin-top:10px">
@@ -850,7 +886,7 @@ function renderForm(){
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="sec-pay">
     <div class="sec-h">💰 תשלום</div>
     <div id="priceHint"></div>
     <div class="grid2">
@@ -1348,6 +1384,68 @@ function renderCustomersList(){
   }).join('');
 }
 
+function scopeOptionsHtml(sel){
+  const t=todayStr();
+  const dates=[...new Set(store.orders.map(o=>o.date).filter(Boolean))].sort();
+  const countIn=(from,to)=>store.orders.filter(o=>o.date&&o.date>=from&&(!to||o.date<=to)&&!isCancelled(o)).length;
+  return `<option value="next7"${sel==='next7'?' selected':''}>📅 השבוע הקרוב (${countIn(t,addDays(t,7))})</option>`+
+    `<option value="upcoming"${sel==='upcoming'?' selected':''}>🔜 כל ההזמנות הקרובות (${countIn(t,null)})</option>`+
+    dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d&&!isCancelled(o)).length})</option>`).join('');
+}
+function mapsUrl(o){
+  return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim());
+}
+function renderDelivery(){
+  const sc=summaryScope();
+  if(!sc.dates.length){
+    $('#view').innerHTML=`<div class="empty"><div class="big">🚚</div><p>עדיין אין הזמנות עם תאריך.<br>ברגע שיהיו — כאן יופיע כל יום המשלוחים: תחנות, ניווט ושליחת מסלול לשליח.</p></div>`;
+    return;
+  }
+  const {list,title,multi}=sc;
+  const dl=list.filter(o=>!o.pickup), pk=list.filter(o=>o.pickup);
+  const owe=o=>(o.paid!=='כן'&&o.paid!=='שת"פ')?Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):0;
+  const stopCard=(o,i)=>`<div class="card order-card">
+      <div class="oc-top">
+        <span class="badge">${i+1}</span>
+        <span class="oc-name">${o.time?esc(o.time)+' · ':''}${esc(o.name)}</span>
+        ${statusPill(o)}
+        <span class="oc-total">${owe(o)>0?`לגבות ${owe(o)}$`:(parseMoney(o.total)>0?'שולם ✓':'')}</span>
+      </div>
+      <div class="oc-meta">${esc(o.place||'—')}${o.address?` · ${esc(o.address)}`:''}${multi?` · ${esc(fmtShort(o.date))}`:''}</div>
+      <div class="oc-actions no-print">
+        ${o.place?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${mapsUrl(o)}">🗺️ ניווט</a>`:''}
+        ${o.phone?`<a class="btn sm" style="text-decoration:none" href="tel:${esc(o.phone)}">📞 ${esc(o.phone)}</a>`:''}
+        ${o.phone?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(o.phone)}">💬</a>`:''}
+        <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">✏️</button>
+      </div>
+    </div>`;
+  $('#view').innerHTML=`
+  <div class="row no-print" style="margin:16px 0 4px">
+    <div class="field" style="flex:1;margin:0"><label>משלוחים ליום</label>
+      <select data-bind="summaryDate">${scopeOptionsHtml(sc.sel)}</select></div>
+  </div>
+  <h2 style="margin:10px 0 0;font-size:1.15rem">🚚 משלוחים — ${esc(title)}</h2>
+  <div class="stats">
+    <div class="stat"><div class="n">${dl.length}</div><div class="l">משלוחים</div></div>
+    <div class="stat"><div class="n">${pk.length}</div><div class="l">איסוף עצמי</div></div>
+    <div class="stat"><div class="n">${money(list.reduce((s,o)=>s+owe(o),0))}</div><div class="l">לגבות בדרך</div></div>
+  </div>
+  ${dl.length?`<div class="row no-print" style="margin:4px 0 10px">
+    <button type="button" class="btn primary" data-act="sendRoute">📤 שליחת המסלול לשליח בוואטסאפ</button>
+    <button type="button" class="btn" data-act="copyRoute">📋 העתקת המסלול</button>
+  </div>
+  <p class="hint no-print" style="margin:0 2px 8px">לוחצים, בוחרים את השליח באנשי הקשר — והוא מקבל את כל התחנות עם ניווט, טלפונים וכמה לגבות.</p>`:''}
+  ${dl.map(stopCard).join('')}
+  ${dl.length===0?`<div class="card"><p class="hint">אין משלוחים בתקופה הזאת${pk.length?' — רק איסופים עצמיים':''}.</p></div>`:''}
+  ${pk.length?`<div class="sec-h" style="margin-top:18px">🏠 איסוף עצמי (${pk.length})</div>${pk.map((o)=>`<div class="card order-card">
+      <div class="oc-top"><span class="oc-name">${esc(o.name)}</span> ${statusPill(o)}
+        <span class="oc-total">${owe(o)>0?`לגבות ${owe(o)}$`:(parseMoney(o.total)>0?'שולם ✓':'')}</span></div>
+      <div class="oc-actions no-print">
+        ${o.phone?`<a class="btn sm" style="text-decoration:none" href="tel:${esc(o.phone)}">📞 ${esc(o.phone)}</a>`:''}
+        <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">✏️</button>
+      </div>
+    </div>`).join('')}`:''}`;
+}
 function buildRouteText(){
   const sc=summaryScope();
   const dl=sc.list.filter(o=>!o.pickup), pk=sc.list.filter(o=>o.pickup);
@@ -1371,6 +1469,20 @@ function buildRouteText(){
 function renderBackup(){
   const json=JSON.stringify(store,null,1);
   $('#view').innerHTML=`
+  <h2 style="margin:16px 0 0;font-size:1.15rem">⚙️ הגדרות וגיבוי</h2>
+  <div class="card">
+    <div class="sec-h">📊 תקרת עומס</div>
+    <div class="field"><label>מקסימום ארוחות זוגיות לשישי (0 = בלי הגבלה)</label>
+      <input inputmode="numeric" data-bind="maxMeals" value="${store.settings.maxMeals||0}" style="max-width:120px"></div>
+    <p class="hint">כשקובעים תקרה: במסך «היום» רואים כמה מקום נשאר לכל שישי, ליד כל תאריך מופיע ${'«'}X/Y זוגיות${'»'}, ובטופס יש התראה כשתאריך מתמלא.</p>
+  </div>
+  <div class="card">
+    <div class="sec-h">⛔ אזל מהמלאי</div>
+    <p class="hint">לוחצים על מנה שנגמרה — היא תסומן ⛔ בטופס ההזמנה. לחיצה נוספת מחזירה אותה.</p>
+    <div class="row" style="gap:6px">
+      ${OUT_POOL.map((n,i)=>`<button type="button" class="chip-t${store.settings.out.includes(n)?' on':''}" data-act="toggleOut" data-i="${i}">${esc(n)}</button>`).join('')}
+    </div>
+  </div>
   <div class="card">
     <div class="sec-h">💾 גיבוי ושחזור</div>
     <p class="hint">הנתונים נשמרים אוטומטית בדפדפן הזה בלבד. כדי לא לאבד כלום (ולהעביר למכשיר אחר) — מומלץ לשמור קובץ גיבוי מדי פעם.</p>
@@ -1383,19 +1495,6 @@ function renderBackup(){
       <textarea id="importText" style="min-height:110px;direction:ltr;font-family:monospace;font-size:.8rem" placeholder='{"orders":[...]}'></textarea>
     </div>
     <button type="button" class="btn danger" data-act="importApply">♻️ שחזור (מחליף את כל הנתונים הנוכחיים)</button>
-  </div>
-  <div class="card">
-    <div class="sec-h">⛔ אזל מהמלאי</div>
-    <p class="hint">לוחצים על מנה שנגמרה — היא תסומן ⛔ בטופס ההזמנה. לחיצה נוספת מחזירה אותה.</p>
-    <div class="row" style="gap:6px">
-      ${OUT_POOL.map((n,i)=>`<button type="button" class="chip-t${store.settings.out.includes(n)?' on':''}" data-act="toggleOut" data-i="${i}">${esc(n)}</button>`).join('')}
-    </div>
-  </div>
-  <div class="card">
-    <div class="sec-h">⚙️ הגדרות</div>
-    <div class="field"><label>מקסימום ארוחות זוגיות לשישי (0 = בלי הגבלה)</label>
-      <input inputmode="numeric" data-bind="maxMeals" value="${store.settings.maxMeals||0}" style="max-width:120px"></div>
-    <p class="hint">כשקובעים תקרה: במסך «היום» רואים כמה מקום נשאר לכל שישי, ליד כל תאריך מופיע ${'«'}X/Y זוגיות${'»'}, ובטופס יש התראה כשתאריך מתמלא.</p>
   </div>
   <div class="card">
     <div class="sec-h">ℹ️ מצב נוכחי</div>
@@ -1454,6 +1553,7 @@ function render(){
   else if(view.tab==='orders') renderOrders();
   else if(view.tab==='form') renderForm();
   else if(view.tab==='summary') renderSummary();
+  else if(view.tab==='delivery') renderDelivery();
   else if(view.tab==='labels') renderLabels();
   else if(view.tab==='customers') renderCustomers();
   else renderBackup();
@@ -1583,6 +1683,12 @@ document.addEventListener('click', e=>{
     if(pv) pv.innerHTML=labelsHtml(summaryScope().list);
     return;
   }
+  if(act==='jump'){
+    const el=document.getElementById(btn.dataset.target);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  if(act==='copyRoute'){ copyText(buildRouteText()); return; }
   if(act==='sendRoute'){
     const t=buildRouteText();
     copyText(t);
@@ -1616,7 +1722,11 @@ document.addEventListener('click', e=>{
 function handleBind(e){
   const b=e.target.dataset.bind;
   if(!b) return;
-  if(b==='summaryDate'){ view.summaryDate=e.target.value; renderSummary(); return; }
+  if(b==='summaryDate'){
+    view.summaryDate=e.target.value;
+    if(view.tab==='delivery') renderDelivery(); else renderSummary();
+    return;
+  }
   if(b==='search'){ view.search=e.target.value; renderOrdersList(); return; }
   if(b==='custSearch'){ view.custSearch=e.target.value; renderCustomersList(); return; }
   if(b==='custNote'){
