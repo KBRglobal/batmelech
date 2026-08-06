@@ -73,6 +73,17 @@ app.post('/api/state', async (req, res) => {
   }
 });
 
+app.delete('/api/state', async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'no database configured' });
+  try {
+    const r = await pool.query('DELETE FROM bm_state WHERE id = 1');
+    res.json({ deleted: r.rowCount });
+  } catch (e) {
+    console.error('DELETE /api/state:', e.message);
+    res.status(500).json({ error: 'db error' });
+  }
+});
+
 // --- HTML: inject the sync script at serve time, files on disk stay untouched ---
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
