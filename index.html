@@ -157,6 +157,10 @@ table.sum .num.gold{color:var(--gold)}
 .storage-warn{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:10px 14px;margin:12px 0;font-size:.9rem}
 
 .badge.red{background:var(--danger-soft);color:var(--danger)}
+tr.prep-row{cursor:pointer}
+tr.prep-row:hover td{background:var(--surface2)}
+tr.prep-row.done td{opacity:.5;text-decoration:line-through}
+.chk{margin-inline-end:4px}
 .cap-bar{height:8px;background:var(--surface2);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:4px}
 .cap-fill{height:100%;background:var(--accent);border-radius:999px}
 .cap-fill.full{background:var(--danger)}
@@ -275,6 +279,9 @@ function loadStore(){
     if(raw){ const d=JSON.parse(raw); if(d && Array.isArray(d.orders)) store=d; }
   }catch(e){ storageOK=false; }
   store.settings=Object.assign({maxMeals:0},store.settings||{});
+  store.prepDone=store.prepDone||{};
+  const cutoff=addDays(todayStr(),-35);
+  for(const k of Object.keys(store.prepDone)) if(k<cutoff) delete store.prepDone[k];
 }
 function saveStore(){
   try{ localStorage.setItem(LS_KEY, JSON.stringify(store)); }
@@ -974,21 +981,32 @@ function bdLine(bdMap,n){
   const parts=Object.entries(bdMap[n]).sort().map(([dt,q])=>`${fmtShort(dt)}: ${q}`);
   return `<div class="hint">${esc(parts.join(' · '))}</div>`;
 }
+function prepMap(dateKey){ return store.prepDone[dateKey]||(store.prepDone[dateKey]={}); }
 function sumTable(title, obj, opts){
   opts=opts||{};
   const rows=Object.entries(obj).filter(([,v])=>(typeof v==='object'?(v.o||v.p):v)>0);
   if(!rows.length) return '';
   const bd=opts.bd||null;
+  const chk=opts.check||null; // {cat, dateKey}
+  const done=chk?prepMap(chk.dateKey):null;
+  const rowOpen=n=>{
+    if(!chk) return '<tr>';
+    const key=chk.cat+'|'+n;
+    return `<tr class="prep-row${done[key]?' done':''}" data-check="${esc(key)}">`;
+  };
+  const mark=n=>chk?`<span class="chk">${done[chk.cat+'|'+n]?'✅':'⬜'}</span>`:'';
+  const doneCount=chk?rows.filter(([n])=>done[chk.cat+'|'+n]).length:0;
+  const prog=chk?` <span class="badge${doneCount===rows.length?' gold':''}">${doneCount}/${rows.length} ✓</span>`:'';
   if(opts.pinukCols){
-    return `<div class="card"><div class="sec-h">${title}</div><div class="tbl-wrap"><table class="sum">
+    return `<div class="card"><div class="sec-h">${title}${prog}</div><div class="tbl-wrap"><table class="sum">
       <tr><th>סלט</th><th class="num">הוזמן</th><th class="num">🎁 פינוק</th><th class="num">סה"כ</th></tr>
-      ${rows.map(([n,v])=>`<tr><td>${esc(n)}${bdLine(bd,n)}</td><td class="num">${v.o||''}</td><td class="num gold">${v.p||''}</td><td class="num">${(v.o||0)+(v.p||0)}</td></tr>`).join('')}
+      ${rows.map(([n,v])=>`${rowOpen(n)}<td>${mark(n)}${esc(n)}${bdLine(bd,n)}</td><td class="num">${v.o||''}</td><td class="num gold">${v.p||''}</td><td class="num">${(v.o||0)+(v.p||0)}</td></tr>`).join('')}
       <tr><td><b>סה"כ סלטים</b></td><td class="num"><b>${rows.reduce((s,[,v])=>s+(v.o||0),0)}</b></td><td class="num gold"><b>${rows.reduce((s,[,v])=>s+(v.p||0),0)}</b></td><td class="num"><b>${rows.reduce((s,[,v])=>s+(v.o||0)+(v.p||0),0)}</b></td></tr>
     </table></div></div>`;
   }
-  return `<div class="card"><div class="sec-h">${title}</div><div class="tbl-wrap"><table class="sum">
+  return `<div class="card"><div class="sec-h">${title}${prog}</div><div class="tbl-wrap"><table class="sum">
     <tr><th>מנה</th><th class="num">כמות</th></tr>
-    ${rows.map(([n,v])=>`<tr><td>${esc(n)}${bdLine(bd,n)}</td><td class="num">${v}</td></tr>`).join('')}
+    ${rows.map(([n,v])=>`${rowOpen(n)}<td>${mark(n)}${esc(n)}${bdLine(bd,n)}</td><td class="num">${v}</td></tr>`).join('')}
   </table></div></div>`;
 }
 function summaryScope(){
@@ -1025,6 +1043,20 @@ function renderSummary(){
   const t=todayStr();
   const agg=aggregate(list);
   const bd=multi?breakdowns(list):null;
+  const canCheck=!multi&&list.length>0;
+  const chkDate=canCheck?sc.scopeDates[0]:null;
+  const chkFor=cat=>canCheck?{cat,dateKey:chkDate}:null;
+  let totalItems=0,doneItems=0;
+  if(canCheck){
+    const done=prepMap(chkDate);
+    for(const [cat,obj] of [['salads',agg.salads],['firsts',agg.firsts],['mains',agg.mains],['sides',agg.sides],['desserts',agg.desserts]]){
+      for(const [n,v] of Object.entries(obj)){
+        const q=typeof v==='object'?(v.o||0)+(v.p||0):v;
+        if(q>0){ totalItems++; if(done[cat+'|'+n]) doneItems++; }
+      }
+    }
+    for(const e of agg.extras){ totalItems++; if(done['extras|'+e.what+'|'+e.who]) doneItems++; }
+  }
   const countIn=(from,to)=>store.orders.filter(o=>o.date&&o.date>=from&&(!to||o.date<=to)).length;
   const dateOpts=
     `<option value="next7"${sel==='next7'?' selected':''}>📅 השבוע הקרוב (${countIn(t,addDays(t,7))})</option>`+
@@ -1032,16 +1064,25 @@ function renderSummary(){
     sc.dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d).length})</option>`).join('');
 
   const payCell=o=>esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid));
+  const mapBtn=o=>(!o.pickup&&o.place)
+    ?` <a class="btn sm no-print" style="text-decoration:none" target="_blank" rel="noopener" title="ניווט" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim())}">🗺️</a>`:'';
   const dateTh=multi?'<th>יום</th>':'';
   const dateTd=o=>multi?`<td class="num">${esc(fmtShort(o.date))}</td>`:'';
   const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים</div><div class="tbl-wrap"><table class="sum">
       <tr>${dateTh}<th>שעה</th><th>שם</th><th>לאן</th><th>טלפון</th><th>תשלום</th></tr>
-      ${list.map(o=>`<tr>${dateTd(o)}<td class="num">${esc(o.pickup?'—':(o.time||'—'))}</td><td>${esc(o.name)}<div class="hint">${statusPill(o)}</div></td><td>${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}${(!o.pickup&&o.address)?`<div class="hint">${esc(o.address)}</div>`:''}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${payCell(o)}</td></tr>`).join('')}
+      ${list.map(o=>`<tr>${dateTd(o)}<td class="num">${esc(o.pickup?'—':(o.time||'—'))}</td><td>${esc(o.name)}<div class="hint">${statusPill(o)}</div></td><td>${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}${mapBtn(o)}${(!o.pickup&&o.address)?`<div class="hint">${esc(o.address)}</div>`:''}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${payCell(o)}</td></tr>`).join('')}
     </table></div></div>`:'';
 
+  const exDone=canCheck?prepMap(chkDate):null;
+  const exRow=e=>{
+    const key='extras|'+e.what+'|'+e.who;
+    const attrs=canCheck?` class="prep-row${exDone[key]?' done':''}" data-check="${esc(key)}"`:'';
+    const mark=canCheck?`<span class="chk">${exDone[key]?'✅':'⬜'}</span>`:'';
+    return `<tr${attrs}><td>${mark}${esc(e.what)}</td><td class="num">${e.q}</td><td>${esc(e.who)}</td>${multi?`<td class="num">${esc(fmtShort(e.date))}</td>`:''}<td>${esc(e.note||'')}</td></tr>`;
+  };
   const extrasHtml=agg.extras.length?`<div class="card"><div class="sec-h">✨ אקסטרות</div><div class="tbl-wrap"><table class="sum">
       <tr><th>מה</th><th class="num">כמות</th><th>למי</th>${multi?'<th>יום</th>':''}<th>הערה</th></tr>
-      ${agg.extras.map(e=>`<tr><td>${esc(e.what)}</td><td class="num">${e.q}</td><td>${esc(e.who)}</td>${multi?`<td class="num">${esc(fmtShort(e.date))}</td>`:''}<td>${esc(e.note||'')}</td></tr>`).join('')}
+      ${agg.extras.map(exRow).join('')}
     </table></div></div>`:'';
 
   const noteWho=n=>`<b>${esc(n.who)}</b>${multi?` (${esc(fmtShort(n.date))})`:''}`;
@@ -1066,8 +1107,10 @@ function renderSummary(){
   </div>
   <h2 style="margin:10px 0 0;font-size:1.15rem">🍲 סיכום הכנות — ${esc(title)}</h2>
   ${multi?`<p class="hint" style="margin:2px 2px 0">מתחת לכל מנה מופיע הפירוט לפי ימים — כמה לכל יום.</p>`:''}
+  ${canCheck?`<p class="hint no-print" style="margin:2px 2px 0">🍳 נגיעה על שורה מסמנת שהמנה מוכנה ✓ — הסימונים נשמרים ליום הזה.</p>`:''}
   <div class="stats">
     <div class="stat"><div class="n">${agg.orders}</div><div class="l">הזמנות</div></div>
+    ${totalItems>0?`<div class="stat"><div class="n">${doneItems}/${totalItems}</div><div class="l">מוכן ✓</div></div>`:''}
     ${multi?`<div class="stat"><div class="n">${sc.scopeDates.length}</div><div class="l">ימי אספקה</div></div>`:''}
     <div class="stat"><div class="n">${agg.meals}</div><div class="l">ארוחות זוגיות</div></div>
     <div class="stat"><div class="n">${agg.challot}</div><div class="l">חלות</div></div>
@@ -1077,11 +1120,11 @@ function renderSummary(){
   </div>
   ${challotBd}
   ${list.length?'':'<div class="empty"><p>אין הזמנות בתקופה הזאת.</p></div>'}
-  ${sumTable('🥗 סלטים להכנה', agg.salads, {pinukCols:true, bd:bd&&bd.salads})}
-  ${sumTable('🐟 מנות ראשונות', agg.firsts, {bd:bd&&bd.firsts})}
-  ${sumTable('🍖 עיקריות', agg.mains, {bd:bd&&bd.mains})}
-  ${sumTable('🍚 תוספות', agg.sides, {bd:bd&&bd.sides})}
-  ${sumTable('🍫 קינוחים', agg.desserts, {bd:bd&&bd.desserts})}
+  ${sumTable('🥗 סלטים להכנה', agg.salads, {pinukCols:true, bd:bd&&bd.salads, check:chkFor('salads')})}
+  ${sumTable('🐟 מנות ראשונות', agg.firsts, {bd:bd&&bd.firsts, check:chkFor('firsts')})}
+  ${sumTable('🍖 עיקריות', agg.mains, {bd:bd&&bd.mains, check:chkFor('mains')})}
+  ${sumTable('🍚 תוספות', agg.sides, {bd:bd&&bd.sides, check:chkFor('sides')})}
+  ${sumTable('🍫 קינוחים', agg.desserts, {bd:bd&&bd.desserts, check:chkFor('desserts')})}
   ${extrasHtml}
   ${notesHtml}
   ${delivHtml}
@@ -1156,6 +1199,15 @@ function renderToday(){
     html+=`<div class="empty"><div class="big">🕯️</div><p>עדיין אין הזמנות.<br>לוחצים על «➕ הזמנה חדשה» ומתחילים.</p></div>`;
     $('#view').innerHTML=html; return;
   }
+  const lbDays=store.lastBackup?Math.floor((Date.now()-store.lastBackup)/86400000):null;
+  if(lbDays===null||lbDays>=7){
+    html+=`<div class="card" style="border-color:var(--gold)">
+      <div class="row" style="justify-content:space-between">
+        <span>💾 ${lbDays===null?'עוד לא נשמר קובץ גיבוי':'עברו '+lbDays+' ימים מהגיבוי האחרון'} — שנייה אחת ליתר ביטחון:</span>
+        <button type="button" class="btn sm primary" data-act="exportFile">גיבוי בלחיצה</button>
+      </div>
+    </div>`;
+  }
   if(todayList.length){
     html+=`<div class="card"><div class="sec-h">🚚 אספקות היום <span class="badge">${todayList.length}</span></div>`+
       todayList.map(o=>`<div class="item-row">
@@ -1176,7 +1228,8 @@ function renderToday(){
           <div class="row" style="justify-content:space-between">
             <b>${esc(fmtDate(dk))}</b>
             <span class="hint">${list.length} הזמנות · ${max>0?`${meals}/${max} זוגיות`:`${meals} זוגיות`}
-              ${full?'<span class="pill no">מלא!</span>':''}</span>
+              ${full?'<span class="pill no">מלא!</span>':''}
+              <button type="button" class="btn sm" data-act="daySummary" data-date="${dk}">🍳 מה מכינים</button></span>
           </div>
           ${max>0?`<div class="cap-bar"><div class="cap-fill${full?' full':''}" style="width:${pct}%"></div></div>`:''}
         </div>`;
@@ -1292,7 +1345,9 @@ function renderBackup(){
   </div>
   <div class="card">
     <div class="sec-h">ℹ️ מצב נוכחי</div>
-    <p>${store.orders.length} הזמנות שמורות${storageOK?'':' · ⚠️ שמירה אוטומטית לא פעילה בדפדפן זה'}</p>
+    <p>${store.orders.length} הזמנות שמורות
+      · גיבוי אחרון: ${store.lastBackup?new Date(store.lastBackup).toLocaleDateString('he-IL'):'עוד לא נעשה'}
+      ${storageOK?'':' · ⚠️ שמירה אוטומטית לא פעילה בדפדפן זה'}</p>
   </div>`;
   const f=$('#importFile');
   if(f) f.addEventListener('change',ev=>{
@@ -1302,13 +1357,18 @@ function renderBackup(){
     r.readAsText(file);
   });
 }
+function markBackedUp(){
+  store.lastBackup=Date.now(); saveStore();
+  if(view.tab==='today') renderToday();
+  else if(view.tab==='backup') renderBackup();
+}
 function exportData(asFile){
   const json=JSON.stringify(store,null,1);
   const fname='batmelech-orders-'+todayStr()+'.json';
-  if(!asFile){ copyText(json); return; }
+  if(!asFile){ copyText(json); markBackedUp(); return; }
   if(window.claude && window.claude.downloads){
     window.claude.downloads.save({filename:fname, data:json})
-      .then(()=>toast('הגיבוי נשמר ✓'))
+      .then(()=>{ toast('הגיבוי נשמר ✓'); markBackedUp(); })
       .catch(err=>{ if(err&&err.code==='declined') return; toast('השמירה לא הצליחה — אפשר להעתיק כטקסט'); });
     return;
   }
@@ -1319,6 +1379,7 @@ function exportData(asFile){
     document.body.appendChild(a); a.click();
     setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},500);
     toast('הגיבוי ירד ✓');
+    markBackedUp();
   }catch(e){ toast('השמירה לא הצליחה — אפשר להעתיק כטקסט'); }
 }
 function importApply(){
@@ -1357,6 +1418,17 @@ function saveDraft(){
 }
 
 document.addEventListener('click', e=>{
+  const chkRow=e.target.closest('tr[data-check]');
+  if(chkRow&&view.tab==='summary'){
+    const sc=summaryScope();
+    if(sc.scopeDates.length===1){
+      const key=chkRow.dataset.check;
+      const dm=prepMap(sc.scopeDates[0]);
+      if(dm[key]) delete dm[key]; else dm[key]=true;
+      saveStore(); renderSummary();
+    }
+    return;
+  }
   const btn=e.target.closest('[data-act]');
   if(!btn) return;
   const act=btn.dataset.act;
