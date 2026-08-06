@@ -38,7 +38,7 @@ body{
   font-size:16px; line-height:1.55;
 }
 #app{direction:rtl}
-.wrap{max-width:860px;margin:0 auto;padding:0 14px 130px}
+.wrap{max-width:860px;margin:0 auto;padding:0 14px 110px}
 a{color:var(--accent)}
 button{font:inherit;color:inherit;cursor:pointer}
 input,select,textarea{
@@ -50,40 +50,45 @@ textarea{min-height:70px;resize:vertical}
 ::placeholder{color:var(--muted);opacity:.8}
 
 /* header */
-.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0}
-.top-in{max-width:860px;margin:0 auto;padding:0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
+.top{position:sticky;top:0;z-index:25;background:var(--surface);border-bottom:1px solid var(--line);height:58px;display:flex;align-items:center}
+.top-in{width:100%;padding:0 20px;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
 .brand h1{font-size:1.15rem;margin:0;font-weight:800;letter-spacing:.02em;white-space:nowrap}
 .brand .sub{color:var(--muted);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:560px){.brand .sub{display:none}}
-.top-icons{display:flex;gap:6px;flex-shrink:0}
-.icon-btn{
-  width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
-  font-size:1.15rem;display:flex;align-items:center;justify-content:center;
-}
-.icon-btn.active{background:var(--accent-soft);border-color:var(--accent)}
 
-/* bottom navigation */
-.bottomnav{
-  position:fixed;bottom:0;right:0;left:0;z-index:40;background:var(--surface);
-  border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:flex-end;
-  padding:6px 4px calc(7px + env(safe-area-inset-bottom));
-}
+/* navigation — sidebar on desktop, top tabs on mobile */
 .bn-item{
-  display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:none;
-  color:var(--muted);font-size:.68rem;font-weight:700;padding:4px 8px;border-radius:12px;min-width:56px;
+  display:flex;align-items:center;gap:9px;border:none;background:none;
+  color:var(--muted);font-weight:700;white-space:nowrap;
 }
-.bn-item .ic{font-size:1.3rem;line-height:1}
-.bn-item.active{color:var(--accent)}
-.bn-item.active:not(.big){background:var(--accent-soft)}
-.bn-item.big .ic{
-  background:var(--accent);color:var(--accent-ink);width:42px;height:42px;border-radius:999px;
-  display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-top:-18px;
-  box-shadow:0 2px 8px rgba(0,0,0,.18);
+.bn-item .ic{font-size:1.05rem;line-height:1}
+@media(min-width:900px){
+  #tabs{
+    position:fixed;top:58px;bottom:0;right:0;width:216px;z-index:20;
+    background:var(--surface);border-inline-end:1px solid var(--line);
+    display:flex;flex-direction:column;gap:2px;padding:14px 10px;overflow-y:auto;
+  }
+  .bn-item{width:100%;padding:10px 12px;border-radius:10px;font-size:.95rem;text-align:right}
+  .bn-item:hover{background:var(--surface2);color:var(--ink)}
+  .bn-item.active{background:var(--accent-soft);color:var(--accent)}
+  .bn-item.sep{margin-top:auto}
+  .wrap{margin-right:216px;max-width:1080px;padding:0 28px 90px}
+  .top{padding-right:0}
+}
+@media(max-width:899px){
+  #tabs{
+    position:sticky;top:58px;z-index:20;background:var(--surface);
+    border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding:0 8px;
+  }
+  .bn-item{padding:10px 12px;font-size:.85rem;border-bottom:3px solid transparent}
+  .bn-item.active{color:var(--accent);border-bottom-color:var(--accent)}
 }
 
 /* form quick-jump */
-.jump{display:flex;gap:6px;overflow-x:auto;position:sticky;top:62px;z-index:15;background:var(--bg);padding:8px 0 8px;margin:0}
+.jump{display:flex;gap:6px;overflow-x:auto;position:sticky;z-index:15;background:var(--bg);padding:8px 0;margin:0}
+@media(min-width:900px){.jump{top:58px}}
+@media(max-width:899px){.jump{top:104px}}
 .jump .btn.sm{white-space:nowrap;flex-shrink:0}
 
 /* cards */
@@ -234,13 +239,12 @@ body.printing #printArea{display:block}
     <div class="top-in">
       <div class="brand">
         <h1>✿ מטעמי בת מלך</h1>
-        <span class="sub">מטבח ביתי אותנטי · כשר</span>
+        <span class="sub">מערכת ניהול הזמנות · מטבח ביתי אותנטי כשר</span>
       </div>
-      <div class="top-icons" id="topIcons"></div>
     </div>
   </header>
+  <nav class="no-print" id="tabs" aria-label="ניווט ראשי"></nav>
   <main class="wrap" id="view"></main>
-  <nav class="bottomnav no-print" id="tabs" aria-label="ניווט ראשי"></nav>
 </div>
 <div id="printArea" dir="rtl" lang="he"></div>
 
@@ -561,22 +565,19 @@ function renderLabels(){
 const MAIN_TABS=[
   {id:'today', ic:'🏠', label:'היום'},
   {id:'orders', ic:'📋', label:'הזמנות'},
-  {id:'form', ic:'➕', label:'חדשה', big:true},
-  {id:'summary', ic:'🍳', label:'הכנות'},
-  {id:'delivery', ic:'🚚', label:'משלוחים'}
+  {id:'form', ic:'➕', label:'הזמנה חדשה'},
+  {id:'summary', ic:'🍳', label:'סיכום הכנות'},
+  {id:'delivery', ic:'🚚', label:'משלוחים'},
+  {id:'customers', ic:'👥', label:'לקוחות'},
+  {id:'backup', ic:'⚙️', label:'הגדרות וגיבוי', sep:true}
 ];
 function renderTabs(){
   const activeTab=view.tab==='labels'?'summary':view.tab;
-  const nav=$('#tabs');
-  nav.innerHTML=MAIN_TABS.map(t=>
-    `<button type="button" class="bn-item${t.big?' big':''}${activeTab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">
+  $('#tabs').innerHTML=MAIN_TABS.map(t=>
+    `<button type="button" class="bn-item${t.sep?' sep':''}${activeTab===t.id?' active':''}" data-act="tab" data-tab="${t.id}">
       <span class="ic">${t.ic}</span><span>${t.label}</span>
     </button>`
   ).join('');
-  nav.style.display=view.tab==='form'?'none':'flex';
-  $('#topIcons').innerHTML=
-    `<button type="button" class="icon-btn${activeTab==='customers'?' active':''}" data-act="tab" data-tab="customers" title="לקוחות" aria-label="לקוחות">👥</button>`+
-    `<button type="button" class="icon-btn${activeTab==='backup'?' active':''}" data-act="tab" data-tab="backup" title="הגדרות וגיבוי" aria-label="הגדרות וגיבוי">⚙️</button>`;
 }
 
 /* ================= render: orders list ================= */
