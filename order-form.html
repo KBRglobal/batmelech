@@ -109,8 +109,25 @@ textarea{min-height:66px;resize:vertical}
     <p class="hint" style="margin:2px 0 6px">משלוח ברחבי דובאי — 15$ (50 דירהם) · באיסוף עצמי אין עלות משלוח</p>
     <div id="deliveryFields">
       <div class="grid2">
-        <div class="field"><label>לאיזה מלון / אזור?</label><input data-bind="place" placeholder="שם המלון"></div>
-        <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" placeholder="לדוגמה: 16:30"></div>
+        <div class="field"><label>לאיזה מלון / אזור?</label>
+          <input data-bind="place" placeholder="שם המלון" list="hotelsDl">
+          <datalist id="hotelsDl">
+            <option value="גרנד הייאט"></option><option value="אטלנטיס דה פאלם"></option>
+            <option value="Address Downtown"></option><option value="JW Marriott Marquis"></option>
+            <option value="Downtown Dubai"></option><option value="Dubai Marina"></option>
+            <option value="JBR"></option><option value="Palm Jumeirah"></option>
+            <option value="Business Bay"></option><option value="DIFC"></option>
+            <option value="Jumeirah"></option><option value="Deira"></option>
+          </datalist>
+        </div>
+        <div class="field"><label>שעת הגעה למלון</label>
+          <input data-bind="time" placeholder="לדוגמה: 16:30" list="timesDl">
+          <datalist id="timesDl">
+            <option value="12:00"></option><option value="13:00"></option><option value="14:00"></option>
+            <option value="15:00"></option><option value="16:00"></option><option value="16:30"></option>
+            <option value="17:00"></option>
+          </datalist>
+        </div>
       </div>
       <div class="field"><label>כתובת מדויקת / הוראות (לא חובה)</label><input data-bind="address" placeholder="מגדל, קומה, למסור בקבלה..."></div>
     </div>

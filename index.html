@@ -126,7 +126,11 @@ textarea{min-height:70px;resize:vertical}
 .date-h{display:flex;align-items:center;gap:10px;margin:20px 0 6px;flex-wrap:wrap}
 .date-h .d{font-weight:800;font-size:1.05rem}
 .order-card{padding:13px 16px}
+.order-card.cancelled{opacity:.55}
 .order-card .oc-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.chip-t{border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:var(--surface);font-size:.82rem;margin:2px 0}
+.chip-t.on{background:var(--danger-soft);color:var(--danger);border-color:var(--danger);text-decoration:line-through}
+.oos-mark{font-size:.7rem;padding:1px 7px}
 .oc-name{font-weight:800;font-size:1.05rem}
 .oc-total{margin-inline-start:auto;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .oc-meta{color:var(--muted);font-size:.88rem;margin:2px 0 8px}
@@ -262,7 +266,9 @@ const MENU = {
   couplePrice:230, challahPrice:10, includedChallot:2, includedSalads:4, includedFish:2
 };
 const HEAT_OPTIONS = ['','לא חריף','חריף','מעורב — חלק חריף וחלק לא'];
-const STATUS_OPTIONS = ['חדשה','אושרה','מוכנה','נמסרה'];
+const STATUS_OPTIONS = ['חדשה','אושרה','מוכנה','במשלוח','נמסרה','בוטלה'];
+const isCancelled=o=>o.status==='בוטלה';
+const OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
 const PAY_METHODS = ['','מזומן','ביט','פייבוקס','לינק','העברה'];
 const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 
@@ -279,6 +285,8 @@ function loadStore(){
     if(raw){ const d=JSON.parse(raw); if(d && Array.isArray(d.orders)) store=d; }
   }catch(e){ storageOK=false; }
   store.settings=Object.assign({maxMeals:0},store.settings||{});
+  store.settings.out=Array.isArray(store.settings.out)?store.settings.out:[];
+  store.customerMeta=store.customerMeta||{};
   store.prepDone=store.prepDone||{};
   const cutoff=addDays(todayStr(),-35);
   for(const k of Object.keys(store.prepDone)) if(k<cutoff) delete store.prepDone[k];
@@ -552,8 +560,8 @@ function sortOrders(list){
 }
 function statusPill(o){
   const st=o.status||'חדשה';
-  const cls=st==='נמסרה'?'mut':(st==='מוכנה'?'ok':(st==='אושרה'?'mid':'no'));
-  return `<span class="pill ${cls}">${esc(st)}</span>`;
+  const cls=st==='בוטלה'?'no':(st==='נמסרה'?'mut':(st==='מוכנה'?'ok':((st==='אושרה'||st==='במשלוח')?'mid':'no')));
+  return `<span class="pill ${cls}">${st==='במשלוח'?'🚚 ':''}${esc(st)}</span>`;
 }
 function orderCard(o){
   const paidCls=o.paid==='כן'?'ok':(o.paid==='מקדמה'?'mid':(o.paid==='שת"פ'?'mut':'no'));
@@ -566,7 +574,7 @@ function orderCard(o){
   if(nEx>0) bits.push(`${nEx} אקסטרות`);
   if(o.aricha>0) bits.push(`עריכה ל־${o.aricha}`);
   if(o.challot>0) bits.push(`${o.challot} חלות`);
-  return `<div class="card order-card" data-oid="${o.id}">
+  return `<div class="card order-card${isCancelled(o)?' cancelled':''}" data-oid="${o.id}">
     <div class="oc-top">
       <span class="oc-name">${esc(o.name||'ללא שם')}</span>
       ${statusPill(o)}
@@ -592,8 +600,9 @@ function orderCard(o){
 function groupHtml(dates,obj){
   return dates.map(dk=>{
     const list=obj[dk];
-    const tot=list.reduce((s,o)=>s+parseMoney(o.total),0);
-    const meals=list.reduce((s,o)=>s+(o.meals||0),0);
+    const act=list.filter(o=>!isCancelled(o));
+    const tot=act.reduce((s,o)=>s+parseMoney(o.total),0);
+    const meals=act.reduce((s,o)=>s+(o.meals||0),0);
     const max=store.settings.maxMeals||0;
     const capBadge=(max>0&&dk!=='ללא תאריך')
       ?`<span class="badge${meals>=max?' red':''}">${meals}/${max} זוגיות${meals>=max?' · מלא!':''}</span>`
@@ -714,25 +723,27 @@ function applyImported(p){
 function renderForm(){
   const d=draft;
   const sug=computeSuggested(d);
+  const oos=n=>store.settings.out.includes(n)?`<span class="pill no oos-mark">⛔ אזל</span> `:'';
   const saladRows=MENU.salads.map((name,i)=>{
     const s=d.salads[name]||{o:0,p:0};
     return `<div class="item-row">
-      <span class="item-name">${esc(name)}</span>
+      <span class="item-name">${oos(name)}${esc(name)}</span>
       <div class="pair">${stepperHtml('salads',i,s.o,'o')}${stepperHtml('salads',i,s.p,'p',true)}</div>
     </div>`;
   }).join('');
   const firstRows=MENU.firsts.map((name,i)=>`<div class="item-row">
-      <span class="item-name">${esc(name)}</span>${stepperHtml('firsts',i,d.firsts[name]||0)}
+      <span class="item-name">${oos(name)}${esc(name)}</span>${stepperHtml('firsts',i,d.firsts[name]||0)}
     </div>`).join('');
   const mainRows=MENU.mains.map((name,i)=>`<div class="item-row">
-      <span class="item-name">${esc(name)}</span>${stepperHtml('mains',i,d.mains[name]||0)}
+      <span class="item-name">${oos(name)}${esc(name)}</span>${stepperHtml('mains',i,d.mains[name]||0)}
     </div>`).join('');
   const sideRows=MENU.sides.map((name,i)=>`<div class="item-row">
-      <span class="item-name">${esc(name)}</span>${stepperHtml('sides',i,d.sides[name]||0)}
+      <span class="item-name">${oos(name)}${esc(name)}</span>${stepperHtml('sides',i,d.sides[name]||0)}
     </div>`).join('');
   const desRows=MENU.desserts.map((name,i)=>`<div class="item-row">
-      <span class="item-name">${esc(name)}</span>${stepperHtml('desserts',i,d.desserts[name]||0)}
+      <span class="item-name">${oos(name)}${esc(name)}</span>${stepperHtml('desserts',i,d.desserts[name]||0)}
     </div>`).join('');
+  const placesDl=[...new Set(store.orders.map(o=>o.place).filter(Boolean))];
   const exRows=MENU.extras.map((ex,i)=>{
     const e=d.extras[ex.name]||{q:0,note:''};
     return `<div class="item-row" style="display:block">
@@ -785,7 +796,10 @@ function renderForm(){
     </label>
     <div id="deliveryFields" ${d.pickup?'hidden':''}>
       <div class="grid2">
-        <div class="field"><label>לאן המשלוח? (בית מלון / אזור)</label><input data-bind="place" value="${esc(d.place)}" placeholder="שם המלון או האזור"></div>
+        <div class="field"><label>לאן המשלוח? (בית מלון / אזור)</label>
+          <input data-bind="place" value="${esc(d.place)}" placeholder="שם המלון או האזור" list="placesDl">
+          <datalist id="placesDl">${placesDl.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+        </div>
         <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" value="${esc(d.time)}" placeholder="לדוגמה: 16:30"></div>
       </div>
       <div class="field"><label>כתובת מדויקת / הוראות הגעה (לא חובה)</label><input data-bind="address" value="${esc(d.address||'')}" placeholder="רחוב, בניין, קומה, למסור בקבלה..."></div>
@@ -891,8 +905,8 @@ function updatePriceHint(){
   const nF=countFish(draft);
   if(draft.meals>0 && nF>inclF) warns.push(`הוזמנו ${nF-inclF} דגים מעבר לכלול.`);
   const max=store.settings.maxMeals||0;
-  if(max>0&&draft.date&&draft.meals>0){
-    const others=store.orders.filter(o=>o.date===draft.date&&o.id!==draft.id).reduce((s,o)=>s+(o.meals||0),0);
+  if(max>0&&draft.date&&draft.meals>0&&draft.status!=='בוטלה'){
+    const others=store.orders.filter(o=>o.date===draft.date&&o.id!==draft.id&&!isCancelled(o)).reduce((s,o)=>s+(o.meals||0),0);
     const tot=others+draft.meals;
     if(tot>max) warns.push(`עומס! עם ההזמנה הזאת יהיו ${tot} זוגיות ב־${fmtShort(draft.date)} — מעבר לתקרה שקבעת (${max}).`);
     else if(tot===max) warns.push(`התאריך ${fmtShort(draft.date)} מתמלא: ${tot}/${max} זוגיות.`);
@@ -1029,7 +1043,7 @@ function summaryScope(){
     list=store.orders.filter(o=>o.date===sel);
     title=fmtDate(sel);
   }
-  list=sortOrders(list);
+  list=sortOrders(list.filter(o=>!isCancelled(o)));
   const scopeDates=[...new Set(list.map(o=>o.date))].sort();
   return {sel, dates, list, title, multi:scopeDates.length>1, scopeDates};
 }
@@ -1068,7 +1082,8 @@ function renderSummary(){
     ?` <a class="btn sm no-print" style="text-decoration:none" target="_blank" rel="noopener" title="ניווט" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim())}">🗺️</a>`:'';
   const dateTh=multi?'<th>יום</th>':'';
   const dateTd=o=>multi?`<td class="num">${esc(fmtShort(o.date))}</td>`:'';
-  const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים</div><div class="tbl-wrap"><table class="sum">
+  const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים
+      <button type="button" class="btn sm no-print" style="margin-inline-start:auto" data-act="sendRoute">📤 שליחת המסלול לשליח</button></div><div class="tbl-wrap"><table class="sum">
       <tr>${dateTh}<th>שעה</th><th>שם</th><th>לאן</th><th>טלפון</th><th>תשלום</th></tr>
       ${list.map(o=>`<tr>${dateTd(o)}<td class="num">${esc(o.pickup?'—':(o.time||'—'))}</td><td>${esc(o.name)}<div class="hint">${statusPill(o)}</div></td><td>${esc(o.pickup?'איסוף עצמי':(o.place||'—'))}${mapBtn(o)}${(!o.pickup&&o.address)?`<div class="hint">${esc(o.address)}</div>`:''}</td><td><a href="tel:${esc(o.phone)}">${esc(o.phone||'')}</a></td><td>${payCell(o)}</td></tr>`).join('')}
     </table></div></div>`:'';
@@ -1183,7 +1198,7 @@ function buildDayText(){
 /* ================= render: today ================= */
 function renderToday(){
   const t=todayStr();
-  const up=sortOrders(store.orders.filter(o=>o.date&&o.date>=t));
+  const up=sortOrders(store.orders.filter(o=>o.date&&o.date>=t&&!isCancelled(o)));
   const todayList=up.filter(o=>o.date===t);
   const max=store.settings.maxMeals||0;
   const hour=new Date().getHours();
@@ -1283,19 +1298,28 @@ function renderCustomersList(){
     if(o.name) c.name=o.name;
     if(o.phone) c.phone=o.phone;
   }
+  for(const [key,c] of Object.entries(map)) c.key=key;
   let custs=Object.values(map);
   const q=view.custSearch.trim().toLowerCase();
-  if(q) custs=custs.filter(c=>(c.name+' '+c.phone).toLowerCase().includes(q));
+  if(q) custs=custs.filter(c=>{
+    const meta=store.customerMeta[c.key]||{};
+    return (c.name+' '+c.phone+' '+(meta.notes||'')).toLowerCase().includes(q);
+  });
   if(!custs.length){
     box.innerHTML=`<div class="empty"><p>לא נמצא לקוח שמתאים ל־«${esc(q)}»</p></div>`;
     return;
   }
-  custs.sort((a,b)=>b.orders[b.orders.length-1].date<a.orders[a.orders.length-1].date?-1:1);
+  custs.sort((a,b)=>{
+    const av=(store.customerMeta[a.key]||{}).vip?1:0, bv=(store.customerMeta[b.key]||{}).vip?1:0;
+    if(av!==bv) return bv-av;
+    return b.orders[b.orders.length-1].date<a.orders[a.orders.length-1].date?-1:1;
+  });
   const t=todayStr();
   box.innerHTML=custs.map(c=>{
-    const total=c.orders.reduce((s,o)=>s+parseMoney(o.total),0);
+    const meta=store.customerMeta[c.key]||{};
+    const total=c.orders.filter(o=>!isCancelled(o)).reduce((s,o)=>s+parseMoney(o.total),0);
     const last=c.orders[c.orders.length-1];
-    const hasUpcoming=c.orders.some(o=>o.date&&o.date>=t);
+    const hasUpcoming=c.orders.some(o=>o.date&&o.date>=t&&!isCancelled(o));
     const histRows=[...c.orders].reverse().map(o=>`<div class="item-row">
         <span class="item-name">${esc(fmtDate(o.date))} ${statusPill(o)} ${o.total?`<b>${money(parseMoney(o.total))}</b>`:''}
           ${o.meals?`<span class="hint">· זוגית ×${o.meals}</span>`:''}</span>
@@ -1303,7 +1327,8 @@ function renderCustomersList(){
       </div>`).join('');
     return `<div class="card order-card">
       <div class="oc-top">
-        <span class="oc-name">${esc(c.name||'ללא שם')}</span>
+        <span class="oc-name">${meta.vip?'⭐ ':''}${esc(c.name||'ללא שם')}</span>
+        ${meta.vip?`<span class="pill mid">VIP</span>`:''}
         ${hasUpcoming?`<span class="pill mid">הזמנה קרובה</span>`:''}
         <span class="oc-total">${total>0?money(total):''}</span>
       </div>
@@ -1314,10 +1339,32 @@ function renderCustomersList(){
       <div class="oc-actions no-print" style="margin-bottom:8px">
         <button type="button" class="btn sm primary" data-act="dup" data-id="${last.id}">🔁 הזמנה חדשה כמו הקודמת</button>
         ${c.phone?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(c.phone)}">💬 וואטסאפ</a>`:''}
+        <button type="button" class="btn sm" data-act="custVip" data-key="${esc(c.key)}">${meta.vip?'⭐ להסיר VIP':'☆ סימון VIP'}</button>
       </div>
-      <details><summary class="hint" style="cursor:pointer">כל ההזמנות (${c.orders.length})</summary>${histRows}</details>
+      <input class="note-in" data-bind="custNote" data-key="${esc(c.key)}" value="${esc(meta.notes||'')}"
+        placeholder="הערות על הלקוח: אלרגיות, העדפות, מה תמיד מזמין...">
+      <details style="margin-top:6px"><summary class="hint" style="cursor:pointer">כל ההזמנות (${c.orders.length})</summary>${histRows}</details>
     </div>`;
   }).join('');
+}
+
+function buildRouteText(){
+  const sc=summaryScope();
+  const dl=sc.list.filter(o=>!o.pickup), pk=sc.list.filter(o=>o.pickup);
+  const L=[`🚚 מסלול משלוחים — ${sc.title}`,''];
+  dl.forEach((o,i)=>{
+    L.push(`${i+1}. ${sc.multi?fmtShort(o.date)+' · ':''}${o.time?o.time+' — ':''}${o.name} — ${o.place||'—'}${o.address?` (${o.address})`:''}`);
+    if(o.phone) L.push(`   📞 ${o.phone}`);
+    const owe=(o.paid!=='כן'&&o.paid!=='שת"פ')?Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):0;
+    if(owe>0) L.push(`   💰 לגבות: ${owe}$`);
+    if(o.place) L.push(`   🗺️ https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim())}`);
+    L.push('');
+  });
+  if(pk.length){
+    L.push('🏠 איסוף עצמי:');
+    for(const o of pk) L.push(`  • ${o.name}${o.phone?' — '+o.phone:''}`);
+  }
+  return L.join('\n');
 }
 
 /* ================= render: backup ================= */
@@ -1336,6 +1383,13 @@ function renderBackup(){
       <textarea id="importText" style="min-height:110px;direction:ltr;font-family:monospace;font-size:.8rem" placeholder='{"orders":[...]}'></textarea>
     </div>
     <button type="button" class="btn danger" data-act="importApply">♻️ שחזור (מחליף את כל הנתונים הנוכחיים)</button>
+  </div>
+  <div class="card">
+    <div class="sec-h">⛔ אזל מהמלאי</div>
+    <p class="hint">לוחצים על מנה שנגמרה — היא תסומן ⛔ בטופס ההזמנה. לחיצה נוספת מחזירה אותה.</p>
+    <div class="row" style="gap:6px">
+      ${OUT_POOL.map((n,i)=>`<button type="button" class="chip-t${store.settings.out.includes(n)?' on':''}" data-act="toggleOut" data-i="${i}">${esc(n)}</button>`).join('')}
+    </div>
   </div>
   <div class="card">
     <div class="sec-h">⚙️ הגדרות</div>
@@ -1529,6 +1583,25 @@ document.addEventListener('click', e=>{
     if(pv) pv.innerHTML=labelsHtml(summaryScope().list);
     return;
   }
+  if(act==='sendRoute'){
+    const t=buildRouteText();
+    copyText(t);
+    window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+    return;
+  }
+  if(act==='toggleOut'){
+    const name=OUT_POOL[Number(btn.dataset.i)];
+    const out=store.settings.out;
+    const idx=out.indexOf(name);
+    if(idx>=0) out.splice(idx,1); else out.push(name);
+    saveStore(); renderBackup(); return;
+  }
+  if(act==='custVip'){
+    const key=btn.dataset.key;
+    const m=store.customerMeta[key]||(store.customerMeta[key]={});
+    m.vip=!m.vip;
+    saveStore(); renderCustomersList(); return;
+  }
   if(act==='printLabels'){
     const html=labelsHtml(summaryScope().list);
     if(html.includes('labels-grid')) printHtml(html);
@@ -1546,6 +1619,12 @@ function handleBind(e){
   if(b==='summaryDate'){ view.summaryDate=e.target.value; renderSummary(); return; }
   if(b==='search'){ view.search=e.target.value; renderOrdersList(); return; }
   if(b==='custSearch'){ view.custSearch=e.target.value; renderCustomersList(); return; }
+  if(b==='custNote'){
+    const key=e.target.dataset.key;
+    const m=store.customerMeta[key]||(store.customerMeta[key]={});
+    m.notes=e.target.value;
+    saveStore(); return;
+  }
   if(b==='maxMeals'){
     store.settings.maxMeals=Math.max(0,parseInt(e.target.value,10)||0);
     saveStore(); return;
