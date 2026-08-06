@@ -258,7 +258,7 @@ body.printing #printArea{display:block}
 <script>
 'use strict';
 /* ================= menu data ================= */
-const MENU = {
+const DEFAULT_MENU = {
   salads: [
     'כרוב לבן קלאסי','כרוב סגול במיונז','קולסלאו','מטבוחה פיקנטית',
     "צ'ירשי טריפוליטאי",'משוויה מרוקאית','מסייר (חמוצים)','טחינה',
@@ -298,7 +298,73 @@ const MENU = {
 const HEAT_OPTIONS = ['','לא חריף','חריף','מעורב — חלק חריף וחלק לא'];
 const STATUS_OPTIONS = ['חדשה','אושרה','מוכנה','במשלוח','נמסרה','בוטלה'];
 const isCancelled=o=>o.status==='בוטלה';
-const OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
+let MENU=null, OUT_POOL=[];
+function buildMenu(){
+  const m=(store&&store.menu)||{};
+  const arr=(k)=>Array.isArray(m[k])&&m[k].length?m[k].filter(x=>typeof x==='string'&&x.trim()).slice():DEFAULT_MENU[k].slice();
+  const num=(k)=>{ const v=Number(m[k]); return Number.isFinite(v)&&v>=0?v:DEFAULT_MENU[k]; };
+  MENU={
+    salads:arr('salads'), firsts:arr('firsts'), mains:arr('mains'), sides:arr('sides'), desserts:arr('desserts'),
+    extras:(Array.isArray(m.extras)&&m.extras.length
+      ?m.extras.filter(x=>x&&typeof x.name==='string'&&x.name.trim()).map(x=>({name:x.name,price:Math.max(0,Number(x.price)||0)}))
+      :DEFAULT_MENU.extras.map(x=>({name:x.name,price:x.price}))),
+    couplePrice:num('couplePrice'), challahPrice:num('challahPrice'),
+    includedChallot:num('includedChallot'), includedSalads:num('includedSalads'), includedFish:num('includedFish')
+  };
+  OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
+}
+function persistMenu(){
+  store.menu={
+    salads:MENU.salads, firsts:MENU.firsts, mains:MENU.mains, sides:MENU.sides, desserts:MENU.desserts,
+    extras:MENU.extras, couplePrice:MENU.couplePrice, challahPrice:MENU.challahPrice,
+    includedChallot:MENU.includedChallot, includedSalads:MENU.includedSalads, includedFish:MENU.includedFish
+  };
+  OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
+  saveStore();
+}
+const MENU_CATS=[['salads','🥗 סלטים'],['firsts','🐟 ראשונות'],['mains','🍖 עיקריות'],['sides','🍚 תוספות'],['desserts','🍫 קינוחים']];
+function menuEditorHtml(){
+  const catBlock=(cat,label)=>`<details style="margin:8px 0">
+    <summary style="cursor:pointer;font-weight:700">${label} (${MENU[cat].length})</summary>
+    ${MENU[cat].map((n,i)=>`<div class="item-row"><span class="item-name">${esc(n)}</span>
+      <button type="button" class="btn sm danger" data-act="menuDel" data-cat="${cat}" data-i="${i}">✕</button></div>`).join('')}
+    <div class="row" style="margin-top:8px">
+      <input id="menuAdd-${cat}" style="flex:1;min-width:140px" placeholder="מנה חדשה...">
+      <button type="button" class="btn sm" data-act="menuAdd" data-cat="${cat}">➕ הוספה</button>
+    </div>
+  </details>`;
+  return `<div class="card">
+    <div class="sec-h">🍽️ מחירון ותפריט</div>
+    <p class="hint">כאן עורכים מחירים ומנות לבד — מעלים מחיר, מוסיפים מנות לחגים, מוחקים מה שירד מהתפריט. הכול מתעדכן מיד בכל המסכים.</p>
+    <div class="grid2">
+      <div class="field"><label>מחיר ארוחה זוגית ($)</label>
+        <input inputmode="numeric" data-bind="menu-num" data-k="couplePrice" value="${MENU.couplePrice}"></div>
+      <div class="field"><label>מחיר חלה נוספת ($)</label>
+        <input inputmode="numeric" data-bind="menu-num" data-k="challahPrice" value="${MENU.challahPrice}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>סלטים כלולים בזוגית</label>
+        <input inputmode="numeric" data-bind="menu-num" data-k="includedSalads" value="${MENU.includedSalads}"></div>
+      <div class="field"><label>דגים כלולים בזוגית</label>
+        <input inputmode="numeric" data-bind="menu-num" data-k="includedFish" value="${MENU.includedFish}"></div>
+    </div>
+    ${MENU_CATS.map(([c,l])=>catBlock(c,l)).join('')}
+    <details style="margin:8px 0">
+      <summary style="cursor:pointer;font-weight:700">✨ אקסטרות ומחירים (${MENU.extras.length})</summary>
+      ${MENU.extras.map((ex,i)=>`<div class="item-row">
+        <span class="item-name">${esc(ex.name)}</span>
+        <input inputmode="decimal" style="max-width:84px;text-align:center" data-bind="menu-extra-price" data-i="${i}" value="${ex.price}">
+        <button type="button" class="btn sm danger" data-act="menuDel" data-cat="extras" data-i="${i}">✕</button>
+      </div>`).join('')}
+      <div class="row" style="margin-top:8px">
+        <input id="menuAdd-extras" style="flex:2;min-width:140px" placeholder="אקסטרה חדשה...">
+        <input id="menuAddPrice-extras" inputmode="decimal" style="flex:0 0 84px" placeholder="מחיר $">
+        <button type="button" class="btn sm" data-act="menuAdd" data-cat="extras">➕ הוספה</button>
+      </div>
+    </details>
+    <button type="button" class="btn sm danger" style="margin-top:8px" data-act="menuReset">↩️ חזרה לתפריט המקורי</button>
+  </div>`;
+}
 const PAY_METHODS = ['','מזומן','ביט','פייבוקס','לינק','העברה'];
 const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 
@@ -306,7 +372,7 @@ const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 const LS_KEY='batmelech-orders-v1';
 let store={orders:[],settings:{maxMeals:0}};
 let storageOK=true;
-let view={tab:'today', summaryDate:null, search:'', custSearch:'', labelCopies:{}};
+let view={tab:'today', summaryDate:null, search:'', custSearch:'', labelCopies:{}, moneyMonth:null};
 let draft=null;
 
 function loadStore(){
@@ -318,6 +384,7 @@ function loadStore(){
   store.settings.out=Array.isArray(store.settings.out)?store.settings.out:[];
   store.customerMeta=store.customerMeta||{};
   store.prepDone=store.prepDone||{};
+  store.expenses=store.expenses||{};
   const cutoff=addDays(todayStr(),-35);
   for(const k of Object.keys(store.prepDone)) if(k<cutoff) delete store.prepDone[k];
 }
@@ -575,6 +642,7 @@ const MAIN_TABS=[
   {id:'form', ic:'➕', label:'הזמנה חדשה'},
   {id:'summary', ic:'🍳', label:'סיכום הכנות'},
   {id:'delivery', ic:'🚚', label:'משלוחים'},
+  {id:'money', ic:'💰', label:'כספים'},
   {id:'customers', ic:'👥', label:'לקוחות'},
   {id:'backup', ic:'⚙️', label:'הגדרות וגיבוי', sep:true}
 ];
@@ -596,8 +664,39 @@ function statusPill(o){
   const cls=st==='בוטלה'?'no':(st==='נמסרה'?'mut':(st==='מוכנה'?'ok':((st==='אושרה'||st==='במשלוח')?'mid':'no')));
   return `<span class="pill ${cls}">${st==='במשלוח'?'🚚 ':''}${esc(st)}</span>`;
 }
+function oweOf(o){
+  return (o.paid!=='כן'&&o.paid!=='שת"פ')?Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):0;
+}
+function payReqText(o,owe){
+  const L=[`היי ${o.name} 🌸`,
+    `לגבי ההזמנה ל${fmtDate(o.date)} — נשאר לתשלום ${owe}$.`];
+  if(store.settings.payLink) L.push(`אפשר לשלם כאן: ${store.settings.payLink}`);
+  L.push('תודה רבה! מטעמי בת מלך 🕯️');
+  return L.join('\n');
+}
+function nextFridayIso(){
+  const d=new Date();
+  while(d.getDay()!==5) d.setDate(d.getDate()+1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function buildPromoText(){
+  const nf=nextFridayIso();
+  const max=store.settings.maxMeals||0;
+  const booked=store.orders.filter(o=>o.date===nf&&!isCancelled(o)).reduce((s,o)=>s+(o.meals||0),0);
+  const L=[`🕯️✨ מטעמי בת מלך — שבת קודש ${fmtShort(nf)} ✨🕯️`,'',
+    `ארוחה זוגית מפנקת לשבת — ${MENU.couplePrice}$`,
+    `כוללת: ${MENU.includedSalads} סלטים לבחירה 🥗 זוג דגי ראשונה 🐟 עיקרית ותוספת לבחירה 🍖 קינוח 🍫 זוג חלות ביתיות 🥖 וערכת אירוח מהודרת לשבת`];
+  if(max>0){
+    const left=Math.max(0,max-booked);
+    L.push(left>0?`🔥 נשארו רק ${left} ארוחות זוגיות לשבת הקרובה — כל הקודמת זוכה!`:'😱 השבת הקרובה כבר מלאה! אפשר לשריין לשבת הבאה');
+  } else L.push('המלאי מוגבל — למקדימים 🌸');
+  if(store.settings.orderFormUrl){ L.push(''); L.push(`להזמנה בקליק: ${store.settings.orderFormUrl}`); }
+  L.push('להזמנות ופרטים בוואטסאפ: +971586288776');
+  return L.join('\n');
+}
 function orderCard(o){
   const paidCls=o.paid==='כן'?'ok':(o.paid==='מקדמה'?'mid':(o.paid==='שת"פ'?'mut':'no'));
+  const owe=oweOf(o);
   const bits=[];
   if(o.meals>0) bits.push(`זוגית ×${o.meals}`);
   const nSal=countSaladsOrdered(o), nPin=countSaladsPinuk(o);
@@ -624,6 +723,7 @@ function orderCard(o){
       <button type="button" class="btn sm" data-act="bon" data-id="${o.id}">🖨️ בון</button>
       <button type="button" class="btn sm" data-act="copyText" data-id="${o.id}">📋 העתקה</button>
       ${o.phone?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(o.phone)}?text=${encodeURIComponent(buildOrderText(o))}">💬 וואטסאפ</a>`:''}
+      ${(o.phone&&owe>0&&!isCancelled(o))?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(o.phone)}?text=${encodeURIComponent(payReqText(o,owe))}">💳 בקשת תשלום</a>`:''}
       <button type="button" class="btn sm" data-act="dup" data-id="${o.id}">🔁 שכפול</button>
       <button type="button" class="btn sm danger" data-act="del" data-id="${o.id}">🗑️ מחיקה</button>
     </div>
@@ -720,6 +820,121 @@ function parseOrderCode(txt){
   if(!m) return null;
   try{ return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }catch(e){ return null; }
 }
+/* free-text WhatsApp order reader — best effort */
+const FT_ALIASES={
+  salads:{
+    'כרוב לבן קלאסי':['כרוב לבן'],'כרוב סגול במיונז':['כרוב סגול'],'קולסלאו':['קולסלאו'],
+    'מטבוחה פיקנטית':['מטבוחה'],"צ'ירשי טריפוליטאי":["צ'ירשי",'צירשי'],'משוויה מרוקאית':['משוויה'],
+    'מסייר (חמוצים)':['מסייר','חמוצים'],'טחינה':['טחינה'],'סלק מבושל':['סלק'],'גזר מרוקאי מבושל':['גזר'],
+    'חציל במיונז':['חציל במיונז'],'חציל מטוגן':['חציל מטוגן'],'פלפלים קלויים':['פלפלים קלויים'],
+    'עגבניות שרי חריפות':['עגבניות שרי','שרי חריפות'],'פלפל חריף צלוי':['פלפל חריף'],
+    'סלט ביצים':['סלט ביצים','ביצים'],'סלט תפו"א':['סלט תפו']
+  },
+  mains:{
+    'קציצות בשר ברוטב אדום עשיר':['קציצות ברוטב אדום','קציצות בשר ברוטב אדום','רוטב אדום'],
+    'קציצות בשר עם אפונה וארטישוק':['ארטישוק'],
+    'קציצות בשר בריבת בצל וערמונים':['ריבת בצל'],
+    'טבחה עוף אדומה עם שעועית':['טבחה אדומה','שעועית'],
+    'תבשיל עוף מרוקאי עם חומוסים':['עוף מרוקאי','חומוסים'],
+    'טבחה עוף צהובה עם תפו"א':['טבחה צהובה','עוף צהובה'],
+    'מגש שניצלים — במקום עיקרית':['מגש שניצלים','מגש שניצל'],
+    'רולדת בשר — במקום עיקרית':['רולדת','רולדה']
+  },
+  sides:{
+    'אורז לבן':['אורז לבן'],'אורז מתובל / פרסי עם עשבי תיבול':['אורז מתובל','אורז פרסי'],
+    'קוסקוס עננים':['קוסקוס'],'פסטה נקיה':['פסטה נקיה','פסטה לבנה'],'פסטה אדומה':['פסטה אדומה'],
+    'מגש תפו"א':['מגש תפו']
+  },
+  desserts:{'סופלה שוקולד':['סופלה'],'סוכריות בקלוואה':['בקלוואה','בקלווה']},
+  extras:{
+    'מארז הבדלה':['הבדלה'],'מפרום ביתי של אמא (זוגי)':['מפרום'],
+    'סיר קובה סלק בתוספת אורז (ל־4 אנשים)':['קובה'],
+    'מנת ילדים — פסטה אדומה ושניצלונים':['מנת ילדים','שניצלונים'],
+    'חלת שניצל (ספיישל סופ"ש)':['חלת שניצל'],
+    'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)':['צלי בקר']
+  }
+};
+function parseFreeText(raw){
+  raw=String(raw||'').trim();
+  if(!raw) return null;
+  const t=(' '+raw+' ').replace(/[‏‎]/g,'');
+  const d=newDraft(); d.meals=0; d.challot=0;
+  let hits=0;
+  const num=re=>{ const m=t.match(re); return m?parseInt(m[1],10):null; };
+  const qtyNear=alias=>{
+    const es=alias.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const m=t.match(new RegExp('(\\d+)\\s*(?:מגשי?\\s+|מנות\\s+)?'+es));
+    return m?parseInt(m[1],10):1;
+  };
+  if(/ארוח(ה|ות)\s+זוגי|זוגית/.test(t)){
+    d.meals=num(/(\d+)\s*ארוחות/)||1; hits++;
+    d.challot=MENU.includedChallot*d.meals;
+  }
+  const ch=num(/(\d+)\s*חלות/);
+  if(ch!==null){ d.challot=ch; hits++; }
+  else if(/חלה\s+אחת|עוד\s+חלה/.test(t)){ d.challot+=1; hits++; }
+  if(/כל\s+(סוגי\s+)?הסלטים/.test(t)){
+    for(const n of MENU.salads) d.salads[n]={o:1,p:0};
+    hits++;
+  } else {
+    for(const [n,aliases] of Object.entries(FT_ALIASES.salads)){
+      if(!MENU.salads.includes(n)) continue;
+      for(const a of aliases){ if(t.includes(a)){ d.salads[n]={o:qtyNear(a),p:0}; hits++; break; } }
+    }
+  }
+  // fish — strip non-fish "מרוקאי" contexts first
+  const tf=t.replace(/גזר\s+מרוקאי|עוף\s+מרוקאי|משוויה\s+מרוקאית|ברוטב\s+מרוקאי|תבשיל\s+מרוקאי/g,'');
+  if(/מרוקאי/.test(tf)&&MENU.firsts[0]){
+    const m=tf.match(/(\d+)\s*(?:דג(?:ים)?\s+)?מרוקאי/);
+    d.firsts[MENU.firsts[0]]=m?parseInt(m[1],10):1; hits++;
+  }
+  if(/חריימה/.test(t)&&MENU.firsts[1]){
+    const m=t.match(/(\d+)\s*(?:דג(?:ים)?\s+)?חריימה/);
+    d.firsts[MENU.firsts[1]]=m?parseInt(m[1],10):1; hits++;
+  }
+  if(/קציצות\s+דגים/.test(t)&&MENU.firsts[2]){ d.firsts[MENU.firsts[2]]=qtyNear('קציצות דגים'); hits++; }
+  if(/לא\s+חריף/.test(t)){ d.heat='לא חריף'; hits++; }
+  else if(/מעורב|חלק\s+חריף/.test(t)){ d.heat='מעורב — חלק חריף וחלק לא'; hits++; }
+  else if(/חריף/.test(t.replace(/פלפל\s+חריף|שרי\s+חריפות|צלחת\s+חריפים/g,''))){ d.heat='חריף'; hits++; }
+  for(const [group,aliases] of [['mains',FT_ALIASES.mains],['sides',FT_ALIASES.sides],['desserts',FT_ALIASES.desserts]]){
+    for(const [n,as] of Object.entries(aliases)){
+      if(!MENU[group].includes(n)) continue;
+      for(const a of as){ if(t.includes(a)){ d[group][n]=qtyNear(a); hits++; break; } }
+    }
+  }
+  const exNames=MENU.extras.map(x=>x.name);
+  for(const [n,as] of Object.entries(FT_ALIASES.extras)){
+    if(!exNames.includes(n)) continue;
+    for(const a of as){ if(t.includes(a)){ d.extras[n]={q:qtyNear(a),note:''}; hits++; break; } }
+  }
+  const ar=num(/עריכה\s*ל?[־-]?\s*(\d+)/); if(ar){ d.aricha=ar; hits++; }
+  if(/איסוף\s+עצמי/.test(t)){ d.pickup=true; hits++; }
+  if(!d.pickup){
+    const known=[...new Set(store.orders.map(o=>o.place).filter(Boolean))];
+    for(const h of known){ if(t.includes(h)){ d.place=h; hits++; break; } }
+    if(!d.place){
+      const hm=raw.match(/(?:ל?מלון|ב?מלון)\s+([^\n,.]{2,30})/);
+      if(hm){ d.place=hm[1].trim(); hits++; }
+    }
+  }
+  const ph=raw.match(/(?:\+?971|0)5\d[\d\- ]{6,10}/);
+  if(ph){ d.phone=ph[0].trim(); hits++; }
+  const tm=raw.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/);
+  if(tm){ d.time=tm[0]; hits++; }
+  const dm=raw.match(/\b(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?\b/);
+  if(dm&&!(tm&&tm[0]===dm[0])){
+    let y=new Date().getFullYear();
+    if(dm[3]) y=dm[3].length===2?2000+parseInt(dm[3],10):parseInt(dm[3],10);
+    const ds=y+'-'+String(parseInt(dm[2],10)).padStart(2,'0')+'-'+String(parseInt(dm[1],10)).padStart(2,'0');
+    d.date=(!dm[3]&&ds<todayStr())?(y+1)+ds.slice(4):ds;
+    hits++;
+  } else if(/שישי|שבת/.test(t)){ d.date=nextFridayIso(); hits++; }
+  const nm=raw.match(/שם(?:\s+מלא)?\s*[:\-]\s*([^\n,]{2,30})/);
+  if(nm){ d.name=nm[1].trim(); hits++; }
+  if(!hits) return null;
+  d.notes=('הודעת הלקוח: '+raw).slice(0,400);
+  return d;
+}
 function applyImported(p){
   const d=newDraft();
   for(const k of ['date','name','phone','place','address','time','heat','firstsNote','mainsNote','notes']){
@@ -803,8 +1018,9 @@ function renderForm(){
     ${JUMPS.map(([t,l])=>`<button type="button" class="btn sm" data-act="jump" data-target="${t}">${l}</button>`).join('')}
   </div>
   ${d.id?'':`<div class="card no-print"><details>
-    <summary style="cursor:pointer;font-weight:700">📥 הלקוח שלח הזמנה מהטופס בוואטסאפ? הדביקי כאן</summary>
-    <textarea id="importOrderText" style="margin:10px 0 8px" placeholder="מדביקים את כל ההודעה שהגיעה בוואטסאפ — כולל הקוד שבסוף"></textarea>
+    <summary style="cursor:pointer;font-weight:700">📥 הלקוח כתב בוואטסאפ? הדביקי את ההודעה כאן</summary>
+    <p class="hint" style="margin:8px 0 0">עובד גם עם הודעה מהטופס (עם הקוד) וגם עם הודעה חופשית — למשל: «אני רוצה ארוחה זוגית עם כל הסלטים ו־10 חלות».</p>
+    <textarea id="importOrderText" style="margin:10px 0 8px" placeholder="מדביקים כאן את ההודעה של הלקוח..."></textarea>
     <button type="button" class="btn" data-act="importOrder">✨ מילוי הטופס מההודעה</button>
   </details></div>`}
   <div class="card" id="sec-details">
@@ -1245,6 +1461,7 @@ function renderToday(){
     <div class="row no-print" style="margin:12px 0">
       <button type="button" class="btn primary" data-act="tab" data-tab="form">➕ הזמנה חדשה</button>
       <button type="button" class="btn" data-act="tab" data-tab="summary">🍲 סיכום הכנות</button>
+      <button type="button" class="btn" data-act="promoMsg">📣 הודעת התפריט לשבת</button>
     </div>`;
   if(!storageOK) html+=`<div class="storage-warn">⚠️ שמירה אוטומטית לא זמינה בדפדפן הזה — מומלץ לייצא גיבוי בסוף כל שימוש.</div>`;
   if(!store.orders.length){
@@ -1306,6 +1523,66 @@ function renderToday(){
     (owed>0?`<p class="hint" style="margin-top:8px">סה"כ נשאר לגבות מהזמנות קרובות: <b>${money(owed)}</b></p>`:'')+
   `</div>`;
   $('#view').innerHTML=html;
+}
+
+/* ================= render: money ================= */
+function fmtMonth(m){ return m.slice(5,7)+'.'+m.slice(0,4); }
+function renderMoney(){
+  const t=todayStr();
+  const months=[...new Set([
+    ...store.orders.filter(o=>o.date).map(o=>o.date.slice(0,7)),
+    ...Object.keys(store.expenses)
+  ].map(d=>d.slice(0,7)))].sort();
+  if(!months.length){
+    $('#view').innerHTML=`<div class="empty"><div class="big">💰</div><p>עדיין אין נתונים.<br>ברגע שיהיו הזמנות — כאן יופיע כמה נכנס, כמה יצא, וכמה נשאר ביד.</p></div>`;
+    return;
+  }
+  let sel=view.moneyMonth;
+  if(!sel||!months.includes(sel)) sel=view.moneyMonth=(months.filter(m=>m<=t.slice(0,7)).pop()||months[0]);
+  const monthOrders=store.orders.filter(o=>o.date&&o.date.slice(0,7)===sel&&!isCancelled(o));
+  const dates=[...new Set([
+    ...monthOrders.map(o=>o.date),
+    ...Object.keys(store.expenses).filter(d=>d.slice(0,7)===sel)
+  ])].sort();
+  const revOn=dk=>monthOrders.filter(o=>o.date===dk).reduce((s,o)=>s+parseMoney(o.total),0);
+  const revenue=monthOrders.reduce((s,o)=>s+parseMoney(o.total),0);
+  const expenses=dates.reduce((s,dk)=>s+(store.expenses[dk]||0),0);
+  const profit=revenue-expenses;
+  const owed=monthOrders.reduce((s,o)=>(o.paid!=='כן'&&o.paid!=='שת"פ')?s+Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):s,0);
+  const meals=monthOrders.reduce((s,o)=>s+(o.meals||0),0);
+  const byCust={};
+  for(const o of monthOrders){ const k=o.name||'ללא שם'; byCust[k]=(byCust[k]||0)+parseMoney(o.total); }
+  const topCust=Object.entries(byCust).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  $('#view').innerHTML=`
+  <div class="row no-print" style="margin:16px 0 4px">
+    <div class="field" style="flex:1;margin:0"><label>חודש</label>
+      <select data-bind="moneyMonth">${months.map(m=>`<option value="${m}"${m===sel?' selected':''}>${fmtMonth(m)}</option>`).join('')}</select></div>
+  </div>
+  <h2 style="margin:10px 0 0;font-size:1.15rem">💰 כספים — ${fmtMonth(sel)}</h2>
+  <div class="stats">
+    <div class="stat"><div class="n">${money(revenue)}</div><div class="l">הכנסות</div></div>
+    <div class="stat"><div class="n">${money(expenses)}</div><div class="l">הוצאות (קניות)</div></div>
+    <div class="stat"><div class="n" style="color:${profit>=0?'var(--ok)':'var(--danger)'}">${money(profit)}</div><div class="l">נשאר ביד 🙌</div></div>
+    <div class="stat"><div class="n">${meals}</div><div class="l">ארוחות זוגיות</div></div>
+    <div class="stat"><div class="n">${money(owed)}</div><div class="l">עוד לא נגבה</div></div>
+  </div>
+  <div class="card">
+    <div class="sec-h">🧾 לפי ימים</div>
+    <p class="hint">בעמודת «הוצאות» מקלידים כמה עלו הקניות לאותו שישי — והרווח מתעדכן לבד.</p>
+    <div class="tbl-wrap"><table class="sum">
+      <tr><th>יום</th><th class="num">הכנסות</th><th class="num" style="width:110px">הוצאות ($)</th><th class="num">רווח</th></tr>
+      ${dates.map(dk=>{
+        const r=revOn(dk), ex=store.expenses[dk]||0;
+        return `<tr><td>${esc(fmtDate(dk))}</td><td class="num">${r?money(r):'—'}</td>
+          <td class="num"><input inputmode="decimal" style="max-width:100px;text-align:center" data-bind="expense" data-date="${dk}" value="${ex||''}" placeholder="0"></td>
+          <td class="num" style="color:${r-ex>=0?'var(--ok)':'var(--danger)'};font-weight:700">${money(r-ex)}</td></tr>`;
+      }).join('')}
+      <tr><td><b>סה"כ</b></td><td class="num"><b>${money(revenue)}</b></td><td class="num"><b>${money(expenses)}</b></td><td class="num"><b style="color:${profit>=0?'var(--ok)':'var(--danger)'}">${money(profit)}</b></td></tr>
+    </table></div>
+  </div>
+  ${topCust.length?`<div class="card"><div class="sec-h">🏆 הלקוחות הגדולים של החודש</div>
+    ${topCust.map(([n,v],i)=>`<div class="item-row"><span class="item-name">${i+1}. <b>${esc(n)}</b></span><b style="font-variant-numeric:tabular-nums">${money(v)}</b></div>`).join('')}
+  </div>`:''}`;
 }
 
 /* ================= render: customers ================= */
@@ -1466,6 +1743,55 @@ function buildRouteText(){
   return L.join('\n');
 }
 
+/* ================= demo data (real cases from the Word file) ================= */
+function loadDemoData(){
+  const fr1=nextFridayIso();
+  const fr4=addDays(fr1,21);
+  store.orders=store.orders.filter(o=>!String(o.id).startsWith('demo'));
+  const base=newDraft();
+  const mk=o=>Object.assign(JSON.parse(JSON.stringify(base)),o);
+  store.orders.push(
+    mk({id:'demo1', date:fr1, name:'קטי סוזנה', phone:'054-2016970', place:'גרנד הייאט', time:'16:30', status:'אושרה',
+      meals:1, aricha:6, challot:2,
+      salads:{'כרוב סגול במיונז':{o:1,p:0},'מסייר (חמוצים)':{o:1,p:0},'טחינה':{o:1,p:0},'עגבניות שרי חריפות':{o:1,p:0},'מטבוחה פיקנטית':{o:0,p:1},'גזר מרוקאי מבושל':{o:0,p:1}},
+      firsts:{'פילה דג ברוטב מרוקאי':1,'פילה דג ברוטב חריימה':1}, heat:'לא חריף',
+      mains:{'קציצות בשר ברוטב אדום עשיר':1}, sides:{'אורז לבן':2},
+      desserts:{'סופלה שוקולד':1,'סוכריות בקלוואה':1},
+      extras:{'מנת ילדים — פסטה אדומה ושניצלונים':{q:1,note:'מנת פסטה ושניצל ילדים'},'מגש שניצלים (זוגי, כ־13–15 יח\')':{q:1,note:''}},
+      total:'390', deposit:'100', payMethod:'ביט', paid:'מקדמה'}),
+    mk({id:'demo2', date:fr1, name:'לילך בוארון', phone:'050-4448731', place:'אטלנטיס דה פאלם', time:'15:00', status:'חדשה',
+      meals:0, aricha:15, challot:10,
+      salads:{'מטבוחה פיקנטית':{o:2,p:0},'מסייר (חמוצים)':{o:1,p:0}},
+      extras:{'מגש אורז / קוסקוס / פסטה אדומה':{q:3,note:'2 אורז + 1 קוסקוס'},'מגש שניצלים (זוגי, כ־13–15 יח\')':{q:2,note:''},'מפרום ביתי של אמא (זוגי)':{q:1,note:'מפרום זוגי'}},
+      custom:[{name:'חומוס',qty:2,price:''},{name:'מרק ירקות קוסקוס פרווה',qty:1,price:''}],
+      total:'540', deposit:'', payMethod:'', paid:'לא'}),
+    mk({id:'demo3', date:fr1, name:'חיים הלוי', phone:'052-3442155', pickup:true, status:'מוכנה',
+      meals:1, aricha:4, challot:2,
+      salads:{'כרוב סגול במיונז':{o:1,p:0},'כרוב לבן קלאסי':{o:1,p:0},'חציל מטוגן':{o:1,p:0},'קולסלאו':{o:1,p:0},'סלט ביצים':{o:2,p:0},'סלט תפו"א':{o:1,p:0},'מסייר (חמוצים)':{o:1,p:0},'מטבוחה פיקנטית':{o:0,p:1},'טחינה':{o:0,p:1}},
+      firsts:{'פילה דג ברוטב מרוקאי':2}, heat:'לא חריף',
+      mains:{'קציצות בשר עם אפונה וארטישוק':1}, sides:{'אורז מתובל / פרסי עם עשבי תיבול':1},
+      desserts:{'סופלה שוקולד':1},
+      total:'230', deposit:'230', payMethod:'מזומן', paid:'כן'}),
+    mk({id:'demo4', date:fr4, name:'ניר מסס', phone:'054-2220431', place:'פייב לוקס', time:'16:30', status:'חדשה',
+      meals:1, aricha:4, challot:6,
+      salads:{'כרוב לבן קלאסי':{o:1,p:0},'מטבוחה פיקנטית':{o:1,p:0},'מסייר (חמוצים)':{o:1,p:0},'חציל מטוגן':{o:1,p:0}},
+      firsts:{'פילה דג ברוטב מרוקאי':1},
+      mains:{'תבשיל עוף מרוקאי עם חומוסים':1}, sides:{'אורז לבן':1},
+      desserts:{'סופלה שוקולד':1},
+      extras:{'חלת שניצל (ספיישל סופ"ש)':{q:4,note:'2 עם הכל, 2 מפורק'}},
+      total:'338', deposit:'', payMethod:'', paid:'לא'})
+  );
+  store.customerMeta['0542016970']=Object.assign(store.customerMeta['0542016970']||{},{vip:true,notes:'אוהבת מרוקאי לא חריף · תמיד מזמינה לזוג + ילדים'});
+  store.customerMeta['0523442155']=Object.assign(store.customerMeta['0523442155']||{},{notes:'תמיד מוסיף הרבה סלטים מעצמו · איסוף עצמי'});
+  if(!store.settings.maxMeals) store.settings.maxMeals=8;
+  if(!store.expenses[fr1]) store.expenses[fr1]=210;
+  saveStore();
+}
+function clearDemoData(){
+  store.orders=store.orders.filter(o=>!String(o.id).startsWith('demo'));
+  saveStore();
+}
+
 /* ================= render: backup ================= */
 function renderBackup(){
   const json=JSON.stringify(store,null,1);
@@ -1476,6 +1802,16 @@ function renderBackup(){
     <div class="field"><label>מקסימום ארוחות זוגיות לשישי (0 = בלי הגבלה)</label>
       <input inputmode="numeric" data-bind="maxMeals" value="${store.settings.maxMeals||0}" style="max-width:120px"></div>
     <p class="hint">כשקובעים תקרה: במסך «היום» רואים כמה מקום נשאר לכל שישי, ליד כל תאריך מופיע ${'«'}X/Y זוגיות${'»'}, ובטופס יש התראה כשתאריך מתמלא.</p>
+  </div>
+  ${menuEditorHtml()}
+  <div class="card">
+    <div class="sec-h">💳 תשלומים וקישורים</div>
+    <div class="field"><label>לינק תשלום (ביט / PayBox / Stripe...)</label>
+      <input data-bind="payLink" value="${esc(store.settings.payLink||'')}" placeholder="https://..." style="direction:ltr;text-align:left"></div>
+    <p class="hint">כשיש לינק — מופיע כפתור «💳 בקשת תשלום» על כל הזמנה, ששולח ללקוח הודעה מוכנה עם הסכום והלינק.</p>
+    <div class="field"><label>קישור לטופס ההזמנה ללקוחות</label>
+      <input data-bind="orderFormUrl" value="${esc(store.settings.orderFormUrl||'')}" placeholder="https://..." style="direction:ltr;text-align:left"></div>
+    <p class="hint">נכנס אוטומטית להודעת «📣 התפריט של שבת» שבמסך «היום».</p>
   </div>
   <div class="card">
     <div class="sec-h">⛔ אזל מהמלאי</div>
@@ -1496,6 +1832,14 @@ function renderBackup(){
       <textarea id="importText" style="min-height:110px;direction:ltr;font-family:monospace;font-size:.8rem" placeholder='{"orders":[...]}'></textarea>
     </div>
     <button type="button" class="btn danger" data-act="importApply">♻️ שחזור (מחליף את כל הנתונים הנוכחיים)</button>
+  </div>
+  <div class="card">
+    <div class="sec-h">🎭 נתוני דוגמה</div>
+    <p class="hint">4 הזמנות אמיתיות מקובץ הוורד (קטי, לילך, חיים וניר) — כדי לראות את כל המסכים בפעולה. אפשר למחוק אותן בלחיצה בכל רגע.</p>
+    <div class="row">
+      <button type="button" class="btn sm" data-act="loadDemo">🎭 טעינת נתוני הדוגמה</button>
+      <button type="button" class="btn sm danger" data-act="clearDemo">🧹 מחיקת נתוני הדוגמה</button>
+    </div>
   </div>
   <div class="card">
     <div class="sec-h">ℹ️ מצב נוכחי</div>
@@ -1555,6 +1899,7 @@ function render(){
   else if(view.tab==='form') renderForm();
   else if(view.tab==='summary') renderSummary();
   else if(view.tab==='delivery') renderDelivery();
+  else if(view.tab==='money') renderMoney();
   else if(view.tab==='labels') renderLabels();
   else if(view.tab==='customers') renderCustomers();
   else renderBackup();
@@ -1611,11 +1956,22 @@ document.addEventListener('click', e=>{
   }
   if(act==='importOrder'){
     const ta=$('#importOrderText');
-    const p=parseOrderCode(ta?ta.value:'');
-    if(!p){ toast('לא נמצא קוד הזמנה בהודעה — צריך להדביק את כל ההודעה'); return; }
-    draft=applyImported(p);
-    renderForm();
-    toast('הטופס מולא מההזמנה של הלקוח ✓ עכשיו רק לבדוק ולשמור');
+    const val=ta?ta.value:'';
+    const p=parseOrderCode(val);
+    if(p){
+      draft=applyImported(p);
+      renderForm();
+      toast('הטופס מולא מההזמנה של הלקוח ✓ עכשיו רק לבדוק ולשמור');
+      return;
+    }
+    const f=parseFreeText(val);
+    if(f){
+      draft=f;
+      renderForm();
+      toast('קראתי את ההודעה ומילאתי מה שזיהיתי 🙏 לבדוק, להשלים ולשמור — ההודעה המקורית נשמרה בהערות');
+      return;
+    }
+    toast('לא הצלחתי לקרוא את ההודעה — אפשר למלא ידנית');
     return;
   }
   if(act==='addCustom'){ draft.custom.push({name:'',qty:1,price:''}); renderForm(); return; }
@@ -1703,6 +2059,43 @@ document.addEventListener('click', e=>{
     if(idx>=0) out.splice(idx,1); else out.push(name);
     saveStore(); renderBackup(); return;
   }
+  if(act==='menuDel'){
+    const cat=btn.dataset.cat, i=Number(btn.dataset.i);
+    if(MENU[cat]&&MENU[cat][i]!==undefined){ MENU[cat].splice(i,1); persistMenu(); renderBackup(); }
+    return;
+  }
+  if(act==='menuAdd'){
+    const cat=btn.dataset.cat;
+    const inp=$('#menuAdd-'+cat);
+    const name=(inp?inp.value:'').trim();
+    if(!name){ toast('כותבים קודם את שם המנה'); return; }
+    if(cat==='extras'){
+      const pr=parseMoney(($('#menuAddPrice-extras')||{}).value);
+      MENU.extras.push({name, price:pr});
+    } else MENU[cat].push(name);
+    persistMenu(); renderBackup(); toast('נוסף לתפריט ✓');
+    return;
+  }
+  if(act==='loadDemo'){
+    loadDemoData(); view.tab='today'; render();
+    toast('נטענו 4 הזמנות לדוגמה — קטי, לילך, חיים וניר 🎭');
+    return;
+  }
+  if(act==='clearDemo'){
+    clearDemoData(); render(); toast('נתוני הדוגמה נמחקו 🧹');
+    return;
+  }
+  if(act==='menuReset'){
+    if(!confirm('לחזור לתפריט ולמחירים המקוריים? העריכות שעשית לתפריט יימחקו (ההזמנות לא נפגעות).')) return;
+    delete store.menu; saveStore(); buildMenu(); renderBackup(); toast('התפריט חזר למקור ✓');
+    return;
+  }
+  if(act==='promoMsg'){
+    const t=buildPromoText();
+    copyText(t);
+    window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+    return;
+  }
   if(act==='custVip'){
     const key=btn.dataset.key;
     const m=store.customerMeta[key]||(store.customerMeta[key]={});
@@ -1730,6 +2123,28 @@ function handleBind(e){
   }
   if(b==='search'){ view.search=e.target.value; renderOrdersList(); return; }
   if(b==='custSearch'){ view.custSearch=e.target.value; renderCustomersList(); return; }
+  if(b==='moneyMonth'){ view.moneyMonth=e.target.value; renderMoney(); return; }
+  if(b==='expense'){
+    const dk=e.target.dataset.date;
+    const n=parseMoney(e.target.value);
+    if(n>0) store.expenses[dk]=n; else delete store.expenses[dk];
+    saveStore();
+    if(e.type==='change') renderMoney();
+    return;
+  }
+  if(b==='menu-num'){
+    const k=e.target.dataset.k;
+    const v=Math.max(0,parseInt(e.target.value,10)||0);
+    if(MENU[k]!==undefined){ MENU[k]=v; persistMenu(); }
+    return;
+  }
+  if(b==='menu-extra-price'){
+    const i=Number(e.target.dataset.i);
+    if(MENU.extras[i]){ MENU.extras[i].price=parseMoney(e.target.value); persistMenu(); }
+    return;
+  }
+  if(b==='payLink'){ store.settings.payLink=e.target.value.trim(); saveStore(); return; }
+  if(b==='orderFormUrl'){ store.settings.orderFormUrl=e.target.value.trim(); saveStore(); return; }
   if(b==='custNote'){
     const key=e.target.dataset.key;
     const m=store.customerMeta[key]||(store.customerMeta[key]={});
@@ -1778,13 +2193,14 @@ function handleBind(e){
 }
 document.addEventListener('input', handleBind);
 document.addEventListener('change', e=>{
-  if(e.target.type==='checkbox'||e.target.tagName==='SELECT'||e.target.type==='date') handleBind(e);
+  if(e.target.type==='checkbox'||e.target.tagName==='SELECT'||e.target.type==='date'||e.target.dataset.bind==='expense') handleBind(e);
 });
 
 /* ================= init ================= */
 document.documentElement.setAttribute('dir','rtl');
 document.documentElement.setAttribute('lang','he');
 loadStore();
+buildMenu();
 render();
 </script>
 
