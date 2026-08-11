@@ -5,44 +5,50 @@
 </head>
 <body>
 <title>מטעמי בת מלך · ניהול הזמנות</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@700;800;900&family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#FBF2EE; --surface:#FFFFFF; --surface2:#FDF8F6; --ink:#41262B; --muted:#96757C;
-  --accent:#B0446B; --accent-ink:#FFFFFF; --accent-soft:#F7E1E9;
-  --gold:#A0761F; --gold-soft:#F7EDD8; --line:#EDD9DC;
-  --ok:#3E7D4E; --ok-soft:#E2F0E5; --danger:#A63D3D; --danger-soft:#F6E2E2;
-  --radius:14px; --shadow:0 1px 3px rgba(65,38,43,.08);
+  --bg:#FDEDF1; --surface:#FFFFFF; --surface2:#FDF4F7; --surface-soft:#FBE3EA; --ink:#3B151A; --muted:#8A5A66;
+  --accent:#C24E76; --accent-ink:#FFFFFF; --accent-soft:#F2B8C9;
+  --gold:#D98A2B; --gold-soft:#FBEFDC; --line:#E8A9BE;
+  --ok:#4E8A5A; --ok-soft:#E2F0E5; --danger:#B23B3B; --danger-soft:#F8E3E3;
+  --radius:18px; --shadow:0 2px 8px rgba(59,21,26,.07);
+  --font-d:'Rubik','Assistant','Segoe UI',Tahoma,Arial,sans-serif;
+  --flower:url("data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cg%20fill='%23F2B8C9'%20stroke='%233B151A'%20stroke-width='1.7'%3E%3Cellipse%20cx='20'%20cy='9.5'%20rx='5.2'%20ry='8'/%3E%3Cellipse%20cx='20'%20cy='9.5'%20rx='5.2'%20ry='8'%20transform='rotate(72%2020%2020)'/%3E%3Cellipse%20cx='20'%20cy='9.5'%20rx='5.2'%20ry='8'%20transform='rotate(144%2020%2020)'/%3E%3Cellipse%20cx='20'%20cy='9.5'%20rx='5.2'%20ry='8'%20transform='rotate(216%2020%2020)'/%3E%3Cellipse%20cx='20'%20cy='9.5'%20rx='5.2'%20ry='8'%20transform='rotate(288%2020%2020)'/%3E%3C/g%3E%3Ccircle%20cx='20'%20cy='20'%20r='4.6'%20fill='%23D98A2B'%20stroke='%233B151A'%20stroke-width='1.7'/%3E%3C/svg%3E") no-repeat center/contain;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#221518; --surface:#2C1D21; --surface2:#271A1E; --ink:#F2E4E1; --muted:#B99BA2;
-    --accent:#E28AAC; --accent-ink:#3A1220; --accent-soft:#43242E;
-    --gold:#D9A94E; --gold-soft:#3D2F17; --line:#463138;
-    --ok:#7FC08D; --ok-soft:#23372A; --danger:#E09090; --danger-soft:#442525;
-    --shadow:0 1px 3px rgba(0,0,0,.35);
+    --bg:#231418; --surface:#2E1B21; --surface2:#281820; --surface-soft:#3A222B; --ink:#F6E7EA; --muted:#C79AA6;
+    --accent:#E58BAD; --accent-ink:#33121F; --accent-soft:#4A2531;
+    --gold:#E3A94F; --gold-soft:#3E2F16; --line:#57323E;
+    --ok:#86C693; --ok-soft:#22372A; --danger:#E79B9B; --danger-soft:#472628;
+    --shadow:0 2px 8px rgba(0,0,0,.35);
   }
 }
 :root[data-theme="dark"]{
-  --bg:#221518; --surface:#2C1D21; --surface2:#271A1E; --ink:#F2E4E1; --muted:#B99BA2;
-  --accent:#E28AAC; --accent-ink:#3A1220; --accent-soft:#43242E;
-  --gold:#D9A94E; --gold-soft:#3D2F17; --line:#463138;
-  --ok:#7FC08D; --ok-soft:#23372A; --danger:#E09090; --danger-soft:#442525;
-  --shadow:0 1px 3px rgba(0,0,0,.35);
+  --bg:#231418; --surface:#2E1B21; --surface2:#281820; --surface-soft:#3A222B; --ink:#F6E7EA; --muted:#C79AA6;
+  --accent:#E58BAD; --accent-ink:#33121F; --accent-soft:#4A2531;
+  --gold:#E3A94F; --gold-soft:#3E2F16; --line:#57323E;
+  --ok:#86C693; --ok-soft:#22372A; --danger:#E79B9B; --danger-soft:#472628;
+  --shadow:0 2px 8px rgba(0,0,0,.35);
 }
 :root[data-theme="light"]{
-  --bg:#FBF2EE; --surface:#FFFFFF; --surface2:#FDF8F6; --ink:#41262B; --muted:#96757C;
-  --accent:#B0446B; --accent-ink:#FFFFFF; --accent-soft:#F7E1E9;
-  --gold:#A0761F; --gold-soft:#F7EDD8; --line:#EDD9DC;
-  --ok:#3E7D4E; --ok-soft:#E2F0E5; --danger:#A63D3D; --danger-soft:#F6E2E2;
-  --shadow:0 1px 3px rgba(65,38,43,.08);
+  --bg:#FDEDF1; --surface:#FFFFFF; --surface2:#FDF4F7; --surface-soft:#FBE3EA; --ink:#3B151A; --muted:#8A5A66;
+  --accent:#C24E76; --accent-ink:#FFFFFF; --accent-soft:#F2B8C9;
+  --gold:#D98A2B; --gold-soft:#FBEFDC; --line:#E8A9BE;
+  --ok:#4E8A5A; --ok-soft:#E2F0E5; --danger:#B23B3B; --danger-soft:#F8E3E3;
+  --shadow:0 2px 8px rgba(59,21,26,.07);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
   background:var(--bg); color:var(--ink);
-  font-family:"Segoe UI","Noto Sans Hebrew","Arial Hebrew",Tahoma,Arial,sans-serif;
+  font-family:'Assistant','Noto Sans Hebrew','Segoe UI','Arial Hebrew',Tahoma,Arial,sans-serif;
   font-size:16px; line-height:1.55;
 }
+h1,.sec-h,.oc-name,.date-h .d,.stat .n,.bon-brand,.lb-name{font-family:var(--font-d)}
 #app{direction:rtl}
 .wrap{max-width:860px;margin:0 auto;padding:0 14px 110px}
 a{color:var(--accent)}
@@ -58,8 +64,8 @@ textarea{min-height:70px;resize:vertical}
 /* header */
 .top{position:sticky;top:0;z-index:25;background:var(--surface);border-bottom:1px solid var(--line);height:58px;display:flex;align-items:center}
 .top-in{width:100%;padding:0 20px;display:flex;align-items:center;gap:14px}
-.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
-.brand h1{font-size:1.15rem;margin:0;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand h1{font-size:1.15rem;margin:0;font-weight:800;letter-spacing:.02em;white-space:nowrap;color:var(--accent)}
 .brand .sub{color:var(--muted);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:560px){.brand .sub{display:none}}
 
@@ -69,6 +75,7 @@ textarea{min-height:70px;resize:vertical}
   color:var(--muted);font-weight:700;white-space:nowrap;
 }
 .bn-item .ic{font-size:1.05rem;line-height:1}
+.bn-item.active::before{content:'';width:15px;height:15px;background:var(--flower);flex-shrink:0}
 @media(min-width:900px){
   #tabs{
     position:fixed;top:58px;bottom:0;right:0;width:216px;z-index:20;
@@ -99,7 +106,9 @@ textarea{min-height:70px;resize:vertical}
 
 /* cards */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin:14px 0}
-.sec-h{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.02rem;margin:0 0 10px}
+.sec-h{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.02rem;margin:0 0 10px;
+  background:var(--surface-soft);border-radius:12px;padding:7px 12px;color:var(--accent)}
+.sec-h::before{content:'';width:19px;height:19px;background:var(--flower);flex-shrink:0}
 .sec-h .badge{font-weight:600}
 .hint{color:var(--muted);font-size:.85rem}
 .warn{color:var(--danger);font-size:.85rem;font-weight:600}
@@ -138,12 +147,13 @@ textarea{min-height:70px;resize:vertical}
 .pill.mut{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
 
 /* buttons */
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 16px;font-weight:700}
-.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 18px;font-weight:700}
+.btn:hover{border-color:var(--accent);color:var(--accent);background:var(--surface-soft)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.primary:hover{filter:brightness(1.06);color:var(--accent-ink)}
-.btn.danger:hover{border-color:var(--danger);color:var(--danger)}
-.btn.sm{padding:5px 11px;font-size:.85rem;border-radius:8px}
+.btn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
+.btn.sm{padding:5px 12px;font-size:.85rem;border-radius:999px}
+@media(max-width:899px){.btn{min-height:40px}.st-btn{width:40px;height:40px}}
 .savebar{
   position:fixed;bottom:0;right:0;left:0;z-index:45;background:var(--surface);
   border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));
@@ -153,6 +163,8 @@ textarea{min-height:70px;resize:vertical}
 
 /* orders list */
 .date-h{display:flex;align-items:center;gap:10px;margin:20px 0 6px;flex-wrap:wrap}
+.grp-block{margin:10px 0;padding:2px 10px 10px;border:1px dashed var(--gold);border-radius:var(--radius)}
+.grp-block .date-h{margin-top:10px;padding:4px 8px;border-radius:10px}
 .date-h .d{font-weight:800;font-size:1.05rem}
 .order-card{padding:13px 16px}
 .order-card.cancelled{opacity:.55}
@@ -203,27 +215,33 @@ tr.prep-row.done td{opacity:.5;text-decoration:line-through}
 body.printing #app{display:none!important}
 body.printing #printArea{display:block}
 .bon{
-  max-width:420px;margin:0 auto 16px;background:#fff;color:#222;
-  border:1.5px solid #b09a8e;border-radius:8px;padding:20px 22px;font-size:.95rem;
+  max-width:420px;margin:0 auto 16px;background:#fff;color:var(--ink);
+  border:2.5px dotted var(--accent);border-radius:16px;padding:20px 22px;font-size:.95rem;
 }
-.bon-bsd{font-size:.7rem;color:#777;margin-bottom:2px}
-.bon-brand{font-size:1.5rem;font-weight:800;text-align:center;margin:0;color:#4a2c2a}
-.bon-sub{text-align:center;color:#8a6b5f;font-size:.8rem;border-bottom:1px dashed #cbb5a8;padding-bottom:10px;margin-bottom:12px}
+.bon-bsd{font-size:.7rem;color:var(--muted);margin-bottom:2px}
+.bon-brand{font-size:1.5rem;font-weight:800;text-align:center;margin:0;color:var(--accent)}
+.bon-brand svg{vertical-align:-4px}
+.bon-sub{text-align:center;color:var(--muted);font-size:.8rem;border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:12px}
 .bon-body{white-space:pre-wrap;line-height:1.65}
-.bon-total{border-top:1px dashed #cbb5a8;margin-top:12px;padding-top:10px;font-weight:800;font-size:1.15rem;text-align:center;font-variant-numeric:tabular-nums}
-.bon-foot{text-align:center;font-size:.8rem;color:#8a6b5f;margin-top:10px}
+.bon-total{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px;font-weight:800;font-size:1.15rem;text-align:center;font-variant-numeric:tabular-nums;color:var(--accent)}
+.bon-foot{text-align:center;font-size:.8rem;color:var(--muted);margin-top:10px}
 
 /* bag labels */
 .labels-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0}
 @media(max-width:420px){.labels-grid{grid-template-columns:1fr}}
 .label{
-  border:2px dashed var(--accent);border-radius:14px;padding:18px 12px;
+  border:2.5px dotted var(--accent);border-radius:16px;padding:18px 12px;
   text-align:center;background:var(--surface);break-inside:avoid;
 }
 .label .lb-brand{font-weight:800;color:var(--accent);font-size:.9rem;letter-spacing:.04em}
+.label .lb-brand svg{vertical-align:-3px}
 .label .lb-kosher{font-size:.72rem;color:var(--muted)}
 .label .lb-name{font-size:1.4rem;font-weight:800;margin:8px 0 3px;text-wrap:balance}
 .label .lb-meta{font-size:.86rem;color:var(--muted)}
+.label .lb-fridge{margin-top:7px;padding-top:6px;border-top:1px dashed var(--line);font-size:.78rem}
+
+/* Brother QL-800 — מדבקת 62מ"מ (DK-11202). named page: לא משפיע על הדפסת בונים/מסמכים */
+@page qlabel{size:62mm 29mm;margin:0}
 
 @media print{
   .top,.savebar,.no-print{display:none!important}
@@ -231,12 +249,28 @@ body.printing #printArea{display:block}
   .card,.stat{box-shadow:none;border-color:#bbb;break-inside:avoid}
   .wrap{max-width:none;padding:0}
   .order-text{border-color:#bbb}
-  .bon{border-color:#000;page-break-inside:avoid}
+  .bon{page-break-inside:avoid}
   .bon+.bon{page-break-before:always}
-  .labels-grid{grid-template-columns:repeat(2,1fr)}
   .label{border-color:#333;background:#fff;color:#000}
   .label .lb-brand{color:#000}
   .label .lb-meta,.label .lb-kosher{color:#333}
+  /* QL-800: כל מדבקת בעמוד 62×29מ"מ בדיוק, grid למסך בלבד */
+  body.printing-labels .labels-grid{display:block;margin:0}
+  body.printing-labels .label{
+    page:qlabel;
+    width:62mm;height:29mm;box-sizing:border-box;margin:0;
+    border:none;border-radius:0;padding:1.2mm 2.5mm;
+    display:flex;flex-direction:column;justify-content:center;gap:.3mm;
+    overflow:hidden;page-break-after:always;break-inside:avoid;
+  }
+  body.printing-labels .label .lb-brand{font-size:8.5pt;line-height:1.1}
+  body.printing-labels .label .lb-brand svg{width:10px;height:10px;vertical-align:-1px}
+  body.printing-labels .label .lb-kosher{font-size:6pt;line-height:1.1}
+  body.printing-labels .label .lb-name{font-size:10pt;margin:.8mm 0 .3mm;line-height:1.12;overflow-wrap:anywhere;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  body.printing-labels .label .lb-meta{font-size:7.5pt;line-height:1.18;overflow-wrap:anywhere}
+  body.printing-labels .label .lb-fridge{margin-top:.8mm;padding-top:.8mm;font-size:5.5pt;line-height:1.15;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 }
 </style>
 
@@ -244,7 +278,8 @@ body.printing #printArea{display:block}
   <header class="top">
     <div class="top-in">
       <div class="brand">
-        <h1>✿ מטעמי בת מלך</h1>
+        <svg viewBox="0 0 40 40" width="26" height="26" aria-hidden="true" style="flex-shrink:0"><g fill="var(--accent-soft)" stroke="var(--ink)" stroke-width="1.7"><ellipse cx="20" cy="9.5" rx="5.2" ry="8"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(72 20 20)"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(144 20 20)"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(216 20 20)"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(288 20 20)"/></g><circle cx="20" cy="20" r="4.6" fill="var(--gold)" stroke="var(--ink)" stroke-width="1.7"/></svg>
+        <h1>מטעמי בת מלך</h1>
         <span class="sub">מערכת ניהול הזמנות · מטבח ביתי אותנטי כשר</span>
       </div>
     </div>
@@ -281,7 +316,9 @@ const DEFAULT_MENU = {
     {name:'רולדת בשר פריך ברוטב פטריות עשיר', price:100},
     {name:'מגש שניצלים (זוגי, כ־13–15 יח\')', price:100},
     {name:'מגש תפו"א קריספיים', price:30},
-    {name:'מגש אורז / קוסקוס / פסטה אדומה', price:25},
+    {name:'אורז', price:25},
+    {name:'פסטה אדומה', price:25},
+    {name:'קוסקוס', price:25},
     {name:'צלחת פתיחה (זיתים וחמוצים)', price:15},
     {name:'צלחת חריפים', price:15},
     {name:'תוספת חומוס ישראלי לניגוב', price:15},
@@ -290,12 +327,108 @@ const DEFAULT_MENU = {
     {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
     {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
     {name:'מנת מפרום ביתי (תוספת)', price:20},
-    {name:'משלוח', price:15}
+    {name:'משלוח', price:15},
+    {name:'מרק ירקות לקוסקוס ללא עוף', price:70},
+    {name:'מרק ירקות לקוסקוס עם עוף', price:100},
+    {name:'תוספת מנת דג', price:35},
+    {name:'תוספת קציצות דגים', price:70},
+    {name:'סט עריכה', price:10},
+    {name:'תוספת יין', price:5}
   ],
+  /* תפריט צהריים — פריטים נפרדים עם וריאציות ותוספות משלהם */
+  lunch:[
+    {key:'baguette', name:'בגט טוניסאי אותנטי', price:22},
+    {key:'schnitzel-roll', name:'בגט/חלת שניצל ישראלי', variants:[
+      {k:'baguette', label:'בבגט', price:25},
+      {k:'challah', label:'בחלה — סופ"ש בלבד', price:28, weekend:true}
+    ]},
+    {key:'kubeh', name:'מנת קובה סלק ביתית', price:35},
+    {key:'schnitzel-plate', name:'שניצל בצלחת', variants:[
+      {k:'single', label:'אישית', price:35, sidePrice:15},
+      {k:'couple', label:'זוגית', price:60, sidePrice:25},
+      {k:'family', label:'משפחתית — כולל 2 תוספות', price:145, includedSides:2, sidePrice:25}
+    ], sideChoice:true},
+    {key:'couscous', name:'ספיישל קוסקוס', price:35, addon:{name:'מנת מפרום ביתי', price:20}}
+  ],
+  lunchSides:['אורז לבן','פסטה אדומה','פסטה נקיה'],
   couplePrice:230, challahPrice:10, includedChallot:2, includedSalads:4, includedFish:2
 };
+const SALAD_PRICE=7; // חיוב סלט בודד מעבר לכלול (בלוק 4 = לפי האקסטרה «תוספת 4 סלטים»)
 const HEAT_OPTIONS = ['','לא חריף','חריף','מעורב — חלק חריף וחלק לא'];
 const STATUS_OPTIONS = ['חדשה','אושרה','מוכנה','במשלוח','נמסרה','בוטלה'];
+/* מלונות מרכזיים בדובאי ואבו דאבי — להשלמה אוטומטית בשדה «לאן המשלוח?» */
+const HOTELS = [
+  // דובאי
+  {name:'Atlantis The Palm', city:'דובאי', addr:'Crescent Rd, Palm Jumeirah, Dubai'},
+  {name:'Atlantis The Royal', city:'דובאי', addr:'Crescent Rd, Palm Jumeirah, Dubai'},
+  {name:'Burj Al Arab Jumeirah', city:'דובאי', addr:'Jumeirah Beach Rd, Umm Suqeim, Dubai'},
+  {name:'Jumeirah Beach Hotel', city:'דובאי', addr:'Jumeirah Beach Rd, Umm Suqeim, Dubai'},
+  {name:'Jumeirah Al Naseem', city:'דובאי', addr:'Madinat Jumeirah, Umm Suqeim, Dubai'},
+  {name:'Jumeirah Al Qasr', city:'דובאי', addr:'Madinat Jumeirah, Umm Suqeim, Dubai'},
+  {name:'Jumeirah Dar Al Masyaf', city:'דובאי', addr:'Madinat Jumeirah, Umm Suqeim, Dubai'},
+  {name:'Address Downtown', city:'דובאי', addr:'Downtown Dubai, Sheikh Mohammed bin Rashid Blvd'},
+  {name:'Address Dubai Marina', city:'דובאי', addr:'Dubai Marina, Al Marsa St'},
+  {name:'Address Beach Resort', city:'דובאי', addr:'JBR, The Walk, Dubai'},
+  {name:'Armani Hotel Dubai', city:'דובאי', addr:'Burj Khalifa, Downtown Dubai'},
+  {name:'JW Marriott Marquis Dubai', city:'דובאי', addr:'Business Bay, Sheikh Zayed Rd, Dubai'},
+  {name:'Grand Hyatt Dubai', city:'דובאי', addr:'Oud Metha Rd, Dubai'},
+  {name:'Hilton Dubai Al Habtoor City', city:'דובאי', addr:'Al Habtoor City, Sheikh Zayed Rd, Dubai'},
+  {name:'W Dubai – Mina Seyahi', city:'דובאי', addr:'Dubai Marina, Mina Seyahi'},
+  {name:'Five Palm Jumeirah', city:'דובאי', addr:'Palm Jumeirah, Dubai'},
+  {name:'Five Jumeirah Village', city:'דובאי', addr:'Jumeirah Village Circle, Dubai'},
+  {name:'Rixos Premium Dubai JBR', city:'דובאי', addr:'JBR, The Walk, Dubai'},
+  {name:'Sofitel Dubai The Palm', city:'דובאי', addr:'East Crescent, Palm Jumeirah, Dubai'},
+  {name:'Fairmont The Palm', city:'דובאי', addr:'Palm Jumeirah, Dubai'},
+  {name:'Waldorf Astoria Dubai Palm Jumeirah', city:'דובאי', addr:'East Crescent, Palm Jumeirah, Dubai'},
+  {name:'One&Only Royal Mirage', city:'דובאי', addr:'Al Sufouh Rd, Dubai Marina'},
+  {name:'One&Only The Palm', city:'דובאי', addr:'West Crescent, Palm Jumeirah, Dubai'},
+  {name:'Four Seasons Resort Dubai at Jumeirah Beach', city:'דובאי', addr:'Jumeirah Beach Rd, Jumeirah 2, Dubai'},
+  {name:'Mandarin Oriental Jumeira', city:'דובאי', addr:'Jumeirah Beach Rd, Jumeirah 1, Dubai'},
+  {name:'Bulgari Resort Dubai', city:'דובאי', addr:'Jumeira Bay Island, Jumeirah 2, Dubai'},
+  {name:'Kempinski Hotel Mall of the Emirates', city:'דובאי', addr:'Sheikh Zayed Rd, Al Barsha, Dubai'},
+  {name:'Sheraton Mall of the Emirates', city:'דובאי', addr:'Sheikh Zayed Rd, Al Barsha, Dubai'},
+  {name:'Rove Downtown', city:'דובאי', addr:'Downtown Dubai, Mohammed bin Rashid Blvd'},
+  {name:'InterContinental Dubai Marina', city:'דובאי', addr:'Dubai Marina, King Salman bin Abdulaziz St'},
+  {name:'Crowne Plaza Dubai Marina', city:'דובאי', addr:'Dubai Marina, Al Yahoom St'},
+  {name:'Grosvenor House Dubai', city:'דובאי', addr:'Dubai Marina, Al Emreef St'},
+  {name:'Le Royal Meridien Beach Resort & Spa', city:'דובאי', addr:'Dubai Marina, Al Mamsha St'},
+  {name:'Habtoor Grand Resort', city:'דובאי', addr:'JBR, Dubai Marina'},
+  {name:'The Ritz-Carlton Dubai', city:'דובאי', addr:'JBR, The Walk, Dubai'},
+  {name:'Anantara The Palm Dubai Resort', city:'דובאי', addr:'East Crescent, Palm Jumeirah, Dubai'},
+  {name:'Raffles The Palm Dubai', city:'דובאי', addr:'West Crescent, Palm Jumeirah, Dubai'},
+  {name:'Taj Exotica Resort & Spa The Palm', city:'דובאי', addr:'East Crescent, Palm Jumeirah, Dubai'},
+  {name:'Paramount Hotel Dubai', city:'דובאי', addr:'Business Bay, Dubai'},
+  {name:'Palazzo Versace Dubai', city:'דובאי', addr:'Culture Village, Al Jaddaf, Dubai'},
+  {name:'Hyatt Regency Dubai', city:'דובאי', addr:'Deira, Corniche Rd, Dubai'},
+  {name:'Radisson Blu Hotel Dubai Deira Creek', city:'דובאי', addr:'Deira, Baniyas Rd, Dubai'},
+  {name:'Conrad Dubai', city:'דובאי', addr:'Sheikh Zayed Rd, Trade Centre, Dubai'},
+  {name:'Sheraton Grand Hotel Dubai', city:'דובאי', addr:'Sheikh Zayed Rd, Trade Centre, Dubai'},
+  {name:'Towers Rotana Dubai', city:'דובאי', addr:'Sheikh Zayed Rd, Trade Centre, Dubai'},
+  // אבו דאבי
+  {name:'Emirates Palace Mandarin Oriental', city:'אבו דאבי', addr:'West Corniche Rd, Abu Dhabi'},
+  {name:'The St. Regis Abu Dhabi', city:'אבו דאבי', addr:'Nation Towers, Corniche Rd, Abu Dhabi'},
+  {name:'Conrad Abu Dhabi Etihad Towers', city:'אבו דאבי', addr:'Etihad Towers, Corniche Rd, Abu Dhabi'},
+  {name:'Grand Hyatt Abu Dhabi', city:'אבו דאבי', addr:'Emirates Pearl, West Corniche, Abu Dhabi'},
+  {name:'Corniche Hotel Abu Dhabi', city:'אבו דאבי', addr:'Corniche Rd East, Abu Dhabi'},
+  {name:'Sofitel Abu Dhabi Corniche', city:'אבו דאבי', addr:'Corniche Rd East, Abu Dhabi'},
+  {name:'Sheraton Abu Dhabi Hotel & Resort', city:'אבו דאבי', addr:'Corniche Rd East, Abu Dhabi'},
+  {name:'InterContinental Abu Dhabi', city:'אבו דאבי', addr:'King Abdullah bin Abdulaziz St, Abu Dhabi'},
+  {name:'Khalidiya Palace Rayhaan by Rotana', city:'אבו דאבי', addr:'Corniche Rd West, Abu Dhabi'},
+  {name:'Beach Rotana Abu Dhabi', city:'אבו דאבי', addr:'Al Zahiyah, Tourist Club Area, Abu Dhabi'},
+  {name:'Le Royal Meridien Abu Dhabi', city:'אבו דאבי', addr:'Sheikh Khalifa St, Abu Dhabi'},
+  {name:'Marriott Hotel Downtown Abu Dhabi', city:'אבו דאבי', addr:'Sheikh Rashid bin Saeed St, Abu Dhabi'},
+  {name:'Rosewood Abu Dhabi', city:'אבו דאבי', addr:'Al Maryah Island, Abu Dhabi'},
+  {name:'Four Seasons Abu Dhabi at Al Maryah Island', city:'אבו דאבי', addr:'Al Maryah Island, Abu Dhabi'},
+  {name:'Fairmont Bab Al Bahr', city:'אבו דאבי', addr:'Between the Bridges, Khor Al Maqta, Abu Dhabi'},
+  {name:'Shangri-La Qaryat Al Beri', city:'אבו דאבי', addr:'Qaryat Al Beri, Khor Al Maqta, Abu Dhabi'},
+  {name:'Park Hyatt Abu Dhabi Hotel & Villas', city:'אבו דאבי', addr:'Saadiyat Island, Abu Dhabi'},
+  {name:'The St. Regis Saadiyat Island Resort', city:'אבו דאבי', addr:'Saadiyat Island, Abu Dhabi'},
+  {name:'Jumeirah at Saadiyat Island Resort', city:'אבו דאבי', addr:'Saadiyat Island, Abu Dhabi'},
+  {name:'Rixos Premium Saadiyat Island', city:'אבו דאבי', addr:'Saadiyat Island, Abu Dhabi'},
+  {name:'W Abu Dhabi – Yas Island', city:'אבו דאבי', addr:'Yas Island, Abu Dhabi'},
+  {name:'Hilton Abu Dhabi Yas Island', city:'אבו דאבי', addr:'Yas Bay, Yas Island, Abu Dhabi'},
+  {name:'WB Abu Dhabi, Curio Collection by Hilton', city:'אבו דאבי', addr:'Yas Island, Abu Dhabi'}
+];
 const isCancelled=o=>o.status==='בוטלה';
 let MENU=null, OUT_POOL=[];
 function buildMenu(){
@@ -307,6 +440,24 @@ function buildMenu(){
     extras:(Array.isArray(m.extras)&&m.extras.length
       ?m.extras.filter(x=>x&&typeof x.name==='string'&&x.name.trim()).map(x=>({name:x.name,price:Math.max(0,Number(x.price)||0)}))
       :DEFAULT_MENU.extras.map(x=>({name:x.name,price:x.price}))),
+    lunch:DEFAULT_MENU.lunch.map(def=>{
+      const it=JSON.parse(JSON.stringify(def));
+      const sv=(Array.isArray(m.lunch)?m.lunch:[]).find(x=>x&&x.key===def.key);
+      if(!sv) return it;
+      if(typeof sv.name==='string'&&sv.name.trim()) it.name=sv.name;
+      const pv=v=>{ const n=Number(v); return Number.isFinite(n)&&n>=0?n:null; };
+      if(it.price!==undefined&&pv(sv.price)!==null) it.price=pv(sv.price);
+      if(it.variants) it.variants=it.variants.map(dv=>{
+        const svv=(Array.isArray(sv.variants)?sv.variants:[]).find(x=>x&&x.k===dv.k)||{};
+        if(pv(svv.price)!==null) dv.price=pv(svv.price);
+        if(dv.sidePrice!==undefined&&pv(svv.sidePrice)!==null) dv.sidePrice=pv(svv.sidePrice);
+        if(dv.includedSides!==undefined&&pv(svv.includedSides)!==null) dv.includedSides=pv(svv.includedSides);
+        return dv;
+      });
+      if(it.addon&&sv.addon&&pv(sv.addon.price)!==null) it.addon.price=pv(sv.addon.price);
+      return it;
+    }),
+    lunchSides:(Array.isArray(m.lunchSides)&&m.lunchSides.length?m.lunchSides.filter(x=>typeof x==='string'&&x.trim()):DEFAULT_MENU.lunchSides.slice()),
     couplePrice:num('couplePrice'), challahPrice:num('challahPrice'),
     includedChallot:num('includedChallot'), includedSalads:num('includedSalads'), includedFish:num('includedFish')
   };
@@ -315,7 +466,8 @@ function buildMenu(){
 function persistMenu(){
   store.menu={
     salads:MENU.salads, firsts:MENU.firsts, mains:MENU.mains, sides:MENU.sides, desserts:MENU.desserts,
-    extras:MENU.extras, couplePrice:MENU.couplePrice, challahPrice:MENU.challahPrice,
+    extras:MENU.extras, lunch:MENU.lunch, lunchSides:MENU.lunchSides,
+    couplePrice:MENU.couplePrice, challahPrice:MENU.challahPrice,
     includedChallot:MENU.includedChallot, includedSalads:MENU.includedSalads, includedFish:MENU.includedFish
   };
   OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
@@ -361,6 +513,27 @@ function menuEditorHtml(){
         <button type="button" class="btn sm" data-act="menuAdd" data-cat="extras">➕ הוספה</button>
       </div>
     </details>
+    <details style="margin:8px 0">
+      <summary style="cursor:pointer;font-weight:700">🌞 תפריט צהריים (${MENU.lunch.length})</summary>
+      <p class="hint">פריטי הצהריים קבועים — כאן עורכים מחירים בלבד (כולל וריאציות ותוספות).</p>
+      ${MENU.lunch.map((it,i)=>`<div class="item-row" style="display:block">
+        <div class="row" style="justify-content:space-between">
+          <span class="item-name">${esc(it.name)}</span>
+          ${it.price!==undefined?`<input inputmode="decimal" style="max-width:84px;text-align:center" data-bind="lunch-price" data-i="${i}" value="${it.price}">`:''}
+        </div>
+        ${(it.variants||[]).map((v,vi)=>`<div class="row" style="justify-content:space-between;padding-inline-start:14px">
+          <span class="item-name"><span class="hint">${esc(v.label)}${v.includedSides?` (כלול ${v.includedSides} תוספות)`:''}</span></span>
+          <span class="row" style="gap:4px">
+            <input inputmode="decimal" style="max-width:74px;text-align:center" title="מחיר" data-bind="lunch-price" data-i="${i}" data-v="${vi}" value="${v.price}">
+            ${v.sidePrice!==undefined?`<input inputmode="decimal" style="max-width:74px;text-align:center" title="מחיר תוספת בחירה" data-bind="lunch-price" data-i="${i}" data-v="${vi}" data-side="1" value="${v.sidePrice}">`:''}
+          </span>
+        </div>`).join('')}
+        ${it.addon?`<div class="row" style="justify-content:space-between;padding-inline-start:14px">
+          <span class="item-name"><span class="hint">+ ${esc(it.addon.name)}</span></span>
+          <input inputmode="decimal" style="max-width:74px;text-align:center" data-bind="lunch-price" data-i="${i}" data-addon="1" value="${it.addon.price}">
+        </div>`:''}
+      </div>`).join('')}
+    </details>
     <button type="button" class="btn sm danger" style="margin-top:8px" data-act="menuReset">↩️ חזרה לתפריט המקורי</button>
   </div>`;
 }
@@ -369,6 +542,8 @@ const PAID_OPTIONS = ['לא','מקדמה','כן','שת"פ'];
 
 /* ================= state ================= */
 const LS_KEY='batmelech-orders-v1';
+/* פרח המותג — SVG inline (5 עלים ורודים, מתאר ink, מרכז זהב) */
+const FLOWER=(s=20)=>`<svg viewBox="0 0 40 40" width="${s}" height="${s}" aria-hidden="true" focusable="false" style="flex-shrink:0"><g fill="var(--accent-soft)" stroke="var(--ink)" stroke-width="1.7"><ellipse cx="20" cy="9.5" rx="5.2" ry="8"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(72 20 20)"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(144 20 20)"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(216 20 20)"/><ellipse cx="20" cy="9.5" rx="5.2" ry="8" transform="rotate(288 20 20)"/></g><circle cx="20" cy="20" r="4.6" fill="var(--gold)" stroke="var(--ink)" stroke-width="1.7"/></svg>`;
 let store={orders:[],settings:{maxMeals:0}};
 let storageOK=true;
 let view={tab:'today', summaryDate:null, search:'', custSearch:'', labelCopies:{}, moneyMonth:null};
@@ -448,14 +623,16 @@ function toast(msg){
 /* ================= draft ================= */
 function newDraft(){
   return {
-    id:null, date:'', name:'', phone:'', place:'', address:'', time:'', pickup:false, status:'חדשה',
+    id:null, date:nextFridayIso(), name:'', phone:'', place:'', address:'', time:'', pickup:false, status:'חדשה',
+    group:'',               // שם קבוצה/יעד משותף — מקשר כמה הזמנות יחד
     meals:1, aricha:0, challot:MENU.includedChallot,
     salads:{},               // name -> {o,p}
     firsts:{}, heat:'', firstsNote:'',
     mains:{}, mainsNote:'',
     sides:{}, desserts:{},
     extras:{},               // name -> {q,note}
-    custom:[],               // [{name,qty,price}]
+    custom:[],               // [{name,qty,price,note}]
+    lunch:{},                // key -> {q, v, sides:{name:count}, addon}
     notes:'', total:'', deposit:'', payMethod:'', paid:'לא'
   };
 }
@@ -465,9 +642,43 @@ function draftFrom(o){
 }
 
 /* ================= price ================= */
+function lunchEntry(d,key){ const e=(d.lunch||{})[key]; return e&&e.q>0?e:null; }
+function lunchItemPriceLines(d){
+  const lines=[];
+  for(const it of MENU.lunch){
+    const e=lunchEntry(d,it.key); if(!e) continue;
+    if(it.variants){
+      const v=it.variants.find(x=>x.k===e.v)||it.variants[0];
+      lines.push({l:`${it.name} (${v.label}) ×${e.q}`, a:v.price*e.q});
+      if(it.sideChoice){
+        const sides=e.sides||{};
+        const nSd=Object.values(sides).reduce((s,x)=>s+(x||0),0);
+        const incl=(v.includedSides||0)*e.q;
+        const over=Math.max(0,nSd-incl);
+        if(over>0) lines.push({l:`תוספות לשניצל בצלחת (${over} מעבר לכלול)`, a:over*(v.sidePrice||0)});
+      }
+    } else {
+      lines.push({l:`${it.name} ×${e.q}`, a:it.price*e.q});
+    }
+    if(it.addon&&(e.addon||0)>0) lines.push({l:`${it.addon.name} (לקוסקוס) ×${e.addon}`, a:it.addon.price*e.addon});
+  }
+  return lines;
+}
+function saladBlockPrice(){
+  const ex=MENU.extras.find(x=>x.name==='תוספת 4 סלטים לבחירה');
+  return ex?ex.price:25;
+}
 function computeSuggested(d){
   const lines=[];
   if(d.meals>0) lines.push({l:`ארוחה זוגית ×${d.meals}`, a:MENU.couplePrice*d.meals});
+  // סלטים מעבר לכלול (פינוקים לא מחויבים): בלוק 4 = 25$, שארית 1-3 = 7$ לסלט
+  const nS=countSaladsOrdered(d);
+  const inclS=MENU.includedSalads*(d.meals||0);
+  const overS=Math.max(0,nS-inclS);
+  if(overS>0&&d.meals>0){
+    const blocks=Math.floor(overS/4), rem=overS%4;
+    lines.push({l:`סלטים נוספים (${overS} מעבר לכלול)`, a:blocks*saladBlockPrice()+rem*SALAD_PRICE});
+  }
   for(const ex of MENU.extras){
     const e=d.extras[ex.name];
     if(e && e.q>0) lines.push({l:`${ex.name} ×${e.q}`, a:ex.price*e.q});
@@ -476,6 +687,7 @@ function computeSuggested(d){
     const q=Number(c.qty)||0, p=parseMoney(c.price);
     if(c.name && q>0) lines.push({l:`${c.name} ×${q}`, a:p*q});
   }
+  for(const ln of lunchItemPriceLines(d)) lines.push(ln);
   const included=MENU.includedChallot*(d.meals||0);
   const extraCh=Math.max(0,(d.challot||0)-included);
   if(extraCh>0 && d.meals>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:MENU.challahPrice*extraCh});
@@ -485,6 +697,28 @@ function computeSuggested(d){
 function countSaladsOrdered(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.o||0),0); }
 function countSaladsPinuk(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.p||0),0); }
 function countFish(d){ return Object.values(d.firsts).reduce((s,x)=>s+(x||0),0); }
+
+function lunchTextLines(o){
+  const out=[];
+  for(const it of MENU.lunch){
+    const e=lunchEntry(o,it.key); if(!e) continue;
+    let line=it.name;
+    if(it.variants){
+      const v=it.variants.find(x=>x.k===e.v)||it.variants[0];
+      line+=` (${v.label})`;
+    }
+    line+=` ×${e.q}`;
+    const parts=[];
+    if(it.sideChoice){
+      const sp=Object.entries(e.sides||{}).filter(([,q])=>q>0).map(([n,q])=>`${n}${q>1?` ×${q}`:''}`);
+      if(sp.length) parts.push('תוספות: '+sp.join(', '));
+    }
+    if(it.addon&&(e.addon||0)>0) parts.push(`+ ${it.addon.name} ×${e.addon}`);
+    if(parts.length) line+=' — '+parts.join(' · ');
+    out.push(line);
+  }
+  return out;
+}
 
 /* ================= order text (like the Word card) ================= */
 function waLink(phone){
@@ -505,6 +739,7 @@ function buildOrderText(o){
   if(o.phone) L.push(`מס' טלפון: ${o.phone}`);
   L.push(`לאן המשלוח? ${o.pickup?'איסוף עצמי':(o.place||'—')}${(!o.pickup&&o.time)?` (הגעה: ${o.time})`:''}`);
   if(!o.pickup&&o.address) L.push(`כתובת: ${o.address}`);
+  if(o.group) L.push(`קבוצה: ${o.group}`);
   if(o.meals>0) L.push(`ארוחה זוגית ×${o.meals}`);
   const saladLines=[];
   for(const name of Object.keys(o.salads)){
@@ -540,8 +775,10 @@ function buildOrderText(o){
     const e=o.extras[name];
     if(e.q>0) exLines.push(`${name} ×${e.q}${e.note?` (${e.note})`:''}`);
   }
-  for(const c of o.custom){ if(c.name && (Number(c.qty)||0)>0) exLines.push(`${c.name} ×${c.qty}${c.price?` (${parseMoney(c.price)}$)`:''}`); }
+  for(const c of o.custom){ if(c.name && (Number(c.qty)||0)>0) exLines.push(`${c.name} ×${c.qty}${c.price?` (${parseMoney(c.price)}$)`:''}${c.note?` — ${c.note}`:''}`); }
   if(exLines.length){ L.push('אקסטרה:'); exLines.forEach(x=>L.push(`  • ${x}`)); }
+  const lunchLines=lunchTextLines(o);
+  if(lunchLines.length){ L.push('תפריט צהריים:'); lunchLines.forEach(x=>L.push(`  • ${x}`)); }
   if(o.aricha>0) L.push(`עריכה: ${o.aricha} איש`);
   if(o.challot>0) L.push(`חלות: ${o.challot} יח'`);
   if(o.total) L.push(`סך לתשלום: ${parseMoney(o.total)}$`);
@@ -554,12 +791,14 @@ function buildOrderText(o){
 
 /* ================= bon + labels printing ================= */
 let printCleanupTimer=null;
-function printHtml(html){
+function printHtml(html,mode){
   const pa=$('#printArea'); if(!pa) return;
   pa.innerHTML=html;
   document.body.classList.add('printing');
+  if(mode==='labels') document.body.classList.add('printing-labels'); // @page qlabel 62מ"מ
   const done=()=>{
     document.body.classList.remove('printing');
+    document.body.classList.remove('printing-labels');
     pa.innerHTML='';
     window.removeEventListener('afterprint',done);
     clearTimeout(printCleanupTimer);
@@ -571,7 +810,7 @@ function printHtml(html){
 function bonHtml(o){
   return `<div class="bon">
     <div class="bon-bsd">בס"ד</div>
-    <div class="bon-brand">מטעמי בת מלך</div>
+    <div class="bon-brand">${FLOWER(22)} מטעמי בת מלך ${FLOWER(22)}</div>
     <div class="bon-sub">מטבח ביתי אותנטי · כשר</div>
     <div class="bon-body">${esc(buildOrderText(o))}</div>
     ${o.total?`<div class="bon-total">סך לתשלום: ${money(parseMoney(o.total))}</div>`:''}
@@ -580,14 +819,14 @@ function bonHtml(o){
 }
 function labelHtml(o){
   return `<div class="label">
-    <div class="lb-brand">✿ מטעמי בת מלך ✿</div>
+    <div class="lb-brand">${FLOWER(14)} מטעמי בת מלך ${FLOWER(14)}</div>
     <div class="lb-kosher">מטבח ביתי אותנטי · כשר</div>
     <div class="lb-name">${esc(o.name||'')}</div>
     <div class="lb-meta">${esc(fmtDate(o.date))}</div>
     <div class="lb-meta">${esc(o.pickup?'איסוף עצמי':(o.place||''))}${(!o.pickup&&o.time)?' · '+esc(o.time):''}</div>
     ${(!o.pickup&&o.address)?`<div class="lb-meta">${esc(o.address)}</div>`:''}
     ${o.phone?`<div class="lb-meta">📞 ${esc(o.phone)}</div>`:''}
-    <div class="lb-meta" style="margin-top:7px;padding-top:6px;border-top:1px dashed var(--line);font-size:.78rem">
+    <div class="lb-meta lb-fridge">
       לשמור בקירור עד החימום ❄️ · חימום בכלי מכוסה${o.date?` · הוכן בתאריך ${esc(fmtShort(o.date))}`:''}
     </div>
   </div>`;
@@ -624,6 +863,7 @@ function renderLabels(){
   <div class="row no-print" style="margin:16px 0 4px">
     <button type="button" class="btn" data-act="labelsBack">→ חזרה לסיכום</button>
     <button type="button" class="btn primary" data-act="printLabels" style="margin-inline-start:auto">🖨️ הדפסת המדבקות</button>
+    <span class="hint">מכוון ל-Brother QL-800 · מדבקת 62 מ"מ</span>
   </div>
   <h2 style="margin:10px 0 0;font-size:1.15rem">🏷️ מדבקות לשקיות — ${esc(sc.title)}</h2>
   <div class="card no-print">
@@ -729,6 +969,31 @@ function orderCard(o){
     <div class="order-text" data-text-for="${o.id}" hidden>${esc(buildOrderText(o))}</div>
   </div>`;
 }
+function groupedOrdersHtml(list){
+  const groups={}, order=[], singles=[];
+  for(const o of list){
+    const g=(o.group||'').trim();
+    if(!g){ singles.push(o); continue; }
+    if(!groups[g]){ groups[g]=[]; order.push(g); }
+    groups[g].push(o);
+  }
+  const groupBlock=g=>{
+    const os=groups[g];
+    const act=os.filter(o=>!isCancelled(o));
+    const tot=act.reduce((s,o)=>s+parseMoney(o.total),0);
+    const dests=[...new Set(act.map(o=>o.place).filter(Boolean))];
+    return `<div class="grp-block">
+      <div class="date-h" style="background:var(--gold-soft)">
+        <span class="d">👥 ${esc(g)}</span>
+        <span class="badge">${os.length} משפחות</span>
+        ${dests.length?`<span class="badge">📍 ${esc(dests.join(' · '))}</span>`:''}
+        ${tot>0?`<span class="badge gold">${money(tot)}</span>`:''}
+      </div>
+      ${os.map(orderCard).join('')}
+    </div>`;
+  };
+  return order.map(groupBlock).join('') + singles.map(orderCard).join('');
+}
 function groupHtml(dates,obj){
   return dates.map(dk=>{
     const list=obj[dk];
@@ -747,12 +1012,12 @@ function groupHtml(dates,obj){
         ${tot>0?`<span class="badge gold">${money(tot)}</span>`:''}
         ${dk!=='ללא תאריך'?`<button type="button" class="btn sm no-print" data-act="daySummary" data-date="${dk}">🍲 לסיכום ההכנות</button>`:''}
       </div>
-      ${list.map(orderCard).join('')}
+      ${groupedOrdersHtml(list)}
     </section>`;
   }).join('');
 }
 function matchOrder(o,q){
-  const hay=(o.name+' '+o.phone+' '+(o.place||'')+' '+(o.notes||'')+' '+buildOrderText(o)).toLowerCase();
+  const hay=(o.name+' '+o.phone+' '+(o.place||'')+' '+(o.group||'')+' '+(o.notes||'')+' '+buildOrderText(o)).toLowerCase();
   return q.toLowerCase().trim().split(/\s+/).every(w=>hay.includes(w));
 }
 function renderOrders(){
@@ -965,6 +1230,23 @@ function applyImported(p){
       if(names.includes(n)&&e&&typeof e.q==='number'&&e.q>0) d.extras[n]={q:Math.floor(e.q),note:typeof e.note==='string'?e.note:''};
     }
   }
+  if(Array.isArray(p.custom)){
+    d.custom=p.custom.filter(c=>c&&typeof c.name==='string'&&c.name.trim())
+      .map(c=>({name:c.name,qty:Math.max(0,Math.floor(Number(c.qty)||0)),price:String(c.price??''),note:typeof c.note==='string'?c.note:''}));
+  }
+  if(p.lunch&&typeof p.lunch==='object'){
+    for(const it of MENU.lunch){
+      const e=p.lunch[it.key];
+      if(!e||typeof e.q!=='number'||e.q<=0) continue;
+      const ne={q:Math.floor(e.q),v:'',sides:{},addon:0};
+      if(it.variants&&typeof e.v==='string'&&it.variants.some(x=>x.k===e.v)) ne.v=e.v;
+      if(it.sideChoice&&e.sides&&typeof e.sides==='object'){
+        for(const [n,q] of Object.entries(e.sides)) if(MENU.lunchSides.includes(n)&&typeof q==='number'&&q>0) ne.sides[n]=Math.floor(q);
+      }
+      if(it.addon&&typeof e.addon==='number'&&e.addon>0) ne.addon=Math.floor(e.addon);
+      d.lunch[it.key]=ne;
+    }
+  }
   return d;
 }
 function renderForm(){
@@ -990,7 +1272,8 @@ function renderForm(){
   const desRows=MENU.desserts.map((name,i)=>`<div class="item-row">
       <span class="item-name">${oos(name)}${esc(name)}</span>${stepperHtml('desserts',i,d.desserts[name]||0)}
     </div>`).join('');
-  const placesDl=[...new Set(store.orders.map(o=>o.place).filter(Boolean))];
+  const placesDl=[...new Set(store.orders.map(o=>o.place).filter(Boolean).filter(p=>!HOTELS.some(h=>h.name===p)))];
+  const groupsDl=[...new Set(store.orders.map(o=>(o.group||'').trim()).filter(Boolean))];
   const exRows=MENU.extras.map((ex,i)=>{
     const e=d.extras[ex.name]||{q:0,note:''};
     return `<div class="item-row" style="display:block">
@@ -998,20 +1281,51 @@ function renderForm(){
         <span class="item-name">${esc(ex.name)} <span class="item-price">${ex.price}$</span></span>
         ${stepperHtml('extras',i,e.q)}
       </div>
-      <input class="note-in${e.q>0?'':' hidden'}" data-note-cell="extras|${i}" data-bind="extra-note" data-i="${i}" value="${esc(e.note)}" placeholder="הערה (מה בפנים, מה בצד...)">
+      <input class="note-in${e.q>0?'':' hidden'}" data-note-cell="extras|${i}" data-bind="extra-note" data-i="${i}" value="${esc(e.note)}" placeholder="${ex.name==='תוספת מנת דג'?'איזה דג?':'הערה (מה בפנים, מה בצד...)'}">
     </div>`;
   }).join('');
   const customRows=d.custom.map((c,i)=>`<div class="row" style="margin:6px 0">
-      <input style="flex:2;min-width:140px" data-bind="custom-name" data-i="${i}" value="${esc(c.name)}" placeholder="פריט חופשי">
-      <input style="flex:0 0 74px" inputmode="numeric" data-bind="custom-qty" data-i="${i}" value="${esc(c.qty)}" placeholder="כמות">
-      <input style="flex:0 0 90px" inputmode="decimal" data-bind="custom-price" data-i="${i}" value="${esc(c.price)}" placeholder="מחיר $">
+      <input style="flex:2;min-width:120px" data-bind="custom-name" data-i="${i}" value="${esc(c.name)}" placeholder="פריט חופשי">
+      <input style="flex:0 0 64px" inputmode="numeric" data-bind="custom-qty" data-i="${i}" value="${esc(c.qty)}" placeholder="כמות">
+      <input style="flex:0 0 80px" inputmode="decimal" data-bind="custom-price" data-i="${i}" value="${esc(c.price)}" placeholder="מחיר $">
+      <input style="flex:1.4;min-width:110px" data-bind="custom-note" data-i="${i}" value="${esc(c.note||'')}" placeholder="הערה (לא חובה)">
       <button type="button" class="btn sm danger" data-act="delCustom" data-i="${i}">✕</button>
     </div>`).join('');
+  const lunchRows=MENU.lunch.map((it,i)=>{
+    const e=(d.lunch||{})[it.key]||{q:0,v:'',sides:{},addon:0};
+    let inner='';
+    if(it.variants){
+      const cur=e.v||it.variants[0].k;
+      inner+=`<div class="row" style="gap:12px;flex-wrap:wrap;margin:6px 0 2px">
+        ${it.variants.map(v=>`<label class="row" style="gap:4px;cursor:pointer;font-size:.9rem">
+          <input type="radio" name="lv-${it.key}" style="width:auto" data-bind="lunch-variant" data-i="${i}" value="${v.k}"${cur===v.k?' checked':''}> ${esc(v.label)} — ${v.price}$
+        </label>`).join('')}
+      </div>`;
+      if(it.sideChoice){
+        const v=it.variants.find(x=>x.k===cur)||it.variants[0];
+        const incl=(v.includedSides||0);
+        inner+=`<div style="margin-top:4px">
+          <div class="hint" style="margin-bottom:2px">תוספות לבחירה${incl?` — ${incl} כלולות במשפחתית`:` — ${v.sidePrice}$ לתוספת`}${incl?`, מעבר לכך ${v.sidePrice}$ לתוספת`:''}:</div>
+          ${MENU.lunchSides.map((sn,si)=>`<div class="item-row"><span class="item-name">${esc(sn)}</span>${stepperHtml('lunchSides',i,(e.sides||{})[sn]||0,'s'+si)}</div>`).join('')}
+        </div>`;
+      }
+    }
+    if(it.addon){
+      inner+=`<div class="item-row" style="margin-top:4px"><span class="item-name">+ ${esc(it.addon.name)} <span class="item-price">${it.addon.price}$</span></span>${stepperHtml('lunchAddon',i,e.addon||0)}</div>`;
+    }
+    return `<div class="item-row" style="display:block">
+      <div class="row" style="justify-content:space-between">
+        <span class="item-name">${esc(it.name)}${it.price!==undefined?` <span class="item-price">${it.price}$</span>`:''}</span>
+        ${stepperHtml('lunch',i,e.q)}
+      </div>
+      ${e.q>0?inner:''}
+    </div>`;
+  }).join('');
   const heatOpts=HEAT_OPTIONS.map(h=>`<option value="${esc(h)}"${d.heat===h?' selected':''}>${h||'— רמת חריפות —'}</option>`).join('');
   const payOpts=PAY_METHODS.map(p=>`<option value="${esc(p)}"${d.payMethod===p?' selected':''}>${p||'— דרך תשלום —'}</option>`).join('');
   const paidOpts=PAID_OPTIONS.map(p=>`<option value="${esc(p)}"${d.paid===p?' selected':''}>${p}</option>`).join('');
 
-  const JUMPS=[['sec-details','🗓️ פרטים'],['sec-cust','👤 לקוח'],['sec-salads','🥗 סלטים'],['sec-firsts','🐟 ראשונות'],['sec-mains','🍖 עיקריות'],['sec-sides','🍚 תוספות'],['sec-desserts','🍫 קינוח'],['sec-extras','✨ אקסטרות'],['sec-pay','💰 תשלום']];
+  const JUMPS=[['sec-details','🗓️ פרטים'],['sec-cust','👤 לקוח'],['sec-salads','🥗 סלטים'],['sec-firsts','🐟 ראשונות'],['sec-mains','🍖 עיקריות'],['sec-sides','🍚 תוספות'],['sec-desserts','🍫 קינוח'],['sec-lunch','🌞 צהריים'],['sec-extras','✨ אקסטרות'],['sec-pay','💰 תשלום']];
   $('#view').innerHTML=`
   <div class="jump no-print">
     ${JUMPS.map(([t,l])=>`<button type="button" class="btn sm" data-act="jump" data-target="${t}">${l}</button>`).join('')}
@@ -1035,6 +1349,10 @@ function renderForm(){
     </div>
     <div class="field"><label>סטטוס ההזמנה</label>
       <select data-bind="status">${STATUS_OPTIONS.map(s=>`<option value="${esc(s)}"${(d.status||'חדשה')===s?' selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>קבוצה / יעד משותף (לא חובה)</label>
+      <input data-bind="group" value="${esc(d.group||'')}" list="groupsDl" placeholder="למשל: משפחת כהן — אירוע במלון אטלנטיס">
+      <datalist id="groupsDl">${groupsDl.map(g=>`<option value="${esc(g)}"></option>`).join('')}</datalist>
+      <p class="hint" style="margin:4px 0 0">כמה משפחות לאותו יעד? תני להן אותו שם קבוצה — הן יוצגו יחד בהזמנות ובמשלוחים.</p></div>
   </div>
 
   <div class="card" id="sec-cust">
@@ -1050,7 +1368,7 @@ function renderForm(){
       <div class="grid2">
         <div class="field"><label>לאן המשלוח? (בית מלון / אזור)</label>
           <input data-bind="place" value="${esc(d.place)}" placeholder="שם המלון או האזור" list="placesDl">
-          <datalist id="placesDl">${placesDl.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+          <datalist id="placesDl">${HOTELS.map(h=>`<option value="${esc(h.name)}" label="${esc(h.city)} · ${esc(h.addr)}"></option>`).join('')}${placesDl.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
         </div>
         <div class="field"><label>שעת הגעה למלון</label><input data-bind="time" value="${esc(d.time)}" placeholder="לדוגמה: 16:30"></div>
       </div>
@@ -1090,6 +1408,12 @@ function renderForm(){
   <div class="card" id="sec-desserts">
     <div class="sec-h">🍫 קינוחים <span class="badge" data-badge="desserts"></span></div>
     ${desRows}
+  </div>
+
+  <div class="card" id="sec-lunch">
+    <div class="sec-h">🌞 תפריט צהריים</div>
+    <p class="hint">פריטי צהריים נפרדים מהארוחה הזוגית — מתומחרים לפי המחירון. 🥖 חלת שניצל זמינה <b>בסופ"ש בלבד</b>.</p>
+    ${lunchRows}
   </div>
 
   <div class="card" id="sec-extras">
@@ -1152,7 +1476,7 @@ function updatePriceHint(){
   const warns=[];
   const inclS=MENU.includedSalads*(draft.meals||0);
   const nO=countSaladsOrdered(draft);
-  if(draft.meals>0 && nO>inclS) warns.push(`הוזמנו ${nO-inclS} סלטים מעבר לכלול — לא לשכוח לחייב (תוספת 4 סלטים = 25$).`);
+  if(draft.meals>0 && nO>inclS) warns.push(`הוזמנו ${nO-inclS} סלטים מעבר לכלול — החיוב נוסף אוטומטית למחיר המוצע (${SALAD_PRICE}$ לסלט, ${saladBlockPrice()}$ לבלוק 4).`);
   const inclF=MENU.includedFish*(draft.meals||0);
   const nF=countFish(draft);
   if(draft.meals>0 && nF>inclF) warns.push(`הוזמנו ${nF-inclF} דגים מעבר לכלול.`);
@@ -1163,7 +1487,16 @@ function updatePriceHint(){
     if(tot>max) warns.push(`עומס! עם ההזמנה הזאת יהיו ${tot} זוגיות ב־${fmtShort(draft.date)} — מעבר לתקרה שקבעת (${max}).`);
     else if(tot===max) warns.push(`התאריך ${fmtShort(draft.date)} מתמלא: ${tot}/${max} זוגיות.`);
   }
+  // אזהרת חלת שניצל ביום חול (לא חוסמת)
+  const roll=(draft.lunch||{})['schnitzel-roll'];
+  if(roll&&roll.q>0&&roll.v==='challah'&&draft.date){
+    const day=new Date(draft.date+'T00:00:00').getDay();
+    if(day!==5&&day!==6) warns.push('חלת שניצל זמינה בסופ"ש בלבד — נבחרה ליום חול, לתאם מול הלקוח.');
+  }
   let html='';
+  if(draft.meals>0){
+    html+=`<div class="hint" style="margin-bottom:6px">כלול במנה הזוגית (בלי חיוב נוסף): ${inclS} סלטים · ${MENU.includedFish*(draft.meals||0)} דגים · ${draft.meals} עיקרית · ${draft.meals} תוספת · ${MENU.includedChallot*draft.meals} חלות${MENU.includedChallot*draft.meals<(draft.challot||0)?` (מעבר לכך — חלה ${MENU.challahPrice}$)`:''}.</div>`;
+  }
   if(sug.lines.length){
     html+=`<div class="hint" style="margin-bottom:8px">מחיר מוצע לפי המחירון: `+
       sug.lines.map(l=>`${esc(l.l)} = ${l.a}$`).join(' · ')+
@@ -1193,6 +1526,24 @@ function bump(g,i,k,delta){
     const e=d.extras[name]||(d.extras[name]={q:0,note:''});
     e.q=Math.max(0,e.q+delta); nv=e.q;
     if(e.q===0&&!e.note) delete d.extras[name];
+  } else if(g==='lunch'){
+    const it=MENU.lunch[i];
+    const e=d.lunch[it.key]||(d.lunch[it.key]={q:0,v:'',sides:{},addon:0});
+    nv=Math.max(0,e.q+delta); e.q=nv;
+    if(nv===0) delete d.lunch[it.key];
+  } else if(g==='lunchSides'){
+    const it=MENU.lunch[i], e=d.lunch[it.key];
+    if(e){
+      const sn=MENU.lunchSides[Number(String(k).slice(1))];
+      if(sn!==undefined){
+        e.sides=e.sides||{};
+        nv=Math.max(0,(e.sides[sn]||0)+delta);
+        if(nv===0) delete e.sides[sn]; else e.sides[sn]=nv;
+      }
+    }
+  } else if(g==='lunchAddon'){
+    const it=MENU.lunch[i], e=d.lunch[it.key];
+    if(e){ nv=Math.max(0,(e.addon||0)+delta); e.addon=nv; }
   }
   return nv;
 }
@@ -1201,7 +1552,7 @@ function bump(g,i,k,delta){
 function aggregate(list){
   const agg={
     orders:list.length, meals:0, aricha:0, challot:0,
-    salads:{}, firsts:{}, mains:{}, sides:{}, desserts:{}, extras:[],
+    salads:{}, firsts:{}, mains:{}, sides:{}, desserts:{}, extras:[], lunch:[],
     heatNotes:[], generalNotes:[],
     revenue:0, deposits:0, owed:0
   };
@@ -1218,7 +1569,17 @@ function aggregate(list){
     for(const [n,e] of Object.entries(o.extras)){
       if(e.q>0) agg.extras.push({who:o.name, what:n, q:e.q, note:e.note, date:o.date});
     }
-    for(const c of o.custom){ if(c.name&&(Number(c.qty)||0)>0) agg.extras.push({who:o.name, what:c.name, q:Number(c.qty)||0, note:c.price?`${parseMoney(c.price)}$`:'', date:o.date}); }
+    for(const c of o.custom){ if(c.name&&(Number(c.qty)||0)>0) agg.extras.push({who:o.name, what:c.name, q:Number(c.qty)||0, note:[c.price?`${parseMoney(c.price)}$`:'',c.note||''].filter(Boolean).join(' · '), date:o.date}); }
+    for(const it of MENU.lunch){
+      const e=lunchEntry(o,it.key); if(!e) continue;
+      let what=it.name;
+      let v=null;
+      if(it.variants){ v=it.variants.find(x=>x.k===e.v)||it.variants[0]; what+=` (${v.label})`; }
+      const sp=(it.sideChoice?Object.entries(e.sides||{}).filter(([,q])=>q>0).map(([n,q])=>`${n}${q>1?` ×${q}`:''}`):[]);
+      agg.lunch.push({who:o.name, what, q:e.q, note:sp.join(', '), date:o.date});
+      if(it.sideChoice) for(const [n,q] of Object.entries(e.sides||{})) if(q>0) agg.sides[n]=(agg.sides[n]||0)+q;
+      if(it.addon&&(e.addon||0)>0) agg.lunch.push({who:o.name, what:'+ '+it.addon.name+' (לקוסקוס)', q:e.addon, note:'', date:o.date});
+    }
     if(o.heat||o.firstsNote) agg.heatNotes.push({who:o.name, txt:[o.heat,o.firstsNote].filter(Boolean).join(' · '), date:o.date});
     if(o.mainsNote) agg.generalNotes.push({who:o.name, txt:'עיקרית: '+o.mainsNote, date:o.date});
     if(o.notes) agg.generalNotes.push({who:o.name, txt:o.notes, date:o.date});
@@ -1352,6 +1713,11 @@ function renderSummary(){
       ${agg.extras.map(exRow).join('')}
     </table></div></div>`:'';
 
+  const lunchHtml=agg.lunch.length?`<div class="card"><div class="sec-h">🌞 תפריט צהריים</div><div class="tbl-wrap"><table class="sum">
+      <tr><th>מה</th><th class="num">כמות</th><th>למי</th>${multi?'<th>יום</th>':''}<th>הערה</th></tr>
+      ${agg.lunch.map(e=>`<tr><td>${esc(e.what)}</td><td class="num">${e.q}</td><td>${esc(e.who)}</td>${multi?`<td class="num">${esc(fmtShort(e.date))}</td>`:''}<td>${esc(e.note||'')}</td></tr>`).join('')}
+    </table></div></div>`:'';
+
   const noteWho=n=>`<b>${esc(n.who)}</b>${multi?` (${esc(fmtShort(n.date))})`:''}`;
   const notesHtml=(agg.heatNotes.length||agg.generalNotes.length)?`<div class="card"><div class="sec-h">📌 הערות חשובות</div>
       ${agg.heatNotes.map(n=>`<div class="item-row"><span class="item-name">${noteWho(n)} — חריפות: ${esc(n.txt)}</span></div>`).join('')}
@@ -1393,6 +1759,7 @@ function renderSummary(){
   ${sumTable('🍚 תוספות', agg.sides, {bd:bd&&bd.sides, check:chkFor('sides')})}
   ${sumTable('🍫 קינוחים', agg.desserts, {bd:bd&&bd.desserts, check:chkFor('desserts')})}
   ${extrasHtml}
+  ${lunchHtml}
   ${notesHtml}
   ${delivHtml}
   ${list.length?`<div class="card">
@@ -1432,6 +1799,11 @@ function buildDayText(){
   if(agg.extras.length){
     L.push('✨ אקסטרות:');
     for(const e of agg.extras) L.push(`  • ${e.what} ×${e.q} (${e.who})${e.note?` — ${e.note}`:''}`);
+    L.push('');
+  }
+  if(agg.lunch.length){
+    L.push('🌞 תפריט צהריים:');
+    for(const e of agg.lunch) L.push(`  • ${e.what} ×${e.q} (${e.who})${e.note?` — ${e.note}`:''}`);
     L.push('');
   }
   if(agg.heatNotes.length||agg.generalNotes.length){
@@ -1704,6 +2076,39 @@ function renderDelivery(){
         <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">✏️</button>
       </div>
     </div>`;
+  // קיבוץ משפחות לאותה קבוצה = תחנת משלוח אחת
+  const gmap=new Map(), singles=[];
+  for(const o of dl){
+    const g=(o.group||'').trim();
+    if(!g){ singles.push(o); continue; }
+    if(!gmap.has(g)) gmap.set(g,[]);
+    gmap.get(g).push(o);
+  }
+  const stops=[...gmap.entries()].map(([g,os])=>({g,os})).concat(singles.map(o=>({o})));
+  const groupStopCard=(g,os,i)=>{
+    const act=os.filter(o=>!isCancelled(o));
+    const nav=os.find(o=>o.place);
+    const owed=act.reduce((s,o)=>s+owe(o),0);
+    const dests=[...new Set(os.map(o=>o.place).filter(Boolean))];
+    return `<div class="card order-card" style="border-inline-start:4px solid var(--gold)">
+      <div class="oc-top">
+        <span class="badge">${i+1}</span>
+        <span class="oc-name">👥 ${esc(g)}</span>
+        <span class="oc-total">${owed>0?`לגבות ${owed}$`:(act.some(o=>parseMoney(o.total)>0)?'שולם ✓':'')}</span>
+      </div>
+      <div class="oc-meta">${esc(dests.join(' · ')||'—')}${nav&&nav.address?` · ${esc(nav.address)}`:''}</div>
+      ${os.map(o=>`<div class="item-row">
+        <span class="item-name">${o.time?esc(o.time)+' · ':''}<b>${esc(o.name)}</b> ${statusPill(o)}
+          ${multi?`<span class="hint"> · ${esc(fmtShort(o.date))}</span>`:''}</span>
+        <span class="hint">${owe(o)>0?`לגבות ${owe(o)}$`:(parseMoney(o.total)>0?'שולם ✓':'')}</span>
+      </div>`).join('')}
+      <div class="oc-actions no-print">
+        ${nav?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${mapsUrl(nav)}">🗺️ ניווט</a>`:''}
+        ${os.map(o=>o.phone?`<a class="btn sm" style="text-decoration:none" href="tel:${esc(o.phone)}">📞 ${esc(o.name)}</a>`:'').join('')}
+      </div>
+    </div>`;
+  };
+  const stopHtml=stops.map((s,i)=>s.o?stopCard(s.o,i):groupStopCard(s.g,s.os,i)).join('');
   $('#view').innerHTML=`
   <div class="row no-print" style="margin:16px 0 4px">
     <div class="field" style="flex:1;margin:0"><label>משלוחים ליום</label>
@@ -1720,7 +2125,7 @@ function renderDelivery(){
     <button type="button" class="btn" data-act="copyRoute">📋 העתקת המסלול</button>
   </div>
   <p class="hint no-print" style="margin:0 2px 8px">לוחצים, בוחרים את השליח באנשי הקשר — והוא מקבל את כל התחנות עם ניווט, טלפונים וכמה לגבות.</p>`:''}
-  ${dl.map(stopCard).join('')}
+  ${stopHtml}
   ${dl.length===0?`<div class="card"><p class="hint">אין משלוחים בתקופה הזאת${pk.length?' — רק איסופים עצמיים':''}.</p></div>`:''}
   ${pk.length?`<div class="sec-h" style="margin-top:18px">🏠 איסוף עצמי (${pk.length})</div>${pk.map((o)=>`<div class="card order-card">
       <div class="oc-top"><span class="oc-name">${esc(o.name)}</span> ${statusPill(o)}
@@ -1734,15 +2139,38 @@ function renderDelivery(){
 function buildRouteText(){
   const sc=summaryScope();
   const dl=sc.list.filter(o=>!o.pickup), pk=sc.list.filter(o=>o.pickup);
-  const L=[`🚚 מסלול משלוחים — ${sc.title}`,''];
-  dl.forEach((o,i)=>{
-    L.push(`${i+1}. ${sc.multi?fmtShort(o.date)+' · ':''}${o.time?o.time+' — ':''}${o.name} — ${o.place||'—'}${o.address?` (${o.address})`:''}`);
+  const oweOf2=o=>(o.paid!=='כן'&&o.paid!=='שת"פ')?Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):0;
+  const stopLine=o=>{
+    L.push(`${n}. ${sc.multi?fmtShort(o.date)+' · ':''}${o.time?o.time+' — ':''}${o.name} — ${o.place||'—'}${o.address?` (${o.address})`:''}`);
     if(o.phone) L.push(`   📞 ${o.phone}`);
-    const owe=(o.paid!=='כן'&&o.paid!=='שת"פ')?Math.max(0,parseMoney(o.total)-parseMoney(o.deposit)):0;
-    if(owe>0) L.push(`   💰 לגבות: ${owe}$`);
+    if(oweOf2(o)>0) L.push(`   💰 לגבות: ${oweOf2(o)}$`);
     if(o.place) L.push(`   🗺️ https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim())}`);
     L.push('');
-  });
+  };
+  const L=[`🚚 מסלול משלוחים — ${sc.title}`,''];
+  const gmap=new Map(), singles=[];
+  for(const o of dl){
+    const g=(o.group||'').trim();
+    if(!g){ singles.push(o); continue; }
+    if(!gmap.has(g)) gmap.set(g,[]);
+    gmap.get(g).push(o);
+  }
+  const stops=[...gmap.entries()].map(([g,os])=>({g,os})).concat(singles.map(o=>({o})));
+  let n=0;
+  for(const s of stops){
+    n++;
+    if(s.o){ stopLine(s.o); continue; }
+    const os=s.os;
+    const nav=os.find(o=>o.place);
+    const owed=os.reduce((sum,o)=>sum+oweOf2(o),0);
+    L.push(`${n}. 👥 ${s.g} — ${os.length} משפחות — ${[...new Set(os.map(o=>o.place).filter(Boolean))].join(' · ')||'—'}${nav&&nav.address?` (${nav.address})`:''}`);
+    for(const o of os){
+      L.push(`   • ${sc.multi?fmtShort(o.date)+' · ':''}${o.time?o.time+' — ':''}${o.name}${o.phone?` 📞 ${o.phone}`:''}${oweOf2(o)>0?` 💰 ${oweOf2(o)}$`:''}`);
+    }
+    if(owed>0) L.push(`   💰 סה"כ לגבות בקבוצה: ${owed}$`);
+    if(nav) L.push(`   🗺️ https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((nav.place+' '+(nav.address||'')+' Dubai').trim())}`);
+    L.push('');
+  }
   if(pk.length){
     L.push('🏠 איסוף עצמי:');
     for(const o of pk) L.push(`  • ${o.name}${o.phone?' — '+o.phone:''}`);
@@ -1769,7 +2197,7 @@ function loadDemoData(){
     mk({id:'demo2', date:fr1, name:'לילך בוארון', phone:'050-4448731', place:'אטלנטיס דה פאלם', time:'15:00', status:'חדשה',
       meals:0, aricha:15, challot:10,
       salads:{'מטבוחה פיקנטית':{o:2,p:0},'מסייר (חמוצים)':{o:1,p:0}},
-      extras:{'מגש אורז / קוסקוס / פסטה אדומה':{q:3,note:'2 אורז + 1 קוסקוס'},'מגש שניצלים (זוגי, כ־13–15 יח\')':{q:2,note:''},'מפרום ביתי של אמא (זוגי)':{q:1,note:'מפרום זוגי'}},
+      extras:{'אורז':{q:2,note:''},'קוסקוס':{q:1,note:''},'מגש שניצלים (זוגי, כ־13–15 יח\')':{q:2,note:''},'מפרום ביתי של אמא (זוגי)':{q:1,note:'מפרום זוגי'}},
       custom:[{name:'חומוס',qty:2,price:''},{name:'מרק ירקות קוסקוס פרווה',qty:1,price:''}],
       total:'540', deposit:'', payMethod:'', paid:'לא'}),
     mk({id:'demo3', date:fr1, name:'חיים הלוי', phone:'052-3442155', pickup:true, status:'מוכנה',
@@ -1947,6 +2375,7 @@ document.addEventListener('click', e=>{
   if(act==='bump'){
     const g=btn.dataset.group, i=Number(btn.dataset.i), k=btn.dataset.k||null, dd=Number(btn.dataset.d);
     const nv=bump(g,i,k,dd);
+    if(g==='lunch'){ renderForm(); return; } // חושף/מסתיר בחירת וריאציה ותוספות
     const cell=document.querySelector(`[data-cell="${g}|${i}${k?'|'+k:''}"]`);
     if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
     if(g==='extras'){
@@ -2112,7 +2541,7 @@ document.addEventListener('click', e=>{
   }
   if(act==='printLabels'){
     const html=labelsHtml(summaryScope().list);
-    if(html.includes('labels-grid')) printHtml(html);
+    if(html.includes('labels-grid')) printHtml(html,'labels');
     else toast('אין מדבקות להדפסה — כל הכמויות על 0');
     return;
   }
@@ -2151,6 +2580,18 @@ function handleBind(e){
     if(MENU.extras[i]){ MENU.extras[i].price=parseMoney(e.target.value); persistMenu(); }
     return;
   }
+  if(b==='lunch-price'){
+    const i=Number(e.target.dataset.i), it=MENU.lunch[i]; if(!it) return;
+    const v=parseMoney(e.target.value);
+    if(e.target.dataset.addon){ if(it.addon) it.addon.price=v; }
+    else if(e.target.dataset.v!==undefined){
+      const vr=it.variants&&it.variants[Number(e.target.dataset.v)]; if(!vr) return;
+      if(e.target.dataset.side){ if(vr.sidePrice!==undefined) vr.sidePrice=v; }
+      else vr.price=v;
+    }
+    else if(it.price!==undefined) it.price=v;
+    persistMenu(); return;
+  }
   if(b==='payLink'){ store.settings.payLink=e.target.value.trim(); saveStore(); return; }
   if(b==='orderFormUrl'){ store.settings.orderFormUrl=e.target.value.trim(); saveStore(); return; }
   if(b==='custNote'){
@@ -2170,8 +2611,17 @@ function handleBind(e){
     case 'date': draft.date=v; updatePriceHint(); break;
     case 'name': draft.name=v; break;
     case 'phone': draft.phone=v; break;
-    case 'place': draft.place=v; break;
+    case 'place': {
+      draft.place=v;
+      const h=HOTELS.find(x=>x.name===v.trim());
+      if(h&&!draft.address){
+        draft.address=h.addr;
+        const a=document.querySelector('[data-bind="address"]'); if(a) a.value=h.addr;
+      }
+      break;
+    }
     case 'address': draft.address=v; break;
+    case 'group': draft.group=v.trim(); break;
     case 'time': draft.time=v; break;
     case 'status': draft.status=v; break;
     case 'pickup': {
@@ -2194,14 +2644,23 @@ function handleBind(e){
       if(ex.q===0&&!ex.note) delete draft.extras[name];
       break;
     }
+    case 'lunch-variant': {
+      const it=MENU.lunch[i];
+      if(it&&it.variants){
+        const e=draft.lunch[it.key]||(draft.lunch[it.key]={q:0,v:'',sides:{},addon:0});
+        e.v=v; updatePriceHint();
+      }
+      break;
+    }
     case 'custom-name': if(draft.custom[i]) draft.custom[i].name=v; break;
+    case 'custom-note': if(draft.custom[i]) draft.custom[i].note=v; break;
     case 'custom-qty': if(draft.custom[i]){ draft.custom[i].qty=v; updatePriceHint(); } break;
     case 'custom-price': if(draft.custom[i]){ draft.custom[i].price=v; updatePriceHint(); } break;
   }
 }
 document.addEventListener('input', handleBind);
 document.addEventListener('change', e=>{
-  if(e.target.type==='checkbox'||e.target.tagName==='SELECT'||e.target.type==='date'||e.target.dataset.bind==='expense') handleBind(e);
+  if(e.target.type==='checkbox'||e.target.type==='radio'||e.target.tagName==='SELECT'||e.target.type==='date'||e.target.dataset.bind==='expense') handleBind(e);
 });
 
 /* ================= init ================= */
