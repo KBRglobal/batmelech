@@ -17,7 +17,7 @@ function orderFormFixture(t) {
     window.__orderFormTest = {
       state:o, firsts:FIRSTS, mains:MAINS, sides:SIDES, desserts:DESSERTS, extras:EXTRAS,
       lunch:LUNCH, lunchSides:LUNCH_SIDES, paidMainExtras:PAID_MAIN_EXTRAS,
-      estLines, buildText, refresh, bump, nextFridayDubai, isRealIsoDate,
+      estLines, buildText, buildInternalText, refresh, bump, nextFridayDubai, isRealIsoDate,
       challotOverridden:()=>challotOverridden
     };
   </script></body>`);
@@ -62,7 +62,7 @@ function resetSelections(api) {
 }
 
 function decodeBM1(api) {
-  const encoded = api.buildText().match(/#BM1#([A-Za-z0-9+/=]+)#/u)?.[1];
+  const encoded = api.buildInternalText().match(/#BM1#([A-Za-z0-9+/=]+)#/u)?.[1];
   assert.ok(encoded, 'the WhatsApp text must include a BM1 payload');
   return JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
 }
@@ -81,6 +81,20 @@ test('actual untouched form starts with zero couple meals and zero challahs', t 
   const payload = decodeBM1(api);
   assert.equal(payload.meals, 0);
   assert.equal(payload.challot, 0);
+});
+
+test('customer WhatsApp text is clean and keeps the internal BM1 payload out of the message', t => {
+  const { api } = orderFormFixture(t);
+  resetSelections(api);
+  api.state.name = 'לקוח בדיקה';
+  api.state.phone = '0500000000';
+  api.state.mains = { 'רולדת בשר — במקום עיקרית': 1 };
+  api.refresh();
+  const customerText = api.buildText();
+  assert.doesNotMatch(customerText, /#BM1#/u);
+  assert.doesNotMatch(customerText, /[A-Za-z0-9+/]{30,}={0,2}#/u);
+  assert.match(api.buildInternalText(), /#BM1#[A-Za-z0-9+/=]+#/u);
+  assert.match(customerText, /רולדת בשר/u);
 });
 
 test('actual customer copy presents the Shabbat couple package as optional beside weekday orders', t => {

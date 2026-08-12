@@ -585,7 +585,7 @@ describe('OrderEditorScreen', () => {
     expect(state.message).toBe('שתי זוגיות')
     expect(state.baseDraft).toMatchObject({
       id: null,
-      status: 'חדשה',
+      status: 'מתעניין',
       name: 'שם ידני',
       address: 'הוראות ידניות לקבלה',
       notes: 'הערה ידנית',

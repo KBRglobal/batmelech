@@ -45,7 +45,7 @@ import {
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
-const STATUS_OPTIONS = ['חדשה', 'אושרה', 'מוכנה', 'במשלוח', 'נמסרה', 'בוטלה'] as const
+const STATUS_OPTIONS = ['מתעניין', 'חדשה', 'אושרה', 'מוכנה', 'במשלוח', 'נמסרה', 'בוטלה'] as const
 const HEAT_OPTIONS = ['', 'לא חריף', 'חריף', 'מעורב — חלק חריף וחלק לא'] as const
 const PAYMENT_METHODS = ['', 'מזומן', 'ביט', 'פייבוקס', 'לינק', 'העברה'] as const
 const PAID_OPTIONS = ['לא', 'מקדמה', 'כן', 'שת"פ'] as const
@@ -532,7 +532,7 @@ function createOrderImportBaseDraft(draft: OrderDraft): OrderDraft {
   return {
     ...draft,
     id: null,
-    status: 'חדשה',
+    status: 'מתעניין',
     meals: 0,
     aricha: 0,
     challot: 0,

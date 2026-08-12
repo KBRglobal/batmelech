@@ -496,7 +496,7 @@ function fmtDateHe(ds){
   const wd=new Intl.DateTimeFormat('he-IL',{weekday:'long'}).format(d);
   return `${wd} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
 }
-function buildText(){
+function buildText({includeInternalPayload=false}={}){
   const L=['היי! אשמח להזמין'];
   if(o.date) L.push(`תאריך: ${fmtDateHe(o.date)}`);
   if(o.name) L.push(`שם: ${o.name}`);
@@ -529,10 +529,13 @@ function buildText(){
   exp.extras=JSON.parse(JSON.stringify(exportedExtras));
   if(!o.pickup&&hasPricedFood(est.lines)) exp.extras['משלוח']={q:1,note:''};
   const code=btoa(unescape(encodeURIComponent(JSON.stringify(exp))));
-  L.push('');
-  L.push(`#BM1#${code}#`);
+  if(includeInternalPayload){
+    L.push('');
+    L.push(`#BM1#${code}#`);
+  }
   return L.join('\n');
 }
+function buildInternalText(){ return buildText({includeInternalPayload:true}); }
 function refresh(){
   const inclS=4*o.meals, nS=Object.values(o.salads).reduce((s,x)=>s+x,0);
   $('#saladBadge').textContent=o.meals>0?`${nS}/${inclS} כלולים`:`${nS}`;
