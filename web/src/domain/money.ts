@@ -1,4 +1,13 @@
-import { dinero, toSnapshot, type Dinero } from 'dinero.js'
+import {
+  DineroComparisonOperator,
+  add,
+  compare,
+  dinero,
+  subtract,
+  toDecimal,
+  toSnapshot,
+  type Dinero,
+} from 'dinero.js'
 import { USD } from 'dinero.js/currencies'
 
 export const MAX_SAFE_MINOR_UNITS = Number.MAX_SAFE_INTEGER
@@ -43,6 +52,21 @@ export function checkedMultiply(
   return multiplicand * multiplier
 }
 
+export function checkedSubtract(
+  minuend: number,
+  subtrahend: number,
+  fieldName = 'integer subtraction',
+): number {
+  requireNonNegativeSafeInteger(minuend, `${fieldName} minuend`)
+  requireNonNegativeSafeInteger(subtrahend, `${fieldName} subtrahend`)
+
+  if (subtrahend > minuend) {
+    throw new RangeError(`${fieldName} cannot produce a negative amount`)
+  }
+
+  return minuend - subtrahend
+}
+
 export function usdFromMinorUnits(minorUnits: unknown): UsdMoney {
   const amount = requireNonNegativeSafeInteger(minorUnits, 'USD minor units')
 
@@ -62,4 +86,45 @@ export function getUsdMinorUnits(money: UsdMoney): number {
   }
 
   return requireNonNegativeSafeInteger(snapshot.amount, 'USD minor units')
+}
+
+export function addUsd(augend: UsdMoney, addend: UsdMoney): UsdMoney {
+  const amount = checkedAdd(
+    getUsdMinorUnits(augend),
+    getUsdMinorUnits(addend),
+    'USD addition',
+  )
+  const result = add(augend, addend)
+
+  if (getUsdMinorUnits(result) !== amount) {
+    throw new RangeError('USD addition produced a non-canonical result')
+  }
+
+  return result
+}
+
+export function subtractUsd(minuend: UsdMoney, subtrahend: UsdMoney): UsdMoney {
+  const amount = checkedSubtract(
+    getUsdMinorUnits(minuend),
+    getUsdMinorUnits(subtrahend),
+    'USD subtraction',
+  )
+  const result = subtract(minuend, subtrahend)
+
+  if (getUsdMinorUnits(result) !== amount) {
+    throw new RangeError('USD subtraction produced a non-canonical result')
+  }
+
+  return result
+}
+
+export function compareUsd(left: UsdMoney, right: UsdMoney): DineroComparisonOperator {
+  getUsdMinorUnits(left)
+  getUsdMinorUnits(right)
+  return compare(left, right)
+}
+
+export function usdDecimalString(money: UsdMoney): string {
+  getUsdMinorUnits(money)
+  return toDecimal(money)
 }
