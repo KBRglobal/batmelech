@@ -31,6 +31,12 @@ vi.mock('./screens/customers-screen.tsx', () => ({
 vi.mock('./screens/finance-screen.tsx', () => ({
   FinanceScreen: () => <h1>מסך הכספים המחובר</h1>,
 }))
+vi.mock('./screens/order-editor-screen.tsx', () => ({
+  OrderEditorScreen: () => <h1>מסך עריכת ההזמנה המחובר</h1>,
+}))
+vi.mock('./screens/order-import-review-screen.tsx', () => ({
+  OrderImportReviewScreen: () => <h1>מסך בדיקת הוואטסאפ המחובר</h1>,
+}))
 
 const LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES = [
   ...CUSTOMER_ORDER_ROUTE_ALIASES,
@@ -79,10 +85,7 @@ describe('AppRoutes', () => {
   })
 
   it.each([
-    [APP_ROUTES.newOrder, 'הזמנה חדשה'],
-    ['/orders/order%201/edit', 'עריכת הזמנה'],
     ['/orders/order%201/bon', 'בון הזמנה'],
-    [APP_ROUTES.orderImportReview, 'בדיקת הזמנה מוואטסאפ'],
     [APP_ROUTES.preparationLabels, 'מדבקות הכנה'],
     [APP_ROUTES.settings, 'הגדרות וגיבוי'],
     [APP_ROUTES.menuSettings, 'עריכת תפריט'],
@@ -110,6 +113,9 @@ describe('AppRoutes', () => {
     [APP_ROUTES.deliveries, 'מסך המשלוחים המחובר'],
     [APP_ROUTES.customers, 'מסך הלקוחות המחובר'],
     [APP_ROUTES.finance, 'מסך הכספים המחובר'],
+    [APP_ROUTES.newOrder, 'מסך עריכת ההזמנה המחובר'],
+    ['/orders/order%201/edit', 'מסך עריכת ההזמנה המחובר'],
+    [APP_ROUTES.orderImportReview, 'מסך בדיקת הוואטסאפ המחובר'],
   ])('registers the real read-only operational screen at %s', (path, title) => {
     const { container } = renderRoute(path)
 

@@ -4,6 +4,8 @@ import { AppShell } from './components/app-shell.tsx'
 import { CustomersScreen } from './screens/customers-screen.tsx'
 import { DeliveriesScreen } from './screens/deliveries-screen.tsx'
 import { FinanceScreen } from './screens/finance-screen.tsx'
+import { OrderEditorScreen } from './screens/order-editor-screen.tsx'
+import { OrderImportReviewScreen } from './screens/order-import-review-screen.tsx'
 import { OrdersScreen } from './screens/orders-screen.tsx'
 import { PendingScreen } from './screens/pending-screen.tsx'
 import { PreparationScreen } from './screens/preparation-screen.tsx'
@@ -41,12 +43,12 @@ export function AppRoutes() {
       <Route element={<OperatorLayout />}>
         <Route path={APP_ROUTES.today} element={<TodayScreen />} />
         <Route path={APP_ROUTES.orders} element={<OrdersScreen />} />
-        <Route path={APP_ROUTES.newOrder} element={<PendingScreen title="הזמנה חדשה" />} />
-        <Route path={APP_ROUTES.editOrder} element={<PendingScreen title="עריכת הזמנה" />} />
+        <Route path={APP_ROUTES.newOrder} element={<OrderEditorScreen />} />
+        <Route path={APP_ROUTES.editOrder} element={<OrderEditorScreen />} />
         <Route path={APP_ROUTES.orderBon} element={<PendingScreen title="בון הזמנה" />} />
         <Route
           path={APP_ROUTES.orderImportReview}
-          element={<PendingScreen title="בדיקת הזמנה מוואטסאפ" />}
+          element={<OrderImportReviewScreen />}
         />
         <Route path={APP_ROUTES.preparation} element={<PreparationScreen />} />
         <Route
