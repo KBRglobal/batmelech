@@ -91,6 +91,7 @@ function publicPayload(patch: Record<string, unknown> = {}) {
     sides: { 'אורז לבן': 1 },
     desserts: { 'סופלה שוקולד': 2 },
     extras: { 'תוספת יין': { q: 1, note: '' }, 'משלוח': { q: 1, note: '' } },
+    lunch: {},
     notes: 'בלי בצל',
     ...patch,
   }
@@ -437,6 +438,79 @@ describe('OrderImportReviewScreen', () => {
 
     expect(currentHandoff().reviewedMessage).toBe('הזמנה מובנית מטופס הלקוח')
     expect(screen.getByTestId('location').textContent).not.toContain('#BM1#')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('preserves a public midweek lunch-only BM1 order without adding a couple package or challahs', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const user = userEvent.setup()
+    renderReview(bm1Message(publicPayload({
+      date: '2026-08-19',
+      meals: 0,
+      challot: 0,
+      salads: {},
+      firsts: {},
+      mains: {},
+      sides: {},
+      desserts: {},
+      extras: {},
+      lunch: {
+        'schnitzel-plate': {
+          q: 2,
+          v: 'family',
+          sides: { 'אורז לבן': 2, 'פסטה אדומה': 2 },
+          addon: 0,
+        },
+        couscous: { q: 1, v: '', sides: {}, addon: 1 },
+      },
+    })))
+
+    await user.click(screen.getByRole('button', { name: 'בניית טופס ההזמנה' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.newOrder))
+
+    const draft = currentHandoff().reviewedDraft as Record<string, unknown>
+    expect(draft.date).toBe('2026-08-19')
+    expect(draft.meals).toBe(0)
+    expect(draft.challot).toBe(0)
+    expect(draft.lunch).toEqual({
+      'schnitzel-plate': {
+        quantity: 2,
+        variantKey: 'family',
+        sides: { 'אורז לבן': 2, 'פסטה אדומה': 2 },
+        addonQuantity: 0,
+      },
+      couscous: {
+        quantity: 1,
+        variantKey: '',
+        sides: {},
+        addonQuantity: 1,
+      },
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when a public BM1 lunch selection contains an unknown variant or side', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const user = userEvent.setup()
+    renderReview(bm1Message(publicPayload({
+      meals: 0,
+      challot: 0,
+      lunch: {
+        'schnitzel-plate': {
+          q: 1,
+          v: 'unknown-size',
+          sides: { 'תוספת לא קיימת': 1 },
+          addon: 0,
+        },
+      },
+    })))
+
+    await user.click(screen.getByRole('button', { name: 'בניית טופס ההזמנה' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('פריט שאינו קיים בתפריט')
+    expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.orderImportReview)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

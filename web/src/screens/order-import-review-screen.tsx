@@ -107,6 +107,12 @@ interface ReviewContext {
 const BM1_COUNT = z.number().int().min(0).max(1000)
 const BM1_SELECTED_COUNT = z.number().int().min(1).max(1000)
 const BM1_TEXT = z.string().max(1000)
+const BM1_LUNCH_SELECTION = z.object({
+  q: BM1_SELECTED_COUNT,
+  v: BM1_TEXT,
+  sides: z.record(z.string().min(1).max(300), BM1_SELECTED_COUNT),
+  addon: BM1_COUNT,
+}).strict()
 const BM1PayloadSchema = z.object({
   date: BM1_TEXT,
   name: BM1_TEXT,
@@ -127,6 +133,7 @@ const BM1PayloadSchema = z.object({
     q: BM1_SELECTED_COUNT,
     note: BM1_TEXT,
   }).strict()),
+  lunch: z.record(z.string().min(1).max(100), BM1_LUNCH_SELECTION).default({}),
   notes: BM1_TEXT,
 }).passthrough()
 
@@ -194,6 +201,31 @@ function assertAllowedNames(
   }
 }
 
+function decodeBM1Lunch(
+  values: Readonly<Record<string, z.infer<typeof BM1_LUNCH_SELECTION>>>,
+  menu: ReturnType<typeof buildOrderEditorMenu>,
+): OrderDraft['lunch'] {
+  const menuByKey = new Map(menu.lunch.map((item) => [item.key, item]))
+  const allowedSides = new Set(menu.lunchSides)
+  return Object.fromEntries(Object.entries(values).map(([key, selection]) => {
+    const item = menuByKey.get(key)
+    if (!item) throw new Error('BM1_UNKNOWN_ITEM')
+    const variantKey = selection.v || item.variants[0]?.key || ''
+    if (
+      (item.variants.length > 0 && !item.variants.some((variant) => variant.key === variantKey)) ||
+      (item.variants.length === 0 && variantKey !== '') ||
+      Object.keys(selection.sides).some((name) => !item.sideChoice || !allowedSides.has(name)) ||
+      (selection.addon > 0 && item.addon === null)
+    ) throw new Error('BM1_UNKNOWN_ITEM')
+    return [key, {
+      quantity: selection.q,
+      variantKey,
+      sides: structuredClone(selection.sides),
+      addonQuantity: selection.addon,
+    }]
+  }))
+}
+
 function decodeBM1Draft(
   message: string,
   menu: ReturnType<typeof buildOrderEditorMenu>,
@@ -218,6 +250,7 @@ function decodeBM1Draft(
       throw new Error('BM1_UNKNOWN_ITEM')
     }
     const base = zeroCoupleDraft(menu)
+    const lunch = decodeBM1Lunch(parsed.lunch, menu)
     return {
       ...base,
       date: parsed.date || base.date,
@@ -241,6 +274,7 @@ function decodeBM1Draft(
           .filter(([name]) => !isAutomaticChargeName(name))
           .map(([name, selection]) => [name, { quantity: selection.q, note: selection.note }]),
       ),
+      lunch,
       notes: parsed.notes,
     }
   } catch (error) {
@@ -259,6 +293,11 @@ function exactReview(draft: OrderDraft, catalog: AIOrderCatalog): AIReview {
     if (target.kind === 'side') return draft.sides[target.name] ?? 0
     if (target.kind === 'dessert') return draft.desserts[target.name] ?? 0
     if (target.kind === 'extra') return draft.extras[target.name]?.quantity ?? 0
+    if (target.kind === 'lunch') {
+      const selection = draft.lunch[target.key]
+      return selection && selection.variantKey === target.variantKey ? selection.quantity : 0
+    }
+    if (target.kind === 'lunch-addon') return draft.lunch[target.key]?.addonQuantity ?? 0
     return 0
   }
   const items = catalog.items.flatMap((item) => {
