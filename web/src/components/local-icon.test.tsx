@@ -11,7 +11,7 @@ describe('LocalIcon', () => {
   it('maps every registered icon to a local inspected SVG asset path', () => {
     for (const [name, path] of Object.entries(LOCAL_ICON_PATHS)) {
       expect(name).toMatch(/^[a-z0-9]+:[a-z0-9-]+$/u)
-      expect(path).toMatch(/^\/icons\/[a-z0-9-]+\.svg$/u)
+      expect(path).toMatch(/^\/(?:app\/)?icons\/[a-z0-9-]+\.svg$/u)
       expect(path).not.toMatch(/^https?:/u)
     }
   })
@@ -22,9 +22,7 @@ describe('LocalIcon', () => {
 
     expect(icon?.getAttribute('aria-hidden')).toBe('true')
     expect(icon?.getAttribute('role')).toBeNull()
-    expect(icon?.getAttribute('style')).toContain(
-      'mask-image: url("/icons/ph-calendar-bold.svg")',
-    )
+    expect(icon?.getAttribute('style')).toContain('mask-image: url("/icons/ph-calendar-bold.svg")')
     expect(container.querySelector('svg')).toBeNull()
     expect(container.innerHTML).not.toContain('http')
   })
