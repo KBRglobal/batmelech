@@ -330,6 +330,21 @@ test('returns advisory review only and has no persistence or state dependency', 
   assert.equal(router.stack[0].route.stack.length, 2);
 });
 
+test('accepts only warning-related demand evidence for configuration findings', async () => {
+  const grounded = completeReview({
+    findings: [{
+      kind: 'configuration_gap',
+      priority: 'high',
+      sourceIds: ['warning-1', 'demand-1'],
+      explanation: 'The recipe configuration gap affects the linked aggregate demand.',
+    }],
+  });
+  const fake = fakeOpenAI({ status: 'completed', output: [], output_parsed: grounded });
+  const reviewer = createOpenAIOperationsReview({ client: fake.client, model: 'test-model' });
+
+  assert.deepEqual(await reviewer(sanitizedSnapshot()), grounded);
+});
+
 test('rejects malformed, ungrounded, corrective, and action-taking provider output', async (t) => {
   const cases = [
     ['malformed schema', { reviewOnly: true }],
@@ -352,6 +367,17 @@ test('rejects malformed, ungrounded, corrective, and action-taking provider outp
           priority: 'high',
           sourceIds: ['warning-1'],
           explanation: 'The supplied warning represents an identity conflict.',
+        }],
+      }),
+    ],
+    [
+      'configuration warning with unrelated demand',
+      completeReview({
+        findings: [{
+          kind: 'configuration_gap',
+          priority: 'high',
+          sourceIds: ['warning-1', 'demand-2'],
+          explanation: 'A configuration gap affects an unrelated aggregate demand.',
         }],
       }),
     ],

@@ -109,20 +109,35 @@ function outputTextIsAdvisoryOnly(review) {
 
 function findingMatchesSources(finding, sourceById) {
   if (new Set(finding.sourceIds).size !== finding.sourceIds.length) return false;
-  const sources = finding.sourceIds.map((id) => sourceById.get(id));
+  const sources = finding.sourceIds.map((id) => {
+    const source = sourceById.get(id);
+    return source === undefined ? undefined : { id, ...source };
+  });
   if (sources.some((source) => source === undefined)) return false;
 
   if (finding.kind === 'unusual_quantity') {
     return sources.every(({ type }) => type === 'demand');
   }
   if (finding.kind === 'configuration_gap') {
-    return sources.every(
+    const warnings = sources.filter(
       ({ type, value }) => type === 'warning' && CONFIGURATION_WARNING_CODES.has(value.code)
+    );
+    if (warnings.length === 0) return false;
+    const relatedDemandIds = new Set(warnings.flatMap(({ value }) => value.relatedDemandIds));
+    return sources.every(({ id, type, value }) =>
+      (type === 'warning' && CONFIGURATION_WARNING_CODES.has(value.code)) ||
+      (type === 'demand' && relatedDemandIds.has(id))
     );
   }
   if (finding.kind === 'unit_conflict') {
-    return sources.every(
+    const warnings = sources.filter(
       ({ type, value }) => type === 'warning' && UNIT_CONFLICT_WARNING_CODES.has(value.code)
+    );
+    if (warnings.length === 0) return false;
+    const relatedDemandIds = new Set(warnings.flatMap(({ value }) => value.relatedDemandIds));
+    return sources.every(({ id, type, value }) =>
+      (type === 'warning' && UNIT_CONFLICT_WARNING_CODES.has(value.code)) ||
+      (type === 'demand' && relatedDemandIds.has(id))
     );
   }
   if (finding.kind === 'delivery_risk') {
