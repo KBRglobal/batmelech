@@ -6,10 +6,22 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 const { Pool } = require('pg');
+const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
+
+function requireServerCredential(name) {
+  const value = process.env[name];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${name} must be configured.`);
+  }
+  return value;
+}
+
+const AUTH_USER = requireServerCredential('BM_USER');
+const AUTH_PASS = requireServerCredential('BM_PASS');
 
 // --- self-updating content: pull latest main from GitHub (public repo, no token) ---
 // Build sessions push app HTML to claude/* branches; the automerge workflow lands
@@ -56,8 +68,6 @@ async function refreshContent() {
 }
 refreshContent();
 setInterval(refreshContent, REFRESH_MS).unref();
-const AUTH_USER = process.env.BM_USER || 'lin';
-const AUTH_PASS = process.env.BM_PASS || 'lin123';
 
 // --- health check (no auth, used by Railway) ---
 app.get('/healthz', (req, res) => res.send('ok'));
@@ -75,6 +85,9 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '15mb' }));
+
+// --- AI-assisted order interpretation (review-only; never persists state) ---
+app.use('/api/ai/order-intake', createOrderIntakeRouter());
 
 // --- Postgres-backed app state (single-row store for the app's localStorage blob) ---
 let pool = null;
@@ -116,17 +129,6 @@ app.post('/api/state', async (req, res) => {
     res.json({ ts });
   } catch (e) {
     console.error('POST /api/state:', e.message);
-    res.status(500).json({ error: 'db error' });
-  }
-});
-
-app.delete('/api/state', async (req, res) => {
-  if (!pool) return res.status(503).json({ error: 'no database configured' });
-  try {
-    const r = await pool.query('DELETE FROM bm_state WHERE id = 1');
-    res.json({ deleted: r.rowCount });
-  } catch (e) {
-    console.error('DELETE /api/state:', e.message);
     res.status(500).json({ error: 'db error' });
   }
 });
