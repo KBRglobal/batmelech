@@ -128,8 +128,11 @@ export function AppRoutes() {
 }
 
 export function AppRouter() {
+  const operatorBasePath = typeof window !== 'undefined' && window.location.pathname.startsWith('/orders/admin')
+    ? '/orders/admin'
+    : '/app'
   return (
-    <BrowserRouter basename="/app">
+    <BrowserRouter basename={operatorBasePath}>
       <AppRoutes />
     </BrowserRouter>
   )

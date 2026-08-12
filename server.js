@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
 const { createOperationsReviewRouter } = require('./server/ai/operations-review-route');
 const { createCustomerOrderRouter } = require('./server/customer-order-route');
+const { createPublicLandingRouter } = require('./server/public-landing-route');
 const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
@@ -37,6 +38,21 @@ const contentRoot = ROOT;
 
 // --- health check (no auth, used by Railway) ---
 app.get('/healthz', (req, res) => res.send('ok'));
+
+// Public marketing entry point and public order form. Neither route receives
+// Basic Auth, the state sync script, or any administrative state.
+app.use('/', createPublicLandingRouter({ contentRoot }));
+app.use('/new-order', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
+
+app.get('/robots.txt', (_request, response) => {
+  response.type('text/plain').send([
+    'User-agent: *',
+    'Disallow: /orders/admin',
+    'Disallow: /app',
+    'Disallow: /api',
+    'Disallow: /legacy',
+  ].join('\n') + '\n');
+});
 
 // --- Public customer form: no manager sync, state API, or admin authentication ---
 app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
@@ -109,6 +125,16 @@ app.get(['/app/order-form.html', '/app/order.html'], (_request, response) => {
 // --- React operator application: authenticated, isolated below /app/ ---
 app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
 app.use('/app', createReactAppRouter({ reactRoot: REACT_ROOT }));
+
+// The operator application has a deliberately non-obvious, authenticated
+// entry path. Keep the old /app path working for existing bookmarks while
+// preventing search engines from indexing either operator surface.
+app.use('/orders/admin', (request, response, next) => {
+  response.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  response.set('Cache-Control', 'no-store');
+  next();
+}, createReactAppRouter({ reactRoot: REACT_ROOT }));
+
 
 // --- Authenticated manager entry: React is primary; legacy remains permanent ---
 app.get(/^\/$/, (_request, response) => {
