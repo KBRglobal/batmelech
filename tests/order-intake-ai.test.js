@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const OpenAI = require('openai');
 
 const {
   OrderIntakeReviewSchema,
@@ -298,7 +299,7 @@ test('uses OPENAI_MODEL when no model is injected and never hardcodes one', asyn
   assert.equal(fake.calls[0].model, 'environment-test-model');
 });
 
-test('uses a frozen no-retry 30-second OpenAI client options guard', async () => {
+test('uses a frozen no-retry 120-second OpenAI client options guard', async () => {
   const fake = fakeOpenAI({ status: 'completed', output: [], output_parsed: completeReview() });
   let capturedOptions;
   const reviewer = createOpenAIOrderIntake({
@@ -313,13 +314,13 @@ test('uses a frozen no-retry 30-second OpenAI client options guard', async () =>
   });
 
   assert.equal(Object.isFrozen(OPENAI_CLIENT_OPTIONS), true);
-  assert.deepEqual(OPENAI_CLIENT_OPTIONS, { maxRetries: 0, timeout: 30_000 });
+  assert.deepEqual(OPENAI_CLIENT_OPTIONS, { maxRetries: 0, timeout: 120_000 });
   await reviewer({ message: 'הזמנה לבדיקה', catalog });
   assert.equal(Object.isFrozen(capturedOptions), true);
   assert.deepEqual(capturedOptions, {
     apiKey: 'server-only-test-key',
     maxRetries: 0,
-    timeout: 30_000,
+    timeout: 120_000,
   });
 });
 
@@ -621,6 +622,34 @@ test('returns safe service errors for refusals, null output, and malformed outpu
         assert.doesNotMatch(error.message, /API secret|טקסט לקוח/);
         return true;
       }
+    );
+  });
+
+  await t.test('provider timeout does not expose provider or customer text', async () => {
+    const fake = fakeOpenAI(() => {
+      throw new OpenAI.APIConnectionTimeoutError({
+        message: 'Provider timed out while processing secret customer text',
+      });
+    });
+    const reviewer = createOpenAIOrderIntake({ client: fake.client, model: 'test-model' });
+    const handler = createOrderIntakeHandler({ reviewOrderIntake: reviewer });
+
+    const response = await invokeHandler(handler, {
+      message: 'טקסט לקוח סודי',
+      catalog,
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(response.body, {
+      error: {
+        code: SERVICE_ERROR_CODES.PROVIDER_FAILURE,
+        message: 'The order review service failed.',
+      },
+    });
+    assert.doesNotMatch(
+      JSON.stringify(response.body),
+      /Provider timed out|secret customer|טקסט לקוח/
     );
   });
 });

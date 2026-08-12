@@ -22,7 +22,7 @@ const SERVICE_ERROR_CODES = Object.freeze({
 
 const OPENAI_CLIENT_OPTIONS = Object.freeze({
   maxRetries: 0,
-  timeout: 30_000,
+  timeout: 120_000,
 });
 
 const OPENAI_REQUEST_LIMITS = Object.freeze({
