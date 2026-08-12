@@ -1,8 +1,13 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 import { APP_ROUTES, CUSTOMER_ORDER_ROUTE_ALIASES, ROOT_ROUTE_TARGET } from './app/routes.ts'
 import { AppShell } from './components/app-shell.tsx'
+import { CustomersScreen } from './screens/customers-screen.tsx'
+import { DeliveriesScreen } from './screens/deliveries-screen.tsx'
+import { FinanceScreen } from './screens/finance-screen.tsx'
 import { OrdersScreen } from './screens/orders-screen.tsx'
 import { PendingScreen } from './screens/pending-screen.tsx'
+import { PreparationScreen } from './screens/preparation-screen.tsx'
+import { ShoppingListScreen } from './screens/shopping-list-screen.tsx'
 import { TodayScreen } from './screens/today-screen.tsx'
 
 const LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES = [
@@ -43,21 +48,21 @@ export function AppRoutes() {
           path={APP_ROUTES.orderImportReview}
           element={<PendingScreen title="בדיקת הזמנה מוואטסאפ" />}
         />
-        <Route path={APP_ROUTES.preparation} element={<PendingScreen title="סיכום הכנות" />} />
+        <Route path={APP_ROUTES.preparation} element={<PreparationScreen />} />
         <Route
           path={APP_ROUTES.preparationLabels}
           element={<PendingScreen title="מדבקות הכנה" />}
         />
-        <Route path={APP_ROUTES.deliveries} element={<PendingScreen title="משלוחים" />} />
-        <Route path={APP_ROUTES.finance} element={<PendingScreen title="כספים" />} />
-        <Route path={APP_ROUTES.customers} element={<PendingScreen title="לקוחות" />} />
+        <Route path={APP_ROUTES.deliveries} element={<DeliveriesScreen />} />
+        <Route path={APP_ROUTES.finance} element={<FinanceScreen />} />
+        <Route path={APP_ROUTES.customers} element={<CustomersScreen />} />
         <Route path={APP_ROUTES.settings} element={<PendingScreen title="הגדרות וגיבוי" />} />
         <Route path={APP_ROUTES.menuSettings} element={<PendingScreen title="עריכת תפריט" />} />
         <Route
           path={APP_ROUTES.recipeSettings}
           element={<PendingScreen title="מתכונים ומצרכים" />}
         />
-        <Route path={APP_ROUTES.shoppingList} element={<PendingScreen title="רשימת קניות" />} />
+        <Route path={APP_ROUTES.shoppingList} element={<ShoppingListScreen />} />
         <Route
           path="*"
           element={

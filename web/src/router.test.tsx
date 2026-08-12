@@ -16,6 +16,21 @@ vi.mock('./screens/today-screen.tsx', () => ({
 vi.mock('./screens/orders-screen.tsx', () => ({
   OrdersScreen: () => <h1>מסך ההזמנות המחובר</h1>,
 }))
+vi.mock('./screens/preparation-screen.tsx', () => ({
+  PreparationScreen: () => <h1>מסך ההכנות המחובר</h1>,
+}))
+vi.mock('./screens/shopping-list-screen.tsx', () => ({
+  ShoppingListScreen: () => <h1>מסך הקניות המחובר</h1>,
+}))
+vi.mock('./screens/deliveries-screen.tsx', () => ({
+  DeliveriesScreen: () => <h1>מסך המשלוחים המחובר</h1>,
+}))
+vi.mock('./screens/customers-screen.tsx', () => ({
+  CustomersScreen: () => <h1>מסך הלקוחות המחובר</h1>,
+}))
+vi.mock('./screens/finance-screen.tsx', () => ({
+  FinanceScreen: () => <h1>מסך הכספים המחובר</h1>,
+}))
 
 const LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES = [
   ...CUSTOMER_ORDER_ROUTE_ALIASES,
@@ -68,15 +83,10 @@ describe('AppRoutes', () => {
     ['/orders/order%201/edit', 'עריכת הזמנה'],
     ['/orders/order%201/bon', 'בון הזמנה'],
     [APP_ROUTES.orderImportReview, 'בדיקת הזמנה מוואטסאפ'],
-    [APP_ROUTES.preparation, 'סיכום הכנות'],
     [APP_ROUTES.preparationLabels, 'מדבקות הכנה'],
-    [APP_ROUTES.deliveries, 'משלוחים'],
-    [APP_ROUTES.finance, 'כספים'],
-    [APP_ROUTES.customers, 'לקוחות'],
     [APP_ROUTES.settings, 'הגדרות וגיבוי'],
     [APP_ROUTES.menuSettings, 'עריכת תפריט'],
     [APP_ROUTES.recipeSettings, 'מתכונים ומצרכים'],
-    [APP_ROUTES.shoppingList, 'רשימת קניות'],
   ])('registers %s as an explicit non-writing operator destination', (path, title) => {
     const { container } = renderRoute(path)
 
@@ -91,6 +101,20 @@ describe('AppRoutes', () => {
 
     expect(container.querySelector('[data-route-status="pending"]')).toBeNull()
     expect(screen.getByRole('heading', { name: 'מסך ההזמנות המחובר' })).toBeTruthy()
+    expect(screen.getAllByRole('navigation')).toHaveLength(2)
+  })
+
+  it.each([
+    [APP_ROUTES.preparation, 'מסך ההכנות המחובר'],
+    [APP_ROUTES.shoppingList, 'מסך הקניות המחובר'],
+    [APP_ROUTES.deliveries, 'מסך המשלוחים המחובר'],
+    [APP_ROUTES.customers, 'מסך הלקוחות המחובר'],
+    [APP_ROUTES.finance, 'מסך הכספים המחובר'],
+  ])('registers the real read-only operational screen at %s', (path, title) => {
+    const { container } = renderRoute(path)
+
+    expect(container.querySelector('[data-route-status="pending"]')).toBeNull()
+    expect(screen.getByRole('heading', { name: title })).toBeTruthy()
     expect(screen.getAllByRole('navigation')).toHaveLength(2)
   })
 
