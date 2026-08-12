@@ -69,7 +69,10 @@ function successfulSave() {
   })
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 beforeEach(() => mockedUseStore.mockReset())
 
 describe('PreparationScreen', () => {
@@ -148,6 +151,85 @@ describe('PreparationScreen', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'יום שבת, 15.08.2099' })).toBeTruthy()
     expect(screen.getAllByText('$50.00').length).toBeGreaterThan(0)
     expect(screen.queryByText('מטבוחה אמיתית')).toBeNull()
+  })
+
+  it('sends only sanitized aggregates for advisory AI and never invokes the save path', async () => {
+    const privateValues = [
+      'PRIVATE CUSTOMER',
+      '+971500000000',
+      'PRIVATE HOTEL ADDRESS',
+      'PRIVATE CUSTOMER NOTE',
+      'PRIVATE DISH NAME',
+    ]
+    const catalog: PreparationCatalog = {
+      items: [{
+        id: 'private-main-id',
+        category: 'mains',
+        name: privateValues[4]!,
+        procurement: { kind: 'recipe' },
+      }],
+      lunchItems: [],
+    }
+    const store = {
+      orders: [{
+        id: 'private-order-id',
+        date: '2099-08-14',
+        name: privateValues[0],
+        phone: privateValues[1],
+        address: privateValues[2],
+        notes: privateValues[3],
+        mains: { [privateValues[4]!]: 3 },
+      }],
+      preparationCatalog: catalog,
+    } as LegacyStore
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      review: {
+        reviewOnly: true,
+        overview: 'נמצאה נקודה תפעולית שמקורה בנתונים המצטברים.',
+        findings: [{
+          kind: 'unusual_quantity',
+          priority: 'medium',
+          sourceIds: ['demand-1'],
+          explanation: 'הדפוס המצטבר שונה מהקבוצה המקבילה ודורש תשומת לב אנושית.',
+        }],
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderPreparation('/preparation?date=2099-08-14', onSave)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'קבלת ייעוץ' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/ai/operations-review/')
+    expect(request.method).toBe('POST')
+    const bodyText = String(request.body)
+    const body = JSON.parse(bodyText)
+    expect(body).toEqual({
+      snapshot: {
+        scope: 'preparation',
+        selectedServiceDate: '2099-08-14',
+        demands: [{
+          id: 'demand-1',
+          source: 'preparation',
+          serviceDate: '2099-08-14',
+          category: 'mains',
+          quantity: '3',
+          procurementKind: 'recipe',
+          comparisonGroup: 'group-1',
+        }],
+        warnings: [],
+      },
+    })
+    for (const privateValue of privateValues) expect(bodyText).not.toContain(privateValue)
+    expect(bodyText).not.toContain('private-order-id')
+    expect(bodyText).not.toContain('customerName')
+    expect(bodyText).not.toContain('notes')
+    expect(onSave).not.toHaveBeenCalled()
+    expect(await screen.findByText(/הדפוס המצטבר שונה/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /החל|שמור|בצע/ })).toBeNull()
   })
 
   it('shows raw preparation totals but explicitly blocks recipe flow when catalog configuration is missing', () => {

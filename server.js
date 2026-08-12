@@ -5,6 +5,7 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
+const { createOperationsReviewRouter } = require('./server/ai/operations-review-route');
 const { createCustomerOrderRouter } = require('./server/customer-order-route');
 const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
@@ -56,6 +57,9 @@ app.use(express.json({ limit: '15mb' }));
 
 // --- AI-assisted order interpretation (review-only; never persists state) ---
 app.use('/api/ai/order-intake', createOrderIntakeRouter());
+
+// --- AI-assisted operations analysis (sanitized advisory; never persists state) ---
+app.use('/api/ai/operations-review', createOperationsReviewRouter());
 
 // --- Explicit staff-triggered hotel search; no customer or order state ---
 app.use('/api/hotels/search', createHotelSearchRouter());

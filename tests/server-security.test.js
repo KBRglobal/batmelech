@@ -64,6 +64,7 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   const healthIndex = source.indexOf("app.get('/healthz'");
   const customerFormIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
   const authIndex = source.indexOf("app.use((req, res, next) => {");
+  const operationsReviewIndex = source.indexOf("app.use('/api/ai/operations-review', createOperationsReviewRouter");
   const hotelSearchIndex = source.indexOf("app.use('/api/hotels/search', createHotelSearchRouter");
   const stateApiIndex = source.indexOf("app.use('/api/state'");
   const legacyManagerIndex = source.indexOf("app.use('/legacy', createLegacyManagerRouter");
@@ -74,6 +75,8 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.ok(healthIndex >= 0, 'health route must exist');
   assert.ok(customerFormIndex > healthIndex, 'customer form must mount after health');
   assert.ok(authIndex > customerFormIndex, 'only the isolated customer form may mount before auth');
+  assert.ok(operationsReviewIndex > authIndex, 'operations AI review must remain behind Basic Auth');
+  assert.ok(hotelSearchIndex > operationsReviewIndex, 'operations AI review must not shadow hotel search');
   assert.ok(hotelSearchIndex > authIndex, 'hotel search must remain behind Basic Auth');
   assert.ok(stateApiIndex > hotelSearchIndex, 'hotel search must not shadow the state API');
   assert.ok(stateApiIndex > authIndex, 'state API must remain behind Basic Auth');
@@ -84,6 +87,8 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /app\.get\('\/healthz'/);
   assert.match(source, /createCustomerOrderRouter\(\{ getContentRoot: \(\) => contentRoot \}\)/);
   assert.equal(source.match(/app\.use\('\/api\/hotels\/search'/g)?.length, 1);
+  assert.equal(source.match(/app\.use\('\/api\/ai\/operations-review'/g)?.length, 1);
+  assert.match(source, /createOperationsReviewRouter\(\)/);
   assert.match(source, /app\.get\(\/\^\\\/legacy\$\//);
   assert.match(source, /app\.get\(\/\^\\\/app\$\//);
   assert.match(source, /app\.get\(\/\^\\\/\$\//);

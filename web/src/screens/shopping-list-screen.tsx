@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
+import { OperationsAiAdvisory } from '../components/operations-ai-advisory.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import {
   isSameVersionedStateEnvelope,
@@ -14,6 +15,7 @@ import {
   isShoppingCompleted,
   shoppingCompletionScope,
 } from '../domain/operational-state.ts'
+import { buildShoppingOperationsReview } from '../domain/operations-review.ts'
 import {
   buildPreparationPlan,
   type PreparationCatalog,
@@ -311,6 +313,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
   const orderCount = safeCountSum(preparationGroups.map(({ orderCount: count }) => count))
   const mealCount = safeCountSum(preparationGroups.map(({ meals }) => meals))
   const completionDate = requestedDate === '' ? null : requestedDate
+  const operationsReview = buildShoppingOperationsReview(demands, result, requestedDate)
 
   const toggleShopping = onSave === undefined
     ? undefined
@@ -463,6 +466,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
       </div>
 
       <div className="mt-8 space-y-8">
+        <OperationsAiAdvisory key={operationsReview.key} presentation={operationsReview} />
         <ConfigurationWarnings catalogState={catalogState} recipeState={recipeConfiguration.state} />
         <ShoppingWarnings result={result} demands={demands} />
 

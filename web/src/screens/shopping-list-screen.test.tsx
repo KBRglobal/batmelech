@@ -51,7 +51,10 @@ function successfulSave() {
   })
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 beforeEach(() => mockedUseStore.mockReset())
 
 describe('ShoppingListScreen', () => {
@@ -116,6 +119,93 @@ describe('ShoppingListScreen', () => {
     await userEvent.setup().selectOptions(screen.getByLabelText('תאריך רשימת קניות'), '2099-08-15')
     expect(screen.getByText('מצרך אחר')).toBeTruthy()
     expect(screen.queryByText('בצל אמיתי')).toBeNull()
+  })
+
+  it('keeps ingredient and customer text local during advisory AI review', async () => {
+    const privateValues = [
+      'PRIVATE SHOPPER',
+      '+971511111111',
+      'PRIVATE ORDER NOTE',
+      'PRIVATE MENU ITEM',
+      'PRIVATE INGREDIENT',
+      'PRIVATE UNIT',
+    ]
+    const catalog: PreparationCatalog = {
+      items: [{
+        id: 'private-menu-id',
+        category: 'mains',
+        name: privateValues[3]!,
+        procurement: { kind: 'recipe' },
+      }],
+      lunchItems: [],
+    }
+    const store = {
+      orders: [{
+        id: 'private-order-id',
+        date: '2099-08-14',
+        name: privateValues[0],
+        phone: privateValues[1],
+        notes: privateValues[2],
+        mains: { [privateValues[3]!]: 2 },
+      }],
+      preparationCatalog: catalog,
+      recipes: [{
+        itemId: 'private-menu-id',
+        yield: 1,
+        ingredients: [{
+          ingredientId: 'private-ingredient-id',
+          ingredientName: privateValues[4],
+          quantity: '0.5',
+          unit: privateValues[5],
+        }],
+      }],
+    } as LegacyStore
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      review: {
+        reviewOnly: true,
+        overview: 'הבדיקה הייעוצית הסתיימה על נתונים מצטברים בלבד.',
+        findings: [],
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderShopping('/shopping-list?date=2099-08-14', onSave)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'קבלת ייעוץ' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const bodyText = String((fetchMock.mock.calls[0]![1] as RequestInit).body)
+    const body = JSON.parse(bodyText)
+    expect(body.snapshot.scope).toBe('shopping')
+    expect(body.snapshot.selectedServiceDate).toBe('2099-08-14')
+    expect(body.snapshot.demands).toEqual([
+      {
+        id: 'demand-1',
+        source: 'preparation',
+        serviceDate: '2099-08-14',
+        category: 'mains',
+        quantity: '2',
+        procurementKind: 'recipe',
+        comparisonGroup: 'group-1',
+      },
+      {
+        id: 'demand-2',
+        source: 'shopping',
+        serviceDate: '2099-08-14',
+        category: 'ingredient',
+        quantity: '1',
+        procurementKind: 'computed',
+        comparisonGroup: 'group-2',
+      },
+    ])
+    for (const privateValue of privateValues) expect(bodyText).not.toContain(privateValue)
+    expect(bodyText).not.toContain('private-order-id')
+    expect(bodyText).not.toContain('private-menu-id')
+    expect(bodyText).not.toContain('private-ingredient-id')
+    expect(onSave).not.toHaveBeenCalled()
+    expect(await screen.findByText(/הבדיקה הייעוצית הסתיימה/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /החל|שמור|בצע/ })).toBeNull()
   })
 
   it('shows exact missing configuration and recipe warnings without inventing quantities', () => {

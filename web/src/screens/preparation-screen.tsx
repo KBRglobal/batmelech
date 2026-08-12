@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
+import { OperationsAiAdvisory } from '../components/operations-ai-advisory.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import {
   isSameVersionedStateEnvelope,
@@ -14,6 +15,7 @@ import {
   isPreparationCompleted,
   type PreparationCompletionCategory,
 } from '../domain/operational-state.ts'
+import { buildPreparationOperationsReview } from '../domain/operations-review.ts'
 import {
   buildPreparationPlan,
   type PreparationCatalog,
@@ -482,6 +484,7 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
   const visibleDates = requestedDate === ''
     ? plan.dates
     : plan.dates.filter(({ serviceDate }) => serviceDate === requestedDate)
+  const operationsReview = buildPreparationOperationsReview(plan, requestedDate)
 
   const toggleCompletion = onSave === undefined
     ? undefined
@@ -624,6 +627,7 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
       </header>
 
       <div className="mt-8 space-y-8">
+        <OperationsAiAdvisory key={operationsReview.key} presentation={operationsReview} />
         {catalogState !== 'configured' && <ConfigurationWarning state={catalogState} />}
         <DataWarnings warnings={plan.warnings} />
         {visibleDates.length === 0 ? (
