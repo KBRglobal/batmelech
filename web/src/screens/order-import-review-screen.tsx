@@ -22,6 +22,76 @@ import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../servic
 
 const AIResponseSchema = z.object({ review: AIReviewSchema }).strict()
 
+const AIErrorCodeSchema = z.enum([
+  'ai_rate_limited',
+  'ai_not_configured',
+  'ai_refused',
+  'invalid_ai_response',
+  'ai_provider_error',
+  'invalid_request',
+  'request_too_large',
+])
+const AIErrorResponseSchema = z.object({
+  error: z.object({
+    code: AIErrorCodeSchema,
+    message: z.string().max(1000),
+  }).strict(),
+}).strict()
+
+const GENERIC_AI_ERROR_MESSAGE = 'לא הצלחנו לקבל פענוח תקין. ההזמנה לא שונתה ואפשר לנסות שוב.'
+
+const AI_ERROR_MESSAGES = {
+  ai_rate_limited: {
+    status: 429,
+    message: 'בוצעו יותר מדי ניסיונות פענוח בזמן קצר. ההזמנה לא שונתה ואפשר לנסות שוב בעוד כמה דקות.',
+  },
+  ai_not_configured: {
+    status: 503,
+    message: 'שירות פענוח ההזמנות אינו זמין כרגע. ההזמנה לא שונתה.',
+  },
+  ai_refused: {
+    status: 422,
+    message: 'ה־AI לא הצליח לפענח את ההודעה הזאת בבטחה. ההזמנה לא שונתה ואפשר לערוך את ההודעה או להקליד ידנית.',
+  },
+  invalid_ai_response: {
+    status: 502,
+    message: 'ה־AI החזיר פענוח שלא עבר את בדיקות הבטיחות. ההזמנה לא שונתה ואפשר לנסות שוב.',
+  },
+  ai_provider_error: {
+    status: 502,
+    message: 'שירות ה־AI לא הגיב בצורה תקינה כרגע. ההזמנה לא שונתה ואפשר לנסות שוב.',
+  },
+  invalid_request: {
+    status: 400,
+    message: 'הודעת ההזמנה או התפריט שנשלחו לפענוח אינם תקינים. ההזמנה לא שונתה.',
+  },
+  request_too_large: {
+    status: 413,
+    message: 'הודעת ההזמנה ארוכה מדי לפענוח. ההזמנה לא שונתה; צריך לקצר אותה ולנסות שוב.',
+  },
+} satisfies Record<z.infer<typeof AIErrorCodeSchema>, { readonly status: number; readonly message: string }>
+
+class AIReviewHttpError extends Error {
+  readonly displayMessage: string
+
+  constructor(displayMessage: string) {
+    super('AI_REVIEW_HTTP_ERROR')
+    this.name = 'AIReviewHttpError'
+    this.displayMessage = displayMessage
+  }
+}
+
+async function safeAIHttpErrorMessage(response: Response): Promise<string> {
+  try {
+    const parsed = AIErrorResponseSchema.safeParse(await response.json())
+    if (!parsed.success) return GENERIC_AI_ERROR_MESSAGE
+    const mapped = AI_ERROR_MESSAGES[parsed.data.error.code]
+    return response.status === mapped.status ? mapped.message : GENERIC_AI_ERROR_MESSAGE
+  } catch {
+    return GENERIC_AI_ERROR_MESSAGE
+  }
+}
+
 interface ReviewContext {
   readonly revision: number
   readonly hash: string
@@ -359,7 +429,7 @@ export function OrderImportReviewScreen() {
         cache: 'no-store',
         body: JSON.stringify({ message: normalizedMessage, catalog: catalog.items }),
       })
-      if (!response.ok) throw new Error('HTTP_ERROR')
+      if (!response.ok) throw new AIReviewHttpError(await safeAIHttpErrorMessage(response))
       const parsed = AIResponseSchema.safeParse(await response.json())
       if (!parsed.success) throw new Error('INVALID_RESPONSE')
       setReview(parsed.data.review)
@@ -368,11 +438,13 @@ export function OrderImportReviewScreen() {
     } catch (error) {
       setStatus('error')
       setErrorMessage(
-        error instanceof Error && error.message === 'BM1_UNKNOWN_ITEM'
+        error instanceof AIReviewHttpError
+          ? error.displayMessage
+          : error instanceof Error && error.message === 'BM1_UNKNOWN_ITEM'
           ? 'קוד ההזמנה כולל פריט שאינו קיים בתפריט הנוכחי. שום פריט לא הוחל וצריך לבדוק את ההודעה ידנית.'
           : error instanceof Error && (error.message === 'BM1_INVALID' || error.message === 'INVALID_BASE_DRAFT')
             ? 'קוד ההזמנה או הטיוטה הקודמת אינם תקינים. שום דבר לא הוחל כדי לא לאבד פריטים.'
-            : 'לא הצלחנו לקבל פענוח תקין. ההזמנה לא שונתה ואפשר לנסות שוב.',
+            : GENERIC_AI_ERROR_MESSAGE,
       )
     }
   }

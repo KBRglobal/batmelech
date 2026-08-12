@@ -476,6 +476,65 @@ describe('OrderImportReviewScreen', () => {
     expect(screen.getByTestId('location').textContent).toContain('הערה ידנית')
   })
 
+  it.each([
+    { status: 429, code: 'ai_rate_limited', expected: 'יותר מדי ניסיונות פענוח בזמן קצר' },
+    { status: 503, code: 'ai_not_configured', expected: 'שירות פענוח ההזמנות אינו זמין כרגע' },
+    { status: 422, code: 'ai_refused', expected: 'לא הצליח לפענח את ההודעה הזאת בבטחה' },
+    { status: 502, code: 'invalid_ai_response', expected: 'פענוח שלא עבר את בדיקות הבטיחות' },
+    { status: 502, code: 'ai_provider_error', expected: 'שירות ה־AI לא הגיב בצורה תקינה כרגע' },
+    { status: 400, code: 'invalid_request', expected: 'הודעת ההזמנה או התפריט שנשלחו לפענוח אינם תקינים' },
+    { status: 413, code: 'request_too_large', expected: 'הודעת ההזמנה ארוכה מדי לפענוח' },
+  ])('maps the safe $status $code response without exposing server details or enabling application', async ({ status, code, expected }) => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        error: { code, message: 'secret provider diagnostic' },
+      }), { status, headers: { 'Content-Type': 'application/json' } }),
+    )
+    const user = userEvent.setup()
+    renderReview('הודעת לקוח אמיתית')
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(expected)
+    expect(alert.textContent).toContain('ההזמנה לא שונתה')
+    expect(alert.textContent).not.toContain('secret provider diagnostic')
+    expect(screen.getByRole('button', { name: 'החלה על טיוטה בזיכרון' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByText('הטיוטה שהוחלה בזיכרון בלבד')).toBeNull()
+    expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.orderImportReview)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('/api/ai/order-intake/')
+  })
+
+  it.each([
+    ['non-JSON', 'private upstream failure', 'text/plain'],
+    ['schema-invalid', JSON.stringify({
+      error: {
+        code: 'ai_provider_error',
+        message: 'private provider failure',
+        details: 'private stack trace',
+      },
+    }), 'application/json'],
+  ])('falls back safely for a %s error body and keeps the review unapplied', async (_label, body, contentType) => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(body, { status: 502, headers: { 'Content-Type': contentType } }),
+    )
+    const user = userEvent.setup()
+    renderReview('הודעת לקוח אמיתית')
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe('לא הצלחנו לקבל פענוח תקין. ההזמנה לא שונתה ואפשר לנסות שוב.')
+    expect(alert.textContent).not.toContain('private')
+    expect(screen.getByRole('button', { name: 'החלה על טיוטה בזיכרון' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByText('הטיוטה שהוחלה בזיכרון בלבד')).toBeNull()
+    expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.orderImportReview)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects malformed or failed provider responses without rendering or applying a draft', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(

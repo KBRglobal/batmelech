@@ -26,8 +26,23 @@ const OPENAI_CLIENT_OPTIONS = Object.freeze({
 });
 
 const OPENAI_REQUEST_LIMITS = Object.freeze({
-  max_output_tokens: 6_000,
-  reasoning: Object.freeze({ effort: 'medium' }),
+  max_output_tokens: 12_000,
+  reasoning: Object.freeze({ effort: 'low' }),
+});
+
+const OPENAI_RETRY_LIMITS = Object.freeze({
+  max_output_tokens: 12_000,
+  reasoning: Object.freeze({ effort: 'low' }),
+});
+
+const RETRY_SYSTEM_INSTRUCTION =
+  'The previous response could not be parsed or completed. Return one minimal, schema-valid review. Use null and empty arrays instead of inventing any value.';
+
+const REVIEW_LIMITS = Object.freeze({
+  ambiguities: 50,
+  missingFields: 50,
+  unknownItems: 50,
+  warnings: 100,
 });
 
 const NUMBER_WORD_VALUES = Object.freeze({
@@ -87,30 +102,81 @@ const CURRENCY_WORDS = new Set([
   'שקלים',
 ]);
 
+const HEBREW_ITEM_PREFIXES = new Set(['ב', 'ה', 'ו', 'כ', 'ל', 'מ', 'ש']);
+const QUANTITY_LINK_WORDS = new Set([
+  'actually',
+  'instead',
+  'make',
+  'of',
+  'portion',
+  'portions',
+  'qty',
+  'quantity',
+  'rather',
+  'x',
+  'בעצם',
+  'במקום',
+  'יח',
+  'יחידה',
+  'יחידות',
+  'כלומר',
+  'כמות',
+  'לא',
+  'מנה',
+  'מנות',
+  'סליחה',
+  'של',
+  'תעשה',
+  'תעשי',
+  'ו',
+]);
+
 class OrderIntakeServiceError extends Error {
-  constructor(code, statusCode, message) {
+  constructor(code, statusCode, message, internalReason = 'unspecified') {
     super(message);
     this.name = 'OrderIntakeServiceError';
     this.code = code;
     this.statusCode = statusCode;
+    this.internalReason = internalReason;
   }
 }
 
-function serviceError(code) {
+function serviceError(code, internalReason) {
   switch (code) {
     case SERVICE_ERROR_CODES.INVALID_INPUT:
-      return new OrderIntakeServiceError(code, 400, 'Invalid order intake request.');
+      return new OrderIntakeServiceError(
+        code,
+        400,
+        'Invalid order intake request.',
+        internalReason
+      );
     case SERVICE_ERROR_CODES.NOT_CONFIGURED:
-      return new OrderIntakeServiceError(code, 503, 'Order review is temporarily unavailable.');
+      return new OrderIntakeServiceError(
+        code,
+        503,
+        'Order review is temporarily unavailable.',
+        internalReason
+      );
     case SERVICE_ERROR_CODES.REFUSED:
-      return new OrderIntakeServiceError(code, 422, 'The order message could not be reviewed.');
+      return new OrderIntakeServiceError(
+        code,
+        422,
+        'The order message could not be reviewed.',
+        internalReason
+      );
     case SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT:
-      return new OrderIntakeServiceError(code, 502, 'The order review response was invalid.');
+      return new OrderIntakeServiceError(
+        code,
+        502,
+        'The order review response was invalid.',
+        internalReason
+      );
     default:
       return new OrderIntakeServiceError(
         SERVICE_ERROR_CODES.PROVIDER_FAILURE,
         502,
-        'The order review service failed.'
+        'The order review service failed.',
+        internalReason
       );
   }
 }
@@ -126,17 +192,48 @@ function hasRefusal(response) {
   );
 }
 
-function hasUniqueIds(items, getId) {
-  const ids = items.map(getId);
-  return new Set(ids).size === ids.length;
-}
-
 function normalizeEvidenceText(value) {
   return value.normalize('NFKC').replace(/\s+/gu, ' ').trim();
 }
 
 function sourceTextIsGrounded(message, sourceText) {
   return normalizeEvidenceText(message).includes(normalizeEvidenceText(sourceText));
+}
+
+function isLetter(value) {
+  return typeof value === 'string' && /^\p{L}$/u.test(value);
+}
+
+function catalogIdentityOccurrences(sourceText, catalogItem) {
+  const normalizedSourceText = normalizeEvidenceText(sourceText).toLowerCase();
+  const occurrences = [];
+
+  for (const identity of [catalogItem.name, ...catalogItem.aliases]) {
+    const normalizedIdentity = normalizeEvidenceText(identity).toLowerCase();
+    let start = normalizedSourceText.indexOf(normalizedIdentity);
+    while (start !== -1) {
+      const end = start + normalizedIdentity.length;
+      const before = normalizedSourceText[start - 1];
+      const beforePrefix = normalizedSourceText[start - 2];
+      const after = normalizedSourceText[end];
+      const repeatedFinalLetter =
+        after === normalizedIdentity[normalizedIdentity.length - 1] &&
+        !isLetter(normalizedSourceText[end + 1]);
+      const startsAtBoundary =
+        !isLetter(before) ||
+        (HEBREW_ITEM_PREFIXES.has(before) && !isLetter(beforePrefix));
+      if (startsAtBoundary && (!isLetter(after) || repeatedFinalLetter)) {
+        occurrences.push({ start, end: repeatedFinalLetter ? end + 1 : end });
+      }
+      start = normalizedSourceText.indexOf(normalizedIdentity, start + 1);
+    }
+  }
+
+  return occurrences;
+}
+
+function sourceTextMatchesCatalogItem(sourceText, catalogItem) {
+  return catalogIdentityOccurrences(sourceText, catalogItem).length > 0;
 }
 
 function digitValue(character) {
@@ -162,9 +259,9 @@ function isCurrencyMarker(value) {
   return /[$€£₪]/u.test(value);
 }
 
-function explicitQuantities(sourceText) {
+function explicitQuantityMentions(sourceText) {
   const normalized = normalizeEvidenceText(sourceText).toLowerCase();
-  const quantities = new Set();
+  const mentions = [];
   const numericTokens = [...normalized.matchAll(/\p{Decimal_Number}+/gu)];
 
   for (const token of numericTokens) {
@@ -174,27 +271,64 @@ function explicitQuantities(sourceText) {
     const followingWord = after.match(/^[\p{L}]+/u)?.[0];
     if (followingWord && CURRENCY_WORDS.has(followingWord)) continue;
     const value = parseUnicodeInteger(token[0]);
-    if (value !== null) quantities.add(value);
+    if (value !== null) {
+      mentions.push({ value, start: token.index, end: token.index + token[0].length });
+    }
   }
 
-  const words = normalized.match(/[\p{L}]+/gu) || [];
-  for (const [index, word] of words.entries()) {
+  const words = [...normalized.matchAll(/[\p{L}]+/gu)];
+  for (const [index, token] of words.entries()) {
+    const word = token[0];
     const candidates = [word];
     if (word.startsWith('ו') && word.length > 1) candidates.push(word.slice(1));
     const value = candidates
       .map((candidate) => NUMBER_WORD_VALUES[candidate])
       .find((candidate) => typeof candidate === 'number');
     if (typeof value !== 'number') continue;
-    const nextWord = words[index + 1];
+    const nextWord = words[index + 1]?.[0];
     if (nextWord && CURRENCY_WORDS.has(nextWord)) continue;
-    quantities.add(value);
+    mentions.push({ value, start: token.index, end: token.index + word.length });
   }
 
-  return quantities;
+  return mentions;
+}
+
+function explicitQuantities(sourceText) {
+  return new Set(explicitQuantityMentions(sourceText).map((mention) => mention.value));
 }
 
 function quantityIsGrounded(sourceText, quantity) {
   return quantity === null || explicitQuantities(sourceText).has(quantity);
+}
+
+function gapContainsOnlyQuantityLinks(value) {
+  const words = value.toLowerCase().match(/\p{L}+/gu) || [];
+  return words.every((word) => QUANTITY_LINK_WORDS.has(word));
+}
+
+function catalogItemQuantityIsGrounded(sourceText, quantity, catalogItem) {
+  if (quantity === null) return true;
+  const normalizedSourceText = normalizeEvidenceText(sourceText).toLowerCase();
+  const identities = catalogIdentityOccurrences(sourceText, catalogItem);
+  const quantities = explicitQuantityMentions(sourceText).filter(
+    (mention) => mention.value === quantity
+  );
+
+  return identities.some((identity) =>
+    quantities.some((mention) => {
+      if (mention.end <= identity.start) {
+        return gapContainsOnlyQuantityLinks(
+          normalizedSourceText.slice(mention.end, identity.start)
+        );
+      }
+      if (mention.start >= identity.end) {
+        return gapContainsOnlyQuantityLinks(
+          normalizedSourceText.slice(identity.end, mention.start)
+        );
+      }
+      return false;
+    })
+  );
 }
 
 function draftTextIsGrounded(draft, message) {
@@ -243,43 +377,378 @@ function isStructuredOutputParseError(error) {
   return error instanceof SyntaxError || error instanceof ZodError || error?.name === 'ZodError';
 }
 
-function matchesCatalog(review, catalog) {
+function pushUniqueCapped(items, value, limit, identity) {
+  if (items.length >= limit) return false;
+  const key = identity(value);
+  if (items.some((item) => identity(item) === key)) return false;
+  items.push(value);
+  return true;
+}
+
+function sanitizeReview(review, catalog, message) {
   const catalogById = new Map(catalog.map((item) => [item.id, item]));
-  const draftIds = new Set(review.draft.items.map((item) => item.catalogItemId));
-  const paidExtraById = new Map(
-    review.paidExtras.map((item) => [item.catalogItemId, item])
-  );
+  const generatedWarnings = [];
+  let changed = false;
 
-  if (!hasUniqueIds(review.draft.items, (item) => item.catalogItemId)) return false;
-  if (!hasUniqueIds(review.paidExtras, (item) => item.catalogItemId)) return false;
+  const warn = (code, messageText) => {
+    pushUniqueCapped(
+      generatedWarnings,
+      { code, severity: 'warning', message: messageText },
+      REVIEW_LIMITS.warnings,
+      (warning) => `${warning.code}\u0000${warning.message}`
+    );
+  };
 
-  for (const item of review.draft.items) {
-    const catalogItem = catalogById.get(item.catalogItemId);
-    if (!catalogItem) return false;
-    if (item.catalogItemName !== catalogItem.name || item.category !== catalogItem.category) {
-      return false;
+  const sanitized = {
+    reviewOnly: true,
+    draft: {
+      customerName: review.draft.customerName,
+      customerPhone: review.draft.customerPhone,
+      serviceDate: review.draft.serviceDate,
+      serviceTime: review.draft.serviceTime,
+      fulfillmentMethod: 'unknown',
+      deliveryLocation: review.draft.deliveryLocation,
+      items: [],
+      notes: [],
+    },
+    corrections: [],
+    ambiguities: [],
+    paidExtras: [],
+    unknownItems: [],
+    missingFields: [],
+    warnings: [],
+    overallConfidence: review.overallConfidence,
+  };
+
+  for (const field of [
+    'customerName',
+    'customerPhone',
+    'serviceDate',
+    'serviceTime',
+    'deliveryLocation',
+  ]) {
+    const value = sanitized.draft[field];
+    if (value !== null && !sourceTextIsGrounded(message, value)) {
+      sanitized.draft[field] = null;
+      changed = true;
+      warn('missing_field', 'An unverified draft detail was removed for human review.');
     }
-    if (catalogItem.isPaidExtra) {
-      const paidExtra = paidExtraById.get(item.catalogItemId);
-      if (!paidExtra || paidExtra.quantity !== item.quantity) return false;
+  }
+
+  sanitized.draft.notes = review.draft.notes.filter((note) => {
+    const grounded = sourceTextIsGrounded(message, note);
+    if (!grounded) changed = true;
+    return grounded;
+  });
+
+  if (review.draft.fulfillmentMethod !== 'unknown') {
+    changed = true;
+    pushUniqueCapped(
+      sanitized.missingFields,
+      {
+        field: 'fulfillment_method',
+        sourceText: null,
+        reason: 'Delivery or pickup must be confirmed by the operator.',
+      },
+      REVIEW_LIMITS.missingFields,
+      (finding) => `${finding.field}\u0000${finding.sourceText || ''}`
+    );
+    warn('missing_field', 'Confirm delivery or pickup before applying this draft.');
+  }
+
+  for (const correction of review.corrections) {
+    if (
+      sourceTextIsGrounded(message, correction.originalText) &&
+      sourceTextIsGrounded(message, correction.correctedText)
+    ) {
+      sanitized.corrections.push({
+        ...correction,
+        reason: 'The quoted customer wording changed and requires operator confirmation.',
+      });
+      if (
+        correction.reason !==
+        'The quoted customer wording changed and requires operator confirmation.'
+      ) {
+        changed = true;
+      }
+    } else {
+      changed = true;
     }
   }
 
   for (const ambiguity of review.ambiguities) {
-    if (!ambiguity.candidateCatalogItemIds.every((id) => catalogById.has(id))) return false;
-  }
-
-  for (const paidExtra of review.paidExtras) {
-    const catalogItem = catalogById.get(paidExtra.catalogItemId);
-    if (!catalogItem || !catalogItem.isPaidExtra || !draftIds.has(paidExtra.catalogItemId)) {
-      return false;
+    if (!sourceTextIsGrounded(message, ambiguity.sourceText)) {
+      changed = true;
+      continue;
     }
-    if (paidExtra.catalogItemName !== catalogItem.name) return false;
-    if (paidExtra.catalogPrice !== catalogItem.price) return false;
-    if (paidExtra.currency !== catalogItem.currency) return false;
+    const candidateCatalogItemIds = [
+      ...new Set(
+        ambiguity.candidateCatalogItemIds.filter((catalogItemId) =>
+          catalogById.has(catalogItemId)
+        )
+      ),
+    ];
+    if (candidateCatalogItemIds.length !== ambiguity.candidateCatalogItemIds.length) {
+      changed = true;
+    }
+    pushUniqueCapped(
+      sanitized.ambiguities,
+      {
+        ...ambiguity,
+        question: 'Confirm the customer\'s intended choice.',
+        candidateCatalogItemIds,
+      },
+      REVIEW_LIMITS.ambiguities,
+      (finding) => `${finding.sourceText}\u0000${finding.candidateCatalogItemIds.join(',')}`
+    );
+    if (ambiguity.question !== 'Confirm the customer\'s intended choice.') changed = true;
+    warn('ambiguous_intent', 'A customer choice requires human confirmation.');
   }
 
-  return true;
+  for (const missingField of review.missingFields) {
+    if (
+      missingField.sourceText === null ||
+      sourceTextIsGrounded(message, missingField.sourceText)
+    ) {
+      pushUniqueCapped(
+        sanitized.missingFields,
+        {
+          ...missingField,
+          reason: 'This detail must be confirmed by the operator.',
+        },
+        REVIEW_LIMITS.missingFields,
+        (finding) => `${finding.field}\u0000${finding.sourceText || ''}`
+      );
+      if (missingField.reason !== 'This detail must be confirmed by the operator.') changed = true;
+      warn('missing_field', 'A missing order detail requires human confirmation.');
+    } else {
+      changed = true;
+      pushUniqueCapped(
+        sanitized.missingFields,
+        {
+          field: missingField.field,
+          sourceText: null,
+          reason: 'This detail must be confirmed by the operator.',
+        },
+        REVIEW_LIMITS.missingFields,
+        (finding) => `${finding.field}\u0000${finding.sourceText || ''}`
+      );
+    }
+  }
+
+  for (const unknownItem of review.unknownItems) {
+    if (!sourceTextIsGrounded(message, unknownItem.sourceText)) {
+      changed = true;
+      continue;
+    }
+    const requestedQuantity = quantityIsGrounded(
+      unknownItem.sourceText,
+      unknownItem.requestedQuantity
+    )
+      ? unknownItem.requestedQuantity
+      : null;
+    if (requestedQuantity !== unknownItem.requestedQuantity) {
+      changed = true;
+      warn('quantity_missing', 'Confirm an unmatched item quantity before applying this draft.');
+    }
+    pushUniqueCapped(
+      sanitized.unknownItems,
+      {
+        ...unknownItem,
+        requestedQuantity,
+        reason: 'No authoritative catalog item has been confirmed for this request.',
+      },
+      REVIEW_LIMITS.unknownItems,
+      (item) => item.sourceText
+    );
+    if (
+      unknownItem.reason !==
+      'No authoritative catalog item has been confirmed for this request.'
+    ) {
+      changed = true;
+    }
+    warn('catalog_mismatch', 'An unmatched customer request requires human review.');
+  }
+
+  const itemById = new Map();
+  for (const item of review.draft.items) {
+    if (!sourceTextIsGrounded(message, item.sourceText)) {
+      changed = true;
+      warn('catalog_mismatch', 'An item without exact customer evidence was removed.');
+      continue;
+    }
+
+    const catalogItem = catalogById.get(item.catalogItemId);
+    const quantity = catalogItem && catalogItemQuantityIsGrounded(
+      item.sourceText,
+      item.quantity,
+      catalogItem
+    )
+      ? item.quantity
+      : null;
+
+    if (!catalogItem) {
+      changed = true;
+      pushUniqueCapped(
+        sanitized.unknownItems,
+        {
+          sourceText: item.sourceText,
+          requestedQuantity: quantity,
+          reason: 'The proposed catalog ID is not present in the authoritative catalog.',
+        },
+        REVIEW_LIMITS.unknownItems,
+        (unknownItem) => unknownItem.sourceText
+      );
+      warn('catalog_mismatch', 'An unknown catalog match requires human review.');
+      continue;
+    }
+
+    if (!sourceTextMatchesCatalogItem(item.sourceText, catalogItem)) {
+      changed = true;
+      pushUniqueCapped(
+        sanitized.unknownItems,
+        {
+          sourceText: item.sourceText,
+          requestedQuantity: null,
+          reason: 'The quoted customer wording does not identify the proposed catalog item.',
+        },
+        REVIEW_LIMITS.unknownItems,
+        (unknownItem) => unknownItem.sourceText
+      );
+      warn('catalog_mismatch', 'An unverified catalog match requires human review.');
+      continue;
+    }
+
+    if (
+      item.catalogItemName !== catalogItem.name ||
+      item.category !== catalogItem.category ||
+      quantity !== item.quantity
+    ) {
+      changed = true;
+    }
+
+    const existingItem = itemById.get(catalogItem.id);
+    if (existingItem) {
+      changed = true;
+      existingItem.quantity = null;
+      existingItem.confidence = Math.min(existingItem.confidence, item.confidence);
+      pushUniqueCapped(
+        sanitized.ambiguities,
+        {
+          sourceText: item.sourceText,
+          question: `Confirm the total quantity for ${catalogItem.name}.`,
+          candidateCatalogItemIds: [catalogItem.id],
+        },
+        REVIEW_LIMITS.ambiguities,
+        (ambiguity) => `${ambiguity.sourceText}\u0000${ambiguity.candidateCatalogItemIds.join(',')}`
+      );
+      pushUniqueCapped(
+        sanitized.missingFields,
+        {
+          field: 'item_quantity',
+          sourceText: item.sourceText,
+          reason: 'Duplicate matches cannot be combined without operator confirmation.',
+        },
+        REVIEW_LIMITS.missingFields,
+        (finding) => `${finding.field}\u0000${finding.sourceText || ''}`
+      );
+      warn('ambiguous_intent', 'Duplicate item matches require quantity confirmation.');
+      continue;
+    }
+
+    const sanitizedItem = {
+      catalogItemId: catalogItem.id,
+      catalogItemName: catalogItem.name,
+      category: catalogItem.category,
+      quantity,
+      sourceText: item.sourceText,
+      confidence: item.confidence,
+    };
+    sanitized.draft.items.push(sanitizedItem);
+    itemById.set(catalogItem.id, sanitizedItem);
+
+    if (quantity !== item.quantity) {
+      pushUniqueCapped(
+        sanitized.missingFields,
+        {
+          field: 'item_quantity',
+          sourceText: item.sourceText,
+          reason: 'The quantity was not explicitly stated in the customer message.',
+        },
+        REVIEW_LIMITS.missingFields,
+        (finding) => `${finding.field}\u0000${finding.sourceText || ''}`
+      );
+      warn('quantity_missing', 'Confirm an ungrounded item quantity before applying this draft.');
+    }
+  }
+
+  const paidExtraWarnings = [];
+  for (const item of sanitized.draft.items) {
+    const catalogItem = catalogById.get(item.catalogItemId);
+    if (!catalogItem.isPaidExtra) continue;
+    const providerPaidExtra = review.paidExtras.find(
+      (paidExtra) =>
+        paidExtra.catalogItemId === catalogItem.id &&
+        paidExtra.sourceText === item.sourceText &&
+        sourceTextIsGrounded(message, paidExtra.sourceText)
+    );
+    sanitized.paidExtras.push({
+      catalogItemId: catalogItem.id,
+      catalogItemName: catalogItem.name,
+      quantity: item.quantity,
+      catalogPrice: catalogItem.price,
+      currency: catalogItem.currency,
+      sourceText: item.sourceText,
+      reason: 'This authoritative catalog item is marked as a paid extra.',
+      confidence: item.confidence,
+    });
+    if (
+      !providerPaidExtra ||
+      providerPaidExtra.catalogItemName !== catalogItem.name ||
+      providerPaidExtra.quantity !== item.quantity ||
+      providerPaidExtra.catalogPrice !== catalogItem.price ||
+      providerPaidExtra.currency !== catalogItem.currency ||
+      providerPaidExtra.reason !==
+        'This authoritative catalog item is marked as a paid extra.' ||
+      providerPaidExtra.confidence !== item.confidence
+    ) {
+      changed = true;
+    }
+    paidExtraWarnings.push({
+      code: 'paid_extra',
+      severity: 'warning',
+      message: `Confirm the paid extra ${catalogItem.name} before applying this draft.`,
+    });
+  }
+
+  if (review.paidExtras.length !== sanitized.paidExtras.length) changed = true;
+
+  if (review.warnings.length > 0) changed = true;
+  sanitized.warnings = [...paidExtraWarnings, ...generatedWarnings].slice(
+    0,
+    REVIEW_LIMITS.warnings
+  );
+
+  if (changed) {
+    sanitized.overallConfidence = Math.min(sanitized.overallConfidence, 0.5);
+  }
+
+  if (changed && sanitized.warnings.length < REVIEW_LIMITS.warnings) {
+    pushUniqueCapped(
+      sanitized.warnings,
+      {
+        code: 'other',
+        severity: 'warning',
+        message: 'The AI draft was safely normalized and requires human review before use.',
+      },
+      REVIEW_LIMITS.warnings,
+      (warning) => `${warning.code}\u0000${warning.message}`
+    );
+  }
+
+  const finalReview = OrderIntakeReviewSchema.safeParse(sanitized);
+  if (!finalReview.success || !evidenceIsGrounded(sanitized, message)) return null;
+  return finalReview.data;
 }
 
 function createOpenAIOrderIntake({
@@ -331,74 +800,106 @@ function createOpenAIOrderIntake({
 
     const selectedModel = resolveModel();
     const selectedClient = resolveClient();
-    let response;
+    const normalizedMessage = message.trim();
 
-    try {
-      response = await selectedClient.responses.parse({
-        model: selectedModel,
-        store: false,
-        ...OPENAI_REQUEST_LIMITS,
-        input: [
-          { role: 'system', content: ORDER_INTAKE_SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: buildOrderIntakeUserPrompt({
-              message: message.trim(),
-              catalog: parsedCatalog.data,
-            }),
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const isRetry = attempt === 1;
+      let response;
+
+      try {
+        response = await selectedClient.responses.parse({
+          model: selectedModel,
+          store: false,
+          ...(isRetry ? OPENAI_RETRY_LIMITS : OPENAI_REQUEST_LIMITS),
+          input: [
+            {
+              role: 'system',
+              content: isRetry
+                ? `${ORDER_INTAKE_SYSTEM_PROMPT}\n\n${RETRY_SYSTEM_INSTRUCTION}`
+                : ORDER_INTAKE_SYSTEM_PROMPT,
+            },
+            {
+              role: 'user',
+              content: buildOrderIntakeUserPrompt({
+                message: normalizedMessage,
+                catalog: parsedCatalog.data,
+              }),
+            },
+          ],
+          text: {
+            format: zodTextFormat(OrderIntakeReviewSchema, 'order_intake_review'),
           },
-        ],
-        text: {
-          format: zodTextFormat(OrderIntakeReviewSchema, 'order_intake_review'),
-        },
-      });
-    } catch (error) {
-      throw serviceError(
-        isStructuredOutputParseError(error)
-          ? SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT
-          : SERVICE_ERROR_CODES.PROVIDER_FAILURE
+        });
+      } catch (error) {
+        if (isStructuredOutputParseError(error) && !isRetry) continue;
+        throw serviceError(
+          isStructuredOutputParseError(error)
+            ? SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT
+            : SERVICE_ERROR_CODES.PROVIDER_FAILURE,
+          isStructuredOutputParseError(error)
+            ? 'structured_parse_failed'
+            : 'provider_request_failed'
+        );
+      }
+
+      if (hasRefusal(response)) {
+        throw serviceError(SERVICE_ERROR_CODES.REFUSED, 'provider_refusal');
+      }
+
+      if (!response || response.status === 'incomplete') {
+        if (!isRetry) continue;
+        throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'incomplete_response');
+      }
+
+      if (!Array.isArray(response.output)) {
+        throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'invalid_output_shape');
+      }
+
+      if (response.status && response.status !== 'completed') {
+        throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'invalid_response_status');
+      }
+
+      let outputParsed;
+      try {
+        outputParsed = response.output_parsed;
+      } catch (error) {
+        if (isStructuredOutputParseError(error) && !isRetry) continue;
+        throw serviceError(
+          SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT,
+          'structured_output_access_failed'
+        );
+      }
+
+      if (outputParsed === null || typeof outputParsed === 'undefined') {
+        if (!isRetry) continue;
+        throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'null_parsed_output');
+      }
+
+      const parsedReview = OrderIntakeReviewSchema.safeParse(outputParsed);
+      if (!parsedReview.success) {
+        throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'schema_invalid');
+      }
+
+      const sanitizedReview = sanitizeReview(
+        parsedReview.data,
+        parsedCatalog.data,
+        normalizedMessage
       );
+      if (!sanitizedReview) {
+        throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'sanitization_failed');
+      }
+
+      return sanitizedReview;
     }
 
-    if (hasRefusal(response)) {
-      throw serviceError(SERVICE_ERROR_CODES.REFUSED);
-    }
-
-    if (
-      !response ||
-      !Array.isArray(response.output) ||
-      (response.status && response.status !== 'completed')
-    ) {
-      throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT);
-    }
-
-    let outputParsed;
-    try {
-      outputParsed = response.output_parsed;
-    } catch {
-      throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT);
-    }
-
-    if (outputParsed === null || typeof outputParsed === 'undefined') {
-      throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT);
-    }
-
-    const parsedReview = OrderIntakeReviewSchema.safeParse(outputParsed);
-    if (
-      !parsedReview.success ||
-      !matchesCatalog(parsedReview.data, parsedCatalog.data) ||
-      !evidenceIsGrounded(parsedReview.data, message.trim())
-    ) {
-      throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT);
-    }
-
-    return parsedReview.data;
+    throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'retry_exhausted');
   };
 }
 
 module.exports = {
   OPENAI_CLIENT_OPTIONS,
   OPENAI_REQUEST_LIMITS,
+  OPENAI_RETRY_LIMITS,
   OrderIntakeServiceError,
   SERVICE_ERROR_CODES,
   createOpenAIOrderIntake,
