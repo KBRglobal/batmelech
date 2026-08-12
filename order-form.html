@@ -76,7 +76,7 @@ textarea{min-height:66px;resize:vertical}
   <header class="head">
     <div class="bsd">בס"ד</div>
     <h1>מטעמי בת מלך</h1>
-    <div class="sub">מטבח ביתי אותנטי · שבת קודש</div>
+    <div class="sub">מטבח ביתי אותנטי · שבת ואמצע השבוע</div>
     <div class="kosher">כשר</div>
   </header>
   <p class="hint" style="text-align:center">
@@ -85,7 +85,7 @@ textarea{min-height:66px;resize:vertical}
 
   <div class="card" style="border-width:2px;border-color:#EFA9BC">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
-      <b style="font-size:1.05rem">ארוחה זוגית לשבת</b>
+      <b style="font-size:1.05rem">חבילת שבת זוגית — לבחירה</b>
       <b style="color:#B0446B;font-size:1.2rem">230$</b>
     </div>
     <div style="font-size:.9rem;margin-top:6px;line-height:1.7">
@@ -95,13 +95,14 @@ textarea{min-height:66px;resize:vertical}
     </div>
     <div class="hint" style="margin-top:6px">
       כל מה שמעבר לכלול מופיע עם מחיר ליד, ומסוכם למטה ב«סיכום מחיר» — בלי הפתעות.
+      אפשר גם להזמין אקסטרות או תפריט צהריים בלבד, בלי לבחור חבילת שבת.
     </div>
   </div>
 
   <h2 class="sec">פרטי ההזמנה</h2>
   <div class="card">
     <div class="grid2">
-      <div class="field"><label>לאיזה תאריך? (שישי)</label><input type="date" data-bind="date"></div>
+      <div class="field"><label>לאיזה תאריך?</label><input type="date" data-bind="date"></div>
       <div class="field"><label>ארוחות זוגיות (230$ לארוחה)</label><span id="mealsStep"></span></div>
     </div>
     <div class="grid2">
@@ -153,7 +154,7 @@ textarea{min-height:66px;resize:vertical}
   </div>
 
   <h2 class="sec">עיקרית</h2>
-  <p class="hint"><b>עיקרית אחת כלולה</b> בכל ארוחה זוגית — אפשר גם להחליף למגש שניצלים או רולדת בשר (במקום העיקרית).</p>
+  <p class="hint"><b>עיקרית אחת כלולה</b> בכל ארוחה זוגית — אפשר גם להחליף למגש שניצלים או רולדת בשר. בלי ארוחה זוגית, או מעבר לכמות הכלולה, מגש שניצלים ורולדת בשר מחויבים ב־<b>100$</b> ליחידה.</p>
   <div class="card" id="mainList"></div>
 
   <h2 class="sec">תוספת</h2>
@@ -161,6 +162,10 @@ textarea{min-height:66px;resize:vertical}
 
   <h2 class="sec">סיום מתוק</h2>
   <div class="card" id="dessertList"></div>
+
+  <h2 class="sec">תפריט צהריים</h2>
+  <p class="hint">אפשר להזמין צהריים בלבד, בלי ארוחה זוגית ובלי חלות. כל פריט, וריאציה ותוספת מחושבים אוטומטית.</p>
+  <div class="card" id="lunchList"></div>
 
   <h2 class="sec">משדרגים את השולחן</h2>
   <div class="card" id="extraList"></div>
@@ -221,11 +226,32 @@ const EXTRAS=[
   {name:'סיר קובה סלק בתוספת אורז (ל־4 אנשים)', price:125},
   {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
   {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
+  {name:'מנת מפרום ביתי (תוספת)', price:20},
   {name:'מרק ירקות לקוסקוס ללא עוף', price:70},
   {name:'מרק ירקות לקוסקוס עם עוף', price:100},
   {name:'סט עריכה', price:10},
   {name:'תוספת יין', price:5}
 ];
+const LUNCH=[
+  {key:'baguette', name:'בגט טוניסאי אותנטי', price:22, variants:[], sideChoice:false, addon:null},
+  {key:'schnitzel-roll', name:'בגט/חלת שניצל ישראלי', price:null, variants:[
+    {key:'baguette', label:'בבגט', price:25, includedSides:0, sidePrice:0},
+    {key:'challah', label:'בחלה — סופ"ש בלבד', price:28, weekendOnly:true, includedSides:0, sidePrice:0}
+  ], sideChoice:false, addon:null},
+  {key:'kubeh', name:'מנת קובה סלק ביתית', price:35, variants:[], sideChoice:false, addon:null},
+  {key:'schnitzel-plate', name:'שניצל בצלחת', price:null, variants:[
+    {key:'single', label:'אישית', price:35, includedSides:0, sidePrice:15},
+    {key:'couple', label:'זוגית', price:60, includedSides:0, sidePrice:25},
+    {key:'family', label:'משפחתית — כולל 2 תוספות', price:145, includedSides:2, sidePrice:25}
+  ], sideChoice:true, addon:null},
+  {key:'couscous', name:'ספיישל קוסקוס', price:35, variants:[], sideChoice:false, addon:{name:'מנת מפרום ביתי', price:20}}
+];
+const LUNCH_SIDES=['אורז לבן','פסטה אדומה','פסטה נקיה'];
+const PAID_MAIN_EXTRAS={
+  'מגש שניצלים — במקום עיקרית':{name:'מגש שניצלים (זוגי, כ־13–15 יח\')', price:100},
+  'רולדת בשר — במקום עיקרית':{name:'רולדת בשר פריך ברוטב פטריות עשיר', price:100}
+};
+const MAIN_CONTROLLED_EXTRA_NAMES=new Set(Object.values(PAID_MAIN_EXTRAS).map(extra=>extra.name));
 const SALAD_BLOCK_PRICE=25, SALAD_REMAINDER_PRICE=7, DELIVERY_PRICE=15, EXTRA_FISH_UNIT_PRICE=30;
 const FISH_CAKES_NAME='קציצות דגים ברוטב מרוקאי';
 const DUBAI_TIME_ZONE='Asia/Dubai';
@@ -243,40 +269,66 @@ function isRealIsoDate(value){
   return date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day;
 }
 const o={date:nextFridayDubai(),name:'',phone:'',place:'',address:'',time:'',pickup:false,
-  meals:1,challot:2,salads:{},firsts:{},heat:'',mains:{},sides:{},desserts:{},extras:{},notes:''};
+  meals:0,challot:0,salads:{},firsts:{},heat:'',mains:{},sides:{},desserts:{},extras:{},lunch:{},notes:''};
 let challotOverridden=false;
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-function stepper(group,i,val){
+function stepper(group,i,val,key=''){
+  const keyAttr=key?` data-k="${esc(key)}"`:'';
+  const cellKey=key?`${group}|${i}|${key}`:`${group}|${i}`;
   return `<span class="stepper">
-    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}" data-d="-1" aria-label="פחות">−</button>
-    <span class="st-qty${val>0?' has':''}" data-cell="${group}|${i}">${val||0}</span>
-    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}" data-d="1" aria-label="עוד">+</button>
+    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}"${keyAttr} data-d="-1" aria-label="פחות">−</button>
+    <span class="st-qty${val>0?' has':''}" data-cell="${cellKey}">${val||0}</span>
+    <button type="button" class="st-btn" data-act="bump" data-group="${group}" data-i="${i}"${keyAttr} data-d="1" aria-label="עוד">+</button>
   </span>`;
 }
-function rowList(el,group,arr){
-  $(el).innerHTML=arr.map((name,i)=>`<div class="item-row"><span class="item-name">${esc(name)}</span>${stepper(group,i,0)}</div>`).join('');
+function rowList(el,group,arr,priceHints={}){
+  $(el).innerHTML=arr.map((name,i)=>`<div class="item-row"><span class="item-name">${esc(name)}${priceHints[name]?` <span class="item-price">${esc(priceHints[name])}</span>`:''}</span>${stepper(group,i,0)}</div>`).join('');
 }
 rowList('#saladList','salads',SALADS);
 rowList('#firstList','firsts',FIRSTS);
-rowList('#mainList','mains',MAINS);
+rowList('#mainList','mains',MAINS,Object.fromEntries(Object.keys(PAID_MAIN_EXTRAS).map(name=>[name,'100$ ללא זוגית / מעבר לכלול'])));
 rowList('#sideList','sides',SIDES);
 rowList('#dessertList','desserts',DESSERTS);
-$('#extraList').innerHTML=EXTRAS.map((ex,i)=>`<div class="item-row" style="display:block">
+$('#extraList').innerHTML=EXTRAS.map((ex,i)=>MAIN_CONTROLLED_EXTRA_NAMES.has(ex.name)?'':`<div class="item-row" style="display:block">
   <div class="row" style="justify-content:space-between">
     <span class="item-name">${esc(ex.name)} <span class="item-price">${ex.price}$</span></span>
     ${stepper('extras',i)}
   </div>
   <input class="note-in hidden" data-note-cell="extras|${i}" data-i="${i}" placeholder="הערה (מה בפנים, מה בצד...)">
 </div>`).join('');
-$('#mealsStep').innerHTML=stepper('meals',0,1);
-$('#challotStep').innerHTML=stepper('challot',0,2);
+function renderLunch(){
+  $('#lunchList').innerHTML=LUNCH.map((item,i)=>{
+    const entry=o.lunch[item.key]||{q:0,v:item.variants[0]?.key||'',sides:{},addon:0};
+    const variant=item.variants.find(candidate=>candidate.key===(entry.v||item.variants[0]?.key));
+    const variantRows=item.variants.length?`<div class="row" style="gap:12px;flex-wrap:wrap;margin:6px 0 2px">
+      ${item.variants.map(option=>`<label class="row" style="gap:4px;cursor:pointer;font-size:.9rem">
+        <input type="radio" name="lunch-variant-${esc(item.key)}" style="width:auto" data-bind="lunch-variant" data-i="${i}" value="${esc(option.key)}"${option.key===(entry.v||item.variants[0]?.key)?' checked':''}> ${esc(option.label)} — ${option.price}$
+      </label>`).join('')}
+    </div>`:'';
+    const sideRows=item.sideChoice&&variant?`<div style="margin-top:4px">
+      <div class="hint" style="margin-bottom:2px">תוספות לבחירה${variant.includedSides?` — ${variant.includedSides} כלולות בכל מנה, מעבר לכך ${variant.sidePrice}$ לתוספת`:` — ${variant.sidePrice}$ לתוספת`}:</div>
+      ${LUNCH_SIDES.map((name,sideIndex)=>`<div class="item-row"><span class="item-name">${esc(name)}</span>${stepper('lunchSides',i,entry.sides[name]||0,'s'+sideIndex)}</div>`).join('')}
+    </div>`:'';
+    const addonRow=item.addon?`<div class="item-row" style="margin-top:4px"><span class="item-name">+ ${esc(item.addon.name)} <span class="item-price">${item.addon.price}$</span></span>${stepper('lunchAddon',i,entry.addon||0)}</div>`:'';
+    return `<div class="item-row" style="display:block">
+      <div class="row" style="justify-content:space-between">
+        <span class="item-name">${esc(item.name)}${item.price!==null?` <span class="item-price">${item.price}$</span>`:''}</span>
+        ${stepper('lunch',i,entry.q)}
+      </div>
+      ${entry.q>0?variantRows+sideRows+addonRow:''}
+    </div>`;
+  }).join('');
+}
+renderLunch();
+$('#mealsStep').innerHTML=stepper('meals',0,0);
+$('#challotStep').innerHTML=stepper('challot',0,0);
 $('[data-bind="date"]').value=o.date;
 
 function groupArr(g){ return {salads:SALADS,firsts:FIRSTS,mains:MAINS,sides:SIDES,desserts:DESSERTS}[g]; }
-function bump(g,i,d){
+function bump(g,i,k,d){
   if(g==='meals'){
     o.meals=Math.max(0,o.meals+d);
     if(!challotOverridden) o.challot=2*o.meals;
@@ -294,10 +346,113 @@ function bump(g,i,d){
     if(!e.q&&!e.note) delete o.extras[name];
     return e.q;
   }
+  if(g==='lunch'){
+    const item=LUNCH[i];
+    const entry=o.lunch[item.key]||(o.lunch[item.key]={q:0,v:item.variants[0]?.key||'',sides:{},addon:0});
+    entry.q=Math.max(0,entry.q+d);
+    if(entry.q===0) delete o.lunch[item.key];
+    return entry.q;
+  }
+  if(g==='lunchSides'){
+    const item=LUNCH[i], entry=o.lunch[item.key];
+    if(!entry) return 0;
+    const name=LUNCH_SIDES[Number(String(k).slice(1))];
+    if(name===undefined) return 0;
+    const quantity=Math.max(0,(entry.sides[name]||0)+d);
+    if(quantity===0) delete entry.sides[name]; else entry.sides[name]=quantity;
+    return quantity;
+  }
+  if(g==='lunchAddon'){
+    const item=LUNCH[i], entry=o.lunch[item.key];
+    if(!entry||!item.addon) return 0;
+    entry.addon=Math.max(0,(entry.addon||0)+d);
+    return entry.addon;
+  }
   const name=groupArr(g)[i];
   const nv=Math.max(0,(o[g][name]||0)+d);
   if(nv===0) delete o[g][name]; else o[g][name]=nv;
   return nv;
+}
+function allocateMainSelections(){
+  let includedRemaining=o.meals;
+  const included={}, paidExtras={};
+  let unpricedOverage=0;
+  for(const name of MAINS){
+    const quantity=o.mains[name]||0;
+    if(quantity<=0) continue;
+    const includedQuantity=Math.min(quantity,includedRemaining);
+    if(includedQuantity>0) included[name]=includedQuantity;
+    includedRemaining-=includedQuantity;
+    const overage=quantity-includedQuantity;
+    if(overage<=0) continue;
+    const paid=PAID_MAIN_EXTRAS[name];
+    if(paid) paidExtras[paid.name]=(paidExtras[paid.name]||0)+overage;
+    else unpricedOverage+=overage;
+  }
+  return {included,paidExtras,unpricedOverage};
+}
+function combinedPaidExtras(){
+  const combined={};
+  for(const ex of EXTRAS){
+    if(MAIN_CONTROLLED_EXTRA_NAMES.has(ex.name)) continue;
+    const selected=o.extras[ex.name];
+    if(selected&&selected.q>0) combined[ex.name]={q:selected.q,note:selected.note||''};
+  }
+  for(const [name,quantity] of Object.entries(allocateMainSelections().paidExtras)){
+    const selected=combined[name]||(combined[name]={q:0,note:''});
+    selected.q+=quantity;
+  }
+  return combined;
+}
+function lunchTextLines(){
+  const lines=[];
+  for(const item of LUNCH){
+    const entry=o.lunch[item.key];
+    if(!entry||entry.q<=0) continue;
+    const variant=item.variants.find(candidate=>candidate.key===(entry.v||item.variants[0]?.key));
+    let line=item.name+(variant?` (${variant.label})`:'')+` ×${entry.q}`;
+    const details=[];
+    if(item.sideChoice){
+      const sides=Object.entries(entry.sides).filter(([,quantity])=>quantity>0).map(([name,quantity])=>`${name}${quantity>1?` ×${quantity}`:''}`);
+      if(sides.length) details.push(`תוספות: ${sides.join(', ')}`);
+    }
+    if(item.addon&&entry.addon>0) details.push(`+ ${item.addon.name} ×${entry.addon}`);
+    if(details.length) line+=` — ${details.join(' · ')}`;
+    lines.push(line);
+  }
+  return lines;
+}
+function lunchPriceLines(){
+  const lines=[];
+  for(const item of LUNCH){
+    const entry=o.lunch[item.key];
+    if(!entry||entry.q<=0) continue;
+    const variant=item.variants.find(candidate=>candidate.key===(entry.v||item.variants[0]?.key));
+    const unitPrice=variant?variant.price:item.price;
+    lines.push({l:`${item.name}${variant?` (${variant.label})`:''} ×${entry.q}`,a:unitPrice*entry.q});
+    if(item.sideChoice&&variant){
+      const selectedSides=Object.values(entry.sides).reduce((sum,quantity)=>sum+quantity,0);
+      const includedSides=variant.includedSides*entry.q;
+      const excessSides=Math.max(0,selectedSides-includedSides);
+      if(excessSides>0) lines.push({l:`תוספות ל${item.name} ×${excessSides}`,a:excessSides*variant.sidePrice});
+    }
+    if(item.addon&&entry.addon>0) lines.push({l:`${item.addon.name} (ל${item.name}) ×${entry.addon}`,a:item.addon.price*entry.addon});
+  }
+  return lines;
+}
+function hasPricedFood(lines){
+  return lines.some(line=>line.l!=='משלוח ברחבי דובאי'&&line.a>0);
+}
+function hasWeekdayOnlyLunchConflict(){
+  if(!isRealIsoDate(o.date)) return false;
+  const day=new Date(`${o.date}T00:00:00Z`).getUTCDay();
+  if(day===5||day===6) return false;
+  return LUNCH.some(item=>{
+    const entry=o.lunch[item.key];
+    if(!entry||entry.q<=0) return false;
+    const variant=item.variants.find(candidate=>candidate.key===(entry.v||item.variants[0]?.key));
+    return variant?.weekendOnly===true;
+  });
 }
 function estLines(){
   const lines=[], blockingWarnings=[];
@@ -311,16 +466,23 @@ function estLines(){
   const includedFishUnits=2*o.meals;
   const extraFishUnits=Math.max(0,fishUnits-includedFishUnits);
   if(extraFishUnits>0) lines.push({l:`יחידות דג נוספות ×${extraFishUnits}`, a:extraFishUnits*EXTRA_FISH_UNIT_PRICE});
-  for(const ex of EXTRAS){ const e=o.extras[ex.name]; if(e&&e.q) lines.push({l:`${ex.name} ×${e.q}`, a:e.q*ex.price}); }
+  const selectedExtras=combinedPaidExtras();
+  for(const ex of EXTRAS){ const e=selectedExtras[ex.name]; if(e&&e.q) lines.push({l:`${ex.name} ×${e.q}`, a:e.q*ex.price}); }
+  for(const line of lunchPriceLines()) lines.push(line);
   const extraCh=Math.max(0,o.challot-2*o.meals);
   if(extraCh>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:extraCh*CHALLAH_PRICE});
-  if(!o.pickup) lines.push({l:'משלוח ברחבי דובאי', a:DELIVERY_PRICE});
-  const nM=Object.values(o.mains).reduce((s,x)=>s+x,0);
+  if(!o.pickup&&hasPricedFood(lines)) lines.push({l:'משלוח ברחבי דובאי', a:DELIVERY_PRICE});
+  const mainAllocation=allocateMainSelections();
   const nSides=Object.values(o.sides).reduce((s,x)=>s+x,0);
   const unknownDesserts=Object.entries(o.desserts).filter(([name,quantity])=>quantity>0&&!DESSERTS.includes(name));
   const dessertUnits=(o.desserts[DESSERTS[0]]||0)+2*(o.desserts[DESSERTS[1]]||0);
   if(!isRealIsoDate(o.date)) blockingWarnings.push('יש לבחור תאריך הזמנה תקין לפני השליחה');
-  if(nM>o.meals) blockingWarnings.push('כמות העיקריות גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
+  if(!o.name.trim()) blockingWarnings.push('יש למלא שם מלא לפני השליחה');
+  if(!o.phone.trim()) blockingWarnings.push('יש למלא מספר טלפון לפני השליחה');
+  if(!o.pickup&&hasPricedFood(lines)&&!o.place.trim()) blockingWarnings.push('יש למלא מלון או אזור למשלוח לפני השליחה');
+  if(!hasPricedFood(lines)) blockingWarnings.push('יש לבחור לפחות פריט אחד לפני השליחה');
+  if(hasWeekdayOnlyLunchConflict()) blockingWarnings.push('חלת שניצל זמינה בסוף השבוע בלבד');
+  if(mainAllocation.unpricedOverage>0) blockingWarnings.push('כמות העיקריות שאינן מגש שניצלים או רולדת בשר גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
   if(nSides>o.meals) blockingWarnings.push('כמות התוספות גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
   if(unknownDesserts.length>0) blockingWarnings.push('נבחר קינוח שהמערכת אינה יודעת לסווג ולתמחר');
   if(dessertUnits>2*o.meals) blockingWarnings.push('כמות הקינוחים גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
@@ -345,10 +507,14 @@ function buildText(){
   const join=(obj)=>Object.entries(obj).map(([n,q])=>`${n}${q>1?` ×${q}`:''}`).join(', ');
   if(Object.keys(o.salads).length) L.push(`סלטים: ${join(o.salads)}`);
   if(Object.keys(o.firsts).length) L.push(`ראשונה: ${Object.entries(o.firsts).map(([n,q])=>`${n} ×${q}`).join(', ')}${o.heat?` (${o.heat})`:''}`);
-  if(Object.keys(o.mains).length) L.push(`עיקרית: ${join(o.mains)}`);
+  const mainAllocation=allocateMainSelections();
+  if(Object.keys(mainAllocation.included).length) L.push(`עיקרית: ${join(mainAllocation.included)}`);
   if(Object.keys(o.sides).length) L.push(`תוספת: ${join(o.sides)}`);
   if(Object.keys(o.desserts).length) L.push(`קינוח: ${join(o.desserts)}`);
-  const exs=Object.entries(o.extras).filter(([,e])=>e.q>0).map(([n,e])=>`${n} ×${e.q}${e.note?` (${e.note})`:''}`);
+  const lunchLines=lunchTextLines();
+  if(lunchLines.length){ L.push('תפריט צהריים:'); lunchLines.forEach(line=>L.push(`  • ${line}`)); }
+  const exportedExtras=combinedPaidExtras();
+  const exs=Object.entries(exportedExtras).filter(([,e])=>e.q>0).map(([n,e])=>`${n} ×${e.q}${e.note?` (${e.note})`:''}`);
   if(exs.length) L.push(`אקסטרות: ${exs.join(', ')}`);
   if(o.challot) L.push(`חלות: ${o.challot}`);
   if(o.notes) L.push(`הערות: ${o.notes}`);
@@ -359,7 +525,9 @@ function buildText(){
   L.push(`סה"כ משוער: ${est.total}$`);
   for(const w of est.warns) L.push(`לתשומת לב: ${w}`);
   const exp=JSON.parse(JSON.stringify(o));
-  if(!o.pickup) exp.extras['משלוח']={q:1,note:''};
+  exp.mains=mainAllocation.included;
+  exp.extras=JSON.parse(JSON.stringify(exportedExtras));
+  if(!o.pickup&&hasPricedFood(est.lines)) exp.extras['משלוח']={q:1,note:''};
   const code=btoa(unescape(encodeURIComponent(JSON.stringify(exp))));
   L.push('');
   L.push(`#BM1#${code}#`);
@@ -399,8 +567,13 @@ function refresh(){
 document.addEventListener('click',e=>{
   const btn=e.target.closest('[data-act="bump"]');
   if(!btn) return;
-  const g=btn.dataset.group, i=Number(btn.dataset.i), d=Number(btn.dataset.d);
-  const nv=bump(g,i,d);
+  const g=btn.dataset.group, i=Number(btn.dataset.i), k=btn.dataset.k||'', d=Number(btn.dataset.d);
+  const nv=bump(g,i,k,d);
+  if(g==='lunch'||g==='lunchSides'||g==='lunchAddon'){
+    renderLunch();
+    refresh();
+    return;
+  }
   const cell=document.querySelector(`[data-cell="${g}|${i}"]`);
   if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
   if(g==='meals'&&!challotOverridden){
@@ -417,6 +590,11 @@ function handleBind(e){
   const b=e.target.dataset.bind;
   if(b){
     if(b==='pickup'){ o.pickup=e.target.checked; $('#deliveryFields').style.display=o.pickup?'none':''; }
+    else if(b==='lunch-variant'){
+      const item=LUNCH[Number(e.target.dataset.i)], entry=o.lunch[item.key];
+      if(entry&&item.variants.some(variant=>variant.key===e.target.value)) entry.v=e.target.value;
+      renderLunch();
+    }
     else o[b]=e.target.value;
     refresh();
     return;
