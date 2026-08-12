@@ -79,6 +79,11 @@ describe('MenuEditorScreen', () => {
     expect(screen.getByText('מנת קובה סלק ביתית')).toBeTruthy()
     expect(screen.getAllByText(/משפחתית — כולל 2 תוספות/).length).toBeGreaterThan(0)
     expect(screen.getByText('זמין בסוף שבוע בלבד')).toBeTruthy()
+    expect(screen.getByText(/מחירי הצהריים מוצגים בלבד ונעולים למחירון שבטופס הלקוחות/)).toBeTruthy()
+    const lunchEditor = screen.getByText('תפריט צהריים (5)').closest('details')
+    expect(lunchEditor).not.toBeNull()
+    expect(lunchEditor?.querySelector('input, select, textarea, button')).toBeNull()
+    expect(within(lunchEditor as HTMLElement).getByText('מחיר בגט טוניסאי אותנטי').parentElement?.textContent).toContain('22$')
     expect(screen.queryByText('תוספת מנת דג')).toBeNull()
     expect(screen.queryByText('תוספת קציצות דגים')).toBeNull()
     expect(screen.queryByText('משלוח')).toBeNull()
@@ -89,7 +94,7 @@ describe('MenuEditorScreen', () => {
     expect(screen.queryByRole('button', { name: 'חזרה לתפריט המקורי' })).toBeNull()
   })
 
-  it('sends one validated whole-store save request only after explicit action', async () => {
+  it('saves unrelated store data without exposing a callback that can change lunch pricing', async () => {
     const store = { orders: [{ id: 'real-order' }], preserved: { exact: true } } as LegacyStore
     mockedUseStore.mockReturnValue(queryResult({ store }))
     const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
@@ -97,10 +102,9 @@ describe('MenuEditorScreen', () => {
     render(<MenuEditorScreen onSave={onSave} />)
 
     expect(onSave).not.toHaveBeenCalled()
-    const lunchPrice = screen.getByLabelText('מחיר בגט טוניסאי אותנטי')
-    await user.clear(lunchPrice)
-    await user.type(lunchPrice, '23')
-    await user.tab()
+    expect(screen.queryByRole('textbox', { name: 'מחיר בגט טוניסאי אותנטי' })).toBeNull()
+    const lunchEditor = screen.getByText('תפריט צהריים (5)').closest('details')
+    expect(lunchEditor?.querySelectorAll('input, select, textarea, button')).toHaveLength(0)
     expect(onSave).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
 
@@ -113,24 +117,14 @@ describe('MenuEditorScreen', () => {
     expect((request.nextStore as Record<string, unknown>).preserved).toEqual({ exact: true })
     expect((request.nextStore as Record<string, unknown>).menu).toMatchObject({
       couplePrice: 230,
-      lunch: expect.arrayContaining([{ key: 'baguette', price: 23 }]),
+      lunch: expect.arrayContaining([{ key: 'baguette', price: 22 }]),
     })
     expect(await screen.findByText('נשמר')).toBeTruthy()
   })
 
-  it('blocks malformed draft prices and loaded duplicate IDs', async () => {
+  it('blocks loaded duplicate IDs without exposing lunch price mutation controls', async () => {
     const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
-    mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
-    const malformed = render(<MenuEditorScreen onSave={onSave} />)
-    const price = screen.getByLabelText('מחיר בגט טוניסאי אותנטי')
-    await user.clear(price)
-    await user.type(price, '1.234')
-    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
-    expect(onSave).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert').textContent).toContain('לתקן את שגיאות התפריט')
-    malformed.unmount()
-
     mockedUseStore.mockReturnValue(queryResult({
       store: {
         orders: [],
@@ -162,21 +156,17 @@ describe('MenuEditorScreen', () => {
     expect(screen.getAllByText(/טופס הלקוחות, המחיר/).length).toBeGreaterThan(0)
   })
 
-  it('keeps an edited draft on its exact initialization envelope and performs no stale callback', async () => {
+  it('keeps its exact initialization envelope and performs no stale callback', async () => {
     const initialStore = { orders: [{ id: 'initial' }], marker: 'initial' } as LegacyStore
     const refreshedStore = { orders: [{ id: 'initial' }], marker: 'refreshed' } as LegacyStore
     const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
     mockedUseStore.mockReturnValue(queryResult({ store: initialStore, revision: 4 }))
     const user = userEvent.setup()
     const view = render(<MenuEditorScreen onSave={onSave} />)
-    const lunchPrice = screen.getByLabelText('מחיר בגט טוניסאי אותנטי')
-    await user.clear(lunchPrice)
-    await user.type(lunchPrice, '23')
-    await user.tab()
 
     mockedUseStore.mockReturnValue(queryResult({ store: refreshedStore, revision: 5 }))
     view.rerender(<MenuEditorScreen onSave={onSave} />)
-    expect((screen.getByLabelText('מחיר בגט טוניסאי אותנטי') as HTMLInputElement).value).toBe('23')
+    expect(screen.queryByRole('textbox', { name: 'מחיר בגט טוניסאי אותנטי' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
 
     expect(onSave).not.toHaveBeenCalled()

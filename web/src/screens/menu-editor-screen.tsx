@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
@@ -8,10 +8,8 @@ import {
   MENU_CATEGORY_KEYS,
   applyCatalogToStore,
   loadSettingsCatalog,
-  updateLunchPrice,
   validateSettingsCatalog,
   type CatalogResult,
-  type LunchPricePath,
   type MenuCategoryKey,
   type SettingsCatalog,
   type StoreSaveHandler,
@@ -173,36 +171,33 @@ function ExtrasEditor({ catalog }: { catalog: SettingsCatalog }) {
   )
 }
 
-function LunchPriceField({ catalog, path, label, value, onChange, onValidityChange }: { catalog: SettingsCatalog; path: LunchPricePath; label: string; value: number; onChange: (catalog: SettingsCatalog) => void; onValidityChange: (fieldId: string, invalid: boolean) => void }) {
-  const fieldId = `lunch-${path.itemKey}-${path.kind}-${'variantKey' in path ? path.variantKey : ''}`
-  return <PriceField label={label} value={value} fieldId={fieldId} onValidityChange={onValidityChange} onCommit={(price) => onChange(updateLunchPrice(catalog, path, price))} />
-}
-
-function LunchEditor({ catalog, onChange, onValidityChange }: { catalog: SettingsCatalog; onChange: (catalog: SettingsCatalog) => void; onValidityChange: (fieldId: string, invalid: boolean) => void }) {
+function LunchEditor({ catalog }: { catalog: SettingsCatalog }) {
   return (
     <details className="rounded-2xl border border-border bg-card p-4">
       <summary className="cursor-pointer text-sm font-black text-primary">תפריט צהריים ({catalog.lunch.length})</summary>
-      <p className="mt-3 text-xs font-bold text-muted-foreground">פריטי הצהריים קבועים — כאן עורכים מחירים בלבד, כולל וריאציות ותוספות.</p>
+      <p className="mt-3 rounded-xl bg-secondary/60 p-3 text-xs font-bold leading-6 text-muted-foreground">
+        מחירי הצהריים מוצגים בלבד ונעולים למחירון שבטופס הלקוחות. שינוי מחיר יתאפשר רק אחרי חיבור שני המסכים לאותו קטלוג ציבורי.
+      </p>
       <div className="mt-4 space-y-4">
         {catalog.lunch.map((item) => (
           <section key={item.key} className="rounded-2xl bg-secondary/40 p-4">
             <h3 className="font-black text-primary">{item.name}</h3>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {item.priceMinorUnits !== null && (
-                <LunchPriceField catalog={catalog} path={{ kind: 'base', itemKey: item.key }} label={`מחיר ${item.name}`} value={item.priceMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+                <FixedValue label={`מחיר ${item.name}`} value={`${displayDollarInput(item.priceMinorUnits)}$`} />
               )}
               {item.variants.map((variant) => (
                 <div key={variant.key} className="space-y-2">
-                  <LunchPriceField catalog={catalog} path={{ kind: 'variant', itemKey: item.key, variantKey: variant.key }} label={`${item.name} — ${variant.name}`} value={variant.priceMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+                  <FixedValue label={`${item.name} — ${variant.name}`} value={`${displayDollarInput(variant.priceMinorUnits)}$`} />
                   {variant.weekendOnly && <p className="text-xs font-black text-amber-800">זמין בסוף שבוע בלבד</p>}
                   {variant.includedSides > 0 && <p className="text-xs font-bold text-muted-foreground">כולל {variant.includedSides} תוספות</p>}
                   {variant.extraSideMinorUnits !== null && (
-                    <LunchPriceField catalog={catalog} path={{ kind: 'side', itemKey: item.key, variantKey: variant.key }} label={`תוספת בחירה — ${variant.name}`} value={variant.extraSideMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+                    <FixedValue label={`תוספת בחירה — ${variant.name}`} value={`${displayDollarInput(variant.extraSideMinorUnits)}$`} />
                   )}
                 </div>
               ))}
               {item.addon !== null && (
-                <LunchPriceField catalog={catalog} path={{ kind: 'addon', itemKey: item.key }} label={`${item.name} — ${item.addon.name}`} value={item.addon.priceMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+                <FixedValue label={`${item.name} — ${item.addon.name}`} value={`${displayDollarInput(item.addon.priceMinorUnits)}$`} />
               )}
             </div>
           </section>
@@ -215,10 +210,8 @@ function LunchEditor({ catalog, onChange, onValidityChange }: { catalog: Setting
 export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
   const storeQuery = useStore()
   const initializationRef = useRef<MenuInitialization | null>(null)
-  const [catalog, setCatalog] = useState<SettingsCatalog | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveMessage, setSaveMessage] = useState('')
-  const [invalidPriceFields, setInvalidPriceFields] = useState<ReadonlySet<string>>(new Set())
 
   if (initializationRef.current === null && storeQuery.data?.data != null) {
     initializationRef.current = {
@@ -227,23 +220,13 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       loaded: loadSettingsCatalog(storeQuery.data.data),
     }
   }
-  const setPriceValidity = useCallback((fieldId: string, invalid: boolean) => {
-    setInvalidPriceFields((previous) => {
-      if (previous.has(fieldId) === invalid) return previous
-      const next = new Set(previous)
-      if (invalid) next.add(fieldId)
-      else next.delete(fieldId)
-      return next
-    })
-  }, [])
-
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את התפריט" />
   if (storeQuery.isError || initializationRef.current === null) {
     return <ScreenState kind="error" title="לא הצלחנו לטעון את התפריט" retry={() => void storeQuery.refetch()} />
   }
   const initialization = initializationRef.current
   const { baseEnvelope, baseStore, loaded } = initialization
-  const current = catalog ?? loaded.catalog
+  const current = loaded.catalog
   const validation = validateSettingsCatalog(current)
   const blockingLoadWarnings = loaded.warnings.filter((warning) => warning.code !== 'SUPERSEDED_EXTRA_REMOVED')
   const visibleWarnings = [...loaded.warnings, ...validation].filter(
@@ -267,7 +250,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       setSaveMessage('הנתונים התעדכנו מאז פתיחת הטיוטה. לא בוצעה שמירה; צריך לפתוח מחדש את המסך.')
       return
     }
-    if (validation.length > 0 || blockingLoadWarnings.length > 0 || invalidPriceFields.size > 0) {
+    if (validation.length > 0 || blockingLoadWarnings.length > 0) {
       setSaveState('error')
       setSaveMessage('יש לתקן את שגיאות התפריט לפני שמירה.')
       return
@@ -293,7 +276,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-black text-primary sm:text-4xl">מחירון ותפריט</h1>
-          <p className="mt-2 text-sm font-bold text-muted-foreground">המנות ומחירי הצהריים נבדקים לפני שמירה אחת מוגנת.</p>
+          <p className="mt-2 text-sm font-bold text-muted-foreground">המנות ומחירי הצהריים מוצגים מתוך המחירון הקבוע.</p>
         </div>
         <button type="button" onClick={() => void commit()} disabled={saveState === 'saving'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground disabled:opacity-50">
           <LocalIcon name="ph:check-circle-bold" />
@@ -333,7 +316,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       <section className="mt-8 space-y-3">
         {MENU_CATEGORY_KEYS.map((category) => <CategoryEditor key={category} category={category} catalog={current} />)}
         <ExtrasEditor catalog={current} />
-        <LunchEditor catalog={current} onChange={setCatalog} onValidityChange={setPriceValidity} />
+        <LunchEditor catalog={current} />
       </section>
     </div>
   )
