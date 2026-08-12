@@ -3,6 +3,7 @@
   "private": true,
   "description": "Bat Melech Kitchen — orders management system + website, served with basic auth and Postgres-backed state sync",
   "scripts": {
+    "build": "npm --prefix web ci --include=dev && npm --prefix web run build",
     "start": "node server.js",
     "test": "node --test tests/*.test.js",
     "test:ai": "node --test tests/order-intake-ai.test.js",

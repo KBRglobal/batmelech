@@ -7,10 +7,12 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 const { Pool } = require('pg');
 const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
+const { createReactAppRouter } = require('./server/react-app-route');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
+const REACT_ROOT = path.join(ROOT, 'web', 'dist');
 
 function requireServerCredential(name) {
   const value = process.env[name];
@@ -132,6 +134,10 @@ app.post('/api/state', async (req, res) => {
     res.status(500).json({ error: 'db error' });
   }
 });
+
+// --- React operator application: authenticated, isolated below /app/ ---
+app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
+app.use('/app', createReactAppRouter({ reactRoot: REACT_ROOT }));
 
 // --- HTML: inject the sync script at serve time, files on disk stay untouched ---
 app.use((req, res, next) => {

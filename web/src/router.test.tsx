@@ -8,7 +8,7 @@ import {
   CUSTOMER_ORDER_ROUTE_ALIASES,
   ROOT_ROUTE_TARGET,
 } from './app/routes.ts'
-import { AppRoutes } from './router.tsx'
+import { AppRouter, AppRoutes } from './router.tsx'
 
 vi.mock('./screens/today-screen.tsx', () => ({
   TodayScreen: () => <h1>מסך היום המחובר</h1>,
@@ -34,9 +34,21 @@ function renderRoute(path: string) {
   )
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.history.replaceState({}, '', '/')
+})
 
 describe('AppRoutes', () => {
+  it('mounts BrowserRouter below the production /app basename', () => {
+    window.history.pushState({}, '', '/app/today')
+
+    render(<AppRouter />)
+
+    expect(screen.getByRole('heading', { name: 'מסך היום המחובר' })).toBeTruthy()
+    expect(screen.getAllByRole('navigation')).toHaveLength(2)
+  })
+
   it('redirects the root route to Today and renders it inside the shared operator shell', async () => {
     renderRoute(APP_ROUTES.root)
 

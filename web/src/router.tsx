@@ -83,7 +83,7 @@ export function AppRoutes() {
 
 export function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <AppRoutes />
     </BrowserRouter>
   )

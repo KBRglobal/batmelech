@@ -45,3 +45,19 @@ test('server source contains no fallback credential or state deletion route', ()
   assert.doesNotMatch(source, /app\.delete\s*\(\s*['"]\/api\/state/);
   assert.doesNotMatch(source, /DELETE\s+FROM\s+bm_state/i);
 });
+
+test('React production route remains behind auth and cannot shadow APIs or legacy HTML', () => {
+  const source = fs.readFileSync(serverPath, 'utf8');
+  const authIndex = source.indexOf("app.use((req, res, next) => {");
+  const stateApiIndex = source.indexOf("app.get('/api/state'");
+  const reactIndex = source.indexOf("app.use('/app', createReactAppRouter");
+  const legacyHtmlIndex = source.indexOf('// --- HTML: inject the sync script');
+
+  assert.ok(authIndex >= 0, 'Basic Auth middleware must exist');
+  assert.ok(stateApiIndex > authIndex, 'state API must remain behind Basic Auth');
+  assert.ok(reactIndex > stateApiIndex, 'React mount must not shadow the state API');
+  assert.ok(legacyHtmlIndex > reactIndex, 'legacy HTML serving must remain separate after /app');
+  assert.match(source, /app\.get\('\/healthz'/);
+  assert.match(source, /app\.get\(\/\^\\\/app\$\//);
+  assert.doesNotMatch(source, /app\.use\('\/'\s*,\s*createReactAppRouter/);
+});
