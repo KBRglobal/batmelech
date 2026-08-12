@@ -36,6 +36,7 @@ import {
   serializeOrderDraft,
   validateOrderDraft,
   type CustomDraftItem,
+  type AIReview,
   type LunchDraftSelection,
   type HotelSearchResult,
   type OrderDraft,
@@ -89,14 +90,28 @@ function currentCatalogSignature(menu: OrderEditorMenu): string {
   return JSON.stringify(buildAIOrderCatalog(menu).items)
 }
 
+function hasReviewHandoffState(value: unknown): boolean {
+  return typeof value === 'object' && value !== null &&
+    ['reviewedMessage', 'review', 'reviewedDraft'].some((key) => Object.hasOwn(value, key))
+}
+
+function recoverReviewedMessage(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || !Object.hasOwn(value, 'reviewedMessage')) {
+    return null
+  }
+  const reviewedMessage = (value as { reviewedMessage?: unknown }).reviewedMessage
+  if (typeof reviewedMessage !== 'string') return null
+  const trimmed = reviewedMessage.trim()
+  return trimmed.length >= 1 && trimmed.length <= 6000 ? trimmed : null
+}
+
 function readReviewState(
   value: unknown,
   expectedCatalogSignature: string,
   expectedEnvelope: VersionedStateEnvelope,
   menu: OrderEditorMenu,
 ):
-  | { readonly kind: 'draft'; readonly draft: OrderDraft }
-  | { readonly kind: 'review'; readonly review: ReturnType<typeof AIReviewSchema.parse> }
+  | { readonly draft: OrderDraft | null; readonly review: AIReview; readonly sourceMessage: string | null }
   | null {
   if (typeof value !== 'object' || value === null) return null
   const state = value as {
@@ -106,26 +121,285 @@ function readReviewState(
     reviewedRevision?: unknown
     reviewedHash?: unknown
     reviewedTs?: unknown
+    reviewedStateSignature?: unknown
+    reviewedMessage?: unknown
   }
   if (
     state.reviewedCatalogSignature !== expectedCatalogSignature ||
     state.reviewedRevision !== expectedEnvelope.revision ||
     state.reviewedHash !== expectedEnvelope.hash ||
-    state.reviewedTs !== expectedEnvelope.ts
+    state.reviewedTs !== expectedEnvelope.ts ||
+    state.reviewedStateSignature !== JSON.stringify(expectedEnvelope.data)
   ) return null
+  const sourceMessage = state.reviewedMessage === undefined
+    ? null
+    : typeof state.reviewedMessage === 'string' && state.reviewedMessage.trim().length >= 1 && state.reviewedMessage.trim().length <= 6000
+      ? state.reviewedMessage.trim()
+      : null
+  if (state.reviewedMessage !== undefined && sourceMessage === null) return null
+  const review = AIReviewSchema.safeParse(state.review)
+  if (!review.success) return null
   if (Object.hasOwn(state, 'reviewedDraft')) {
     try {
       const stored = serializeOrderDraft(state.reviewedDraft as OrderDraft, 'reviewed-draft')
       return {
-        kind: 'draft',
         draft: { ...createOrderDraftFromLegacy(stored, menu), id: null },
+        review: review.data,
+        sourceMessage,
       }
     } catch {
       return null
     }
   }
-  const review = AIReviewSchema.safeParse(state.review)
-  return review.success ? { kind: 'review', review: review.data } : null
+  return { draft: null, review: review.data, sourceMessage }
+}
+
+const MISSING_FIELD_LABELS: Record<AIReview['missingFields'][number]['field'], string> = {
+  customer_name: 'חסר שם הלקוח',
+  customer_phone: 'חסר מספר טלפון',
+  service_date: 'חסר תאריך להזמנה',
+  service_time: 'חסרה שעת מסירה או איסוף',
+  fulfillment_method: 'צריך לאשר משלוח או איסוף עצמי',
+  delivery_location: 'חסר יעד למשלוח',
+  item_quantity: 'חסרה כמות לפריט',
+  item_choice: 'חסרה בחירת מנה',
+  other: 'חסר פרט להזמנה',
+}
+
+const WARNING_LABELS: Record<AIReview['warnings'][number]['code'], string> = {
+  paid_extra: 'צריך לבדוק תוספת בתשלום שלא הותאמה להזמנה',
+  quantity_missing: 'צריך לבדוק כמות שלא הושלמה בהזמנה',
+  catalog_mismatch: 'צריך לבדוק בקשה שלא הותאמה לתפריט',
+  ambiguous_intent: 'צריך לוודא למה הלקוח התכוון',
+  missing_field: 'צריך להשלים פרט חסר בהזמנה',
+  other: 'יש פרט נוסף שצריך לבדוק מול הודעת הלקוח',
+}
+
+interface ManagerFinding {
+  readonly id: string
+  readonly label: string
+  readonly sourceText: string | null
+}
+
+function paidExtraPrice(price: number | null, currency: 'USD' | null): string | null {
+  if (price === null) return null
+  if (currency === 'USD') return `$${price.toFixed(2)}`
+  return price.toFixed(2)
+}
+
+function recognizedReviewItems(review: AIReview, menu: OrderEditorMenu) {
+  const currentCatalogById = new Map(buildAIOrderCatalog(menu).items.map((item) => [item.id, item]))
+  return review.draft.items.flatMap((reviewItem) => {
+    const catalogItem = currentCatalogById.get(reviewItem.catalogItemId)
+    return catalogItem ? [{ reviewItem, catalogItem }] : []
+  })
+}
+
+function recognizedPaidExtras(review: AIReview, menu: OrderEditorMenu) {
+  const currentCatalogById = new Map(buildAIOrderCatalog(menu).items.map((item) => [item.id, item]))
+  const draftItemById = new Map(review.draft.items.map((item) => [item.catalogItemId, item]))
+  const reviewedExtraById = new Map(review.paidExtras.map((extra) => [extra.catalogItemId, extra]))
+  const paidIds = new Set([
+    ...review.draft.items.map((item) => item.catalogItemId),
+    ...review.paidExtras.map((extra) => extra.catalogItemId),
+  ])
+  return [...paidIds].flatMap((id) => {
+    const catalogItem = currentCatalogById.get(id)
+    if (!catalogItem?.isPaidExtra) return []
+    const draftItem = draftItemById.get(id)
+    const reviewedExtra = reviewedExtraById.get(id)
+    return [{
+      catalogItem,
+      quantity: draftItem?.quantity ?? reviewedExtra?.quantity ?? null,
+      sourceText: reviewedExtra?.sourceText ?? draftItem?.sourceText ?? null,
+    }]
+  })
+}
+
+function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly ManagerFinding[] {
+  const missingQuantitySources = new Set(
+    review.missingFields.flatMap((finding) =>
+      finding.field === 'item_quantity' && finding.sourceText ? [finding.sourceText] : []),
+  )
+  const ambiguitySources = new Set(review.ambiguities.map((finding) => finding.sourceText))
+  const paidExtras = recognizedPaidExtras(review, menu)
+  const coveredWarningCodes = new Set<AIReview['warnings'][number]['code']>()
+  if (paidExtras.length > 0) coveredWarningCodes.add('paid_extra')
+  if (
+    review.draft.items.some((item) => item.quantity === null) ||
+    review.missingFields.some((finding) => finding.field === 'item_quantity') ||
+    review.unknownItems.some((item) => item.requestedQuantity === null) ||
+    paidExtras.some((item) => item.quantity === null)
+  ) coveredWarningCodes.add('quantity_missing')
+  if (review.unknownItems.length > 0) coveredWarningCodes.add('catalog_mismatch')
+  if (review.ambiguities.length > 0) coveredWarningCodes.add('ambiguous_intent')
+  if (review.missingFields.length > 0) coveredWarningCodes.add('missing_field')
+  const warningFallbacks = new Map<AIReview['warnings'][number]['code'], ManagerFinding>()
+  for (const warning of review.warnings) {
+    if (
+      warning.severity !== 'warning' ||
+      warningFallbacks.has(warning.code) ||
+      (warning.code !== 'other' && coveredWarningCodes.has(warning.code))
+    ) continue
+    warningFallbacks.set(warning.code, {
+      id: `warning:${warning.code}`,
+      label: WARNING_LABELS[warning.code],
+      sourceText: null,
+    })
+  }
+  return [
+    ...review.draft.items.flatMap((finding, index) =>
+      finding.quantity === null && !missingQuantitySources.has(finding.sourceText)
+      ? [{
+          id: `item-quantity:${index}`,
+          label: `צריך לקבוע כמות עבור ${finding.catalogItemName}`,
+          sourceText: finding.sourceText,
+        }]
+      : []),
+    ...review.corrections.map((finding, index) => ({
+      id: `correction:${index}`,
+      label: `הלקוח תיקן: „${finding.originalText}” ל„${finding.correctedText}”`,
+      sourceText: finding.correctedText,
+    })),
+    ...review.ambiguities.map((finding, index) => ({
+      id: `ambiguity:${index}`,
+      label: 'צריך לוודא לאיזו מנה הלקוח התכוון',
+      sourceText: finding.sourceText,
+    })),
+    ...review.unknownItems.map((finding, index) => ({
+      id: `unknown:${index}`,
+      label: finding.requestedQuantity === null
+        ? 'הפריט לא נמצא בתפריט'
+        : `הפריט לא נמצא בתפריט · כמות ${finding.requestedQuantity}`,
+      sourceText: finding.sourceText,
+    })),
+    ...review.missingFields.flatMap((finding, index) =>
+      finding.sourceText && ambiguitySources.has(finding.sourceText) &&
+        (finding.field === 'item_quantity' || finding.field === 'item_choice')
+        ? []
+        : [{
+            id: `missing:${index}`,
+            label: MISSING_FIELD_LABELS[finding.field],
+            sourceText: finding.sourceText,
+          }]),
+    ...paidExtras.map((extra, index) => {
+      const price = paidExtraPrice(extra.catalogItem.price, extra.catalogItem.currency)
+      return {
+        id: `paid-extra:${extra.catalogItem.id}:${index}`,
+        label: `אישור תוספת בתשלום: ${extra.catalogItem.name} · ${extra.quantity ?? 'כמות חסרה'}${price ? ` · ${price}` : ''}`,
+        sourceText: extra.sourceText,
+      }
+    }),
+    ...warningFallbacks.values(),
+  ]
+}
+
+function OrderManagerPanel({
+  review,
+  menu,
+  sourceMessage,
+  acknowledged,
+  onToggleAcknowledged,
+}: {
+  readonly review: AIReview
+  readonly menu: OrderEditorMenu
+  readonly sourceMessage: string | null
+  readonly acknowledged: ReadonlySet<string>
+  readonly onToggleAcknowledged: (id: string) => void
+}) {
+  const findings = managerFindings(review, menu)
+  const remaining = findings.filter((finding) => !acknowledged.has(finding.id)).length
+  const recognizedItems = recognizedReviewItems(review, menu)
+  const paidExtras = recognizedPaidExtras(review, menu)
+
+  return (
+    <section aria-label="מנהל ההזמנה מוואטסאפ" className="space-y-4 rounded-[2rem] border border-primary/20 bg-secondary p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3 text-primary">
+          <LocalIcon name="ph:list-checks-bold" className="text-2xl" />
+          <div>
+            <h2 className="font-heading text-xl font-black">מנהל ההזמנה</h2>
+            <p className="mt-1 text-xs font-bold text-muted-foreground">ההזמנה כבר פתוחה לעריכה. עברי על מה שנבנה וסגרי את הדברים שדורשים טיפול.</p>
+          </div>
+        </div>
+        {findings.length > 0 && (
+          <span className="rounded-full bg-card px-3 py-1 text-xs font-black text-primary">
+            {remaining === 0 ? 'כל הבירורים טופלו' : `${remaining} לבירור`}
+          </span>
+        )}
+      </div>
+
+      {sourceMessage && (
+        <details className="rounded-2xl border border-border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-black text-primary">הודעת הלקוח המקורית</summary>
+          <blockquote className="mt-3 break-words whitespace-pre-wrap text-sm font-bold text-muted-foreground [overflow-wrap:anywhere]">{sourceMessage}</blockquote>
+        </details>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="text-xs font-black text-muted-foreground">מה נכנס להזמנה</h3>
+          {recognizedItems.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {recognizedItems.map(({ reviewItem, catalogItem }, index) => (
+                <li key={`${catalogItem.id}-${index}`} className="text-sm font-bold text-primary">
+                  <span>{catalogItem.name} · {reviewItem.quantity ?? 'לא הוחל · חסרה כמות'}</span>
+                  <q className="mt-1 block break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">{reviewItem.sourceText}</q>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs font-bold text-muted-foreground">לא זוהו בחירות מהתפריט.</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+          <h3 className="text-xs font-black">תוספות בתשלום</h3>
+          {paidExtras.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {paidExtras.map(({ sourceText, quantity, catalogItem }, index) => (
+                <li key={`${catalogItem.id}-${index}`} className="text-sm font-bold">
+                  <span>{catalogItem.name} · {quantity ?? 'כמות חסרה'}{paidExtraPrice(catalogItem.price, catalogItem.currency) ? ` · ${paidExtraPrice(catalogItem.price, catalogItem.currency)}` : ''}</span>
+                  <q className="mt-1 block break-words text-xs [overflow-wrap:anywhere]">{sourceText}</q>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs font-bold">לא זוהו תוספות בתשלום.</p>
+          )}
+        </div>
+      </div>
+
+      {findings.length > 0 && (
+        <div>
+          <h3 className="text-sm font-black text-primary">מה עדיין צריך לסגור</h3>
+          <ul className="mt-3 space-y-2">
+            {findings.map((finding) => {
+              const isAcknowledged = acknowledged.has(finding.id)
+              return (
+                <li key={finding.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3 ${isAcknowledged ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-card'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-primary">{finding.label}</p>
+                    {finding.sourceText && <q className="mt-1 block break-words text-xs font-bold text-muted-foreground [overflow-wrap:anywhere]">{finding.sourceText}</q>}
+                  </div>
+                  <button
+                    type="button"
+                    aria-pressed={isAcknowledged}
+                    aria-label={`טופל: ${finding.label}`}
+                    onClick={() => onToggleAcknowledged(finding.id)}
+                    className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-black ${isAcknowledged ? 'border-emerald-300 bg-emerald-100 text-emerald-950' : 'border-primary/20 bg-card text-primary hover:bg-secondary'}`}
+                  >
+                    <LocalIcon name="ph:check-circle-bold" className="text-base" />
+                    <span>טופל</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  )
 }
 
 function Section({
@@ -254,6 +528,32 @@ function updateExtraRecord(
   return next
 }
 
+function createOrderImportBaseDraft(draft: OrderDraft): OrderDraft {
+  return {
+    ...draft,
+    id: null,
+    status: 'חדשה',
+    meals: 0,
+    aricha: 0,
+    challot: 0,
+    salads: {},
+    firsts: {},
+    heat: '',
+    firstsNote: '',
+    mains: {},
+    mainsNote: '',
+    sides: {},
+    desserts: {},
+    extras: {},
+    custom: [],
+    lunch: {},
+    total: '',
+    deposit: '',
+    payMethod: '',
+    paid: 'לא',
+  }
+}
+
 function countRecord(record: Readonly<Record<string, number>>): number {
   return Object.values(record).reduce((total, quantity) => total + quantity, 0)
 }
@@ -270,6 +570,8 @@ function OrderEditorContent({
   saveFeedback,
   requiresCurrentPricing,
   autoConvertUntouchedDefaultMeal,
+  managerReview,
+  managerSourceMessage,
 }: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
@@ -282,6 +584,8 @@ function OrderEditorContent({
   readonly saveFeedback: SaveFeedback
   readonly requiresCurrentPricing: boolean
   readonly autoConvertUntouchedDefaultMeal: boolean
+  readonly managerReview: AIReview | null
+  readonly managerSourceMessage: string | null
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
@@ -296,6 +600,9 @@ function OrderEditorContent({
   >({ kind: 'idle' })
   const [staticHotelName, setStaticHotelName] = useState('')
   const [mixedOrderConfirmed, setMixedOrderConfirmed] = useState(false)
+  const [acknowledgedManagerFindings, setAcknowledgedManagerFindings] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
   const hotelRequest = useRef(0)
   const untouchedDefaultMeal = useRef(autoConvertUntouchedDefaultMeal)
   const outOfStock = useMemo(() => new Set(outOfStockNames), [outOfStockNames])
@@ -309,9 +616,13 @@ function OrderEditorContent({
   )
   const allIssues = [...validationIssues, ...pricing.issues]
   const hasBlockingIssue = allIssues.some((issue) => issue.blocking)
+  const unresolvedManagerFindings = managerReview === null
+    ? []
+    : managerFindings(managerReview, menu).filter((finding) => !acknowledgedManagerFindings.has(finding.id))
   const saveIsSafelyBlocked =
     !persistenceReady ||
     hasBlockingIssue ||
+    unresolvedManagerFindings.length > 0 ||
     pricing.result === null ||
     isSaving ||
     saveFeedback.kind === 'conflict' ||
@@ -458,13 +769,30 @@ function OrderEditorContent({
           </p>
         )}
 
+        {managerReview && (
+          <OrderManagerPanel
+            review={managerReview}
+            menu={menu}
+            sourceMessage={managerSourceMessage}
+            acknowledged={acknowledgedManagerFindings}
+            onToggleAcknowledged={(id) => {
+              setAcknowledgedManagerFindings((current) => {
+                const next = new Set(current)
+                if (next.has(id)) next.delete(id)
+                else next.add(id)
+                return next
+              })
+            }}
+          />
+        )}
+
         {mode === 'new' && (
           <section className="rounded-[2rem] border border-border bg-secondary p-5 sm:p-7">
             <div className="flex items-center gap-3 text-primary">
               <LocalIcon name="ph:plus-circle-bold" className="text-2xl" />
-              <h2 className="font-black">הלקוח כתב בוואטסאפ? הדביקי את ההודעה כאן</h2>
+              <h2 className="font-black">בניית הזמנה מהודעת וואטסאפ</h2>
             </div>
-            <p className="mt-2 text-xs font-bold text-muted-foreground">הפענוח מציע טיוטה בלבד. את בודקת את התיקונים, הספקות והתוספות בתשלום.</p>
+            <p className="mt-2 text-xs font-bold text-muted-foreground">מדביקים את ההודעה המלאה ומקבלים הזמנה פתוחה לעריכה, עם רשימה קצרה של מה שצריך לסגור.</p>
             <label className="sr-only" htmlFor="customer-message">הודעת הלקוח</label>
             <textarea
               id="customer-message"
@@ -484,12 +812,17 @@ function OrderEditorContent({
                   setImportError('הדביקי קודם את הודעת הלקוח.')
                   return
                 }
-                navigate(APP_ROUTES.orderImportReview, { state: { message: importText, baseDraft: draft } })
+                navigate(APP_ROUTES.orderImportReview, {
+                  state: {
+                    message: importText,
+                    baseDraft: createOrderImportBaseDraft(draft),
+                  },
+                })
               }}
               className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground hover:bg-primary/90"
             >
               <LocalIcon name="ph:plus-circle-bold" className="text-lg" />
-              <span>פענוח ובדיקת ההזמנה</span>
+              <span>בניית הזמנה מההודעה</span>
             </button>
           </section>
         )}
@@ -802,6 +1135,9 @@ function OrderEditorContent({
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[0.65rem] font-black text-muted-foreground">{isSaving ? 'ממתינה לאישור שמירה מהשרת' : 'עד לאישור השמירה, הטיוטה לא משנה את מסד הנתונים'}</p>
+            {unresolvedManagerFindings.length > 0 && (
+              <p className="mt-1 text-xs font-black text-amber-900">השמירה תיפתח אחרי סימון טופל בכל הבירורים.</p>
+            )}
             <p className="text-lg font-black text-primary" dir="ltr">{pricing.result ? formatUsdMinorUnits(pricing.result.totalMinorUnits) : '—'}</p>
           </div>
           <div className="flex gap-2">
@@ -809,8 +1145,16 @@ function OrderEditorContent({
             <button
               type="button"
               disabled={saveIsSafelyBlocked}
-              onClick={() => onSave(mixedOrderConfirmed)}
-              title={!persistenceReady ? 'השמירה דורשת מעטפת נתונים עם גרסה מאומתת' : hasBlockingIssue ? 'יש לתקן את השדות המסומנים לפני השמירה' : undefined}
+              onClick={() => {
+                if (unresolvedManagerFindings.length === 0) onSave(mixedOrderConfirmed)
+              }}
+              title={!persistenceReady
+                ? 'השמירה דורשת מעטפת נתונים עם גרסה מאומתת'
+                : unresolvedManagerFindings.length > 0
+                  ? 'יש לסמן טופל בכל הבירורים לפני השמירה'
+                  : hasBlockingIssue
+                    ? 'יש לתקן את השדות המסומנים לפני השמירה'
+                    : undefined}
               className="min-h-11 rounded-full bg-primary px-7 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
             >
               {isSaving ? 'שומרת בבטחה' : saveFeedback.kind === 'network-error' ? 'בדיקת ניסיון השמירה מחדש' : mode === 'edit' ? 'שמירת השינויים' : 'שמירת ההזמנה'}
@@ -829,8 +1173,11 @@ export function OrderEditorScreen() {
   const location = useLocation()
   const navigate = useNavigate()
   const [draft, setDraft] = useState<OrderDraft | null>(null)
+  const [managerReview, setManagerReview] = useState<AIReview | null>(null)
+  const [managerSourceMessage, setManagerSourceMessage] = useState<string | null>(null)
   const [editLoadIssue, setEditLoadIssue] = useState<string | null>(null)
   const [duplicateLoadIssue, setDuplicateLoadIssue] = useState<string | null>(null)
+  const [reviewLoadIssue, setReviewLoadIssue] = useState<{ readonly sourceMessage: string | null } | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>({ kind: 'idle' })
   const initializedFor = useRef('')
   const baseEnvelope = useRef<VersionedStateEnvelope | null>(null)
@@ -854,11 +1201,37 @@ export function OrderEditorScreen() {
       : null
     if (storedOrderIdStatus !== 'safe') {
       initialDraftKind.current = 'other'
+      setManagerReview(null)
+      setManagerSourceMessage(null)
+      setReviewLoadIssue(null)
+      setDraft(null)
+      return
+    }
+    const reviewHandoffPresent = hasReviewHandoffState(location.state)
+    const reviewHandoff = reviewHandoffPresent && mode === 'new' && isVersionedStateEnvelope(storeQuery.data)
+      ? readReviewState(
+          location.state,
+          currentCatalogSignature(menu),
+          storeQuery.data,
+          menu,
+        )
+      : null
+    if (reviewHandoffPresent && reviewHandoff === null) {
+      initialDraftKind.current = 'other'
+      initialPricingFingerprint.current = null
+      setEditLoadIssue(null)
+      setDuplicateLoadIssue(null)
+      setManagerReview(null)
+      setManagerSourceMessage(null)
+      setReviewLoadIssue({ sourceMessage: recoverReviewedMessage(location.state) })
       setDraft(null)
       return
     }
     if (mode === 'edit') {
       initialDraftKind.current = 'other'
+      setManagerReview(null)
+      setManagerSourceMessage(null)
+      setReviewLoadIssue(null)
       const matches = (store?.orders ?? []).filter((order) => order.id === orderId)
       if (matches.length !== 1) {
         setDraft(null)
@@ -880,6 +1253,9 @@ export function OrderEditorScreen() {
     const duplicateValues = new URLSearchParams(location.search).getAll('duplicate')
     if (duplicateValues.length > 0) {
       initialDraftKind.current = 'other'
+      setManagerReview(null)
+      setManagerSourceMessage(null)
+      setReviewLoadIssue(null)
       const duplicateId = duplicateValues.length === 1 ? duplicateValues[0]! : ''
       if (!CANONICAL_ORDER_ID_PATTERN.test(duplicateId)) {
         setDuplicateLoadIssue('מזהה הזמנת המקור אינו תקין. לא נפתחה טיוטה חדשה.')
@@ -912,23 +1288,19 @@ export function OrderEditorScreen() {
       return
     }
     const base = createOrderDraft(menu)
-    const reviewHandoff = isVersionedStateEnvelope(storeQuery.data)
-      ? readReviewState(
-          location.state,
-          currentCatalogSignature(menu),
-          storeQuery.data,
-          menu,
-        )
-      : null
-    const nextDraft = reviewHandoff?.kind === 'draft'
-      ? reviewHandoff.draft
-      : reviewHandoff?.kind === 'review'
-        ? applyAIReviewToDraft(base, reviewHandoff.review, buildAIOrderCatalog(menu).targetsById, menu)
+    const zeroBaseline = { ...base, meals: 0, challot: 0 }
+    const nextDraft = reviewHandoff?.draft ?? (
+      reviewHandoff
+        ? applyAIReviewToDraft(zeroBaseline, reviewHandoff.review, buildAIOrderCatalog(menu).targetsById, menu)
         : base
+    )
     initialDraftKind.current = reviewHandoff ? 'other' : 'fresh'
     initialPricingFingerprint.current = orderPricingFingerprint(nextDraft)
     setEditLoadIssue(null)
     setDuplicateLoadIssue(null)
+    setReviewLoadIssue(null)
+    setManagerReview(reviewHandoff?.review ?? null)
+    setManagerSourceMessage(reviewHandoff?.sourceMessage ?? null)
     setDraft(nextDraft)
   }, [initializationKey, location.search, location.state, menu, mode, orderId, store, storedOrderIdStatus, storeQuery.data])
 
@@ -1079,6 +1451,24 @@ export function OrderEditorScreen() {
       />
     )
   }
+  if (reviewLoadIssue !== null) {
+    return (
+      <ScreenState
+        kind="error"
+        title="לא ניתן לפתוח את פענוח הוואטסאפ בבטחה"
+        description="פרטי הבדיקה אינם תואמים לנתונים שנטענו. לא נפתחה טיוטה ושום נתון לא השתנה."
+        action={{
+          label: 'חזרה לבדיקת הודעת הוואטסאפ',
+          onClick: () => navigate(APP_ROUTES.orderImportReview, {
+            replace: true,
+            state: reviewLoadIssue.sourceMessage === null
+              ? undefined
+              : { message: reviewLoadIssue.sourceMessage },
+          }),
+        }}
+      />
+    )
+  }
   if (mode === 'edit') {
     const matches = (store?.orders ?? []).filter((order) => order.id === orderId)
     if (matches.length !== 1) {
@@ -1107,6 +1497,8 @@ export function OrderEditorScreen() {
         mode === 'new' || orderPricingFingerprint(draft) !== initialPricingFingerprint.current
       }
       autoConvertUntouchedDefaultMeal={initialDraftKind.current === 'fresh'}
+      managerReview={managerReview}
+      managerSourceMessage={managerSourceMessage}
     />
   )
 }

@@ -556,21 +556,265 @@ describe('OrderEditorScreen', () => {
     expect(save.hasAttribute('disabled')).toBe(false)
   })
 
-  it('routes a nonempty WhatsApp message to mandatory review and performs no network or save call', async () => {
+  it('routes a complete WhatsApp message with manual details preserved and every order or money field reset', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const user = userEvent.setup()
     renderEditor()
+    await user.type(await screen.findByLabelText('שם מלא'), 'שם ידני')
+    await user.type(screen.getByLabelText('כתובת מלאה'), 'הוראות ידניות לקבלה')
+    await user.type(screen.getByLabelText('הערות כלליות'), 'הערה ידנית')
+    await user.type(screen.getByLabelText('קבוצה / יעד משותף'), 'קבוצה ידנית')
+    await user.type(screen.getByLabelText('סך לתשלום'), '245.00')
+    await user.type(screen.getByLabelText('מקדמה'), '20.00')
+    await user.selectOptions(screen.getByLabelText('דרך תשלום'), 'ביט')
+    await user.selectOptions(screen.getByLabelText('סטטוס תשלום'), 'כן')
+    await user.click(screen.getByRole('button', { name: 'הוספה לטחינה הוזמן' }))
+    await user.click(screen.getByRole('button', { name: `הוספה למגש שניצלים (זוגי, כ־13–15 יח') · $100.00` }))
+    await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))
+    await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט ידני')
     await user.type(await screen.findByLabelText('הודעת הלקוח'), 'שתי זוגיות')
-    await user.click(screen.getByRole('button', { name: 'פענוח ובדיקת ההזמנה' }))
+    await user.click(screen.getByRole('button', { name: 'בניית הזמנה מההודעה' }))
 
-    expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.orderImportReview)
-    expect(screen.getByTestId('location').textContent).toContain('שתי זוגיות')
+    const location = screen.getByTestId('location').textContent!
+    expect(location).toContain(APP_ROUTES.orderImportReview)
+    const state = JSON.parse(location.slice(location.indexOf('|') + 1)) as {
+      message: string
+      baseDraft: ReturnType<typeof createOrderDraft>
+    }
+    expect(state.message).toBe('שתי זוגיות')
+    expect(state.baseDraft).toMatchObject({
+      id: null,
+      status: 'חדשה',
+      name: 'שם ידני',
+      address: 'הוראות ידניות לקבלה',
+      notes: 'הערה ידנית',
+      group: 'קבוצה ידנית',
+      meals: 0,
+      aricha: 0,
+      challot: 0,
+      salads: {},
+      firsts: {},
+      heat: '',
+      firstsNote: '',
+      mains: {},
+      mainsNote: '',
+      sides: {},
+      desserts: {},
+      extras: {},
+      custom: [],
+      lunch: {},
+      total: '',
+      deposit: '',
+      payMethod: '',
+      paid: 'לא',
+    })
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
   })
 
-  it('applies an AI handoff only when catalog, revision, hash, and timestamp all match', async () => {
+  it('shows the reviewed order as an editable manager, gates save on every finding, and saves only on explicit save', async () => {
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('123e4567-e89b-42d3-a456-426614174099')
+    const store: LegacyStore = { orders: [] }
+    const menu = buildOrderEditorMenu(store)
+    const catalog = buildAIOrderCatalog(menu)
+    const trayName = "מגש שניצלים (זוגי, כ־13–15 יח')"
+    const tray = catalog.items.find((item) => item.name === trayName)!
+    const reviewedDraft = {
+      ...createOrderDraft(menu, new Date(2026, 7, 12)),
+      name: 'לקוחה מהוואטסאפ',
+      extras: { [trayName]: { quantity: 1, note: '' } },
+    }
+    const review = AIReviewSchema.parse({
+      reviewOnly: true,
+      draft: {
+        customerName: 'לקוחה מהוואטסאפ',
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [
+          {
+            catalogItemId: 'meal:couple',
+            catalogItemName: 'ארוחה זוגית',
+            category: 'couple_meal',
+            quantity: 1,
+            sourceText: 'זוגית אחת',
+            confidence: 1,
+          },
+          {
+            catalogItemId: tray.id,
+            catalogItemName: 'שם שגוי מהמודל',
+            category: tray.category,
+            quantity: 1,
+            sourceText: 'ומגש שניצלים אחד',
+            confidence: 0.95,
+          },
+        ],
+        notes: [],
+      },
+      corrections: [{
+        originalText: 'בעצם שתי זוגיות',
+        correctedText: 'זוגית אחת',
+        reason: 'Provider correction reason must stay hidden.',
+      }],
+      ambiguities: [{
+        sourceText: 'בשישי',
+        question: "Confirm the customer's intended choice.",
+        candidateCatalogItemIds: [],
+      }],
+      paidExtras: [],
+      unknownItems: [{
+        sourceText: 'וסלט הבית',
+        requestedQuantity: 1,
+        reason: 'Provider unknown-item reason must stay hidden.',
+      }],
+      missingFields: [{
+        field: 'customer_phone',
+        sourceText: null,
+        reason: 'Provider missing-field reason must stay hidden.',
+      }, {
+        field: 'item_choice',
+        sourceText: 'בשישי',
+        reason: 'Duplicate provider finding must stay hidden.',
+      }],
+      warnings: [{
+        code: 'other',
+        severity: 'warning',
+        message: 'Provider warning must stay hidden.',
+      }],
+      overallConfidence: 0.8,
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, request) => {
+      const command = JSON.parse(String(request?.body)) as { localState: LegacyStore }
+      return new Response(JSON.stringify({
+        ok: true,
+        idempotent: false,
+        revision: 2,
+        ts: 2,
+        hash: 'b'.repeat(64),
+        data: command.localState,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    renderEditor(APP_ROUTES.newOrder, {
+      review,
+      reviewedDraft,
+      reviewedCatalogSignature: JSON.stringify(catalog.items),
+      reviewedRevision: 1,
+      reviewedHash: 'a'.repeat(64),
+      reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'בעצם שתי זוגיות, זוגית אחת ומגש שניצלים אחד בשישי וסלט הבית',
+    })
+
+    const manager = await screen.findByRole('region', { name: 'מנהל ההזמנה מוואטסאפ' })
+    await user.click(within(manager).getByText('הודעת הלקוח המקורית'))
+    expect(within(manager).getByText('בעצם שתי זוגיות, זוגית אחת ומגש שניצלים אחד בשישי וסלט הבית')).toBeTruthy()
+    const quotedSourceRows = manager.querySelectorAll('blockquote, q')
+    expect(quotedSourceRows.length).toBeGreaterThan(0)
+    for (const quotedSourceRow of quotedSourceRows) {
+      expect(quotedSourceRow.classList.contains('break-words')).toBe(true)
+      expect(quotedSourceRow.classList.contains('[overflow-wrap:anywhere]')).toBe(true)
+    }
+    expect(within(manager).getByText('ארוחה זוגית · 1')).toBeTruthy()
+    expect(within(manager).getAllByText('ומגש שניצלים אחד').length).toBeGreaterThanOrEqual(2)
+    expect(within(manager).getByText(`${trayName} · 1 · $100.00`)).toBeTruthy()
+    expect(within(manager).getByText(`אישור תוספת בתשלום: ${trayName} · 1 · $100.00`)).toBeTruthy()
+    expect(within(manager).getByText('הלקוח תיקן: „בעצם שתי זוגיות” ל„זוגית אחת”')).toBeTruthy()
+    expect(within(manager).getByText('צריך לוודא לאיזו מנה הלקוח התכוון')).toBeTruthy()
+    expect(within(manager).getByText('חסר מספר טלפון')).toBeTruthy()
+    expect(within(manager).getByText('יש פרט נוסף שצריך לבדוק מול הודעת הלקוח')).toBeTruthy()
+    expect(within(manager).queryByText(/Provider/)).toBeNull()
+    expect((screen.getByLabelText('שם מלא') as HTMLInputElement).value).toBe('לקוחה מהוואטסאפ')
+
+    await user.click(screen.getByRole('button', { name: 'להשתמש במחיר המוצע' }))
+    const save = screen.getByRole('button', { name: 'שמירת ההזמנה' })
+    expect(save.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('השמירה תיפתח אחרי סימון טופל בכל הבירורים.')).toBeTruthy()
+    expect(fetchSpy).not.toHaveBeenCalled()
+
+    const findingButtons = within(manager).getAllByRole('button', { name: /^טופל:/ })
+    expect(findingButtons).toHaveLength(6)
+    expect(new Set(findingButtons.map((button) => button.getAttribute('aria-label'))).size).toBe(6)
+    for (let index = 0; index < findingButtons.length; index += 1) {
+      const next = within(manager).getAllByRole('button', { name: /^טופל:/ })
+        .find((button) => button.getAttribute('aria-pressed') === 'false')
+      expect(next).toBeTruthy()
+      await user.click(next!)
+      if (index < findingButtons.length - 1) expect(save.hasAttribute('disabled')).toBe(true)
+    }
+    expect(save.hasAttribute('disabled')).toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+
+    await user.click(save)
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+    const command = JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body)) as { localState: LegacyStore }
+    expect(command.localState.orders[0]).toMatchObject({
+      name: 'לקוחה מהוואטסאפ',
+      meals: 1,
+      extras: { [trayName]: { q: 1 } },
+    })
+  })
+
+  it('keeps a warning-only handoff blocked until its Hebrew fallback is acknowledged', async () => {
+    const store: LegacyStore = { orders: [] }
+    const menu = buildOrderEditorMenu(store)
+    const review = AIReviewSchema.parse({
+      reviewOnly: true,
+      draft: {
+        customerName: 'לקוחה',
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [],
+        notes: [],
+      },
+      corrections: [],
+      ambiguities: [],
+      paidExtras: [],
+      unknownItems: [],
+      missingFields: [],
+      warnings: [{
+        code: 'catalog_mismatch',
+        severity: 'warning',
+        message: 'The provider-only warning must never be shown.',
+      }],
+      overallConfidence: 0.7,
+    })
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const user = userEvent.setup()
+    renderEditor(APP_ROUTES.newOrder, {
+      review,
+      reviewedDraft: {
+        ...createOrderDraft(menu, new Date(2026, 7, 12)),
+        name: 'לקוחה',
+        total: '245.00',
+      },
+      reviewedCatalogSignature: JSON.stringify(buildAIOrderCatalog(menu).items),
+      reviewedRevision: 1,
+      reviewedHash: 'a'.repeat(64),
+      reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'הודעה שלא הותאמה במלואה',
+    })
+
+    const manager = await screen.findByRole('region', { name: 'מנהל ההזמנה מוואטסאפ' })
+    expect(within(manager).getByText('צריך לבדוק בקשה שלא הותאמה לתפריט')).toBeTruthy()
+    expect(within(manager).queryByText(/provider-only/i)).toBeNull()
+    const save = screen.getByRole('button', { name: 'שמירת ההזמנה' })
+    expect(save.hasAttribute('disabled')).toBe(true)
+    await user.click(within(manager).getByRole('button', { name: 'טופל: צריך לבדוק בקשה שלא הותאמה לתפריט' }))
+    expect(save.hasAttribute('disabled')).toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('applies an AI handoff only when catalog, envelope metadata, and the full state signature match', async () => {
     const store: LegacyStore = { orders: [] }
     const signature = JSON.stringify(buildAIOrderCatalog(buildOrderEditorMenu(store)).items)
     const review = AIReviewSchema.parse({
@@ -594,17 +838,65 @@ describe('OrderEditorScreen', () => {
       reviewedRevision: 1,
       reviewedHash: 'a'.repeat(64),
       reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
     })
     expect((await screen.findByLabelText('שם מלא') as HTMLInputElement).value).toBe('לקוחה מה-AI')
+    expect(screen.getByLabelText('כמות ארוחות זוגיות').textContent).toBe('0')
+    expect(screen.getByLabelText('כמות חלות').textContent).toBe('0')
     exact.unmount()
 
-    renderEditor(APP_ROUTES.newOrder, {
+    const mismatchedState = renderEditor(APP_ROUTES.newOrder, {
       review,
       reviewedCatalogSignature: signature,
       reviewedRevision: 1,
       reviewedHash: 'a'.repeat(64),
+      reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify({ orders: [], settings: { out: [] } }),
     })
-    expect((await screen.findByLabelText('שם מלא') as HTMLInputElement).value).toBe('')
+    expect(await screen.findByText('לא ניתן לפתוח את פענוח הוואטסאפ בבטחה')).toBeTruthy()
+    expect(screen.queryByLabelText('שם מלא')).toBeNull()
+    mismatchedState.unmount()
+  })
+
+  it('fails closed when reviewedTs is missing and returns the recoverable message to review without saving', async () => {
+    const store: LegacyStore = { orders: [] }
+    const menu = buildOrderEditorMenu(store)
+    const review = AIReviewSchema.parse({
+      reviewOnly: true,
+      draft: {
+        customerName: 'אסור לפתוח טיוטה',
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [],
+        notes: [],
+      },
+      corrections: [], ambiguities: [], paidExtras: [], unknownItems: [], missingFields: [], warnings: [], overallConfidence: 1,
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    renderEditor(APP_ROUTES.newOrder, {
+      review,
+      reviewedCatalogSignature: JSON.stringify(buildAIOrderCatalog(menu).items),
+      reviewedRevision: 1,
+      reviewedHash: 'a'.repeat(64),
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'הודעה שצריך לבדוק שוב',
+    })
+
+    expect(await screen.findByText('לא ניתן לפתוח את פענוח הוואטסאפ בבטחה')).toBeTruthy()
+    expect(screen.queryByLabelText('שם מלא')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'שמירת ההזמנה' })).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'חזרה לבדיקת הודעת הוואטסאפ' }))
+    expect(screen.getByTestId('location').textContent).toBe(
+      `${APP_ROUTES.orderImportReview}|${JSON.stringify({ message: 'הודעה שצריך לבדוק שוב' })}`,
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('prefers a canonical reviewed draft and preserves BM1 and base-draft fields through save', async () => {
@@ -659,6 +951,7 @@ describe('OrderEditorScreen', () => {
       reviewedRevision: 1,
       reviewedHash: 'a'.repeat(64),
       reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
     })
 
     expect((await screen.findByLabelText('שם מלא') as HTMLInputElement).value).toBe('שם BM1')
@@ -681,7 +974,7 @@ describe('OrderEditorScreen', () => {
     })
   })
 
-  it('rejects a present malformed reviewed draft instead of falling back to the review projection', async () => {
+  it('fails closed for a corrupt reviewed draft and returns its recoverable message without saving', async () => {
     const store: LegacyStore = { orders: [] }
     const signature = JSON.stringify(buildAIOrderCatalog(buildOrderEditorMenu(store)).items)
     const review = AIReviewSchema.parse({
@@ -698,7 +991,9 @@ describe('OrderEditorScreen', () => {
       },
       corrections: [], ambiguities: [], paidExtras: [], unknownItems: [], missingFields: [], warnings: [], overallConfidence: 1,
     })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
     mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
     renderEditor(APP_ROUTES.newOrder, {
       review,
       reviewedDraft: { custom: ['opaque'] },
@@ -706,9 +1001,20 @@ describe('OrderEditorScreen', () => {
       reviewedRevision: 1,
       reviewedHash: 'a'.repeat(64),
       reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'הודעה עם טיוטה פגומה',
     })
 
-    expect((await screen.findByLabelText('שם מלא') as HTMLInputElement).value).toBe('')
+    expect(await screen.findByText('לא ניתן לפתוח את פענוח הוואטסאפ בבטחה')).toBeTruthy()
+    expect(screen.queryByLabelText('שם מלא')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'שמירת ההזמנה' })).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'חזרה לבדיקת הודעת הוואטסאפ' }))
+    expect(screen.getByTestId('location').textContent).toBe(
+      `${APP_ROUTES.orderImportReview}|${JSON.stringify({ message: 'הודעה עם טיוטה פגומה' })}`,
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('marks real configured out-of-stock items visually without disabling selection', async () => {
