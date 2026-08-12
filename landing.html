@@ -3,33 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="מטעמי בת מלך — אוכל ביתי כשר עם תעודת כשרות מישראל, להזמנות שבת וצהריים בדובאי.">
+  <meta name="description" content="בת מלך — אוכל של שישי בטעם של בית. אוכל כשר עם תעודת כשרות מישראל בדובאי.">
   <meta name="robots" content="index, follow">
-  <title>מטעמי בת מלך · אוכל כשר בדובאי</title>
+  <title>בת מלך · אוכל של שישי בטעם של בית</title>
   <style>
-    :root{font-family:"Segoe UI","Noto Sans Hebrew",Arial,sans-serif;color:#fff8f2;background:#24191a}
-    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:linear-gradient(110deg,#24191a 0%,#4e252b 53%,#8e3b51 100%)}
-    main{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:38px;align-items:center;max-width:1180px;margin:auto;padding:42px 34px}
-    .copy{max-width:590px}.logo{width:112px;height:112px;object-fit:cover;border-radius:28px;background:#fff;padding:10px;box-shadow:0 16px 45px #120b0c80;margin-bottom:26px}
-    .eyebrow{margin:0 0 16px;color:#f4c477;font-weight:800;letter-spacing:.08em;font-size:.95rem}h1{margin:0;color:#fff;font-size:clamp(2.5rem,6vw,5.4rem);line-height:1.02;letter-spacing:-.05em}
-    h1 span{color:#f4c477}p{color:#f5dfd4;font-size:1.2rem;line-height:1.8;max-width:570px}.badge{display:inline-flex;gap:10px;align-items:center;border:1px solid #f4c47799;border-radius:999px;padding:10px 16px;color:#ffe0a8;font-weight:800;margin:10px 0 6px}.dot{width:9px;height:9px;border-radius:50%;background:#f4c477}
-    .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}a{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 28px;border-radius:15px;background:#f4c477;color:#351e20;text-decoration:none;font-weight:900;box-shadow:0 12px 28px #120b0c40}a.secondary{background:transparent;color:#fff;border:1px solid #f7d9c9aa;box-shadow:none}.note{font-size:.9rem;color:#d8bdb6;margin-top:24px}
-    .visual{position:relative;min-height:520px;border-radius:34px;background:linear-gradient(145deg,#e4b983,#7c3048);overflow:hidden;box-shadow:0 24px 70px #11090b80}.visual:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 35%,#fff5d655,transparent 42%),linear-gradient(180deg,transparent,#24191acc)}.plate{position:absolute;inset:12% 8%;border-radius:50%;background:radial-gradient(circle,#fff2df 0 19%,#cf8b55 20% 22%,#f6d2a3 23% 48%,#9d4c50 49% 51%,#54232c 52%);transform:rotate(-9deg);box-shadow:0 24px 50px #16090c88}.food{position:absolute;border-radius:50%;background:#d88342;box-shadow:inset -8px -8px 12px #753329;}.food.one{width:120px;height:85px;top:30%;right:23%}.food.two{width:90px;height:70px;top:50%;right:51%;background:#bf552f}.food.three{width:100px;height:70px;top:58%;right:23%;background:#e8b04e}.food.four{width:70px;height:70px;top:37%;right:52%;background:#79914b}
-    @media(max-width:760px){main{display:block;padding:26px 20px}.copy{max-width:none}.logo{width:86px;height:86px;border-radius:22px;margin-bottom:18px}h1{font-size:3.1rem}p{font-size:1.05rem}.visual{min-height:280px;margin-top:34px}.plate{inset:10% 14%}.actions a{width:100%}}
+    :root{font-family:Inter,"Segoe UI","Noto Sans Hebrew",Arial,sans-serif;color:#451a1a;background:#fffbfb}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#fffbfb}.page{min-height:100vh;display:grid;grid-template-columns:1fr 1.16fr;direction:ltr;overflow:hidden}.copy{direction:rtl;display:flex;align-items:center;padding:clamp(28px,7vw,96px);background:#fffbfb}.inner{width:min(100%,520px);margin-inline:auto}.logo{display:block;width:clamp(120px,16vw,220px);height:auto;max-height:210px;object-fit:contain;object-position:center;mix-blend-mode:multiply;margin:0 0 32px auto}.eyebrow{margin:0 0 18px;color:#9d174d;font-weight:900;font-size:.86rem;letter-spacing:.08em}.title{margin:0;color:#632128;font-size:clamp(2.7rem,5vw,5.2rem);font-weight:950;line-height:1.05;letter-spacing:-.055em}.title span{white-space:nowrap}.description{margin:24px 0 20px;color:#86868b;font-size:clamp(1.05rem,1.5vw,1.25rem);font-weight:600;line-height:1.85}.proofs{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 28px}.proof{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:999px;background:#fff;color:#632128;border:1px solid #f3e8e8;box-shadow:0 4px 16px #6321280b;font-size:.72rem;font-weight:900}.proof.primary{color:#fff;background:#632128;border-color:#632128}.icon{width:16px;height:16px;object-fit:contain}.proof.primary .icon{filter:brightness(0) invert(1)}.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:58px;padding:0 28px;border-radius:16px;background:#632128;color:#fff;text-decoration:none;font-weight:950;font-size:1rem;box-shadow:0 18px 32px #63212830;transition:transform .15s,filter .15s}.cta:hover{transform:translateY(-2px);filter:brightness(1.08)}.arrow{width:19px;height:19px;filter:brightness(0) invert(1)}.secondary{color:#632128;font-size:.85rem;font-weight:900;text-decoration:none}.secondary:hover{text-decoration:underline}.foot{display:flex;flex-wrap:wrap;gap:18px;margin-top:42px;padding-top:22px;border-top:1px solid #f3e8e8;color:#86868b;font-size:.82rem;font-weight:800}.contact{display:inline-flex;align-items:center;gap:6px}.contact img{width:17px;height:17px;object-fit:contain}.visual{direction:rtl;position:relative;min-height:100vh;background:#632128}.visual img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.visual:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#fffbfb 0%,#fffbfb08 36%,#63212814 100%)}.card{position:absolute;z-index:1;right:clamp(22px,5vw,72px);bottom:clamp(24px,7vw,80px);max-width:360px;padding:26px 28px;border:1px solid #ffffff80;border-radius:32px;background:#ffffffeb;backdrop-filter:blur(18px);box-shadow:0 24px 50px #451a1a30}.card-label{display:flex;align-items:center;gap:9px;color:#632128;font-size:.7rem;font-weight:950;letter-spacing:.08em}.live{width:10px;height:10px;border-radius:50%;background:#25d366}.card p{margin:12px 0 0;color:#451a1a;font-size:1rem;font-weight:800;line-height:1.7}
+    @media(max-width:800px){.page{display:flex;flex-direction:column}.visual{order:-1;min-height:34vh;max-height:390px}.visual:after{background:linear-gradient(180deg,#63212812 25%,#fffbfb 100%)}.card{right:20px;left:20px;bottom:20px;max-width:none;padding:18px 20px}.card p{font-size:.9rem}.copy{padding:34px 24px 42px}.logo{width:140px;margin:0 auto 24px}.inner{text-align:center}.title{font-size:clamp(2.6rem,12vw,4.1rem)}.title span{white-space:normal}.proofs,.actions,.foot{justify-content:center}.cta{width:100%}.secondary{width:100%;padding:8px}}
   </style>
 </head>
 <body>
-  <main>
-    <section class="copy">
-      <img class="logo" src="/assets/batmelech-logo.jpeg" alt="הלוגו של מטעמי בת מלך">
+  <main class="page">
+    <section class="copy"><div class="inner">
+      <img class="logo" src="/assets/brand-logo.jpeg" alt="בת מלך — מטבח ביתי אותנטי">
       <p class="eyebrow">מטבח ביתי ישראלי · דובאי</p>
-      <h1>טעם של בית.<br><span>כשר. אמיתי. בדרך.</span></h1>
-      <div class="badge"><i class="dot"></i> אוכל כשר · תעודת כשרות מישראל</div>
-      <p>אנחנו עובדים על אתר ההזמנות החדש שלנו, עם אוכל ביתי שמוכן באהבה, חומרי גלם איכותיים ותפריט שנבנה לשבת, לאירוח ולצהריים באמצע השבוע.</p>
-      <div class="actions"><a href="/new-order">לבחירת מנות ולהזמנה</a><a class="secondary" href="/new-order">לפתיחת טופס ההזמנה</a></div>
-      <p class="note">ההזמנה נבדקת ומאושרת אישית מול הצוות. זמינות ומחיר סופי מאושרים לפני הסגירה.</p>
-    </section>
-    <aside class="visual" aria-label="מנות אוכל ביתי כשר"><div class="plate"></div><div class="food one"></div><div class="food two"></div><div class="food three"></div><div class="food four"></div></aside>
+      <h1 class="title">אוכל של שישי<br><span>בטעם של בית</span></h1>
+      <p class="description">האתר החדש של בת מלך בהקמה. בינתיים אנחנו ממשיכים לבשל עבורכם מכל הלב — עם מוצרים טריים, עבודת יד וטעמים שמרגישים כמו בית.</p>
+      <div class="proofs"><span class="proof primary"><img class="icon" src="/assets/brand-icons/ph-heart-fill.svg" alt=""> עבודת יד</span><span class="proof"><img class="icon" src="/assets/brand-icons/ph-basket-bold.svg" alt=""> מוצרים טריים</span><span class="proof"><img class="icon" src="/assets/brand-icons/ph-check-circle-bold.svg" alt=""> אוכל כשר</span><span class="proof"><img class="icon" src="/assets/brand-icons/ph-check-circle-bold.svg" alt=""> תעודת כשרות מישראל</span></div>
+      <p class="eyebrow">להזמנות לשבת הקרובה ולצהריים באמצע השבוע</p>
+      <div class="actions"><a class="cta" href="/new-order">למעבר לטופס ההזמנה <img class="arrow" src="/assets/brand-icons/ph-arrow-left-bold.svg" alt=""></a><a class="secondary" href="/new-order">לבחירת מנות והזמנה</a></div>
+      <div class="foot"><span>מטבח משפחתי פתוח</span><span class="contact"><img src="/assets/brand-icons/ph-phone-bold.svg" alt=""><b dir="ltr">+971 58 628 8776</b></span><span class="contact"><img src="/assets/brand-icons/mdi-whatsapp.svg" alt="">זמינים בוואטסאפ</span></div>
+    </div></section>
+    <section class="visual"><img src="/assets/brand-food.jpeg" alt="אוכל של שישי עשיר וביתי"><div class="card"><div class="card-label"><i class="live"></i> מטבח משפחתי פתוח</div><p>החריימה, הבקר, החלות ומגוון הסלטים שלנו מחכים לכם. אוכל טרי, בדיוק כמו שאתם אוהבים.</p></div></section>
   </main>
 </body>
 </html>
