@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 import { APP_ROUTES, CUSTOMER_ORDER_ROUTE_ALIASES, ROOT_ROUTE_TARGET } from './app/routes.ts'
 import { AppShell } from './components/app-shell.tsx'
+import { OrdersScreen } from './screens/orders-screen.tsx'
 import { PendingScreen } from './screens/pending-screen.tsx'
 import { TodayScreen } from './screens/today-screen.tsx'
 
@@ -34,7 +35,7 @@ export function AppRoutes() {
 
       <Route element={<OperatorLayout />}>
         <Route path={APP_ROUTES.today} element={<TodayScreen />} />
-        <Route path={APP_ROUTES.orders} element={<PendingScreen title="הזמנות" />} />
+        <Route path={APP_ROUTES.orders} element={<OrdersScreen />} />
         <Route path={APP_ROUTES.newOrder} element={<PendingScreen title="הזמנה חדשה" />} />
         <Route path={APP_ROUTES.editOrder} element={<PendingScreen title="עריכת הזמנה" />} />
         <Route path={APP_ROUTES.orderBon} element={<PendingScreen title="בון הזמנה" />} />

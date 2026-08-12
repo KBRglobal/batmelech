@@ -13,6 +13,9 @@ import { AppRouter, AppRoutes } from './router.tsx'
 vi.mock('./screens/today-screen.tsx', () => ({
   TodayScreen: () => <h1>מסך היום המחובר</h1>,
 }))
+vi.mock('./screens/orders-screen.tsx', () => ({
+  OrdersScreen: () => <h1>מסך ההזמנות המחובר</h1>,
+}))
 
 const LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES = [
   ...CUSTOMER_ORDER_ROUTE_ALIASES,
@@ -61,7 +64,6 @@ describe('AppRoutes', () => {
   })
 
   it.each([
-    [APP_ROUTES.orders, 'הזמנות'],
     [APP_ROUTES.newOrder, 'הזמנה חדשה'],
     ['/orders/order%201/edit', 'עריכת הזמנה'],
     ['/orders/order%201/bon', 'בון הזמנה'],
@@ -82,6 +84,14 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('heading', { name: title })).toBeTruthy()
     expect(screen.getAllByRole('navigation')).toHaveLength(2)
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('registers the real read-only Orders screen inside the shared shell', () => {
+    const { container } = renderRoute(APP_ROUTES.orders)
+
+    expect(container.querySelector('[data-route-status="pending"]')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'מסך ההזמנות המחובר' })).toBeTruthy()
+    expect(screen.getAllByRole('navigation')).toHaveLength(2)
   })
 
   it('registers the canonical customer route without the operator navigation', () => {
