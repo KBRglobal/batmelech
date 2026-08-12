@@ -923,6 +923,14 @@ test('migration is schema-qualified, non-destructive, and contains DB enforcemen
   assert.match(source, /SET search_path = pg_catalog, public/);
 });
 
+test('schema validation excludes PostgreSQL 18 catalog-only NOT NULL constraints', () => {
+  assert.match(SQL.READ_SCHEMA_CONSTRAINTS, /con\.contype <> 'n'/);
+  assert.doesNotMatch(
+    SQL.READ_SCHEMA_CONSTRAINTS,
+    /con\.contype NOT IN \('n',\s*'p',\s*'u',\s*'f',\s*'c'\)/,
+  );
+});
+
 test('state safety modules construct no production pool or network client', () => {
   for (const relative of [
     '../server/state/three-way-merge.js',

@@ -114,6 +114,7 @@ const SQL = Object.freeze({
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
       AND c.relname = ANY($1::text[])
+      AND con.contype <> 'n'
     ORDER BY c.relname, con.conname`,
   READ_SCHEMA_TRIGGERS: `SELECT c.relname AS table_name,
       t.tgname AS trigger_name,
