@@ -8,6 +8,10 @@ const { execFile } = require('child_process');
 const { Pool } = require('pg');
 const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
 const { createReactAppRouter } = require('./server/react-app-route');
+const { createStateRepository } = require('./server/state/state-repository');
+const { createStateRouter } = require('./server/state/state-route');
+const { createStateSafetyService } = require('./server/state/state-service');
+const { startAfterStateInitialization } = require('./server/state/state-startup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -91,49 +95,23 @@ app.use(express.json({ limit: '15mb' }));
 // --- AI-assisted order interpretation (review-only; never persists state) ---
 app.use('/api/ai/order-intake', createOrderIntakeRouter());
 
-// --- Postgres-backed app state (single-row store for the app's localStorage blob) ---
+// --- Versioned Postgres-backed app state with merge, history, and idempotency ---
 let pool = null;
+let stateRepository = null;
 if (process.env.DATABASE_URL) {
   // Uses Railway private networking (railway.internal) — plain TCP inside the
   // private network, no TLS needed. External URLs should carry ?sslmode=require.
+  const commandSecret = requireServerCredential('BM_STATE_COMMAND_SECRET');
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  pool
-    .query(
-      'CREATE TABLE IF NOT EXISTS bm_state (id INT PRIMARY KEY, data JSONB NOT NULL, updated_at BIGINT NOT NULL)'
-    )
-    .catch((e) => console.error('db init failed:', e.message));
+  stateRepository = createStateRepository({ pool, commandSecret });
+  app.use('/api/state', createStateRouter({
+    service: createStateSafetyService({ repository: stateRepository }),
+  }));
+} else {
+  app.use('/api/state', (_request, response) => {
+    response.status(503).json({ error: 'state unavailable' });
+  });
 }
-
-app.get('/api/state', async (req, res) => {
-  if (!pool) return res.status(503).json({ error: 'no database configured' });
-  try {
-    const r = await pool.query('SELECT data, updated_at FROM bm_state WHERE id = 1');
-    if (!r.rows.length) return res.json({ ts: 0, data: null });
-    res.json({ ts: Number(r.rows[0].updated_at), data: r.rows[0].data });
-  } catch (e) {
-    console.error('GET /api/state:', e.message);
-    res.status(500).json({ error: 'db error' });
-  }
-});
-
-app.post('/api/state', async (req, res) => {
-  if (!pool) return res.status(503).json({ error: 'no database configured' });
-  if (!req.body || typeof req.body.data === 'undefined' || req.body.data === null) {
-    return res.status(400).json({ error: 'missing data' });
-  }
-  const ts = Date.now();
-  try {
-    await pool.query(
-      'INSERT INTO bm_state (id, data, updated_at) VALUES (1, $1, $2) ' +
-        'ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = $2',
-      [JSON.stringify(req.body.data), ts]
-    );
-    res.json({ ts });
-  } catch (e) {
-    console.error('POST /api/state:', e.message);
-    res.status(500).json({ error: 'db error' });
-  }
-});
 
 // --- React operator application: authenticated, isolated below /app/ ---
 app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
@@ -162,4 +140,14 @@ app.use((req, res, next) => {
 app.get('/bm-sync.js', (req, res) => res.sendFile(path.join(ROOT, 'bm-sync.js')));
 app.use((req, res, next) => express.static(contentRoot)(req, res, next));
 
-app.listen(PORT, () => console.log(`batmelech listening on :${PORT}, db: ${pool ? 'on' : 'off'}`));
+startAfterStateInitialization({
+  repository: stateRepository,
+  listen: () => app.listen(
+    PORT,
+    () => console.log(`batmelech listening on :${PORT}, db: ${pool ? 'on' : 'off'}`)
+  ),
+  closePool: pool ? () => pool.end() : undefined,
+}).catch((error) => {
+  console.error('startup failed:', error.message);
+  process.exitCode = 1;
+});

@@ -44,12 +44,15 @@ test('server source contains no fallback credential or state deletion route', ()
   assert.doesNotMatch(source, /process\.env\.BM_PASS\s*\|\|/);
   assert.doesNotMatch(source, /app\.delete\s*\(\s*['"]\/api\/state/);
   assert.doesNotMatch(source, /DELETE\s+FROM\s+bm_state/i);
+  assert.doesNotMatch(source, /ON CONFLICT \(id\) DO UPDATE SET data/i);
+  assert.doesNotMatch(source, /INSERT INTO bm_state/i);
+  assert.match(source, /requireServerCredential\('BM_STATE_COMMAND_SECRET'\)/);
 });
 
 test('React production route remains behind auth and cannot shadow APIs or legacy HTML', () => {
   const source = fs.readFileSync(serverPath, 'utf8');
   const authIndex = source.indexOf("app.use((req, res, next) => {");
-  const stateApiIndex = source.indexOf("app.get('/api/state'");
+  const stateApiIndex = source.indexOf("app.use('/api/state'");
   const reactIndex = source.indexOf("app.use('/app', createReactAppRouter");
   const legacyHtmlIndex = source.indexOf('// --- HTML: inject the sync script');
 
@@ -60,4 +63,25 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /app\.get\('\/healthz'/);
   assert.match(source, /app\.get\(\/\^\\\/app\$\//);
   assert.doesNotMatch(source, /app\.use\('\/'\s*,\s*createReactAppRouter/);
+});
+
+test('server fails closed before a database connection when the state capability is absent', () => {
+  const env = {
+    ...process.env,
+    BM_USER: 'configured-test-user',
+    BM_PASS: 'configured-test-password',
+    DATABASE_URL: 'postgres://127.0.0.1:1/never_contact_this_database',
+  };
+  delete env.BM_STATE_COMMAND_SECRET;
+
+  const result = spawnSync(process.execPath, [serverPath], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+    env,
+    timeout: 5_000,
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /BM_STATE_COMMAND_SECRET must be configured\./);
+  assert.doesNotMatch(result.stderr, /ECONNREFUSED|connect ECONN/);
 });
