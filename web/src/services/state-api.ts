@@ -1,22 +1,83 @@
 import { z } from 'zod'
-import { LegacyStoreSchema, type LegacyStore } from '../domain/store.ts'
+import { LegacyStoreSchema } from '../domain/store.ts'
 
 const TimestampSchema = z.number().finite().nonnegative()
+const RevisionSchema = z.number().int().nonnegative().safe()
+const StateHashSchema = z.string().regex(/^[0-9a-f]{64}$/)
+const RequestIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/)
 
 const StateEnvelopeSchema = z
   .object({
     ts: TimestampSchema,
     data: LegacyStoreSchema.nullable(),
+    revision: RevisionSchema.optional(),
+    hash: StateHashSchema.optional(),
   })
   .passthrough()
 
-const SaveStateResponseSchema = z
+const VersionedStateEnvelopeSchema = z
   .object({
+    revision: RevisionSchema,
     ts: TimestampSchema,
+    hash: StateHashSchema,
+    data: LegacyStoreSchema,
   })
   .passthrough()
+
+const SaveStateCommandSchema = z
+  .object({
+    baseState: LegacyStoreSchema,
+    localState: LegacyStoreSchema,
+    baseRevision: RevisionSchema,
+    baseHash: StateHashSchema,
+    requestId: RequestIdSchema,
+  })
+  .strict()
+
+const SaveSuccessSchema = VersionedStateEnvelopeSchema.extend({
+  ok: z.literal(true),
+  idempotent: z.boolean(),
+})
+
+const VersionConflictSchema = z.object({
+  kind: z.literal('base-version-mismatch'),
+  expectedBaseRevision: RevisionSchema,
+  expectedBaseHash: StateHashSchema,
+  actualRevision: RevisionSchema,
+  actualHash: StateHashSchema,
+  remoteState: LegacyStoreSchema,
+})
+
+const MergeConflictSchema = z.object({
+  kind: z.literal('merge-conflict'),
+  conflicts: z.array(z.unknown()).min(1),
+  actualRevision: RevisionSchema,
+  actualHash: StateHashSchema,
+  remoteState: LegacyStoreSchema,
+})
+
+const IdempotencyConflictSchema = z.object({
+  kind: z.literal('idempotency-mismatch'),
+  requestId: RequestIdSchema,
+})
+
+const SaveConflictSchema = z.object({
+  ok: z.literal(false),
+  conflict: z.union([
+    VersionConflictSchema,
+    MergeConflictSchema,
+    IdempotencyConflictSchema,
+  ]),
+  idempotent: z.boolean(),
+  stage: z.enum(['merge', 'persistence']).optional(),
+})
+
+const SaveStateResponseSchema = z.union([SaveSuccessSchema, SaveConflictSchema])
 
 export type StateEnvelope = z.infer<typeof StateEnvelopeSchema>
+export type VersionedStateEnvelope = z.infer<typeof VersionedStateEnvelopeSchema>
+export type SaveStateCommand = z.infer<typeof SaveStateCommandSchema>
+export type SaveStateResult = z.infer<typeof SaveStateResponseSchema>
 
 type StateApiErrorCode = 'HTTP_ERROR' | 'INVALID_RESPONSE'
 
@@ -76,11 +137,11 @@ export async function loadState(options: StateApiOptions = {}): Promise<StateEnv
 }
 
 export async function saveState(
-  store: LegacyStore,
+  command: SaveStateCommand,
   options: StateApiOptions = {},
-): Promise<z.infer<typeof SaveStateResponseSchema>> {
-  const validatedStore = LegacyStoreSchema.safeParse(store)
-  if (!validatedStore.success) {
+): Promise<SaveStateResult> {
+  const validatedCommand = SaveStateCommandSchema.safeParse(command)
+  if (!validatedCommand.success) {
     throw new StateApiError('INVALID_RESPONSE', 0)
   }
 
@@ -92,10 +153,10 @@ export async function saveState(
       'Content-Type': 'application/json',
     },
     credentials: 'same-origin',
-    body: JSON.stringify({ data: validatedStore.data }),
+    body: JSON.stringify(validatedCommand.data),
   })
 
-  if (!response.ok) {
+  if (!response.ok && response.status !== 409) {
     throw new StateApiError('HTTP_ERROR', response.status)
   }
 
@@ -105,4 +166,10 @@ export async function saveState(
   }
 
   return result.data
+}
+
+export function isVersionedStateEnvelope(
+  envelope: StateEnvelope,
+): envelope is VersionedStateEnvelope {
+  return VersionedStateEnvelopeSchema.safeParse(envelope).success
 }
