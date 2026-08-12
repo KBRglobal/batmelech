@@ -1,0 +1,25 @@
+export const LOCAL_ICON_PATHS = {
+  'ph:arrow-counter-clockwise-bold': '/icons/ph-arrow-counter-clockwise-bold.svg',
+  'ph:arrow-left-bold': '/icons/ph-arrow-left-bold.svg',
+  'ph:calendar-bold': '/icons/ph-calendar-bold.svg',
+  'ph:chart-pie-slice-bold': '/icons/ph-chart-pie-slice-bold.svg',
+  'ph:check-circle-bold': '/icons/ph-check-circle-bold.svg',
+  'ph:clock-bold': '/icons/ph-clock-bold.svg',
+  'ph:cloud-arrow-up-bold': '/icons/ph-cloud-arrow-up-bold.svg',
+  'ph:coins-bold': '/icons/ph-coins-bold.svg',
+  'ph:cooking-pot-bold': '/icons/ph-cooking-pot-bold.svg',
+  'ph:gear-six-bold': '/icons/ph-gear-six-bold.svg',
+  'ph:list-checks-bold': '/icons/ph-list-checks-bold.svg',
+  'ph:map-pin-bold': '/icons/ph-map-pin-bold.svg',
+  'ph:package-bold': '/icons/ph-package-bold.svg',
+  'ph:pencil-simple-bold': '/icons/ph-pencil-simple-bold.svg',
+  'ph:plus-bold': '/icons/ph-plus-bold.svg',
+  'ph:plus-circle-bold': '/icons/ph-plus-circle-bold.svg',
+  'ph:shopping-cart-bold': '/icons/ph-shopping-cart-bold.svg',
+  'ph:storefront-bold': '/icons/ph-storefront-bold.svg',
+  'ph:truck-bold': '/icons/ph-truck-bold.svg',
+  'ph:users-bold': '/icons/ph-users-bold.svg',
+  'ph:warning-circle-bold': '/icons/ph-warning-circle-bold.svg',
+} as const
+
+export type LocalIconName = keyof typeof LOCAL_ICON_PATHS
