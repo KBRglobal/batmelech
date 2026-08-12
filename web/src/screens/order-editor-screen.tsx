@@ -798,7 +798,7 @@ function OrderEditorContent({
         </Section>
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64">
+      <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[0.65rem] font-black text-muted-foreground">{isSaving ? 'ממתינה לאישור שמירה מהשרת' : 'עד לאישור השמירה, הטיוטה לא משנה את מסד הנתונים'}</p>

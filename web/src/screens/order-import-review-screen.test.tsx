@@ -177,6 +177,16 @@ describe('OrderImportReviewScreen', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('keeps the fixed review footer above mobile navigation and resets it on desktop', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    renderReview('הודעת בדיקה')
+
+    const footer = screen.getByRole('button', { name: 'החלה על טיוטה בזיכרון' }).closest('footer')
+    expect(footer).toBeTruthy()
+    expect(footer?.className).toContain('bottom-[calc(5rem+env(safe-area-inset-bottom))]')
+    expect(footer?.className).toContain('md:bottom-0')
+  })
+
   it('requires a real message before it performs the review request', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const fetchSpy = vi.spyOn(globalThis, 'fetch')

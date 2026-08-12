@@ -110,6 +110,16 @@ describe('OrderEditorScreen', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the fixed action footer above mobile navigation and resets it on desktop', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    renderEditor()
+
+    const footer = (await screen.findByRole('button', { name: 'שמירת ההזמנה' })).closest('footer')
+    expect(footer).toBeTruthy()
+    expect(footer?.className).toContain('bottom-[calc(5rem+env(safe-area-inset-bottom))]')
+    expect(footer?.className).toContain('md:bottom-0')
+  })
+
   it('opens a complete fresh draft on the nearest Friday with every operational section', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 7, 12, 15, 0))

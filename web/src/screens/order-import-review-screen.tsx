@@ -530,7 +530,7 @@ export function OrderImportReviewScreen() {
         )}
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64">
+      <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <p className="text-xs font-black text-muted-foreground">שום דבר לא נשמר במסד הנתונים</p>
           <div className="flex flex-wrap gap-2">
