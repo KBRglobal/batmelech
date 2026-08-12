@@ -1675,6 +1675,10 @@ function dollarsFromMinorUnits(minorUnits: number): number {
   return minorUnits / 100
 }
 
+const AUTHORITATIVE_EXTRA_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  ["מגש שניצלים (זוגי, כ־13–15 יח')"]: ['מגש שניצלים'],
+}
+
 export function buildAIOrderCatalog(menu: OrderEditorMenu): AIOrderCatalog {
   const items: AIRequestCatalogItem[] = []
   const targetsById: Record<string, AICatalogTarget> = {}
@@ -1724,6 +1728,7 @@ export function buildAIOrderCatalog(menu: OrderEditorMenu): AIOrderCatalog {
   }
   menu.extras.forEach((extra, index) => {
     add(`extra:${index}`, extra.name, 'extra', { kind: 'extra', name: extra.name }, {
+      aliases: AUTHORITATIVE_EXTRA_ALIASES[extra.name],
       paid: true,
       priceMinorUnits: extra.priceMinorUnits,
     })

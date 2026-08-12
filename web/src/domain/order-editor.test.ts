@@ -816,11 +816,56 @@ describe('validation and AI review application', () => {
     const catalog = buildAIOrderCatalog(buildOrderEditorMenu(emptyStore))
     const ids = catalog.items.map((item) => item.id)
     const couscous = catalog.items.find((item) => item.name === 'קוסקוס עננים')
+    const schnitzelTray = catalog.items.find(
+      (item) => item.name === "מגש שניצלים (זוגי, כ־13–15 יח')",
+    )
     const wine = catalog.items.find((item) => item.name === 'תוספת יין')
 
     expect(new Set(ids).size).toBe(ids.length)
     expect(couscous?.aliases).toContain('קוסקוס אוורירי')
+    expect(schnitzelTray?.aliases).toContain('מגש שניצלים')
+    expect(catalog.targetsById[schnitzelTray!.id]).toEqual({
+      kind: 'extra',
+      name: "מגש שניצלים (זוגי, כ־13–15 יח')",
+    })
     expect(wine).toMatchObject({ isPaidExtra: true, price: 5, currency: 'USD' })
+  })
+
+  it('applies the short schnitzel-tray alias to the exact authoritative extra', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const catalog = buildAIOrderCatalog(menu)
+    const schnitzelTray = catalog.items.find(
+      (item) => item.name === "מגש שניצלים (זוגי, כ־13–15 יח')",
+    )!
+    const applied = applyAIReviewToDraft(
+      draftWith({ extras: {} }),
+      reviewWith({
+        draft: {
+          customerName: null,
+          customerPhone: null,
+          serviceDate: null,
+          serviceTime: null,
+          fulfillmentMethod: 'unknown',
+          deliveryLocation: null,
+          items: [{
+            catalogItemId: schnitzelTray.id,
+            catalogItemName: schnitzelTray.name,
+            category: schnitzelTray.category,
+            quantity: 1,
+            sourceText: 'מגש שניצלים',
+            confidence: 1,
+          }],
+          notes: [],
+        },
+      }),
+      catalog.targetsById,
+      menu,
+    )
+
+    expect(applied.extras).toEqual({
+      ["מגש שניצלים (זוגי, כ־13–15 יח')"]: { quantity: 1, note: '' },
+    })
+    expect(applied.extras).not.toHaveProperty('מגש שניצלים')
   })
 
   it('applies only reviewed catalog quantities to a new in-memory draft and does not mutate it', () => {
