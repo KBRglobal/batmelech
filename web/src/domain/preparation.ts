@@ -1,4 +1,5 @@
-import { checkedAdd, getUsdMinorUnits, usdFromMinorUnits, type UsdMoney } from './money.ts'
+import { checkedAdd, usdFromMinorUnits, type UsdMoney } from './money.ts'
+import { parseLegacyUsdAmount } from './customers-finance.ts'
 import {
   PositiveDecimalQuantitySchema,
   StableCatalogIdSchema,
@@ -196,6 +197,9 @@ export interface PreparationWarning {
   readonly orderId: LegacyOrderId
   readonly path: string
   readonly message: string
+  readonly occurrences: number
+  readonly itemCategory?: PreparationCatalogCategory
+  readonly itemName?: string
 }
 
 export interface PreparationDateGroup {
@@ -326,6 +330,8 @@ function compareCustomerDetails(left: CustomerSpecificDetail, right: CustomerSpe
 
 function compareWarnings(left: PreparationWarning, right: PreparationWarning): number {
   return (
+    compareText(left.itemCategory ?? '', right.itemCategory ?? '') ||
+    compareText(left.itemName ?? '', right.itemName ?? '') ||
     compareText(orderIdKey(left.orderId), orderIdKey(right.orderId)) ||
     compareText(left.path, right.path) ||
     compareText(left.code, right.code) ||
@@ -628,8 +634,19 @@ function pushWarning(
   code: PreparationWarningCode,
   path: string,
   message: string,
+  item?: {
+    readonly category: PreparationCatalogCategory
+    readonly name: string
+  },
 ): void {
-  warnings.push({ code, orderId: context.orderId, path, message })
+  warnings.push({
+    code,
+    orderId: context.orderId,
+    path,
+    message,
+    occurrences: 1,
+    ...(item === undefined ? {} : { itemCategory: item.category, itemName: item.name }),
+  })
 }
 
 function readCount(
@@ -715,6 +732,7 @@ function selectionFor(
     'UNKNOWN_CATALOG_ITEM',
     path,
     `${path} has no stable catalog identity or procurement classification`,
+    { category, name: itemName },
   )
   return null
 }
@@ -1070,29 +1088,14 @@ function parseLegacyUsdMinorUnits(
   context: OrderContext,
   path: 'total' | 'deposit',
 ): number | null {
-  if (value === undefined || value === null || value === '') return 0
-  const raw = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : ''
-  if (raw === '') return 0
-  const validFormat = /^\$?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?|\.\d{1,2})$/.test(raw)
-  const stripped = raw.replace(/[$,]/g, '')
-  const normalized = stripped.startsWith('.') ? `0${stripped}` : stripped
-  if (!validFormat) {
-    pushWarning(
-      context.warnings,
-      context,
-      'INVALID_MONEY',
-      path,
-      `${path} must be a non-negative USD amount with at most two decimal places`,
-    )
-    return null
-  }
-
-  const [dollars, cents = ''] = normalized.split('.')
-  const minorUnitsText = `${dollars}${cents.padEnd(2, '0')}`.replace(/^0+(?=\d)/, '')
-  const maximum = String(Number.MAX_SAFE_INTEGER)
+  const raw = typeof value === 'string' ? value.trim() : ''
+  const hasLeadingDollar = raw.startsWith('$')
+  const hasTrailingDollar = raw.endsWith('$')
+  const numericBody = hasLeadingDollar ? raw.slice(1) : hasTrailingDollar ? raw.slice(0, -1) : raw
   if (
-    minorUnitsText.length > maximum.length ||
-    (minorUnitsText.length === maximum.length && minorUnitsText > maximum)
+    raw.length > 64 &&
+    !(hasLeadingDollar && hasTrailingDollar) &&
+    /^\d+(?:\.\d{1,2})?$/.test(numericBody)
   ) {
     pushWarning(
       context.warnings,
@@ -1103,7 +1106,53 @@ function parseLegacyUsdMinorUnits(
     )
     return null
   }
-  return getUsdMinorUnits(usdFromMinorUnits(Number(minorUnitsText)))
+  const parsed = parseLegacyUsdAmount(value)
+  if (parsed.state === 'absent') return 0
+  if (parsed.state === 'invalid') {
+    const overflow = parsed.reason === 'overflow'
+    pushWarning(
+      context.warnings,
+      context,
+      overflow ? 'MONEY_OVERFLOW' : 'INVALID_MONEY',
+      path,
+      overflow
+        ? `${path} exceeds the safe USD minor-unit range`
+        : `${path} must be a non-negative USD amount with at most two decimal places`,
+    )
+    return null
+  }
+  return parsed.minorUnits
+}
+
+function collapseUnknownCatalogWarnings(
+  warnings: readonly PreparationWarning[],
+): PreparationWarning[] {
+  const ordered = [...warnings].sort(compareWarnings)
+  const collapsed = new Map<string, number>()
+  const output: PreparationWarning[] = []
+
+  for (const warning of ordered) {
+    if (
+      warning.code !== 'UNKNOWN_CATALOG_ITEM' ||
+      warning.itemCategory === undefined ||
+      warning.itemName === undefined
+    ) {
+      output.push(warning)
+      continue
+    }
+    const key = JSON.stringify([warning.itemCategory, warning.itemName])
+    const existingIndex = collapsed.get(key)
+    if (existingIndex === undefined) {
+      collapsed.set(key, output.length)
+      output.push(warning)
+      continue
+    }
+    const existing = output[existingIndex]!
+    const merged = { ...existing, occurrences: existing.occurrences + warning.occurrences }
+    output[existingIndex] = merged
+  }
+
+  return output.sort(compareWarnings)
 }
 
 function addMoneyValue(
@@ -1351,7 +1400,7 @@ export function buildPreparationPlan(
   const dates = [...groupsByDate.values()]
     .sort((left, right) => compareText(left.serviceDate, right.serviceDate))
     .map(finalizeGroup)
-  const sortedWarnings = [...warnings].sort(compareWarnings)
+  const sortedWarnings = collapseUnknownCatalogWarnings(warnings)
 
   return {
     complete: sortedWarnings.length === 0,

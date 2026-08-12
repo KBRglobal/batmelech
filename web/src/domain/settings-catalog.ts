@@ -12,10 +12,14 @@ import {
   validateRecipeDefinition,
   type RecipeDefinition,
 } from './recipes.ts'
-import type {
-  LunchCatalogVariant,
-  PreparationCatalog,
-  ProcurementPolicy,
+import {
+  CANCELLED_STATUS_ALIASES,
+  type LunchCatalogAddon,
+  type LunchCatalogItem,
+  type LunchCatalogVariant,
+  type PreparationCatalog,
+  type PreparationCatalogItem,
+  type ProcurementPolicy,
 } from './preparation.ts'
 import type { LegacyStore } from './store.ts'
 import type { VersionedStateEnvelope } from '../services/state-api.ts'
@@ -118,6 +122,16 @@ export interface CatalogResult {
   readonly catalog: SettingsCatalog
   readonly warnings: readonly CatalogWarning[]
 }
+
+export type PreparationCatalogResolutionState = 'configured' | 'missing' | 'invalid'
+
+export interface PreparationCatalogResolution {
+  readonly catalog: PreparationCatalog
+  readonly state: PreparationCatalogResolutionState
+  readonly issues: readonly string[]
+}
+
+export type PreparationCatalogState = PreparationCatalogResolutionState
 
 export interface StoreSaveRequest {
   readonly reason:
@@ -338,6 +352,26 @@ function generatedId(scope: string, name: string): string {
   return `${scope}-${hashText(name)}`
 }
 
+export const REVIEWED_LEGACY_PREPARATION_ITEMS = [
+  {
+    id: generatedId('legacy-extra', 'מגש אורז / קוסקוס / פסטה אדומה'),
+    category: 'extras',
+    name: 'מגש אורז / קוסקוס / פסטה אדומה',
+  },
+  {
+    id: generatedId('legacy-custom', 'חומוס'),
+    category: 'custom',
+    name: 'חומוס',
+  },
+  {
+    id: generatedId('legacy-custom', 'מרק ירקות קוסקוס פרווה'),
+    category: 'custom',
+    name: 'מרק ירקות קוסקוס פרווה',
+  },
+] as const satisfies ReadonlyArray<
+  Pick<PreparationCatalogItem, 'id' | 'category' | 'name'>
+>
+
 function cloneCatalog(catalog: SettingsCatalog): SettingsCatalog {
   return {
     ...catalog,
@@ -421,19 +455,16 @@ function preservedTextList(value: unknown): readonly string[] | undefined {
   return values.length === 0 ? undefined : [...new Set(values)]
 }
 
-function preservedProcurement(
-  value: unknown,
-  fallback: ProcurementPolicy,
-): ProcurementPolicy {
-  if (!isRecord(value)) return fallback
+function parsedProcurement(value: unknown): ProcurementPolicy | null {
+  if (!isRecord(value)) return null
   if (value.kind === 'recipe' || value.kind === 'none') return { kind: value.kind }
-  if (value.kind !== 'direct') return fallback
+  if (value.kind !== 'direct') return null
   const ingredientId = StableCatalogIdSchema.safeParse(value.ingredientId)
   const ingredientName = text(value.ingredientName)
   const unit = text(value.unit)
   const quantity = PositiveDecimalQuantitySchema.safeParse(value.quantityPerItem)
   if (!ingredientId.success || ingredientName === '' || unit === '' || !quantity.success) {
-    return fallback
+    return null
   }
   return {
     kind: 'direct',
@@ -444,6 +475,159 @@ function preservedProcurement(
   }
 }
 
+function preservedProcurement(
+  value: unknown,
+  fallback: ProcurementPolicy,
+): ProcurementPolicy {
+  return parsedProcurement(value) ?? fallback
+}
+
+function positiveLegacyCount(value: unknown): boolean {
+  const raw = isRecord(value) ? value.q : value
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) && raw > 0
+  if (typeof raw !== 'string') return false
+  const normalized = raw.trim()
+  if (!/^\d+$/.test(normalized)) return false
+  const count = Number(normalized)
+  return Number.isSafeInteger(count) && count > 0
+}
+
+function activeOrder(order: LegacyStore['orders'][number]): boolean {
+  const status = text(order.status)
+  const normalized = status.toLocaleLowerCase('en-US')
+  return !CANCELLED_STATUS_ALIASES.some((alias) => alias === status || alias === normalized)
+}
+
+function positiveSaladCount(value: unknown): boolean {
+  if (!isRecord(value)) return positiveLegacyCount(value)
+  return positiveLegacyCount(value.o) || positiveLegacyCount(value.p)
+}
+
+function persistedItemIsUsed(
+  item: Pick<PreparationCatalogItem, 'category' | 'name' | 'legacyNames'>,
+  store: Readonly<LegacyStore>,
+): boolean {
+  const names = new Set([item.name, ...(item.legacyNames ?? [])])
+  return store.orders.some((order) => {
+    if (!activeOrder(order)) return false
+    if (item.category === 'custom') {
+      return Array.isArray(order.custom) && order.custom.some(
+        (entry) =>
+          isRecord(entry) &&
+          names.has(text(entry.name)) &&
+          positiveLegacyCount(entry.qty),
+      )
+    }
+    const source = (order as Readonly<Record<string, unknown>>)[item.category]
+    if (!isRecord(source)) return false
+    return [...names].some((name) =>
+      item.category === 'salads'
+        ? positiveSaladCount(source[name])
+        : positiveLegacyCount(source[name]),
+    )
+  })
+}
+
+function reviewedLegacyItemIsUsed(
+  item: (typeof REVIEWED_LEGACY_PREPARATION_ITEMS)[number],
+  store: Readonly<LegacyStore>,
+): boolean {
+  return persistedItemIsUsed(item, store)
+}
+
+function validPersistedItem(value: unknown): PreparationCatalogItem | null {
+  if (!isRecord(value)) return null
+  const id = StableCatalogIdSchema.safeParse(value.id)
+  const category = value.category
+  const name = text(value.name)
+  const procurement = parsedProcurement(value.procurement)
+  if (
+    !id.success ||
+    !['salads', 'firsts', 'mains', 'sides', 'desserts', 'extras', 'custom'].includes(
+      category as string,
+    ) ||
+    name === '' ||
+    procurement === null
+  ) {
+    return null
+  }
+  const legacyNames = preservedTextList(value.legacyNames)
+  return {
+    id: id.data,
+    category: category as PreparationCatalogItem['category'],
+    name,
+    ...(legacyNames === undefined ? {} : { legacyNames }),
+    procurement,
+  }
+}
+
+function validPersistedLunchItem(value: unknown): LunchCatalogItem | null {
+  if (!isRecord(value)) return null
+  const key = text(value.key)
+  const name = text(value.name)
+  if (key === '' || name === '') return null
+  const legacyKeys = preservedTextList(value.legacyKeys)
+  const allowsSides = value.allowsSides === true
+  let addon: LunchCatalogAddon | undefined
+  if (value.addon !== undefined) {
+    if (!isRecord(value.addon)) return null
+    const itemId = StableCatalogIdSchema.safeParse(value.addon.itemId)
+    const addonName = text(value.addon.name)
+    const procurement = parsedProcurement(value.addon.procurement)
+    if (!itemId.success || addonName === '' || procurement === null) return null
+    addon = { itemId: itemId.data, name: addonName, procurement }
+  }
+  const shared = {
+    key,
+    name,
+    ...(legacyKeys === undefined ? {} : { legacyKeys }),
+    ...(allowsSides ? { allowsSides: true } : {}),
+    ...(addon === undefined ? {} : { addon }),
+  }
+  if (Array.isArray(value.variants) && value.variants.length > 0) {
+    if (value.itemId !== undefined || value.procurement !== undefined) return null
+    const keys = new Set<string>()
+    const variants: LunchCatalogVariant[] = []
+    for (const rawVariant of value.variants) {
+      if (!isRecord(rawVariant)) return null
+      const variantKey = text(rawVariant.key)
+      const itemId = StableCatalogIdSchema.safeParse(rawVariant.itemId)
+      const variantName = text(rawVariant.name)
+      const procurement = parsedProcurement(rawVariant.procurement)
+      if (
+        variantKey === '' ||
+        keys.has(variantKey) ||
+        !itemId.success ||
+        variantName === '' ||
+        procurement === null
+      ) {
+        return null
+      }
+      keys.add(variantKey)
+      variants.push({ key: variantKey, itemId: itemId.data, name: variantName, procurement })
+    }
+    return {
+      ...shared,
+      variants: variants as [LunchCatalogVariant, ...LunchCatalogVariant[]],
+    }
+  }
+  if (value.variants !== undefined) return null
+  const itemId = StableCatalogIdSchema.safeParse(value.itemId)
+  const procurement = parsedProcurement(value.procurement)
+  if (!itemId.success || procurement === null) return null
+  return { ...shared, itemId: itemId.data, procurement }
+}
+
+function persistedLunchItemIsUsed(item: LunchCatalogItem, store: Readonly<LegacyStore>): boolean {
+  const keys = new Set([item.key, ...(item.legacyKeys ?? [])])
+  return store.orders.some(
+    (order) =>
+      activeOrder(order) &&
+      isRecord(order.lunch) &&
+      [...keys].some((key) => positiveLegacyCount(order.lunch?.[key])),
+  )
+}
+
 export function buildPreparationCatalog(
   catalog: SettingsCatalog,
   store: Readonly<LegacyStore> = { orders: [] },
@@ -451,12 +635,23 @@ export function buildPreparationCatalog(
   const previous = preparationSource(store)
   const previousItems = Array.isArray(previous.items) ? previous.items : []
   const previousLunch = Array.isArray(previous.lunchItems) ? previous.lunchItems : []
-  const findPreviousItem = (itemId: string): Readonly<Record<string, unknown>> | undefined =>
+  const findPreviousItem = (
+    itemId: string,
+    category?: string,
+    name?: string,
+  ): Readonly<Record<string, unknown>> | undefined =>
     previousItems.find((value) => isRecord(value) && text(value.id) === itemId) as
       | Readonly<Record<string, unknown>>
-      | undefined
+      | undefined ?? previousItems.find(
+        (value) =>
+          isRecord(value) &&
+          category !== undefined &&
+          name !== undefined &&
+          value.category === category &&
+          text(value.name) === name,
+      ) as Readonly<Record<string, unknown>> | undefined
 
-  const items = [
+  const items: PreparationCatalogItem[] = [
     ...MENU_CATEGORY_KEYS.flatMap((category) =>
       catalog.categories[category].map((item) => {
         const source = findPreviousItem(item.id)
@@ -486,7 +681,42 @@ export function buildPreparationCatalog(
         procurement: preservedProcurement(source?.procurement, fallback),
       }
     }),
+    ...REVIEWED_LEGACY_PREPARATION_ITEMS.flatMap((item) => {
+      const source = findPreviousItem(item.id, item.category, item.name)
+      if (source === undefined && !reviewedLegacyItemIsUsed(item, store)) return []
+      const legacyNames = preservedTextList(source?.legacyNames)
+      return [{
+        ...preservedUnknownFields(source, ['id', 'category', 'name', 'legacyNames', 'procurement']),
+        id: item.id,
+        category: item.category,
+        name: item.name,
+        ...(legacyNames === undefined ? {} : { legacyNames }),
+        procurement: preservedProcurement(source?.procurement, { kind: 'recipe' }),
+      }]
+    }),
   ]
+
+  const knownItemIds = new Set(items.map((item) => item.id))
+  const knownCustomNames = new Set(
+    items.filter((item) => item.category === 'custom').map((item) => item.name),
+  )
+  for (const value of previousItems) {
+    const persisted = validPersistedItem(value)
+    if (
+      persisted?.category !== 'custom' ||
+      knownItemIds.has(persisted.id) ||
+      knownCustomNames.has(persisted.name)
+    ) {
+      continue
+    }
+    const source = value as Readonly<Record<string, unknown>>
+    items.push({
+      ...preservedUnknownFields(source, ['id', 'category', 'name', 'legacyNames', 'procurement']),
+      ...persisted,
+    })
+    knownItemIds.add(persisted.id)
+    knownCustomNames.add(persisted.name)
+  }
 
   const lunchItems = catalog.lunch.map((item) => {
     const source = previousLunch.find(
@@ -851,7 +1081,7 @@ function normalizeLunchSides(source: unknown, warnings: CatalogWarning[]): Catal
     }
     names.push(name)
   })
-  return (names.length === 0 ? DEFAULT_LUNCH_SIDES : names).map((name) => ({
+  return names.map((name) => ({
     id: generatedId('lunch-side', name),
     name,
   }))
@@ -995,6 +1225,340 @@ export function loadSettingsCatalog(store: Readonly<LegacyStore>): CatalogResult
     lunchSides: normalizeLunchSides(menu.lunchSides, warnings),
   }
   return { catalog, warnings: [...warnings, ...validateSettingsCatalog(catalog)] }
+}
+
+function persistedPreparationIssues(
+  value: unknown,
+  authoritative: Readonly<PreparationCatalog>,
+): string[] {
+  if (!isRecord(value)) return ['preparationCatalog must be an object']
+  const issues: string[] = []
+  const authoritativeItems = new Map(authoritative.items.map((item) => [item.id, item]))
+  const authoritativeLunch = new Map(authoritative.lunchItems.map((item) => [item.key, item]))
+  const validateAliases = (raw: unknown, path: string): void => {
+    if (!Array.isArray(raw) || raw.some((alias) => text(alias) === '')) {
+      issues.push(`${path} must contain only nonblank aliases`)
+    }
+  }
+  const validatePolicy = (raw: unknown, path: string): void => {
+    if (parsedProcurement(raw) === null) issues.push(`${path} is invalid`)
+  }
+
+  if (value.items !== undefined && !Array.isArray(value.items)) {
+    issues.push('preparationCatalog.items must be an array')
+  } else if (Array.isArray(value.items)) {
+    value.items.forEach((rawItem, index) => {
+      const path = `preparationCatalog.items.${index}`
+      if (!isRecord(rawItem)) {
+        issues.push(`${path} must be an object`)
+        return
+      }
+      const id = StableCatalogIdSchema.safeParse(rawItem.id)
+      const matched = id.success ? authoritativeItems.get(id.data) : undefined
+      if (!id.success) {
+        issues.push(`${path}.id is invalid`)
+      }
+      if (rawItem.category === undefined) {
+        if (matched === undefined) issues.push(`${path}.category is invalid`)
+      } else if (!['salads', 'firsts', 'mains', 'sides', 'desserts', 'extras', 'custom'].includes(
+        String(rawItem.category),
+      )) {
+        issues.push(`${path}.category is invalid`)
+      }
+      if (rawItem.name === undefined) {
+        if (matched === undefined) issues.push(`${path}.name is invalid`)
+      } else if (text(rawItem.name) === '') {
+        issues.push(`${path}.name is invalid`)
+      }
+      if (rawItem.legacyNames !== undefined) validateAliases(rawItem.legacyNames, `${path}.legacyNames`)
+      if (rawItem.procurement === undefined) {
+        if (matched === undefined) issues.push(`${path}.procurement is invalid`)
+      } else {
+        validatePolicy(rawItem.procurement, `${path}.procurement`)
+      }
+    })
+  }
+
+  if (value.lunchItems !== undefined && !Array.isArray(value.lunchItems)) {
+    issues.push('preparationCatalog.lunchItems must be an array')
+  } else if (Array.isArray(value.lunchItems)) {
+    value.lunchItems.forEach((rawItem, index) => {
+      const path = `preparationCatalog.lunchItems.${index}`
+      if (!isRecord(rawItem)) {
+        issues.push(`${path} must be an object`)
+        return
+      }
+      const key = text(rawItem.key)
+      const matched = authoritativeLunch.get(key)
+      if (key === '') issues.push(`${path}.key is invalid`)
+      if (rawItem.name === undefined) {
+        if (matched === undefined) issues.push(`${path}.name is invalid`)
+      } else if (text(rawItem.name) === '') {
+        issues.push(`${path}.name is invalid`)
+      }
+      if (rawItem.legacyKeys !== undefined) validateAliases(rawItem.legacyKeys, `${path}.legacyKeys`)
+      if (rawItem.variants !== undefined && !Array.isArray(rawItem.variants)) {
+        issues.push(`${path}.variants must be an array`)
+      } else if (Array.isArray(rawItem.variants)) {
+        if (rawItem.variants.length === 0) issues.push(`${path}.variants must be non-empty`)
+        rawItem.variants.forEach((rawVariant, variantIndex) => {
+          const variantPath = `${path}.variants.${variantIndex}`
+          if (!isRecord(rawVariant)) {
+            issues.push(`${variantPath} must be an object`)
+            return
+          }
+          const variantKey = text(rawVariant.key)
+          const variantId = StableCatalogIdSchema.safeParse(rawVariant.itemId)
+          const matchedVariant = matched?.variants?.find(
+            (variant) =>
+              (variantKey !== '' && variant.key === variantKey) ||
+              (variantId.success && variant.itemId === variantId.data),
+          )
+          if (rawVariant.key === undefined) {
+            if (matchedVariant === undefined) issues.push(`${variantPath}.key is invalid`)
+          } else if (variantKey === '') {
+            issues.push(`${variantPath}.key is invalid`)
+          }
+          if (rawVariant.itemId === undefined) {
+            if (matchedVariant === undefined) issues.push(`${variantPath}.itemId is invalid`)
+          } else if (!variantId.success) {
+            issues.push(`${variantPath}.itemId is invalid`)
+          }
+          if (rawVariant.name === undefined) {
+            if (matchedVariant === undefined) issues.push(`${variantPath}.name is invalid`)
+          } else if (text(rawVariant.name) === '') {
+            issues.push(`${variantPath}.name is invalid`)
+          }
+          if (rawVariant.procurement === undefined) {
+            if (matchedVariant === undefined) issues.push(`${variantPath}.procurement is invalid`)
+          } else {
+            validatePolicy(rawVariant.procurement, `${variantPath}.procurement`)
+          }
+        })
+      } else {
+        if (rawItem.itemId === undefined) {
+          if (matched === undefined) issues.push(`${path}.itemId is invalid`)
+        } else if (!StableCatalogIdSchema.safeParse(rawItem.itemId).success) {
+          issues.push(`${path}.itemId is invalid`)
+        }
+        if (rawItem.procurement === undefined) {
+          if (matched === undefined) issues.push(`${path}.procurement is invalid`)
+        } else {
+          validatePolicy(rawItem.procurement, `${path}.procurement`)
+        }
+      }
+      if (rawItem.addon !== undefined && !isRecord(rawItem.addon)) {
+        issues.push(`${path}.addon must be an object`)
+      } else if (isRecord(rawItem.addon)) {
+        if (rawItem.addon.itemId === undefined) {
+          if (matched?.addon === undefined) issues.push(`${path}.addon.itemId is invalid`)
+        } else if (!StableCatalogIdSchema.safeParse(rawItem.addon.itemId).success) {
+          issues.push(`${path}.addon.itemId is invalid`)
+        }
+        if (rawItem.addon.name === undefined) {
+          if (matched?.addon === undefined) issues.push(`${path}.addon.name is invalid`)
+        } else if (text(rawItem.addon.name) === '') {
+          issues.push(`${path}.addon.name is invalid`)
+        }
+        if (rawItem.addon.procurement === undefined) {
+          if (matched?.addon === undefined) issues.push(`${path}.addon.procurement is invalid`)
+        } else {
+          validatePolicy(rawItem.addon.procurement, `${path}.addon.procurement`)
+        }
+      }
+    })
+  }
+  return issues
+}
+
+function strictRuntimePreparationCatalog(
+  projected: PreparationCatalog,
+  issues: string[],
+): PreparationCatalog {
+  const ids = new Set<string>()
+  const canonicalNames = new Map<string, string>()
+  const aliases = new Map<string, string>()
+  const items: PreparationCatalogItem[] = []
+  for (const item of projected.items) {
+    const canonicalKey = JSON.stringify([item.category, item.name])
+    const canonicalOwner = canonicalNames.get(canonicalKey)
+    if (ids.has(item.id) || (canonicalOwner !== undefined && canonicalOwner !== item.id)) {
+      issues.push(`preparation item ${item.id} conflicts with an existing item identity`)
+      continue
+    }
+    ids.add(item.id)
+    canonicalNames.set(canonicalKey, item.id)
+    const legacyNames = [...new Set(item.legacyNames ?? [])].filter((alias) => {
+      const key = JSON.stringify([item.category, alias])
+      const namedOwner = canonicalNames.get(key)
+      const aliasOwner = aliases.get(key)
+      if (
+        (namedOwner !== undefined && namedOwner !== item.id) ||
+        (aliasOwner !== undefined && aliasOwner !== item.id)
+      ) {
+        issues.push(`preparation alias ${alias} conflicts in ${item.category}`)
+        return false
+      }
+      aliases.set(key, item.id)
+      return true
+    })
+    items.push({
+      id: item.id,
+      category: item.category,
+      name: item.name,
+      ...(legacyNames.length === 0 ? {} : { legacyNames }),
+      procurement: item.procurement.kind === 'direct'
+        ? { ...item.procurement }
+        : { kind: item.procurement.kind },
+    })
+  }
+
+  const canonicalLunchKeys = new Map<string, string>()
+  const lunchAliases = new Map<string, string>()
+  const lunchItems: LunchCatalogItem[] = []
+  for (const item of projected.lunchItems) {
+    if (canonicalLunchKeys.has(item.key)) {
+      issues.push(`preparation lunch key ${item.key} conflicts with an existing item`)
+      continue
+    }
+    const itemIds = [
+      ...(item.itemId === undefined ? [] : [item.itemId]),
+      ...(item.variants ?? []).map((variant) => variant.itemId),
+      ...(item.addon === undefined ? [] : [item.addon.itemId]),
+    ]
+    if (new Set(itemIds).size !== itemIds.length || itemIds.some((id) => ids.has(id))) {
+      issues.push(`preparation lunch item ${item.key} conflicts with an existing catalog ID`)
+      continue
+    }
+    itemIds.forEach((id) => ids.add(id))
+    canonicalLunchKeys.set(item.key, item.key)
+    const legacyKeys = [...new Set(item.legacyKeys ?? [])].filter((alias) => {
+      const namedOwner = canonicalLunchKeys.get(alias)
+      const aliasOwner = lunchAliases.get(alias)
+      if (
+        (namedOwner !== undefined && namedOwner !== item.key) ||
+        (aliasOwner !== undefined && aliasOwner !== item.key)
+      ) {
+        issues.push(`preparation lunch alias ${alias} conflicts`)
+        return false
+      }
+      lunchAliases.set(alias, item.key)
+      return true
+    })
+    const shared = {
+      key: item.key,
+      name: item.name,
+      ...(legacyKeys.length === 0 ? {} : { legacyKeys: [...new Set(legacyKeys)] }),
+      ...(item.allowsSides === true ? { allowsSides: true } : {}),
+      ...(item.addon === undefined
+        ? {}
+        : {
+            addon: {
+              itemId: item.addon.itemId,
+              name: item.addon.name,
+              procurement: item.addon.procurement.kind === 'direct'
+                ? { ...item.addon.procurement }
+                : { kind: item.addon.procurement.kind },
+            },
+          }),
+    }
+    if (item.itemId !== undefined) {
+      lunchItems.push({
+        ...shared,
+        itemId: item.itemId,
+        procurement: item.procurement.kind === 'direct'
+          ? { ...item.procurement }
+          : { kind: item.procurement.kind },
+      })
+      continue
+    }
+    lunchItems.push({
+      ...shared,
+      variants: item.variants.map((variant) => ({
+        key: variant.key,
+        itemId: variant.itemId,
+        name: variant.name,
+        procurement: variant.procurement.kind === 'direct'
+          ? { ...variant.procurement }
+          : { kind: variant.procurement.kind },
+      })) as [LunchCatalogVariant, ...LunchCatalogVariant[]],
+    })
+  }
+  return { items, lunchItems }
+}
+
+export function resolvePreparationCatalog(
+  store: Readonly<LegacyStore>,
+): PreparationCatalogResolution {
+  const raw = (store as Readonly<Record<string, unknown>>).preparationCatalog
+  const settings = loadSettingsCatalog(store).catalog
+  const projected = buildPreparationCatalog(settings, store)
+  const issues = raw === undefined || raw === null
+    ? []
+    : persistedPreparationIssues(raw, projected)
+  const menuItemIds = new Set([
+    ...MENU_CATEGORY_KEYS.flatMap((category) =>
+      settings.categories[category].map((item) => item.id),
+    ),
+    ...settings.extras.map((item) => item.id),
+  ])
+  const authoritativeLunchIds = new Set(
+    projected.lunchItems.flatMap((item) => [
+      ...(item.itemId === undefined ? [] : [item.itemId]),
+      ...(item.variants ?? []).map((variant) => variant.itemId),
+      ...(item.addon === undefined ? [] : [item.addon.itemId]),
+    ]),
+  )
+  const conflictingPersistedItemIds = new Set<string>()
+  const items = projected.items.filter((item) => {
+    const used = persistedItemIsUsed(item, store)
+    if (!menuItemIds.has(item.id) && used && authoritativeLunchIds.has(item.id)) {
+      conflictingPersistedItemIds.add(item.id)
+      issues.push(`persisted preparation item ${item.id} conflicts with an authoritative lunch ID`)
+      return false
+    }
+    return menuItemIds.has(item.id) || used
+  })
+  const lunchItems = [...projected.lunchItems]
+
+  if (isRecord(raw)) {
+    if (Array.isArray(raw.items)) {
+      for (const value of raw.items) {
+        const item = validPersistedItem(value)
+        if (
+          item !== null &&
+          persistedItemIsUsed(item, store) &&
+          !authoritativeLunchIds.has(item.id) &&
+          !items.some((candidate) => candidate.id === item.id)
+        ) {
+          items.push(item)
+        } else if (
+          item !== null &&
+          persistedItemIsUsed(item, store) &&
+          authoritativeLunchIds.has(item.id) &&
+          !conflictingPersistedItemIds.has(item.id)
+        ) {
+          issues.push(`persisted preparation item ${item.id} conflicts with an authoritative lunch ID`)
+        }
+      }
+    }
+    if (Array.isArray(raw.lunchItems)) {
+      for (const value of raw.lunchItems) {
+        const item = validPersistedLunchItem(value)
+        if (item === null || !persistedLunchItemIsUsed(item, store)) continue
+        const existingIndex = lunchItems.findIndex((candidate) => candidate.key === item.key)
+        if (existingIndex === -1) lunchItems.push(item)
+        else lunchItems[existingIndex] = item
+      }
+    }
+  }
+
+  const catalog = strictRuntimePreparationCatalog({ items, lunchItems }, issues)
+  return {
+    catalog,
+    state: issues.length > 0 ? 'invalid' : raw === undefined || raw === null ? 'missing' : 'configured',
+    issues,
+  }
 }
 
 function decimalFromMinorUnits(value: number): number {

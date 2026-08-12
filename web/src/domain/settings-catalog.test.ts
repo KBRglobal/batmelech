@@ -3,6 +3,7 @@ import {
   AUTHORITATIVE_ALLOWANCES,
   AUTHORITATIVE_FIRST_COURSE_ITEMS,
   DEFAULT_SETTINGS_CATALOG,
+  REVIEWED_LEGACY_PREPARATION_ITEMS,
   SUPERSEDED_MANUAL_EXTRAS,
   addCatalogExtra,
   addCatalogItem,
@@ -13,6 +14,7 @@ import {
   loadSettingsCatalog,
   nextStableIngredientId,
   removeCatalogItem,
+  resolvePreparationCatalog,
   recipeTargets,
   updateLunchPrice,
   validateRecipeDrafts,
@@ -336,6 +338,247 @@ describe('settings catalog', () => {
     expect(preparation.items.some((item) => item.name === 'משלוח')).toBe(false)
     expect(preparation.items.find((item) => item.name === 'מרק ירקות לקוסקוס ללא עוף')?.procurement).toEqual({ kind: 'recipe' })
     expect(preparation.lunchItems).toHaveLength(5)
+  })
+
+  it('resolves every active default category, extra, and lunch identity when preparation is missing', () => {
+    const resolved = resolvePreparationCatalog(EMPTY_STORE)
+
+    expect(resolved.state).toBe('missing')
+    expect(resolved.issues).toEqual([])
+    for (const category of ['salads', 'firsts', 'mains', 'sides', 'desserts'] as const) {
+      expect(
+        resolved.catalog.items
+          .filter((item) => item.category === category)
+          .map((item) => ({ id: item.id, name: item.name })),
+      ).toEqual(DEFAULT_SETTINGS_CATALOG.categories[category])
+    }
+    expect(
+      resolved.catalog.items
+        .filter((item) => item.category === 'extras')
+        .map((item) => item.name),
+    ).toEqual(DEFAULT_SETTINGS_CATALOG.extras.map((item) => item.name))
+    expect(resolved.catalog.lunchItems.map((item) => item.key)).toEqual(
+      DEFAULT_SETTINGS_CATALOG.lunch.map((item) => item.key),
+    )
+  })
+
+  it('completes empty and partial preparation, reports malformed storage, and honors empty menu arrays', () => {
+    const salad = DEFAULT_SETTINGS_CATALOG.categories.salads[0]!
+    const empty = resolvePreparationCatalog({
+      orders: [],
+      preparationCatalog: {},
+    } as LegacyStore)
+    const partial = resolvePreparationCatalog({
+      orders: [],
+      preparationCatalog: {
+        futureRoot: { keepPersistedOnly: true },
+        items: [{
+          id: salad.id,
+          legacyNames: ['סלט היסטורי'],
+          procurement: { kind: 'none' },
+          futureItem: { keepPersistedOnly: true },
+        }],
+      },
+    } as LegacyStore)
+    const malformed = resolvePreparationCatalog({
+      orders: [],
+      preparationCatalog: { items: 'not-an-array' },
+    } as LegacyStore)
+    const intentionallyEmpty = resolvePreparationCatalog({
+      orders: [],
+      menu: { salads: [], extras: [], lunchSides: [] },
+    } as LegacyStore)
+
+    expect(empty.state).toBe('configured')
+    expect(empty.catalog.items.length).toBeGreaterThan(0)
+    expect(partial.state).toBe('configured')
+    expect(partial.catalog.items.find((item) => item.id === salad.id)).toEqual({
+      id: salad.id,
+      category: 'salads',
+      name: salad.name,
+      legacyNames: ['סלט היסטורי'],
+      procurement: { kind: 'none' },
+    })
+    expect(partial.catalog).not.toHaveProperty('futureRoot')
+    expect(partial.catalog.items.find((item) => item.id === salad.id)).not.toHaveProperty('futureItem')
+    expect(malformed.state).toBe('invalid')
+    expect(malformed.issues).toContain('preparationCatalog.items must be an array')
+    expect(malformed.catalog.items.length).toBeGreaterThan(0)
+    expect(intentionallyEmpty.catalog.items.filter((item) => item.category === 'salads')).toEqual([])
+    expect(intentionallyEmpty.catalog.items.filter((item) => item.category === 'extras')).toEqual([])
+    expect(loadSettingsCatalog({ orders: [], menu: { lunchSides: [] } } as LegacyStore).catalog.lunchSides).toEqual([])
+  })
+
+  it('adds only the three reviewed legacy order identities with deterministic recipe policies', () => {
+    const store = {
+      orders: [{
+        id: 'legacy-items',
+        date: '2026-08-15',
+        extras: { 'מגש אורז / קוסקוס / פסטה אדומה': { q: 1 } },
+        custom: [
+          { name: 'חומוס', qty: 2 },
+          { name: 'מרק ירקות קוסקוס פרווה', qty: 1 },
+          { name: 'פריט שרירותי', qty: 1 },
+        ],
+      }],
+    } as LegacyStore
+
+    const first = resolvePreparationCatalog(store)
+    const second = resolvePreparationCatalog(structuredClone(store))
+    const reviewedNames = new Set<string>(REVIEWED_LEGACY_PREPARATION_ITEMS.map((item) => item.name))
+    const reviewed = first.catalog.items.filter((item) => reviewedNames.has(item.name))
+
+    expect(reviewed).toEqual(REVIEWED_LEGACY_PREPARATION_ITEMS.map((item) => ({
+      ...item,
+      procurement: { kind: 'recipe' },
+    })))
+    expect(second.catalog.items.filter((item) => reviewedNames.has(item.name))).toEqual(reviewed)
+    expect(first.catalog.items.some((item) => item.name === 'פריט שרירותי')).toBe(false)
+  })
+
+  it('preserves valid configured custom entries in persistence but strips their future metadata at runtime', () => {
+    const store = {
+      orders: [{
+        id: 'custom-order',
+        date: '2026-08-15',
+        custom: [{ name: 'מנה פרטית מאושרת', qty: 1 }],
+      }],
+      preparationCatalog: {
+        futureRoot: { keep: true },
+        items: [{
+          id: 'custom-approved-item',
+          category: 'custom',
+          name: 'מנה פרטית מאושרת',
+          legacyNames: ['שם פרטי קודם'],
+          procurement: { kind: 'none' },
+          futureItem: { keep: true },
+        }],
+        lunchItems: [],
+      },
+    } as LegacyStore
+
+    for (const persisted of [
+      applyCatalogToStore(store, loadSettingsCatalog(store).catalog),
+      applyRecipesToStore(store, [], loadSettingsCatalog(store).catalog),
+    ] as Array<Record<string, unknown>>) {
+      const preparation = persisted.preparationCatalog as Record<string, unknown>
+      const custom = (preparation.items as Array<Record<string, unknown>>).find(
+        (item) => item.id === 'custom-approved-item',
+      )
+      expect(preparation.futureRoot).toEqual({ keep: true })
+      expect(custom).toMatchObject({
+        category: 'custom',
+        name: 'מנה פרטית מאושרת',
+        futureItem: { keep: true },
+      })
+    }
+
+    const runtime = resolvePreparationCatalog(store)
+    expect(runtime.state).toBe('configured')
+    expect(runtime.catalog).not.toHaveProperty('futureRoot')
+    expect(runtime.catalog.items.find((item) => item.id === 'custom-approved-item')).toEqual({
+      id: 'custom-approved-item',
+      category: 'custom',
+      name: 'מנה פרטית מאושרת',
+      legacyNames: ['שם פרטי קודם'],
+      procurement: { kind: 'none' },
+    })
+  })
+
+  it('keeps used configured non-menu items and lunch while omitting unused reviewed history', () => {
+    const store = {
+      orders: [{
+        id: 'configured-use',
+        date: '2026-08-15',
+        mains: { 'עיקרית שמורה': 1 },
+        extras: { 'אקסטרה שמורה': { q: 2 } },
+        lunch: { 'legacy-lunch': { q: 1 } },
+      }],
+      preparationCatalog: {
+        items: [
+          { id: 'saved-main', category: 'mains', name: 'עיקרית שמורה', procurement: { kind: 'none' } },
+          { id: 'saved-extra', category: 'extras', name: 'אקסטרה שמורה', procurement: { kind: 'none' } },
+          {
+            id: REVIEWED_LEGACY_PREPARATION_ITEMS[1]!.id,
+            category: 'custom',
+            name: REVIEWED_LEGACY_PREPARATION_ITEMS[1]!.name,
+            procurement: { kind: 'recipe' },
+          },
+        ],
+        lunchItems: [{
+          key: 'legacy-lunch',
+          name: 'צהריים שמור',
+          itemId: 'saved-lunch',
+          procurement: { kind: 'none' },
+        }],
+      },
+    } as LegacyStore
+
+    const resolved = resolvePreparationCatalog(store)
+
+    expect(resolved.state).toBe('configured')
+    expect(resolved.catalog.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'saved-main', name: 'עיקרית שמורה' }),
+      expect.objectContaining({ id: 'saved-extra', name: 'אקסטרה שמורה' }),
+    ]))
+    expect(resolved.catalog.lunchItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'legacy-lunch', itemId: 'saved-lunch' }),
+    ]))
+    expect(resolved.catalog.items.some((item) => item.name === 'חומוס')).toBe(false)
+  })
+
+  it('fails safely on persisted cross-section ID collisions without throwing', () => {
+    const store = {
+      orders: [{
+        id: 'collision-use',
+        date: '2026-08-15',
+        custom: [{ name: 'מנה מתנגשת', qty: 1 }],
+      }],
+      preparationCatalog: {
+        items: [{
+          id: 'lunch-tunisian-baguette',
+          category: 'custom',
+          name: 'מנה מתנגשת',
+          procurement: { kind: 'none' },
+        }],
+        lunchItems: [],
+      },
+    } as LegacyStore
+
+    expect(() => resolvePreparationCatalog(store)).not.toThrow()
+    const resolved = resolvePreparationCatalog(store)
+    expect(resolved.state).toBe('invalid')
+    expect(resolved.issues.join(' ')).toContain('conflicts with an authoritative lunch ID')
+    expect(resolved.catalog.items.some((item) => item.name === 'מנה מתנגשת')).toBe(false)
+    expect(resolved.catalog.lunchItems.some((item) => item.key === 'baguette')).toBe(true)
+  })
+
+  it('marks incomplete persisted rows invalid and gives issues precedence over a missing catalog', () => {
+    const incomplete = resolvePreparationCatalog({
+      orders: [],
+      preparationCatalog: {
+        items: [{ id: 'incomplete-item', name: 'חסר סיווג' }],
+        lunchItems: [{ key: 'incomplete-lunch', name: 'חסר מזהה' }],
+      },
+    } as LegacyStore)
+    const missingWithMenuCollision = resolvePreparationCatalog({
+      orders: [],
+      menu: {
+        mains: ['מנה עם מזהה מתנגש'],
+        itemIds: { mains: { 'מנה עם מזהה מתנגש': 'lunch-tunisian-baguette' } },
+      },
+    } as LegacyStore)
+
+    expect(incomplete.state).toBe('invalid')
+    expect(incomplete.issues).toEqual(expect.arrayContaining([
+      expect.stringContaining('items.0.category is invalid'),
+      expect.stringContaining('items.0.procurement is invalid'),
+      expect.stringContaining('lunchItems.0.itemId is invalid'),
+      expect.stringContaining('lunchItems.0.procurement is invalid'),
+    ]))
+    expect(missingWithMenuCollision.state).toBe('invalid')
+    expect(missingWithMenuCollision.issues.join(' ')).toContain('conflicts with an existing catalog ID')
+    expect(missingWithMenuCollision.catalog.lunchItems.some((item) => item.key === 'baguette')).toBe(false)
   })
 
   it('preserves unknown preparation metadata through menu and recipe projections', () => {

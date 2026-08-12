@@ -553,6 +553,30 @@ describe('buildPreparationPlan', () => {
     ])
   })
 
+  it('accepts a single trailing dollar sign while rejecting double signs, bad grouping, and overflow', () => {
+    const trailing = buildPreparationPlan(
+      [{ id: 'trailing-dollar', date: '2026-08-15', total: '250$', deposit: '.25$' }],
+      CATALOG,
+    )
+    const invalid = buildPreparationPlan(
+      [
+        { id: 'double-dollar', date: '2026-08-15', total: '$1$' },
+        { id: 'bad-grouping', date: '2026-08-15', total: '1,2,3' },
+        { id: 'overflow', date: '2026-08-15', total: '9'.repeat(1_000) },
+      ],
+      CATALOG,
+    )
+
+    expect(trailing.complete).toBe(true)
+    expect(getUsdMinorUnits(trailing.finance.revenue)).toBe(25_000)
+    expect(getUsdMinorUnits(trailing.finance.deposits)).toBe(25)
+    expect(invalid.warnings.map(({ code, orderId }) => ({ code, orderId }))).toEqual([
+      { code: 'INVALID_MONEY', orderId: 'bad-grouping' },
+      { code: 'INVALID_MONEY', orderId: 'double-dollar' },
+      { code: 'MONEY_OVERFLOW', orderId: 'overflow' },
+    ])
+  })
+
   it('uses prototype-safe maps for hostile legacy item names without mutating global prototypes', () => {
     const hostileCatalog = {
       ...CATALOG,
@@ -613,7 +637,64 @@ describe('buildPreparationPlan', () => {
       },
     ])
     expect(result.warnings).toMatchObject([
-      { code: 'UNKNOWN_CATALOG_ITEM', path: 'mains.Mystery' },
+      {
+        code: 'UNKNOWN_CATALOG_ITEM',
+        path: 'mains.Mystery',
+        itemCategory: 'mains',
+        itemName: 'Mystery',
+        occurrences: 1,
+      },
+    ])
+  })
+
+  it('deduplicates unknown items by exact category and name without merging custom rows that share a path', () => {
+    const result = buildPreparationPlan(
+      [
+        {
+          id: 'unknown-a',
+          date: '2026-08-15',
+          mains: { Mystery: 2, Shared: 1 },
+          custom: [
+            { name: 'Alpha', qty: 1 },
+            { name: 'Beta', qty: 2 },
+            { name: 'Shared', qty: 3 },
+          ],
+        },
+        {
+          id: 'unknown-b',
+          date: '2026-08-15',
+          mains: { Mystery: 3 },
+          custom: [
+            { name: 'Alpha', qty: 4 },
+            { name: 'Gamma', qty: 5 },
+          ],
+        },
+      ],
+      CATALOG,
+    )
+    const group = dateGroup(result, '2026-08-15')
+    const unknown = result.warnings.filter((warning) => warning.code === 'UNKNOWN_CATALOG_ITEM')
+
+    expect(group.categories.mains).toEqual({ Mystery: 5, Shared: 1 })
+    expect(group.categories.custom).toEqual({ Alpha: 5, Beta: 2, Gamma: 5, Shared: 3 })
+    expect(group.itemDemands).toEqual([])
+    expect(unknown.map(({ itemCategory, itemName, occurrences }) => ({
+      itemCategory,
+      itemName,
+      occurrences,
+    }))).toEqual([
+      { itemCategory: 'custom', itemName: 'Alpha', occurrences: 2 },
+      { itemCategory: 'custom', itemName: 'Beta', occurrences: 1 },
+      { itemCategory: 'custom', itemName: 'Gamma', occurrences: 1 },
+      { itemCategory: 'custom', itemName: 'Shared', occurrences: 1 },
+      { itemCategory: 'mains', itemName: 'Mystery', occurrences: 2 },
+      { itemCategory: 'mains', itemName: 'Shared', occurrences: 1 },
+    ])
+    expect(unknown.filter((warning) => warning.itemCategory === 'custom').map((warning) => warning.path)).toEqual([
+      'custom.0',
+      'custom.1',
+      'custom.1',
+      'custom.2',
     ])
   })
 

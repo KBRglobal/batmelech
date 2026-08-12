@@ -18,17 +18,15 @@ import {
 import { buildPreparationOperationsReview } from '../domain/operations-review.ts'
 import {
   buildPreparationPlan,
-  type PreparationCatalog,
   type PreparationCategoryGroups,
   type PreparationDateGroup,
   type PreparationPlan,
   type PreparationWarning,
 } from '../domain/preparation.ts'
+import { resolvePreparationCatalog } from '../domain/settings-catalog.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
-
-const EMPTY_CATALOG: PreparationCatalog = { items: [], lunchItems: [] }
 
 const linkClassName =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-5 py-3 text-sm font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
@@ -52,25 +50,14 @@ type ToggleCompletion = (
   completed: boolean,
 ) => void
 
-function storedCatalog(store: LegacyStore): unknown {
-  return (store as Readonly<Record<string, unknown>>).preparationCatalog
-}
-
 function safePreparationPlan(store: LegacyStore): {
   readonly plan: PreparationPlan
   readonly catalogState: CatalogState
 } {
-  const rawCatalog = storedCatalog(store)
-  if (rawCatalog === undefined) {
-    return { plan: buildPreparationPlan(store.orders, EMPTY_CATALOG), catalogState: 'missing' }
-  }
-  try {
-    return {
-      plan: buildPreparationPlan(store.orders, rawCatalog as PreparationCatalog),
-      catalogState: 'configured',
-    }
-  } catch {
-    return { plan: buildPreparationPlan(store.orders, EMPTY_CATALOG), catalogState: 'invalid' }
+  const resolvedCatalog = resolvePreparationCatalog(store)
+  return {
+    plan: buildPreparationPlan(store.orders, resolvedCatalog.catalog),
+    catalogState: resolvedCatalog.state,
   }
 }
 
@@ -96,7 +83,10 @@ function warningText(warning: PreparationWarning): string {
     return `כמות לא תקינה בשדה ${warning.path}.`
   }
   if (warning.code === 'UNKNOWN_CATALOG_ITEM') {
-    return `הפריט בשדה ${warning.path} אינו מחובר לקטלוג הכנה יציב.`
+    const itemName = warning.itemName?.trim() || warning.path
+    const occurrences = warning.occurrences ?? 1
+    const occurrenceText = occurrences === 1 ? 'הופעה אחת' : `${occurrences} הופעות`
+    return `הפריט ${itemName} אינו מחובר לקטלוג ההכנה (${occurrenceText}).`
   }
   if (warning.code === 'UNKNOWN_LUNCH_ITEM') {
     return `פריט הצהריים בשדה ${warning.path} אינו מחובר לקטלוג הכנה יציב.`
@@ -107,18 +97,18 @@ function warningText(warning: PreparationWarning): string {
   return `מבנה לא צפוי בשדה ${warning.path}.`
 }
 
-function ConfigurationWarning({ state }: { state: Exclude<CatalogState, 'configured'> }) {
+function ConfigurationWarning() {
   return (
     <section className="rounded-3xl border border-amber-200 bg-amber-50/70 p-5" role="alert">
       <div className="flex items-start gap-3">
         <LocalIcon name="ph:warning-circle-bold" className="mt-0.5 text-2xl text-amber-700" />
         <div>
           <h2 className="font-black text-primary">
-            {state === 'missing' ? 'קטלוג ההכנה עדיין לא נשמר' : 'קטלוג ההכנה השמור אינו תקין'}
+            קטלוג ההכנה השמור אינו תקין
           </h2>
           <p className="mt-1 text-sm leading-6 text-amber-900">
-            הכמויות הגולמיות מוצגות מההזמנות, אבל מנות שלא חוברו למזהה יציב לא יעברו
-            לרשימת הקניות עד שהקטלוג יתוקן.
+            הכמויות מחושבות כעת לפי ההגדרה התקינה שאפשר לשחזר מהתפריט. יש לתקן את
+            הקטלוג השמור כדי שכל המנות יישארו מחוברות למתכונים שלהן.
           </p>
           <Link className="mt-3 inline-block text-sm font-black text-primary underline underline-offset-4" to={APP_ROUTES.recipeSettings}>
             להגדרת מתכונים ומצרכים
@@ -141,6 +131,14 @@ function DataWarnings({ warnings }: { warnings: readonly PreparationWarning[] })
             {warnings.map((warning, index) => (
               <li key={`${warning.code}-${String(warning.orderId)}-${warning.path}-${index}`}>
                 {warningText(warning)}
+                {warning.code === 'UNKNOWN_CATALOG_ITEM' && (
+                  <>
+                    {' '}
+                    <Link className="font-black underline underline-offset-4" to={APP_ROUTES.recipeSettings}>
+                      להוספה בהגדרות
+                    </Link>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -628,7 +626,7 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
 
       <div className="mt-8 space-y-8">
         <OperationsAiAdvisory key={operationsReview.key} presentation={operationsReview} />
-        {catalogState !== 'configured' && <ConfigurationWarning state={catalogState} />}
+        {catalogState === 'invalid' && <ConfigurationWarning />}
         <DataWarnings warnings={plan.warnings} />
         {visibleDates.length === 0 ? (
           <ScreenState

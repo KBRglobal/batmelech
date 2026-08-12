@@ -18,11 +18,11 @@ import {
 import { buildShoppingOperationsReview } from '../domain/operations-review.ts'
 import {
   buildPreparationPlan,
-  type PreparationCatalog,
   type PreparationItemDemand,
   type PreparationPlan,
 } from '../domain/preparation.ts'
 import type { RecipeDefinition } from '../domain/recipes.ts'
+import { resolvePreparationCatalog } from '../domain/settings-catalog.ts'
 import {
   buildShoppingList,
   type ShoppingListItem,
@@ -31,8 +31,6 @@ import {
 } from '../domain/shopping-list.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
-
-const EMPTY_CATALOG: PreparationCatalog = { items: [], lunchItems: [] }
 
 type ConfigurationState = 'configured' | 'missing' | 'invalid'
 
@@ -59,17 +57,10 @@ function safePreparation(store: LegacyStore): {
   readonly plan: PreparationPlan
   readonly catalogState: ConfigurationState
 } {
-  const rawCatalog = storedValue(store, 'preparationCatalog')
-  if (rawCatalog === undefined) {
-    return { plan: buildPreparationPlan(store.orders, EMPTY_CATALOG), catalogState: 'missing' }
-  }
-  try {
-    return {
-      plan: buildPreparationPlan(store.orders, rawCatalog as PreparationCatalog),
-      catalogState: 'configured',
-    }
-  } catch {
-    return { plan: buildPreparationPlan(store.orders, EMPTY_CATALOG), catalogState: 'invalid' }
+  const resolvedCatalog = resolvePreparationCatalog(store)
+  return {
+    plan: buildPreparationPlan(store.orders, resolvedCatalog.catalog),
+    catalogState: resolvedCatalog.state,
   }
 }
 
@@ -123,12 +114,10 @@ function ConfigurationWarnings({ catalogState, recipeState }: {
   catalogState: ConfigurationState
   recipeState: ConfigurationState
 }) {
-  if (catalogState === 'configured' && recipeState === 'configured') return null
+  if (catalogState !== 'invalid' && recipeState === 'configured') return null
   const messages: string[] = []
-  if (catalogState === 'missing') {
-    messages.push('לא נשמר קטלוג הכנה, ולכן אי אפשר לחבר את מנות ההזמנה למתכונים.')
-  } else if (catalogState === 'invalid') {
-    messages.push('קטלוג ההכנה השמור אינו תקין, ולכן לא נעשה בו שימוש.')
+  if (catalogState === 'invalid') {
+    messages.push('קטלוג ההכנה השמור אינו תקין. החישוב משתמש זמנית בהגדרה התקינה ששוחזרה מהתפריט.')
   }
   if (recipeState === 'missing') {
     messages.push('לא נשמרו מתכונים, ולכן לא הומצאו מצרכים או כמויות חסרות.')

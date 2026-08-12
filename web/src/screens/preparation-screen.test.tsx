@@ -232,20 +232,77 @@ describe('PreparationScreen', () => {
     expect(screen.queryByRole('button', { name: /החל|שמור|בצע/ })).toBeNull()
   })
 
-  it('shows raw preparation totals but explicitly blocks recipe flow when catalog configuration is missing', () => {
+  it('uses the effective default catalog when no preparation catalog was persisted and performs no read-time write', () => {
+    const onSave = successfulSave()
     mockedUseStore.mockReturnValue(queryResult({
       store: {
         orders: [{
-          id: 'raw', date: '2099-08-14', name: 'לקוחה', firsts: { 'מנה לא מקוטלגת': 3 },
+          id: 'default-catalog', date: '2099-08-14', name: 'לקוחה', sides: { 'אורז לבן': 3 },
         }],
       },
     }))
+    renderPreparation('/preparation', onSave)
+
+    expect(screen.getByText('אורז לבן')).toBeTruthy()
+    expect(screen.queryByText('קטלוג ההכנה עדיין לא נשמר')).toBeNull()
+    expect(screen.queryByText(/אינו מחובר לקטלוג ההכנה/)).toBeNull()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['empty', { items: [], lunchItems: [] }],
+    ['partial', { items: [] }],
+  ])('completes a valid %s persisted catalog from the effective default menu', (_label, preparationCatalog) => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'completed-catalog', date: '2099-08-14', mains: { 'תבשיל עוף מרוקאי עם חומוסים': 2 } }],
+        preparationCatalog,
+      } as LegacyStore,
+    }))
     renderPreparation()
 
-    expect(screen.getByText('קטלוג ההכנה עדיין לא נשמר')).toBeTruthy()
-    expect(screen.getByText('מנה לא מקוטלגת')).toBeTruthy()
-    const alerts = screen.getAllByRole('alert')
-    expect(alerts.some((alert) => within(alert).queryByText(/אינו מחובר לקטלוג הכנה יציב/) !== null)).toBe(true)
+    expect(screen.getByText('תבשיל עוף מרוקאי עם חומוסים')).toBeTruthy()
+    expect(screen.queryByText(/אינו מחובר לקטלוג ההכנה/)).toBeNull()
+    expect(screen.queryByText('קטלוג ההכנה השמור אינו תקין')).toBeNull()
+  })
+
+  it('collapses repeated unknown catalog warnings by exact item without hiding other validation warnings', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          {
+            id: 'custom-a-1',
+            date: '2099-08-14',
+            meals: 'not-a-count',
+            custom: [{ name: 'מנה סודית', qty: 1 }],
+          },
+          { id: 'custom-a-2', date: '2099-08-14', custom: [{ name: 'מנה סודית', qty: 2 }] },
+          { id: 'custom-b', date: '2099-08-14', custom: [{ name: 'מנה אחרת', qty: 1 }] },
+        ],
+      } as LegacyStore,
+    }))
+    renderPreparation()
+
+    expect(screen.getAllByText(/הפריט מנה סודית.*2 הופעות/)).toHaveLength(1)
+    expect(screen.getAllByText(/הפריט מנה אחרת.*הופעה אחת/)).toHaveLength(1)
+    expect(screen.getAllByText('כמות לא תקינה בשדה meals.')).toHaveLength(1)
+    const settingsLinks = screen.getAllByRole('link', { name: 'להוספה בהגדרות' })
+    expect(settingsLinks).toHaveLength(2)
+    settingsLinks.forEach((link) => expect(link.getAttribute('href')).toBe('/settings/recipes'))
+  })
+
+  it('flags an invalid persisted catalog while using the safe authoritative projection', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'invalid-catalog', date: '2099-08-14', sides: { 'אורז לבן': 2 } }],
+        preparationCatalog: { items: 'not-an-array', lunchItems: [] },
+      } as unknown as LegacyStore,
+    }))
+    renderPreparation()
+
+    expect(screen.getByText('קטלוג ההכנה השמור אינו תקין')).toBeTruthy()
+    expect(screen.getByText('אורז לבן')).toBeTruthy()
+    expect(screen.queryByText(/הפריט אורז לבן אינו מחובר/)).toBeNull()
   })
 
   it('never presents a coerced finance total when legacy money is malformed', () => {

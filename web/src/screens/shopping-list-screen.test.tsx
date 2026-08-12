@@ -121,6 +121,86 @@ describe('ShoppingListScreen', () => {
     expect(screen.queryByText('בצל אמיתי')).toBeNull()
   })
 
+  it('uses the effective menu catalog when none was persisted and performs no read-time write', () => {
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'menu-demand', date: '2099-08-14', sides: { 'אורז מהתפריט': 3 } }],
+        menu: {
+          sides: ['אורז מהתפריט'],
+          itemIds: { sides: { 'אורז מהתפריט': 'menu-side-rice' } },
+        },
+        recipes: [{
+          itemId: 'menu-side-rice',
+          yield: 1,
+          ingredients: [{
+            ingredientId: 'default-rice',
+            ingredientName: 'אורז לקנייה',
+            quantity: '0.25',
+            unit: 'kg',
+          }],
+        }],
+      } as LegacyStore,
+    }))
+    renderShopping('/shopping-list?date=2099-08-14', onSave)
+
+    expect(screen.getByText('אורז לקנייה')).toBeTruthy()
+    expect(screen.getByText('0.75 kg')).toBeTruthy()
+    expect(screen.queryByText(/לא נשמר קטלוג הכנה/)).toBeNull()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('completes an empty persisted catalog from the effective default menu', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'empty-catalog-demand', date: '2099-08-14', sides: { 'אורז לבן': 2 } }],
+        preparationCatalog: { items: [], lunchItems: [] },
+        recipes: [{
+          itemId: 'shabbat-sides-01',
+          yield: 1,
+          ingredients: [{
+            ingredientId: 'empty-catalog-rice',
+            ingredientName: 'אורז מהקטלוג המשלים',
+            quantity: '0.5',
+            unit: 'kg',
+          }],
+        }],
+      } as LegacyStore,
+    }))
+    renderShopping('/shopping-list?date=2099-08-14')
+
+    expect(screen.getByText('אורז מהקטלוג המשלים')).toBeTruthy()
+    expect(screen.getByText('1 kg')).toBeTruthy()
+    expect(screen.queryByText('קטלוג ההכנה השמור אינו תקין')).toBeNull()
+  })
+
+  it('preserves a valid procurement rule from a partial persisted catalog', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'partial-catalog-demand', date: '2099-08-14', sides: { 'אורז לבן': 2 } }],
+        preparationCatalog: {
+          items: [{
+            id: 'shabbat-sides-01',
+            category: 'sides',
+            name: 'אורז לבן',
+            procurement: {
+              kind: 'direct',
+              ingredientId: 'partial-rice',
+              ingredientName: 'שקית אורז',
+              quantityPerItem: '1.5',
+              unit: 'שקיות',
+            },
+          }],
+        },
+      } as LegacyStore,
+    }))
+    renderShopping('/shopping-list?date=2099-08-14')
+
+    expect(screen.getByText('שקית אורז')).toBeTruthy()
+    expect(screen.getByText('3 שקיות')).toBeTruthy()
+    expect(screen.queryByText('קטלוג ההכנה השמור אינו תקין')).toBeNull()
+  })
+
   it('keeps ingredient and customer text local during advisory AI review', async () => {
     const privateValues = [
       'PRIVATE SHOPPER',
@@ -251,17 +331,39 @@ describe('ShoppingListScreen', () => {
     expect(screen.getByText('5 יחידות')).toBeTruthy()
   })
 
-  it('rejects malformed persisted configuration instead of coercing it', () => {
+  it('flags malformed persisted catalog data while calculating from its safe authoritative projection', () => {
     mockedUseStore.mockReturnValue(queryResult({
       store: {
-        orders: [{ id: 'one', date: '2099-08-14', mains: { 'מנה': 1 } }],
-        preparationCatalog: { items: 'not-an-array' },
+        orders: [{ id: 'one', date: '2099-08-14', sides: { 'אורז לבן': 2 } }],
+        preparationCatalog: { items: 'not-an-array', lunchItems: [] },
+        recipes: [{
+          itemId: 'shabbat-sides-01',
+          yield: 1,
+          ingredients: [{
+            ingredientId: 'safe-rice',
+            ingredientName: 'אורז בטוח',
+            quantity: '0.5',
+            unit: 'kg',
+          }],
+        }],
+      } as unknown as LegacyStore,
+    }))
+    renderShopping()
+
+    expect(screen.getByText(/קטלוג ההכנה השמור אינו תקין/)).toBeTruthy()
+    expect(screen.getByText('אורז בטוח')).toBeTruthy()
+    expect(screen.getByText('1 kg')).toBeTruthy()
+  })
+
+  it('rejects a malformed persisted recipe collection instead of inventing quantities', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'one', date: '2099-08-14', sides: { 'אורז לבן': 1 } }],
         recipes: { itemId: 'not-an-array' },
       } as unknown as LegacyStore,
     }))
     renderShopping()
 
-    expect(screen.getByText('קטלוג ההכנה השמור אינו תקין, ולכן לא נעשה בו שימוש.')).toBeTruthy()
     expect(screen.getByText('הגדרת המתכונים השמורה אינה מערך תקין, ולכן לא נעשה בה שימוש.')).toBeTruthy()
     expect(screen.queryByText('1 kg')).toBeNull()
   })

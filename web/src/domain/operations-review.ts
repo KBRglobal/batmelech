@@ -84,6 +84,7 @@ interface LocalWarning {
   readonly source: OperationsReviewScope
   readonly code: OperationsWarningCode
   readonly serviceDate: string | null
+  readonly occurrences: number
   readonly relatedDemandIdentities: readonly string[]
 }
 
@@ -198,8 +199,11 @@ function buildPresentation(
       [...warning.relatedDemandIdentities].sort(compareText),
     ])
     const existing = groupedWarnings.get(key)
-    if (existing === undefined) groupedWarnings.set(key, { warning, occurrences: 1 })
-    else existing.occurrences += 1
+    if (existing === undefined) {
+      groupedWarnings.set(key, { warning, occurrences: warning.occurrences })
+    } else {
+      existing.occurrences += warning.occurrences
+    }
   }
 
   const warnings = [...groupedWarnings.entries()]
@@ -236,6 +240,7 @@ function preparationWarnings(warnings: readonly PreparationWarning[]): LocalWarn
     source: 'preparation',
     code: warning.code,
     serviceDate: null,
+    occurrences: warning.occurrences,
     relatedDemandIdentities: [],
   }))
 }
@@ -262,6 +267,7 @@ function shoppingWarnings(
     source: 'shopping',
     code: warning.code,
     serviceDate: warning.serviceDate && isRealIsoDate(warning.serviceDate) ? warning.serviceDate : null,
+    occurrences: 1,
     relatedDemandIdentities: warning.itemId === undefined
       ? []
       : demandIdentityByItemId.get(warning.itemId) ?? [],
