@@ -93,6 +93,7 @@ test('customer WhatsApp text is clean and keeps the internal BM1 payload out of 
   const customerText = api.buildText();
   assert.doesNotMatch(customerText, /#BM1#/u);
   assert.doesNotMatch(customerText, /[A-Za-z0-9+/]{30,}={0,2}#/u);
+  assert.ok(customerText.includes('\u2060'), 'the exact manager payload is carried invisibly');
   assert.match(api.buildInternalText(), /#BM1#[A-Za-z0-9+/=]+#/u);
   assert.match(customerText, /רולדת בשר/u);
 });

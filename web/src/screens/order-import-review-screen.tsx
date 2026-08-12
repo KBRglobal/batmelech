@@ -113,6 +113,10 @@ const BM1_LUNCH_SELECTION = z.object({
   sides: z.record(z.string().min(1).max(300), BM1_SELECTED_COUNT),
   addon: BM1_COUNT,
 }).strict()
+const HIDDEN_BM1_PREFIX = '\u2060\u200b\u200c'
+const HIDDEN_BM1_SUFFIX = '\u2060\u200c\u200b'
+const HIDDEN_BM1_ALPHABET = ['\u200b', '\u200c', '\u200d', '\u2060'] as const
+const HIDDEN_BM1_VALUES = new Map<string, number>(HIDDEN_BM1_ALPHABET.map((character, index) => [character, index]))
 const BM1PayloadSchema = z.object({
   date: BM1_TEXT,
   name: BM1_TEXT,
@@ -230,14 +234,36 @@ function decodeBM1Draft(
   message: string,
   menu: ReturnType<typeof buildOrderEditorMenu>,
 ): OrderDraft | null {
-  const markerPresent = message.includes('#BM1#')
-  const match = /#BM1#([A-Za-z0-9+/=]{1,12000})#/u.exec(message)
-  if (!match) {
+  const markerPresent = message.includes('#BM1#') || message.includes(HIDDEN_BM1_PREFIX)
+  const visibleMatch = /#BM1#([A-Za-z0-9+/=]{1,12000})#/u.exec(message)
+  let encoded = visibleMatch?.[1] ?? null
+  if (encoded === null) {
+    const hiddenStart = message.indexOf(HIDDEN_BM1_PREFIX)
+    const hiddenEnd = hiddenStart < 0 ? -1 : message.indexOf(HIDDEN_BM1_SUFFIX, hiddenStart + HIDDEN_BM1_PREFIX.length)
+    if (hiddenStart >= 0 && hiddenEnd > hiddenStart) {
+      const hidden = message.slice(hiddenStart + HIDDEN_BM1_PREFIX.length, hiddenEnd)
+      if (hidden.length > 0 && hidden.length % 3 === 0) {
+        let decoded = ''
+        for (let index = 0; index < hidden.length; index += 3) {
+          const high = HIDDEN_BM1_VALUES.get(hidden[index]!)
+          const middle = HIDDEN_BM1_VALUES.get(hidden[index + 1]!)
+          const low = HIDDEN_BM1_VALUES.get(hidden[index + 2]!)
+          if (high === undefined || middle === undefined || low === undefined) {
+            decoded = ''
+            break
+          }
+          decoded += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='[(high << 4) | (middle << 2) | low]
+        }
+        encoded = decoded || null
+      }
+    }
+  }
+  if (encoded === null) {
     if (markerPresent) throw new Error('BM1_INVALID')
     return null
   }
   try {
-    const binary = atob(match[1]!)
+    const binary = atob(encoded)
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
     const parsed = BM1PayloadSchema.parse(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)))
     assertAllowedNames(parsed.salads, menu.salads)

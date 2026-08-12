@@ -255,6 +255,9 @@ const MAIN_CONTROLLED_EXTRA_NAMES=new Set(Object.values(PAID_MAIN_EXTRAS).map(ex
 const SALAD_BLOCK_PRICE=25, SALAD_REMAINDER_PRICE=7, DELIVERY_PRICE=15, EXTRA_FISH_UNIT_PRICE=30;
 const FISH_CAKES_NAME='קציצות דגים ברוטב מרוקאי';
 const DUBAI_TIME_ZONE='Asia/Dubai';
+const HIDDEN_BM1_PREFIX='\u2060\u200b\u200c';
+const HIDDEN_BM1_SUFFIX='\u2060\u200c\u200b';
+const HIDDEN_BM1_ALPHABET=['\u200b','\u200c','\u200d','\u2060'];
 function nextFridayDubai(now=new Date()){
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
     timeZone:DUBAI_TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'
@@ -496,6 +499,15 @@ function fmtDateHe(ds){
   const wd=new Intl.DateTimeFormat('he-IL',{weekday:'long'}).format(d);
   return `${wd} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
 }
+function encodeHiddenBM1(code){
+  let hidden=HIDDEN_BM1_PREFIX;
+  for(const character of code){
+    const value='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='.indexOf(character);
+    if(value<0) return '';
+    hidden+=HIDDEN_BM1_ALPHABET[(value>>4)&3]+HIDDEN_BM1_ALPHABET[(value>>2)&3]+HIDDEN_BM1_ALPHABET[value&3];
+  }
+  return hidden+HIDDEN_BM1_SUFFIX;
+}
 function buildText({includeInternalPayload=false}={}){
   const L=['היי! אשמח להזמין'];
   if(o.date) L.push(`תאריך: ${fmtDateHe(o.date)}`);
@@ -532,7 +544,7 @@ function buildText({includeInternalPayload=false}={}){
   if(includeInternalPayload){
     L.push('');
     L.push(`#BM1#${code}#`);
-  }
+  } else L.push(encodeHiddenBM1(code));
   return L.join('\n');
 }
 function buildInternalText(){ return buildText({includeInternalPayload:true}); }
