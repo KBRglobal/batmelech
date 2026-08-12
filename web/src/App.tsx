@@ -1,5 +1,7 @@
+import { AppRouter } from './router.tsx'
+
 function App() {
-  return <main id="bat-melech-app" />
+  return <AppRouter />
 }
 
 export default App
