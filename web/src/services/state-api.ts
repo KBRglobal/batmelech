@@ -41,6 +41,11 @@ function stateUrl(baseUrl = ''): string {
   return `${baseUrl.replace(/\/$/, '')}/api/state`
 }
 
+function defaultStateBaseUrl(): string {
+  if (typeof window === 'undefined') return ''
+  return window.location.origin
+}
+
 async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json()
@@ -51,7 +56,7 @@ async function readJson(response: Response): Promise<unknown> {
 
 export async function loadState(options: StateApiOptions = {}): Promise<StateEnvelope> {
   const fetcher = options.fetcher ?? fetch
-  const response = await fetcher(stateUrl(options.baseUrl), {
+  const response = await fetcher(stateUrl(options.baseUrl ?? defaultStateBaseUrl()), {
     method: 'GET',
     headers: { Accept: 'application/json' },
     credentials: 'same-origin',
@@ -80,7 +85,7 @@ export async function saveState(
   }
 
   const fetcher = options.fetcher ?? fetch
-  const response = await fetcher(stateUrl(options.baseUrl), {
+  const response = await fetcher(stateUrl(options.baseUrl ?? defaultStateBaseUrl()), {
     method: 'POST',
     headers: {
       Accept: 'application/json',

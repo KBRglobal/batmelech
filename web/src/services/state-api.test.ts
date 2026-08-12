@@ -39,6 +39,26 @@ describe('state API', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/state', expect.objectContaining({ method: 'GET' }))
   })
 
+  it('uses an origin-qualified same-origin URL in the browser so Basic Auth URL credentials do not break fetch', async () => {
+    const originalWindow = globalThis.window
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { location: { origin: 'https://app.example.test' } },
+    })
+    const fetcher = vi.fn(async () => jsonResponse({ ts: 1234, data: { orders: [] } })) as unknown as typeof fetch
+
+    try {
+      await loadState({ fetcher })
+    } finally {
+      Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow })
+    }
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://app.example.test/api/state',
+      expect.objectContaining({ method: 'GET', credentials: 'same-origin' }),
+    )
+  })
+
   it('saves the complete store without stripping unknown fields', async () => {
     const data = parseLegacyStore({
       orders: [{ id: 'o1', futureOrderField: 'kept' }],
