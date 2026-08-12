@@ -512,7 +512,7 @@ describe('OrderEditorScreen', () => {
       await user.click(screen.getByRole('button', { name: 'הוספה לטחינה הוזמן' }))
     }
     await user.click(screen.getByRole('button', { name: 'הוספה לסופלה שוקולד' }))
-    await user.click(screen.getByRole('button', { name: 'הוספה לסוכריות בקלאווה' }))
+    await user.click(screen.getByRole('button', { name: 'הוספה לסוכריות בקלוואה' }))
 
     expect(screen.getAllByText('$282.00').length).toBeGreaterThan(0)
     expect(screen.getByText('$30.00')).toBeTruthy()
@@ -524,7 +524,7 @@ describe('OrderEditorScreen', () => {
     expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.00')
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
 
-    await user.click(screen.getByRole('button', { name: 'הפחתה מסוכריות בקלאווה' }))
+    await user.click(screen.getByRole('button', { name: 'הפחתה מסוכריות בקלוואה' }))
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
 
     await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))

@@ -784,9 +784,9 @@ describe('deterministic draft pricing and allowances', () => {
 
   it('models two souffles or one baklava portion per couple and flags excess without inventing a price', () => {
     expect(calculateDessertAllowance(draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 2 } }))).toMatchObject({ selectedHalfUnits: 2, includedHalfUnits: 2, excessHalfUnits: 0 })
-    expect(calculateDessertAllowance(draftWith({ meals: 2, desserts: { 'סוכריות בקלאווה': 2 } }))).toMatchObject({ selectedHalfUnits: 4, includedHalfUnits: 4, excessHalfUnits: 0 })
+    expect(calculateDessertAllowance(draftWith({ meals: 2, desserts: { 'סוכריות בקלוואה': 2 } }))).toMatchObject({ selectedHalfUnits: 4, includedHalfUnits: 4, excessHalfUnits: 0 })
     const pricing = calculateOrderDraftPricing(
-      draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 1, 'סוכריות בקלאווה': 1 } }),
+      draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 1, 'סוכריות בקלוואה': 1 } }),
       buildOrderEditorMenu(emptyStore),
     )
     expect(pricing.issues).toContainEqual(expect.objectContaining({ code: 'DESSERT_OVERAGE', blocking: true }))

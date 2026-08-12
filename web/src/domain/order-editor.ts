@@ -55,7 +55,7 @@ export const DEFAULT_MENU_CATEGORIES = {
     'פסטה אדומה',
     'מגש תפו"א',
   ],
-  desserts: ['סופלה שוקולד', 'סוכריות בקלאווה'],
+  desserts: ['סופלה שוקולד', 'סוכריות בקלוואה'],
 } as const
 
 const DEFAULT_EXTRAS_DOLLARS = [
@@ -1236,7 +1236,7 @@ export function calculateOrderDraftPricing(
     issues.push({
       code: 'DESSERT_OVERAGE',
       message:
-        'בחירת הקינוחים חורגת מהזכאות: שני סופלה או מנת סוכריות בקלאווה לכל זוגית. המחיר לחריגה טרם הוגדר.',
+        'בחירת הקינוחים חורגת מהזכאות: שני סופלה או מנת סוכריות בקלוואה לכל זוגית. המחיר לחריגה טרם הוגדר.',
       blocking: true,
     })
   }
