@@ -1,14 +1,47 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
+  applyDailyExpenseToStore,
   buildFinanceDashboard,
+  expenseInputValue,
   formatFinanceMonth,
   formatSignedUsdMinorUnits,
+  hasStoredExpense,
+  validateExpenseInput,
+  type CustomerFinanceSaveHandler,
   type CustomerFinanceWarning,
   type FinanceDaySummary,
 } from '../domain/customers-finance.ts'
+import type { LegacyStore } from '../domain/store.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
+
+type ExpenseSaveState =
+  | { readonly kind: 'idle'; readonly message: '' }
+  | { readonly kind: 'saving'; readonly message: string }
+  | { readonly kind: 'saved'; readonly message: string }
+  | { readonly kind: 'error'; readonly message: string }
+
+interface FinanceInitialization {
+  readonly baseEnvelope: Readonly<VersionedStateEnvelope> | null
+  readonly baseStore: Readonly<LegacyStore>
+}
+
+interface ExpenseDraft {
+  readonly date: string
+  readonly value: string
+}
+
+interface AcceptedExpenseSave {
+  readonly nextStore: LegacyStore
+  readonly serviceDate: string
+  readonly overlayValue: number | null
+  readonly draftValue: string
+}
+
+const IDLE_EXPENSE_SAVE: ExpenseSaveState = { kind: 'idle', message: '' }
 
 function MoneyValue({ value, signed = false }: { value: number | null; signed?: boolean }) {
   if (value === null) return <span className="text-sm font-black text-destructive">דורש בדיקה</span>
@@ -87,7 +120,27 @@ function FinanceWarnings({ warnings }: { warnings: readonly CustomerFinanceWarni
   )
 }
 
-function DayRow({ day }: { day: FinanceDaySummary }) {
+function lastDateOfMonth(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const day = new Date(Date.UTC(year!, monthNumber!, 0)).getUTCDate()
+  return `${month}-${String(day).padStart(2, '0')}`
+}
+
+function defaultExpenseDate(month: string, currentMonth: string): string {
+  if (month !== currentMonth) return `${month}-01`
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'Asia/Dubai',
+  }).formatToParts(new Date())
+  const read = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  const date = `${read('year')}-${read('month')}-${read('day')}`
+  return date.startsWith(`${month}-`) ? date : `${month}-01`
+}
+
+function DayRow({ day, onEditExpense }: { day: FinanceDaySummary; onEditExpense: () => void }) {
   return (
     <tr className="border-b border-border last:border-0">
       <th scope="row" className="px-4 py-5 text-right font-black text-primary sm:px-6">
@@ -116,13 +169,71 @@ function DayRow({ day }: { day: FinanceDaySummary }) {
       >
         <MoneyValue value={day.profitMinorUnits} signed />
       </td>
+      <td className="px-4 py-5 text-left sm:px-6">
+        <button
+          type="button"
+          onClick={onEditExpense}
+          aria-label={`עריכת הוצאה עבור ${day.localizedDate}`}
+          className="min-h-9 rounded-xl border border-border bg-card px-3 text-xs font-black text-primary hover:bg-secondary"
+        >
+          עריכת הוצאה
+        </button>
+      </td>
     </tr>
   )
 }
 
-export function FinanceScreen() {
+export function FinanceScreen({ onSave }: { readonly onSave?: CustomerFinanceSaveHandler }) {
   const storeQuery = useStore()
+  const initializationRef = useRef<FinanceInitialization | null>(null)
+  const acceptedSaveRef = useRef<AcceptedExpenseSave | null>(null)
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft | null>(null)
+  const [confirmedExpenses, setConfirmedExpenses] = useState<Readonly<Record<string, number | null>>>({})
+  const [expenseSaveState, setExpenseSaveState] = useState<ExpenseSaveState>(IDLE_EXPENSE_SAVE)
+
+  if (initializationRef.current === null && storeQuery.data?.data != null) {
+    initializationRef.current = {
+      baseEnvelope: isVersionedStateEnvelope(storeQuery.data) ? storeQuery.data : null,
+      baseStore: storeQuery.data.data,
+    }
+  }
+  const acceptedSave = acceptedSaveRef.current
+  const acknowledgedEnvelope =
+    acceptedSave !== null &&
+    storeQuery.data !== undefined &&
+    isVersionedStateEnvelope(storeQuery.data) &&
+    JSON.stringify(storeQuery.data.data) === JSON.stringify(acceptedSave.nextStore)
+      ? storeQuery.data
+      : null
+
+  useEffect(() => {
+    if (
+      acceptedSave === null ||
+      acknowledgedEnvelope === null ||
+      acceptedSaveRef.current !== acceptedSave
+    ) return
+
+    initializationRef.current = {
+      baseEnvelope: acknowledgedEnvelope,
+      baseStore: acknowledgedEnvelope.data,
+    }
+    acceptedSaveRef.current = null
+    setConfirmedExpenses((current) => {
+      if (
+        !Object.prototype.hasOwnProperty.call(current, acceptedSave.serviceDate) ||
+        current[acceptedSave.serviceDate] !== acceptedSave.overlayValue
+      ) return current
+      const next = { ...current }
+      delete next[acceptedSave.serviceDate]
+      return next
+    })
+    setExpenseDraft((current) =>
+      current?.date === acceptedSave.serviceDate && current.value === acceptedSave.draftValue
+        ? null
+        : current,
+    )
+  }, [acceptedSave, acknowledgedEnvelope])
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את הנתונים הכספיים" />
   if (storeQuery.isError) {
@@ -138,19 +249,93 @@ export function FinanceScreen() {
     )
   }
 
-  const dashboard = buildFinanceDashboard(storeQuery.data.data ?? { orders: [] }, { selectedMonth })
-  if (dashboard.globallyEmpty) {
-    return (
-      <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
-        <FinanceWarnings warnings={dashboard.warnings} />
-        <ScreenState
-          kind="empty"
-          title="עדיין אין נתונים כספיים"
-          description="כשתישמר הזמנה או הוצאה עם תאריך תקין, הסיכום יופיע כאן."
-          className="px-0"
-        />
-      </div>
-    )
+  let displayStore = storeQuery.data.data ?? { orders: [] }
+  for (const [date, minorUnits] of Object.entries(confirmedExpenses)) {
+    displayStore = applyDailyExpenseToStore(displayStore, date, minorUnits ?? 0)
+  }
+  const dashboard = buildFinanceDashboard(displayStore, { selectedMonth })
+  const activeMonth = dashboard.selectedMonth ?? dashboard.currentMonth
+  const monthOptions = [...new Set([activeMonth, dashboard.currentMonth, ...dashboard.availableMonths])]
+    .sort((left, right) => right.localeCompare(left))
+  const fallbackExpenseDate = defaultExpenseDate(activeMonth, dashboard.currentMonth)
+  const formDate =
+    expenseDraft?.date.startsWith(`${activeMonth}-`) === true
+      ? expenseDraft.date
+      : fallbackExpenseDate
+  const formValue =
+    expenseDraft?.date === formDate ? expenseDraft.value : expenseInputValue(displayStore, formDate)
+  const storedExpenseExists = hasStoredExpense(displayStore, formDate)
+
+  const saveExpense = async (minorUnitsOverride?: number) => {
+    const initialization = initializationRef.current
+    const validation =
+      minorUnitsOverride === undefined
+        ? validateExpenseInput(formValue)
+        : ({ valid: true, minorUnits: minorUnitsOverride } as const)
+    if (!validation.valid) {
+      setExpenseSaveState({ kind: 'error', message: validation.message })
+      return
+    }
+    if (!formDate.startsWith(`${activeMonth}-`)) {
+      setExpenseSaveState({ kind: 'error', message: 'תאריך ההוצאה חייב להיות בחודש שנבחר.' })
+      return
+    }
+    if (!onSave) {
+      setExpenseSaveState({
+        kind: 'error',
+        message: 'השמירה המוגנת עדיין אינה מחוברת. לא בוצע שינוי בשרת.',
+      })
+      return
+    }
+    if (
+      initialization?.baseEnvelope == null ||
+      !isSameVersionedStateEnvelope(storeQuery.data, initialization.baseEnvelope)
+    ) {
+      setExpenseSaveState({
+        kind: 'error',
+        message: 'הנתונים התעדכנו מאז פתיחת המסך. הטיוטה נשארה כאן ולא נשלחה.',
+      })
+      return
+    }
+
+    let nextStore: LegacyStore
+    try {
+      nextStore = applyDailyExpenseToStore(
+        initialization.baseStore,
+        formDate,
+        validation.minorUnits,
+      )
+    } catch {
+      setExpenseSaveState({ kind: 'error', message: 'התאריך או הסכום אינם בטוחים לשמירה.' })
+      return
+    }
+
+    setExpenseSaveState({ kind: 'saving', message: 'שומרת...' })
+    try {
+      await onSave({
+        reason: 'finance',
+        baseEnvelope: initialization.baseEnvelope,
+        baseStore: initialization.baseStore,
+        nextStore,
+      })
+      const overlayValue = validation.minorUnits === 0 ? null : validation.minorUnits
+      const draftValue = expenseInputValue(nextStore, formDate)
+      acceptedSaveRef.current = { nextStore, serviceDate: formDate, overlayValue, draftValue }
+      setConfirmedExpenses((current) => ({
+        ...current,
+        [formDate]: overlayValue,
+      }))
+      setExpenseDraft({
+        date: formDate,
+        value: draftValue,
+      })
+      setExpenseSaveState({ kind: 'saved', message: 'ההוצאה נשמרה.' })
+    } catch {
+      setExpenseSaveState({
+        kind: 'error',
+        message: 'השמירה נכשלה. הטיוטה נשארה כאן והנתונים הקיימים לא הוחלפו.',
+      })
+    }
   }
 
   return (
@@ -158,7 +343,7 @@ export function FinanceScreen() {
       <header className="flex flex-col gap-6 border-b border-border pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="font-heading text-3xl font-black tracking-tight text-primary sm:text-4xl">
-            כספים — {dashboard.localizedMonth}
+            כספים — {dashboard.localizedMonth || formatFinanceMonth(activeMonth)}
           </h1>
           <p className="mt-2 text-sm font-bold text-muted-foreground">
             הכנסות, מקדמות, יתרות, הוצאות ורווח לפי הנתונים השמורים.
@@ -170,11 +355,15 @@ export function FinanceScreen() {
           </label>
           <select
             id="finance-month"
-            value={dashboard.selectedMonth ?? ''}
-            onChange={(event) => setSelectedMonth(event.currentTarget.value)}
+            value={activeMonth}
+            onChange={(event) => {
+              setSelectedMonth(event.currentTarget.value)
+              setExpenseDraft(null)
+              setExpenseSaveState(IDLE_EXPENSE_SAVE)
+            }}
             className="min-h-11 rounded-2xl border border-border bg-card px-5 py-3 text-sm font-black text-primary shadow-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
-            {dashboard.availableMonths.map((month) => (
+            {monthOptions.map((month) => (
               <option key={month} value={month}>
                 {formatFinanceMonth(month)}
               </option>
@@ -185,6 +374,84 @@ export function FinanceScreen() {
 
       <div className="mt-8 space-y-8">
         <FinanceWarnings warnings={dashboard.warnings} />
+
+        {dashboard.globallyEmpty && (
+          <ScreenState
+            kind="empty"
+            title="עדיין אין נתונים כספיים"
+            description="אפשר להוסיף כאן הוצאה ראשונה; הזמנות ייכנסו לסיכום אוטומטית."
+            className="min-h-44 px-0"
+          />
+        )}
+
+        <section
+          className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8"
+          aria-label="עריכת הוצאה יומית"
+        >
+          <div className="flex items-center gap-2">
+            <LocalIcon name="ph:calendar-bold" className="text-xl text-accent" />
+            <h2 className="text-xl font-black text-primary">הוצאה יומית</h2>
+          </div>
+          <p className="mt-1 text-xs font-bold text-muted-foreground">
+            הזנה ושמירה הן ידניות. סכום 0 או כפתור הניקוי מסירים רק את ההוצאה של היום שנבחר.
+          </p>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-end">
+            <label className="flex flex-col gap-2 text-xs font-black text-muted-foreground">
+              תאריך ההוצאה
+              <input
+                type="date"
+                value={formDate}
+                min={`${activeMonth}-01`}
+                max={lastDateOfMonth(activeMonth)}
+                onChange={(event) => {
+                  const date = event.currentTarget.value
+                  setExpenseDraft({ date, value: expenseInputValue(displayStore, date) })
+                  setExpenseSaveState(IDLE_EXPENSE_SAVE)
+                }}
+                className="min-h-11 rounded-xl border border-border bg-background px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-black text-muted-foreground">
+              סכום בדולרים
+              <input
+                type="text"
+                inputMode="decimal"
+                value={formValue}
+                onChange={(event) => {
+                  setExpenseDraft({ date: formDate, value: event.currentTarget.value })
+                  setExpenseSaveState(IDLE_EXPENSE_SAVE)
+                }}
+                placeholder="0.00"
+                aria-label="סכום ההוצאה בדולרים"
+                className="min-h-11 rounded-xl border border-border bg-background px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void saveExpense()}
+              disabled={expenseSaveState.kind === 'saving'}
+              className="min-h-11 rounded-xl bg-primary px-5 text-xs font-black text-primary-foreground disabled:cursor-wait disabled:opacity-50"
+            >
+              שמירת הוצאה
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveExpense(0)}
+              disabled={!storedExpenseExists || expenseSaveState.kind === 'saving'}
+              className="min-h-11 rounded-xl border border-border bg-card px-5 text-xs font-black text-destructive disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ניקוי הוצאה
+            </button>
+          </div>
+          {expenseSaveState.kind !== 'idle' && (
+            <p
+              className={`mt-3 text-xs font-bold ${expenseSaveState.kind === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+              role={expenseSaveState.kind === 'error' ? 'alert' : 'status'}
+            >
+              {expenseSaveState.message}
+            </p>
+          )}
+        </section>
 
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6" aria-label="סיכום חודשי">
           <MetricCard label="הכנסות" value={dashboard.revenueMinorUnits} />
@@ -233,11 +500,22 @@ export function FinanceScreen() {
                       <th className="px-4 py-4 font-black text-primary sm:px-6">יתרה</th>
                       <th className="px-4 py-4 font-black text-primary sm:px-6">הוצאות</th>
                       <th className="px-4 py-4 text-left font-black text-primary sm:px-6">רווח</th>
+                      <th className="px-4 py-4 text-left font-black text-primary sm:px-6">פעולות</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dashboard.days.map((day) => (
-                      <DayRow key={day.serviceDate} day={day} />
+                      <DayRow
+                        key={day.serviceDate}
+                        day={day}
+                        onEditExpense={() => {
+                          setExpenseDraft({
+                            date: day.serviceDate,
+                            value: expenseInputValue(displayStore, day.serviceDate),
+                          })
+                          setExpenseSaveState(IDLE_EXPENSE_SAVE)
+                        }}
+                      />
                     ))}
                   </tbody>
                   <tfoot className="border-t border-border bg-secondary/50">
@@ -264,6 +542,7 @@ export function FinanceScreen() {
                       >
                         <MoneyValue value={dashboard.profitMinorUnits} signed />
                       </td>
+                      <td className="px-4 py-5 sm:px-6" />
                     </tr>
                   </tfoot>
                 </table>

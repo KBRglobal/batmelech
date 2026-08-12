@@ -308,8 +308,6 @@ const DEFAULT_MENU = {
   sides: ['אורז לבן','אורז מתובל / פרסי עם עשבי תיבול','קוסקוס עננים','פסטה נקיה','פסטה אדומה','מגש תפו"א'],
   desserts: ['סופלה שוקולד','סוכריות בקלוואה'],
   extras: [
-    {name:'תוספת 4 סלטים לבחירה', price:25},
-    {name:'תוספת חלה', price:10},
     {name:'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)', price:150},
     {name:'מפרום ביתי של אמא (זוגי)', price:40},
     {name:'טבחה בשר אדומה עם אפונה ותפו"א (ל־2־3 אנשים)', price:100},
@@ -327,11 +325,8 @@ const DEFAULT_MENU = {
     {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
     {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
     {name:'מנת מפרום ביתי (תוספת)', price:20},
-    {name:'משלוח', price:15},
     {name:'מרק ירקות לקוסקוס ללא עוף', price:70},
     {name:'מרק ירקות לקוסקוס עם עוף', price:100},
-    {name:'תוספת מנת דג', price:35},
-    {name:'תוספת קציצות דגים', price:70},
     {name:'סט עריכה', price:10},
     {name:'תוספת יין', price:5}
   ],
@@ -353,7 +348,32 @@ const DEFAULT_MENU = {
   lunchSides:['אורז לבן','פסטה אדומה','פסטה נקיה'],
   couplePrice:230, challahPrice:10, includedChallot:2, includedSalads:4, includedFish:2
 };
-const SALAD_PRICE=7; // חיוב סלט בודד מעבר לכלול (בלוק 4 = לפי האקסטרה «תוספת 4 סלטים»)
+const INCLUDED_SALADS_PER_COUPLE=4;
+const SALAD_PRICE=7;
+const SALAD_BLOCK_PRICE=25;
+const INCLUDED_FISH_UNITS_PER_COUPLE=2;
+const EXTRA_FISH_UNIT_PRICE=30;
+const DELIVERY_PRICE=15;
+const DELIVERY_EXTRA_NAME='משלוח';
+const AUTHORITATIVE_FIRST_COURSE_NAMES=[
+  'פילה דג ברוטב מרוקאי',
+  'פילה דג ברוטב חריימה',
+  'קציצות דגים ברוטב מרוקאי'
+];
+const FISH_CAKES_NAME=AUTHORITATIVE_FIRST_COURSE_NAMES[2];
+function canonicalName(value){
+  return typeof value==='string'?value.normalize('NFKC').trim().replace(/\s+/gu,' '):'';
+}
+const AUTO_PRICED_EXTRA_NAMES=new Set([
+  'תוספת 4 סלטים לבחירה',
+  'תוספת מנת דג',
+  'תוספת קציצות דגים',
+  'תוספת חלה'
+].map(canonicalName));
+const isAutoPricedExtraName=value=>AUTO_PRICED_EXTRA_NAMES.has(canonicalName(value));
+const isDeliveryExtraName=value=>canonicalName(value)===canonicalName(DELIVERY_EXTRA_NAME);
+const isAutomaticChargeName=value=>isAutoPricedExtraName(value)||isDeliveryExtraName(value);
+const isAuthoritativeFirstCourseName=value=>AUTHORITATIVE_FIRST_COURSE_NAMES.some(name=>canonicalName(name)===canonicalName(value));
 const HEAT_OPTIONS = ['','לא חריף','חריף','מעורב — חלק חריף וחלק לא'];
 const STATUS_OPTIONS = ['חדשה','אושרה','מוכנה','במשלוח','נמסרה','בוטלה'];
 /* מלונות מרכזיים בדובאי ואבו דאבי — להשלמה אוטומטית בשדה «לאן המשלוח?» */
@@ -436,9 +456,9 @@ function buildMenu(){
   const arr=(k)=>Array.isArray(m[k])&&m[k].length?m[k].filter(x=>typeof x==='string'&&x.trim()).slice():DEFAULT_MENU[k].slice();
   const num=(k)=>{ const v=Number(m[k]); return Number.isFinite(v)&&v>=0?v:DEFAULT_MENU[k]; };
   MENU={
-    salads:arr('salads'), firsts:arr('firsts'), mains:arr('mains'), sides:arr('sides'), desserts:arr('desserts'),
+    salads:arr('salads'), firsts:AUTHORITATIVE_FIRST_COURSE_NAMES.slice(), mains:arr('mains'), sides:arr('sides'), desserts:arr('desserts'),
     extras:(Array.isArray(m.extras)&&m.extras.length
-      ?m.extras.filter(x=>x&&typeof x.name==='string'&&x.name.trim()).map(x=>({name:x.name,price:Math.max(0,Number(x.price)||0)}))
+      ?m.extras.filter(x=>x&&typeof x.name==='string'&&x.name.trim()&&!isAutomaticChargeName(x.name)).map(x=>Object.assign({},x,{name:x.name,price:Math.max(0,Number(x.price)||0)}))
       :DEFAULT_MENU.extras.map(x=>({name:x.name,price:x.price}))),
     lunch:DEFAULT_MENU.lunch.map(def=>{
       const it=JSON.parse(JSON.stringify(def));
@@ -459,17 +479,20 @@ function buildMenu(){
     }),
     lunchSides:(Array.isArray(m.lunchSides)&&m.lunchSides.length?m.lunchSides.filter(x=>typeof x==='string'&&x.trim()):DEFAULT_MENU.lunchSides.slice()),
     couplePrice:num('couplePrice'), challahPrice:num('challahPrice'),
-    includedChallot:num('includedChallot'), includedSalads:num('includedSalads'), includedFish:num('includedFish')
+    includedChallot:num('includedChallot'), includedSalads:INCLUDED_SALADS_PER_COUPLE, includedFish:INCLUDED_FISH_UNITS_PER_COUPLE
   };
   OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
 }
 function persistMenu(){
-  store.menu={
+  MENU.firsts=AUTHORITATIVE_FIRST_COURSE_NAMES.slice();
+  MENU.extras=MENU.extras.filter(ex=>ex&&typeof ex.name==='string'&&!isAutomaticChargeName(ex.name));
+  const priorMenu=store.menu&&typeof store.menu==='object'&&!Array.isArray(store.menu)?store.menu:{};
+  store.menu=Object.assign({},priorMenu,{
     salads:MENU.salads, firsts:MENU.firsts, mains:MENU.mains, sides:MENU.sides, desserts:MENU.desserts,
     extras:MENU.extras, lunch:MENU.lunch, lunchSides:MENU.lunchSides,
     couplePrice:MENU.couplePrice, challahPrice:MENU.challahPrice,
     includedChallot:MENU.includedChallot, includedSalads:MENU.includedSalads, includedFish:MENU.includedFish
-  };
+  });
   OUT_POOL=[...MENU.salads,...MENU.firsts,...MENU.mains,...MENU.sides,...MENU.desserts];
   saveStore();
 }
@@ -495,9 +518,9 @@ function menuEditorHtml(){
     </div>
     <div class="grid2">
       <div class="field"><label>סלטים כלולים בזוגית</label>
-        <input inputmode="numeric" data-bind="menu-num" data-k="includedSalads" value="${MENU.includedSalads}"></div>
+        <input inputmode="numeric" value="${INCLUDED_SALADS_PER_COUPLE}" disabled title="כלל תמחור קבוע"></div>
       <div class="field"><label>דגים כלולים בזוגית</label>
-        <input inputmode="numeric" data-bind="menu-num" data-k="includedFish" value="${MENU.includedFish}"></div>
+        <input inputmode="numeric" value="${INCLUDED_FISH_UNITS_PER_COUPLE}" disabled title="כלל תמחור קבוע"></div>
     </div>
     ${MENU_CATS.map(([c,l])=>catBlock(c,l)).join('')}
     <details style="margin:8px 0">
@@ -664,39 +687,77 @@ function lunchItemPriceLines(d){
   }
   return lines;
 }
-function saladBlockPrice(){
-  const ex=MENU.extras.find(x=>x.name==='תוספת 4 סלטים לבחירה');
-  return ex?ex.price:25;
-}
 function computeSuggested(d){
   const lines=[];
   if(d.meals>0) lines.push({l:`ארוחה זוגית ×${d.meals}`, a:MENU.couplePrice*d.meals});
   // סלטים מעבר לכלול (פינוקים לא מחויבים): בלוק 4 = 25$, שארית 1-3 = 7$ לסלט
   const nS=countSaladsOrdered(d);
-  const inclS=MENU.includedSalads*(d.meals||0);
+  const inclS=INCLUDED_SALADS_PER_COUPLE*(d.meals||0);
   const overS=Math.max(0,nS-inclS);
-  if(overS>0&&d.meals>0){
+  if(overS>0){
     const blocks=Math.floor(overS/4), rem=overS%4;
-    lines.push({l:`סלטים נוספים (${overS} מעבר לכלול)`, a:blocks*saladBlockPrice()+rem*SALAD_PRICE});
+    lines.push({l:`סלטים נוספים (${overS} מעבר לכלול)`, a:blocks*SALAD_BLOCK_PRICE+rem*SALAD_PRICE});
   }
+  const fishUnits=countFish(d);
+  const includedFishUnits=INCLUDED_FISH_UNITS_PER_COUPLE*(d.meals||0);
+  const extraFishUnits=Math.max(0,fishUnits-includedFishUnits);
+  if(extraFishUnits>0) lines.push({l:`יחידות דג נוספות (${extraFishUnits} מעבר לכלול)`, a:extraFishUnits*EXTRA_FISH_UNIT_PRICE});
   for(const ex of MENU.extras){
+    if(isAutomaticChargeName(ex.name)) continue;
     const e=d.extras[ex.name];
     if(e && e.q>0) lines.push({l:`${ex.name} ×${e.q}`, a:ex.price*e.q});
   }
   for(const c of d.custom){
     const q=Number(c.qty)||0, p=parseMoney(c.price);
-    if(c.name && q>0) lines.push({l:`${c.name} ×${q}`, a:p*q});
+    if(c.name && q>0&&!isAutomaticChargeName(c.name)) lines.push({l:`${c.name} ×${q}`, a:p*q});
   }
   for(const ln of lunchItemPriceLines(d)) lines.push(ln);
   const included=MENU.includedChallot*(d.meals||0);
   const extraCh=Math.max(0,(d.challot||0)-included);
-  if(extraCh>0 && d.meals>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:MENU.challahPrice*extraCh});
+  if(extraCh>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:MENU.challahPrice*extraCh});
+  if(!d.pickup) lines.push({l:'משלוח ברחבי דובאי', a:DELIVERY_PRICE});
   const total=lines.reduce((s,x)=>s+x.a,0);
   return {lines,total};
 }
 function countSaladsOrdered(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.o||0),0); }
 function countSaladsPinuk(d){ return Object.values(d.salads).reduce((s,x)=>s+(x.p||0),0); }
-function countFish(d){ return Object.values(d.firsts).reduce((s,x)=>s+(x||0),0); }
+function countFish(d){
+  return Object.entries(d.firsts).reduce((s,[name,qty])=>s+(qty||0)*(canonicalName(name)===canonicalName(FISH_CAKES_NAME)?2:1),0);
+}
+function dessertAllowance(d){
+  let souffleQuantity=0, baklavaQuantity=0, unclassifiedQuantity=0;
+  for(const [name,rawQuantity] of Object.entries(d.desserts||{})){
+    const quantity=Math.max(0,Number(rawQuantity)||0);
+    if(quantity===0) continue;
+    const normalized=canonicalName(name);
+    if(normalized.includes('סופלה')) souffleQuantity+=quantity;
+    else if(/בקל/u.test(normalized)) baklavaQuantity+=quantity;
+    else unclassifiedQuantity+=quantity;
+  }
+  const selectedHalfUnits=souffleQuantity+baklavaQuantity*2;
+  const includedHalfUnits=Math.max(0,Number(d.meals)||0)*2;
+  return {
+    souffleQuantity,
+    baklavaQuantity,
+    unclassifiedQuantity,
+    selectedHalfUnits,
+    includedHalfUnits,
+    excessHalfUnits:Math.max(0,selectedHalfUnits-includedHalfUnits)
+  };
+}
+function parseUsdMinorUnits(value){
+  const normalized=String(value??'').trim();
+  if(!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/u.test(normalized)) return null;
+  const [whole,fraction='']=normalized.split('.');
+  const minor=Number(whole)*100+Number(fraction.padEnd(2,'0'));
+  return Number.isSafeInteger(minor)?minor:null;
+}
+function calculatedMinorUnits(value){
+  if(!Number.isFinite(value)||value<0) return null;
+  const scaled=value*100;
+  const rounded=Math.round(scaled);
+  return Number.isSafeInteger(rounded)&&Math.abs(scaled-rounded)<1e-7?rounded:null;
+}
 
 function lunchTextLines(o){
   const out=[];
@@ -1452,11 +1513,11 @@ function renderForm(){
 }
 function refreshFormDerived(){
   const d=draft; if(!d) return;
-  const inclS=MENU.includedSalads*(d.meals||0);
+  const inclS=INCLUDED_SALADS_PER_COUPLE*(d.meals||0);
   const nO=countSaladsOrdered(d), nP=countSaladsPinuk(d);
   const bS=$('[data-badge="salads"]');
   if(bS) bS.textContent=inclS>0?`${nO}/${inclS} כלולים · 🎁 ${nP}`:`${nO} הוזמנו · 🎁 ${nP}`;
-  const inclF=MENU.includedFish*(d.meals||0);
+  const inclF=INCLUDED_FISH_UNITS_PER_COUPLE*(d.meals||0);
   const nF=countFish(d);
   const bF=$('[data-badge="firsts"]');
   if(bF) bF.textContent=inclF>0?`${nF}/${inclF} כלולים`:`${nF}`;
@@ -1474,12 +1535,22 @@ function updatePriceHint(){
   const el=$('#priceHint'); if(!el||!draft) return;
   const sug=computeSuggested(draft);
   const warns=[];
-  const inclS=MENU.includedSalads*(draft.meals||0);
+  const inclS=INCLUDED_SALADS_PER_COUPLE*(draft.meals||0);
   const nO=countSaladsOrdered(draft);
-  if(draft.meals>0 && nO>inclS) warns.push(`הוזמנו ${nO-inclS} סלטים מעבר לכלול — החיוב נוסף אוטומטית למחיר המוצע (${SALAD_PRICE}$ לסלט, ${saladBlockPrice()}$ לבלוק 4).`);
-  const inclF=MENU.includedFish*(draft.meals||0);
+  if(nO>inclS) warns.push(`הוזמנו ${nO-inclS} סלטים מעבר לכלול — החיוב נוסף אוטומטית למחיר המוצע (${SALAD_PRICE}$ לסלט, ${SALAD_BLOCK_PRICE}$ לבלוק 4).`);
+  const inclF=INCLUDED_FISH_UNITS_PER_COUPLE*(draft.meals||0);
   const nF=countFish(draft);
-  if(draft.meals>0 && nF>inclF) warns.push(`הוזמנו ${nF-inclF} דגים מעבר לכלול.`);
+  if(nF>inclF) warns.push(`הוזמנו ${nF-inclF} יחידות דג מעבר לכלול — החיוב נוסף אוטומטית למחיר המוצע (${EXTRA_FISH_UNIT_PRICE}$ ליחידה).`);
+  const selectedMains=Object.values(draft.mains||{}).reduce((sum,quantity)=>sum+(Number(quantity)||0),0);
+  if(selectedMains>(draft.meals||0)) warns.push('בחירת העיקריות חורגת ממנה אחת לכל זוגית — אי אפשר לשמור עד שיוגדר מחיר מאושר לחריגה.');
+  const selectedSides=Object.values(draft.sides||{}).reduce((sum,quantity)=>sum+(Number(quantity)||0),0);
+  if(selectedSides>(draft.meals||0)) warns.push('בחירת התוספות חורגת מתוספת אחת לכל זוגית — אי אפשר לשמור עד שיוגדר מחיר מאושר לחריגה.');
+  const dessert=dessertAllowance(draft);
+  if(dessert.unclassifiedQuantity>0) warns.push('יש קינוח שאי אפשר לשייך בבטחה לזכאות — אי אפשר לשמור עד שהבחירה תתוקן.');
+  if(dessert.excessHalfUnits>0) warns.push('בחירת הקינוחים חורגת מהזכאות — אי אפשר לשמור עד שיוגדר מחיר מאושר לחריגה.');
+  if((draft.custom||[]).some(c=>c&&isAutomaticChargeName(c.name)&&(Number(c.qty)||0)>0)){
+    warns.push('נוסף פריט חופשי שמחושב אוטומטית — הוא לא יחויב פעמיים, ויש להסיר אותו לפני השמירה.');
+  }
   const max=store.settings.maxMeals||0;
   if(max>0&&draft.date&&draft.meals>0&&draft.status!=='בוטלה'){
     const others=store.orders.filter(o=>o.date===draft.date&&o.id!==draft.id&&!isCancelled(o)).reduce((s,o)=>s+(o.meals||0),0);
@@ -1495,7 +1566,7 @@ function updatePriceHint(){
   }
   let html='';
   if(draft.meals>0){
-    html+=`<div class="hint" style="margin-bottom:6px">כלול במנה הזוגית (בלי חיוב נוסף): ${inclS} סלטים · ${MENU.includedFish*(draft.meals||0)} דגים · ${draft.meals} עיקרית · ${draft.meals} תוספת · ${MENU.includedChallot*draft.meals} חלות${MENU.includedChallot*draft.meals<(draft.challot||0)?` (מעבר לכך — חלה ${MENU.challahPrice}$)`:''}.</div>`;
+    html+=`<div class="hint" style="margin-bottom:6px">כלול במנה הזוגית (בלי חיוב נוסף): ${inclS} סלטים · ${INCLUDED_FISH_UNITS_PER_COUPLE*(draft.meals||0)} יחידות דג · ${draft.meals} עיקרית · ${draft.meals} תוספת · ${MENU.includedChallot*draft.meals} חלות${MENU.includedChallot*draft.meals<(draft.challot||0)?` (מעבר לכך — חלה ${MENU.challahPrice}$)`:''}.</div>`;
   }
   if(sug.lines.length){
     html+=`<div class="hint" style="margin-bottom:8px">מחיר מוצע לפי המחירון: `+
@@ -1510,7 +1581,12 @@ function updatePriceHint(){
 function bump(g,i,k,delta){
   const d=draft; if(!d) return 0;
   let nv=0;
-  if(g==='meals'||g==='challot'||g==='aricha'){
+  if(g==='meals'){
+    const previousMeals=d.meals||0;
+    const previousAutomaticChallahs=MENU.includedChallot*previousMeals;
+    nv=Math.max(0,previousMeals+delta); d.meals=nv;
+    if((d.challot||0)===previousAutomaticChallahs) d.challot=MENU.includedChallot*nv;
+  } else if(g==='challot'||g==='aricha'){
     nv=Math.max(0,(d[g]||0)+delta); d[g]=nv;
   } else if(g==='salads'){
     const name=MENU.salads[i];
@@ -1530,6 +1606,14 @@ function bump(g,i,k,delta){
     const it=MENU.lunch[i];
     const e=d.lunch[it.key]||(d.lunch[it.key]={q:0,v:'',sides:{},addon:0});
     nv=Math.max(0,e.q+delta); e.q=nv;
+    if(
+      nv>0 && Object.keys(d.lunch).filter(key=>key!==it.key&&d.lunch[key]&&d.lunch[key].q>0).length===0 &&
+      d.meals===1 && d.challot===MENU.includedChallot &&
+      ['salads','firsts','mains','sides','desserts'].every(group=>Object.keys(d[group]||{}).length===0)
+    ){
+      d.meals=0;
+      d.challot=0;
+    }
     if(nv===0) delete d.lunch[it.key];
   } else if(g==='lunchSides'){
     const it=MENU.lunch[i], e=d.lunch[it.key];
@@ -1691,8 +1775,8 @@ function renderSummary(){
     sc.dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d).length})</option>`).join('');
 
   const payCell=o=>esc(o.paid==='כן'?'שולם ✓':(o.paid==='לא'?'לגבות '+(parseMoney(o.total)-parseMoney(o.deposit))+'$':o.paid));
-  const mapBtn=o=>(!o.pickup&&o.place)
-    ?` <a class="btn sm no-print" style="text-decoration:none" target="_blank" rel="noopener" title="ניווט" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim())}">🗺️</a>`:'';
+  const mapBtn=o=>(!o.pickup&&mapsUrl(o))
+    ?` <a class="btn sm no-print" style="text-decoration:none" target="_blank" rel="noopener" title="ניווט" href="${esc(mapsUrl(o))}">🗺️</a>`:'';
   const dateTh=multi?'<th>יום</th>':'';
   const dateTd=o=>multi?`<td class="num">${esc(fmtShort(o.date))}</td>`:'';
   const delivHtml=(list.length)?`<div class="card"><div class="sec-h">🚚 לוח משלוחים ואיסופים
@@ -2049,8 +2133,19 @@ function scopeOptionsHtml(sel){
     `<option value="upcoming"${sel==='upcoming'?' selected':''}>🔜 כל ההזמנות הקרובות (${countIn(t,null)})</option>`+
     dates.map(d=>`<option value="${d}"${d===sel?' selected':''}>${esc(fmtDate(d))} (${store.orders.filter(o=>o.date===d&&!isCancelled(o)).length})</option>`).join('');
 }
+function validatedStoredMapsUrl(value){
+  if(typeof value!=='string'||!value.trim()) return '';
+  try{
+    const u=new URL(value);
+    const h=u.hostname.toLowerCase();
+    return u.protocol==='https:'&&(h==='google.com'||h==='www.google.com'||h.endsWith('.google.com'))?u.toString():'';
+  }catch(e){ return ''; }
+}
 function mapsUrl(o){
-  return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim());
+  const stored=validatedStoredMapsUrl(o.navigationUrl);
+  if(stored) return stored;
+  const query=String(o.hotelAddress||o.address||o.place||'').trim();
+  return query?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query):'';
 }
 function renderDelivery(){
   const sc=summaryScope();
@@ -2070,7 +2165,7 @@ function renderDelivery(){
       </div>
       <div class="oc-meta">${esc(o.place||'—')}${o.address?` · ${esc(o.address)}`:''}${multi?` · ${esc(fmtShort(o.date))}`:''}</div>
       <div class="oc-actions no-print">
-        ${o.place?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${mapsUrl(o)}">🗺️ ניווט</a>`:''}
+        ${mapsUrl(o)?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${esc(mapsUrl(o))}">🗺️ ניווט</a>`:''}
         ${o.phone?`<a class="btn sm" style="text-decoration:none" href="tel:${esc(o.phone)}">📞 ${esc(o.phone)}</a>`:''}
         ${o.phone?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${waLink(o.phone)}">💬</a>`:''}
         <button type="button" class="btn sm" data-act="edit" data-id="${o.id}">✏️</button>
@@ -2103,7 +2198,7 @@ function renderDelivery(){
         <span class="hint">${owe(o)>0?`לגבות ${owe(o)}$`:(parseMoney(o.total)>0?'שולם ✓':'')}</span>
       </div>`).join('')}
       <div class="oc-actions no-print">
-        ${nav?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${mapsUrl(nav)}">🗺️ ניווט</a>`:''}
+        ${nav&&mapsUrl(nav)?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${esc(mapsUrl(nav))}">🗺️ ניווט</a>`:''}
         ${os.map(o=>o.phone?`<a class="btn sm" style="text-decoration:none" href="tel:${esc(o.phone)}">📞 ${esc(o.name)}</a>`:'').join('')}
       </div>
     </div>`;
@@ -2144,7 +2239,7 @@ function buildRouteText(){
     L.push(`${n}. ${sc.multi?fmtShort(o.date)+' · ':''}${o.time?o.time+' — ':''}${o.name} — ${o.place||'—'}${o.address?` (${o.address})`:''}`);
     if(o.phone) L.push(`   📞 ${o.phone}`);
     if(oweOf2(o)>0) L.push(`   💰 לגבות: ${oweOf2(o)}$`);
-    if(o.place) L.push(`   🗺️ https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.place+' '+(o.address||'')+' Dubai').trim())}`);
+    if(mapsUrl(o)) L.push(`   🗺️ ${mapsUrl(o)}`);
     L.push('');
   };
   const L=[`🚚 מסלול משלוחים — ${sc.title}`,''];
@@ -2168,7 +2263,7 @@ function buildRouteText(){
       L.push(`   • ${sc.multi?fmtShort(o.date)+' · ':''}${o.time?o.time+' — ':''}${o.name}${o.phone?` 📞 ${o.phone}`:''}${oweOf2(o)>0?` 💰 ${oweOf2(o)}$`:''}`);
     }
     if(owed>0) L.push(`   💰 סה"כ לגבות בקבוצה: ${owed}$`);
-    if(nav) L.push(`   🗺️ https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((nav.place+' '+(nav.address||'')+' Dubai').trim())}`);
+    if(nav&&mapsUrl(nav)) L.push(`   🗺️ ${mapsUrl(nav)}`);
     L.push('');
   }
   if(pk.length){
@@ -2176,55 +2271,6 @@ function buildRouteText(){
     for(const o of pk) L.push(`  • ${o.name}${o.phone?' — '+o.phone:''}`);
   }
   return L.join('\n');
-}
-
-/* ================= demo data (real cases from the Word file) ================= */
-function loadDemoData(){
-  const fr1=nextFridayIso();
-  const fr4=addDays(fr1,21);
-  store.orders=store.orders.filter(o=>!String(o.id).startsWith('demo'));
-  const base=newDraft();
-  const mk=o=>Object.assign(JSON.parse(JSON.stringify(base)),o);
-  store.orders.push(
-    mk({id:'demo1', date:fr1, name:'קטי סוזנה', phone:'054-2016970', place:'גרנד הייאט', time:'16:30', status:'אושרה',
-      meals:1, aricha:6, challot:2,
-      salads:{'כרוב סגול במיונז':{o:1,p:0},'מסייר (חמוצים)':{o:1,p:0},'טחינה':{o:1,p:0},'עגבניות שרי חריפות':{o:1,p:0},'מטבוחה פיקנטית':{o:0,p:1},'גזר מרוקאי מבושל':{o:0,p:1}},
-      firsts:{'פילה דג ברוטב מרוקאי':1,'פילה דג ברוטב חריימה':1}, heat:'לא חריף',
-      mains:{'קציצות בשר ברוטב אדום עשיר':1}, sides:{'אורז לבן':2},
-      desserts:{'סופלה שוקולד':1,'סוכריות בקלוואה':1},
-      extras:{'מנת ילדים — פסטה אדומה ושניצלונים':{q:1,note:'מנת פסטה ושניצל ילדים'},'מגש שניצלים (זוגי, כ־13–15 יח\')':{q:1,note:''}},
-      total:'390', deposit:'100', payMethod:'ביט', paid:'מקדמה'}),
-    mk({id:'demo2', date:fr1, name:'לילך בוארון', phone:'050-4448731', place:'אטלנטיס דה פאלם', time:'15:00', status:'חדשה',
-      meals:0, aricha:15, challot:10,
-      salads:{'מטבוחה פיקנטית':{o:2,p:0},'מסייר (חמוצים)':{o:1,p:0}},
-      extras:{'אורז':{q:2,note:''},'קוסקוס':{q:1,note:''},'מגש שניצלים (זוגי, כ־13–15 יח\')':{q:2,note:''},'מפרום ביתי של אמא (זוגי)':{q:1,note:'מפרום זוגי'}},
-      custom:[{name:'חומוס',qty:2,price:''},{name:'מרק ירקות קוסקוס פרווה',qty:1,price:''}],
-      total:'540', deposit:'', payMethod:'', paid:'לא'}),
-    mk({id:'demo3', date:fr1, name:'חיים הלוי', phone:'052-3442155', pickup:true, status:'מוכנה',
-      meals:1, aricha:4, challot:2,
-      salads:{'כרוב סגול במיונז':{o:1,p:0},'כרוב לבן קלאסי':{o:1,p:0},'חציל מטוגן':{o:1,p:0},'קולסלאו':{o:1,p:0},'סלט ביצים':{o:2,p:0},'סלט תפו"א':{o:1,p:0},'מסייר (חמוצים)':{o:1,p:0},'מטבוחה פיקנטית':{o:0,p:1},'טחינה':{o:0,p:1}},
-      firsts:{'פילה דג ברוטב מרוקאי':2}, heat:'לא חריף',
-      mains:{'קציצות בשר עם אפונה וארטישוק':1}, sides:{'אורז מתובל / פרסי עם עשבי תיבול':1},
-      desserts:{'סופלה שוקולד':1},
-      total:'230', deposit:'230', payMethod:'מזומן', paid:'כן'}),
-    mk({id:'demo4', date:fr4, name:'ניר מסס', phone:'054-2220431', place:'פייב לוקס', time:'16:30', status:'חדשה',
-      meals:1, aricha:4, challot:6,
-      salads:{'כרוב לבן קלאסי':{o:1,p:0},'מטבוחה פיקנטית':{o:1,p:0},'מסייר (חמוצים)':{o:1,p:0},'חציל מטוגן':{o:1,p:0}},
-      firsts:{'פילה דג ברוטב מרוקאי':1},
-      mains:{'תבשיל עוף מרוקאי עם חומוסים':1}, sides:{'אורז לבן':1},
-      desserts:{'סופלה שוקולד':1},
-      extras:{'חלת שניצל (ספיישל סופ"ש)':{q:4,note:'2 עם הכל, 2 מפורק'}},
-      total:'338', deposit:'', payMethod:'', paid:'לא'})
-  );
-  store.customerMeta['0542016970']=Object.assign(store.customerMeta['0542016970']||{},{vip:true,notes:'אוהבת מרוקאי לא חריף · תמיד מזמינה לזוג + ילדים'});
-  store.customerMeta['0523442155']=Object.assign(store.customerMeta['0523442155']||{},{notes:'תמיד מוסיף הרבה סלטים מעצמו · איסוף עצמי'});
-  if(!store.settings.maxMeals) store.settings.maxMeals=8;
-  if(!store.expenses[fr1]) store.expenses[fr1]=210;
-  saveStore();
-}
-function clearDemoData(){
-  store.orders=store.orders.filter(o=>!String(o.id).startsWith('demo'));
-  saveStore();
 }
 
 /* ================= render: backup ================= */
@@ -2257,24 +2303,12 @@ function renderBackup(){
   </div>
   <div class="card">
     <div class="sec-h">💾 גיבוי ושחזור</div>
-    <p class="hint">הנתונים נשמרים אוטומטית בדפדפן הזה בלבד. כדי לא לאבד כלום (ולהעביר למכשיר אחר) — מומלץ לשמור קובץ גיבוי מדי פעם.</p>
+    <p class="hint">הנתונים מסתנכרנים למסד הנתונים המוגן. אפשר להוריד עותק לקריאה ולשמירה מחוץ למערכת.</p>
     <div class="row" style="margin-bottom:12px">
       <button type="button" class="btn primary" data-act="exportFile">⬇️ שמירת קובץ גיבוי</button>
       <button type="button" class="btn" data-act="exportCopy">📋 העתקת הגיבוי כטקסט</button>
     </div>
-    <div class="field"><label>שחזור מגיבוי — בחרי קובץ או הדביקי כאן את הטקסט:</label>
-      <input type="file" id="importFile" accept=".json,application/json" style="margin-bottom:8px">
-      <textarea id="importText" style="min-height:110px;direction:ltr;font-family:monospace;font-size:.8rem" placeholder='{"orders":[...]}'></textarea>
-    </div>
-    <button type="button" class="btn danger" data-act="importApply">♻️ שחזור (מחליף את כל הנתונים הנוכחיים)</button>
-  </div>
-  <div class="card">
-    <div class="sec-h">🎭 נתוני דוגמה</div>
-    <p class="hint">4 הזמנות אמיתיות מקובץ הוורד (קטי, לילך, חיים וניר) — כדי לראות את כל המסכים בפעולה. אפשר למחוק אותן בלחיצה בכל רגע.</p>
-    <div class="row">
-      <button type="button" class="btn sm" data-act="loadDemo">🎭 טעינת נתוני הדוגמה</button>
-      <button type="button" class="btn sm danger" data-act="clearDemo">🧹 מחיקת נתוני הדוגמה</button>
-    </div>
+    <p class="hint">שחזור שמחליף את כל ההזמנות אינו זמין במערכת הישנה כדי להגן על נתוני הלקוחות.</p>
   </div>
   <div class="card">
     <div class="sec-h">ℹ️ מצב נוכחי</div>
@@ -2282,13 +2316,6 @@ function renderBackup(){
       · גיבוי אחרון: ${store.lastBackup?new Date(store.lastBackup).toLocaleDateString('he-IL'):'עוד לא נעשה'}
       ${storageOK?'':' · ⚠️ שמירה אוטומטית לא פעילה בדפדפן זה'}</p>
   </div>`;
-  const f=$('#importFile');
-  if(f) f.addEventListener('change',ev=>{
-    const file=ev.target.files&&ev.target.files[0]; if(!file) return;
-    const r=new FileReader();
-    r.onload=()=>{ $('#importText').value=String(r.result||''); toast('הקובץ נטען — עכשיו ללחוץ «שחזור»'); };
-    r.readAsText(file);
-  });
 }
 function markBackedUp(){
   store.lastBackup=Date.now(); saveStore();
@@ -2315,17 +2342,6 @@ function exportData(asFile){
     markBackedUp();
   }catch(e){ toast('השמירה לא הצליחה — אפשר להעתיק כטקסט'); }
 }
-function importApply(){
-  const txt=($('#importText')||{}).value||'';
-  if(!txt.trim()){ toast('אין מה לשחזר — קודם לבחור קובץ או להדביק טקסט'); return; }
-  let d;
-  try{ d=JSON.parse(txt); }catch(e){ toast('הטקסט לא תקין — זה לא קובץ גיבוי'); return; }
-  if(!d||!Array.isArray(d.orders)){ toast('הקובץ לא נראה כמו גיבוי של המערכת'); return; }
-  if(!confirm(`לשחזר ${d.orders.length} הזמנות? זה יחליף את ${store.orders.length} ההזמנות הנוכחיות.`)) return;
-  store=d; store.settings=Object.assign({maxMeals:0},d.settings||{});
-  saveStore(); view.tab='orders'; render(); toast('שוחזר ✓');
-}
-
 /* ================= actions ================= */
 function render(){
   renderTabs();
@@ -2343,6 +2359,61 @@ function render(){
 function saveDraft(){
   if(!draft.date){ toast('חסר תאריך להזמנה 🗓️'); const el=document.querySelector('[data-bind="date"]'); if(el) el.focus(); return; }
   if(!draft.name.trim()){ toast('חסר שם לקוח 👤'); const el=document.querySelector('[data-bind="name"]'); if(el) el.focus(); return; }
+  const reservedCustom=(draft.custom||[]).find(c=>c&&isAutomaticChargeName(c.name)&&(Number(c.qty)||0)>0);
+  if(reservedCustom){
+    toast('אי אפשר לשמור פריט חופשי בשם הזה — הפריט מחושב אוטומטית.');
+    const i=draft.custom.indexOf(reservedCustom);
+    const el=document.querySelector(`[data-bind="custom-name"][data-i="${i}"]`); if(el) el.focus();
+    return;
+  }
+  const selectedMains=Object.values(draft.mains||{}).reduce((sum,quantity)=>sum+(Number(quantity)||0),0);
+  if(selectedMains>(draft.meals||0)){
+    toast('בחירת העיקריות חורגת ממנה אחת לכל זוגית — המחיר לחריגה טרם הוגדר.');
+    return;
+  }
+  const selectedSides=Object.values(draft.sides||{}).reduce((sum,quantity)=>sum+(Number(quantity)||0),0);
+  if(selectedSides>(draft.meals||0)){
+    toast('בחירת התוספות חורגת מתוספת אחת לכל זוגית — המחיר לחריגה טרם הוגדר.');
+    return;
+  }
+  const dessert=dessertAllowance(draft);
+  if(dessert.unclassifiedQuantity>0){
+    toast('יש קינוח שאי אפשר לשייך בבטחה לזכאות.');
+    return;
+  }
+  if(dessert.excessHalfUnits>0){
+    toast('בחירת הקינוחים חורגת מהזכאות — המחיר לחריגה טרם הוגדר.');
+    return;
+  }
+  const suggested=computeSuggested(draft);
+  const expectedTotalMinorUnits=calculatedMinorUnits(suggested.total);
+  if(expectedTotalMinorUnits===null){
+    toast('אי אפשר לחשב מחיר בטוח עד שהמחירון יתוקן.');
+    return;
+  }
+  const totalMinorUnits=parseUsdMinorUnits(draft.total);
+  if(String(draft.total??'').trim()===''||totalMinorUnits===null){
+    toast('צריך לאשר את המחיר המחושב לפני השמירה.');
+    const el=document.querySelector('[data-bind="total"]'); if(el) el.focus();
+    return;
+  }
+  if(totalMinorUnits!==expectedTotalMinorUnits){
+    toast('סך התשלום חייב להיות זהה למחיר המחושב.');
+    const el=document.querySelector('[data-bind="total"]'); if(el) el.focus();
+    return;
+  }
+  const depositText=String(draft.deposit??'').trim();
+  const depositMinorUnits=depositText===''?0:parseUsdMinorUnits(depositText);
+  if(depositMinorUnits===null){
+    toast('המקדמה אינה תקינה.');
+    const el=document.querySelector('[data-bind="deposit"]'); if(el) el.focus();
+    return;
+  }
+  if(depositMinorUnits>expectedTotalMinorUnits){
+    toast('המקדמה לא יכולה להיות גבוהה מסך התשלום המחושב.');
+    const el=document.querySelector('[data-bind="deposit"]'); if(el) el.focus();
+    return;
+  }
   if(!draft.id){ draft.id=uid(); store.orders.push(draft); }
   else {
     const i=store.orders.findIndex(o=>o.id===draft.id);
@@ -2376,6 +2447,10 @@ document.addEventListener('click', e=>{
     const g=btn.dataset.group, i=Number(btn.dataset.i), k=btn.dataset.k||null, dd=Number(btn.dataset.d);
     const nv=bump(g,i,k,dd);
     if(g==='lunch'){ renderForm(); return; } // חושף/מסתיר בחירת וריאציה ותוספות
+    if(g==='meals'){
+      const challahCell=document.querySelector('[data-cell="challot|0"]');
+      if(challahCell){ challahCell.textContent=draft.challot||0; challahCell.classList.toggle('has',(draft.challot||0)>0); }
+    }
     const cell=document.querySelector(`[data-cell="${g}|${i}${k?'|'+k:''}"]`);
     if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
     if(g==='extras'){
@@ -2427,11 +2502,7 @@ document.addEventListener('click', e=>{
     return;
   }
   if(act==='del'){
-    const o=store.orders.find(x=>x.id===btn.dataset.id);
-    if(o && confirm(`למחוק את ההזמנה של ${o.name||'ללא שם'}?`)){
-      store.orders=store.orders.filter(x=>x.id!==o.id);
-      saveStore(); render(); toast('נמחק');
-    }
+    toast('מחיקה הושבתה במערכת הישנה כדי להגן על הזמנות אמיתיות');
     return;
   }
   if(act==='toggleText'){
@@ -2496,35 +2567,16 @@ document.addEventListener('click', e=>{
     saveStore(); renderBackup(); return;
   }
   if(act==='menuDel'){
-    const cat=btn.dataset.cat, i=Number(btn.dataset.i);
-    if(MENU[cat]&&MENU[cat][i]!==undefined){ MENU[cat].splice(i,1); persistMenu(); renderBackup(); }
+    toast('עריכת התפריט זמינה במערכת החדשה בלבד כדי לשמור התאמה לטופס הלקוחות');
     return;
   }
   if(act==='menuAdd'){
-    const cat=btn.dataset.cat;
-    const inp=$('#menuAdd-'+cat);
-    const name=(inp?inp.value:'').trim();
-    if(!name){ toast('כותבים קודם את שם המנה'); return; }
-    if(cat==='extras'){
-      const pr=parseMoney(($('#menuAddPrice-extras')||{}).value);
-      MENU.extras.push({name, price:pr});
-    } else MENU[cat].push(name);
-    persistMenu(); renderBackup(); toast('נוסף לתפריט ✓');
+    toast('עריכת התפריט זמינה במערכת החדשה בלבד כדי לשמור התאמה לטופס הלקוחות');
     return;
   }
   if(act==='introSeen'){ store.introSeen=true; saveStore(); renderToday(); return; }
-  if(act==='loadDemo'){
-    loadDemoData(); view.tab='today'; render();
-    toast('נטענו 4 הזמנות לדוגמה — קטי, לילך, חיים וניר 🎭');
-    return;
-  }
-  if(act==='clearDemo'){
-    clearDemoData(); render(); toast('נתוני הדוגמה נמחקו 🧹');
-    return;
-  }
   if(act==='menuReset'){
-    if(!confirm('לחזור לתפריט ולמחירים המקוריים? העריכות שעשית לתפריט יימחקו (ההזמנות לא נפגעות).')) return;
-    delete store.menu; saveStore(); buildMenu(); renderBackup(); toast('התפריט חזר למקור ✓');
+    toast('איפוס התפריט הושבת כדי לא לפגוע ברשימות ההכנה והקניות');
     return;
   }
   if(act==='promoMsg'){
@@ -2547,7 +2599,6 @@ document.addEventListener('click', e=>{
   }
   if(act==='exportFile'){ exportData(true); return; }
   if(act==='exportCopy'){ exportData(false); return; }
-  if(act==='importApply'){ importApply(); return; }
 });
 
 function handleBind(e){
@@ -2569,28 +2620,12 @@ function handleBind(e){
     if(e.type==='change') renderMoney();
     return;
   }
-  if(b==='menu-num'){
-    const k=e.target.dataset.k;
-    const v=Math.max(0,parseInt(e.target.value,10)||0);
-    if(MENU[k]!==undefined){ MENU[k]=v; persistMenu(); }
-    return;
-  }
-  if(b==='menu-extra-price'){
-    const i=Number(e.target.dataset.i);
-    if(MENU.extras[i]){ MENU.extras[i].price=parseMoney(e.target.value); persistMenu(); }
-    return;
-  }
-  if(b==='lunch-price'){
-    const i=Number(e.target.dataset.i), it=MENU.lunch[i]; if(!it) return;
-    const v=parseMoney(e.target.value);
-    if(e.target.dataset.addon){ if(it.addon) it.addon.price=v; }
-    else if(e.target.dataset.v!==undefined){
-      const vr=it.variants&&it.variants[Number(e.target.dataset.v)]; if(!vr) return;
-      if(e.target.dataset.side){ if(vr.sidePrice!==undefined) vr.sidePrice=v; }
-      else vr.price=v;
+  if(b==='menu-num'||b==='menu-extra-price'||b==='lunch-price'){
+    if(e.type==='change'){
+      toast('מחירי התפריט נעולים עד שטופס הלקוחות יקבל את אותו מחירון');
+      renderBackup();
     }
-    else if(it.price!==undefined) it.price=v;
-    persistMenu(); return;
+    return;
   }
   if(b==='payLink'){ store.settings.payLink=e.target.value.trim(); saveStore(); return; }
   if(b==='orderFormUrl'){ store.settings.orderFormUrl=e.target.value.trim(); saveStore(); return; }
@@ -2627,6 +2662,7 @@ function handleBind(e){
     case 'pickup': {
       draft.pickup=e.target.checked;
       const df=$('#deliveryFields'); if(df) df.hidden=draft.pickup;
+      updatePriceHint();
       break;
     }
     case 'heat': draft.heat=v; break;
@@ -2652,7 +2688,7 @@ function handleBind(e){
       }
       break;
     }
-    case 'custom-name': if(draft.custom[i]) draft.custom[i].name=v; break;
+    case 'custom-name': if(draft.custom[i]){ draft.custom[i].name=v; updatePriceHint(); } break;
     case 'custom-note': if(draft.custom[i]) draft.custom[i].note=v; break;
     case 'custom-qty': if(draft.custom[i]){ draft.custom[i].qty=v; updatePriceHint(); } break;
     case 'custom-price': if(draft.custom[i]){ draft.custom[i].price=v; updatePriceHint(); } break;
@@ -2666,11 +2702,8 @@ document.addEventListener('change', e=>{
 /* ================= init ================= */
 document.documentElement.setAttribute('dir','rtl');
 document.documentElement.setAttribute('lang','he');
-let firstRun=false;
-try{ firstRun=!localStorage.getItem(LS_KEY); }catch(e){}
 loadStore();
 buildMenu();
-if(firstRun&&storageOK&&!store.orders.length) loadDemoData();
 render();
 </script>
 

@@ -5,28 +5,49 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../data/use-store.ts'
+import type { ConfirmedStoreSaveHandler } from '../data/versioned-screen-save.tsx'
 import type { LegacyStore } from '../domain/store.ts'
+import type { VersionedStateEnvelope } from '../services/state-api.ts'
 import { DeliveriesScreen } from './deliveries-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
 const mockedUseStore = vi.mocked(useStore)
+const HASH = 'a'.repeat(64)
 
 function queryResult(options: {
   readonly pending?: boolean
   readonly error?: boolean
   readonly store?: LegacyStore | null
   readonly refetch?: ReturnType<typeof vi.fn>
+  readonly revision?: number
 } = {}): ReturnType<typeof useStore> {
   return {
     isPending: options.pending === true,
     isError: options.error === true,
-    data: options.pending || options.error ? undefined : { ts: 1, data: options.store ?? { orders: [] } },
+    data: options.pending || options.error ? undefined : {
+      revision: options.revision ?? 1,
+      ts: options.revision ?? 1,
+      hash: HASH,
+      data: options.store ?? { orders: [] },
+    },
     refetch: options.refetch ?? vi.fn(),
   } as unknown as ReturnType<typeof useStore>
 }
 
-function renderDeliveries() {
-  return render(<MemoryRouter initialEntries={['/deliveries']}><DeliveriesScreen /></MemoryRouter>)
+function renderDeliveries(onSave?: ConfirmedStoreSaveHandler) {
+  return render(<MemoryRouter initialEntries={['/deliveries']}><DeliveriesScreen onSave={onSave} /></MemoryRouter>)
+}
+
+function confirmedEnvelope(data: LegacyStore, revision = 2): VersionedStateEnvelope {
+  return { revision, ts: revision, hash: HASH, data }
+}
+
+function successfulSave() {
+  let revision = 1
+  return vi.fn<ConfirmedStoreSaveHandler>().mockImplementation(async ({ nextStore }) => {
+    revision += 1
+    return confirmedEnvelope(nextStore, revision)
+  })
 }
 
 afterEach(cleanup)
@@ -111,6 +132,19 @@ describe('DeliveriesScreen', () => {
     )
   })
 
+  it('builds an edit link for a canonical colon ID with one encoding pass', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'order:1', date: '2099-08-14', name: 'לקוח קנוני', place: 'יעד קנוני' }],
+      },
+    }))
+
+    renderDeliveries()
+
+    expect(screen.getByRole('link', { name: 'עריכה' }).getAttribute('href'))
+      .toBe('/orders/order%3A1/edit')
+  })
+
   it('keeps unsafe deliveries visible but blocks navigation, phone, edit, and collection', () => {
     mockedUseStore.mockReturnValue(queryResult({
       store: {
@@ -129,5 +163,166 @@ describe('DeliveriesScreen', () => {
     expect(screen.queryByRole('link', { name: 'ניווט ליעד' })).toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('לא נשמר יעד או כתובת')
     expect(screen.queryByText('$123.00')).toBeNull()
+  })
+
+  it('writes only the next status after an explicit click and preserves every other field', async () => {
+    const store = {
+      orders: [{
+        id: 'real-delivery',
+        date: '2099-08-14',
+        name: 'לקוחה לשמירה',
+        place: 'מלון',
+        status: 'אושרה',
+        unknownOrderField: { keep: ['exact'] },
+      }],
+      unknownStoreField: { keep: true },
+    } satisfies LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    renderDeliveries(onSave)
+
+    expect(onSave).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'עדכון לקוחה לשמירה לסטטוס מוכנה' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const request = onSave.mock.calls[0]![0]
+    expect(request.reason).toBe('deliveries')
+    expect(request.baseStore).toBe(store)
+    expect(request.baseEnvelope).toMatchObject({ revision: 1, ts: 1, hash: HASH, data: store })
+    expect(request.nextStore).toEqual({
+      ...store,
+      orders: [{ ...store.orders[0], status: 'מוכנה' }],
+    })
+    expect(screen.getByText('הסטטוס עודכן למוכנה.')).toBeTruthy()
+    expect(screen.getByText('מוכנה')).toBeTruthy()
+  })
+
+  it('fails closed for duplicate IDs and performs no write', () => {
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          { id: 'duplicate', date: '2099-08-14', name: 'אחת', place: 'מלון א' },
+          { id: 'duplicate', date: '2099-08-14', name: 'שתיים', place: 'מלון ב' },
+        ],
+      },
+    }))
+    renderDeliveries(onSave)
+
+    expect(screen.getAllByRole('button', { name: 'עדכון סטטוס לא זמין' })).toHaveLength(2)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('keeps a unique numeric legacy ID visible but exposes no edit or status write', () => {
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 7, date: '2099-08-14', name: 'לקוחה ישנה', place: 'מלון' }],
+      },
+    }))
+    renderDeliveries(onSave)
+
+    expect(screen.getByText('לקוחה ישנה')).toBeTruthy()
+    expect(screen.getByText('עריכה לא זמינה')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'עדכון סטטוס לא זמין' }).hasAttribute('disabled')).toBe(true)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('adopts the exact merged server envelope and allows a second guarded status write', async () => {
+    const store = {
+      orders: [{
+        id: 'merge-delivery',
+        date: '2099-08-14',
+        name: 'לקוחה ממוזגת',
+        place: 'מלון',
+        status: 'אושרה',
+      }],
+    } satisfies LegacyStore
+    let mergedStore: LegacyStore | null = null
+    const onSave = vi.fn<ConfirmedStoreSaveHandler>()
+      .mockImplementationOnce(async ({ nextStore }) => {
+        mergedStore = {
+          ...nextStore,
+          remoteOnly: { keep: true },
+          orders: [
+            ...nextStore.orders,
+            {
+              id: 'remote-delivery',
+              date: '2099-08-14',
+              name: 'לקוחה מרחוק',
+              place: 'מלון אחר',
+              status: 'חדשה',
+            },
+          ],
+        }
+        return confirmedEnvelope(mergedStore, 2)
+      })
+      .mockImplementationOnce(async ({ nextStore }) => confirmedEnvelope(nextStore, 3))
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const view = renderDeliveries(onSave)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'עדכון לקוחה ממוזגת לסטטוס מוכנה' }))
+
+    expect(screen.getByText('לקוחה מרחוק')).toBeTruthy()
+    expect(mergedStore).not.toBeNull()
+
+    mockedUseStore.mockReturnValue(queryResult({ store: mergedStore!, revision: 2 }))
+    view.rerender(
+      <MemoryRouter initialEntries={['/deliveries']}>
+        <DeliveriesScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+
+    const secondButton = screen.getByRole('button', { name: 'עדכון לקוחה ממוזגת לסטטוס במשלוח' })
+    expect(secondButton.hasAttribute('disabled')).toBe(false)
+    await user.click(secondButton)
+
+    expect(onSave).toHaveBeenCalledTimes(2)
+    expect(onSave.mock.calls[1]![0].baseStore).toEqual(mergedStore)
+    expect(onSave.mock.calls[1]![0].nextStore).toMatchObject({
+      remoteOnly: { keep: true },
+      orders: [
+        { id: 'merge-delivery', status: 'במשלוח' },
+        { id: 'remote-delivery', status: 'חדשה' },
+      ],
+    })
+  })
+
+  it('retains a conflict error and never shows an unconfirmed status', async () => {
+    const onSave = vi.fn<ConfirmedStoreSaveHandler>().mockRejectedValue(new Error('conflict'))
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'conflict', date: '2099-08-14', name: 'לקוח קונפליקט', place: 'מלון', status: 'מוכנה' }],
+      },
+    }))
+    const user = userEvent.setup()
+    renderDeliveries(onSave)
+
+    await user.click(screen.getByRole('button', { name: 'עדכון לקוח קונפליקט לסטטוס במשלוח' }))
+
+    expect(screen.getByRole('alert').textContent).toContain('השמירה נכשלה או התנגשה')
+    expect(screen.getByText('מוכנה')).toBeTruthy()
+    expect(screen.queryByText('במשלוח')).toBeNull()
+  })
+
+  it('rejects background envelope drift before calling the save callback', async () => {
+    const store = {
+      orders: [{ id: 'drift', date: '2099-08-14', name: 'לקוחה דריפט', place: 'מלון', status: 'אושרה' }],
+    } satisfies LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const view = renderDeliveries(onSave)
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { ...store, remoteUnknown: true },
+      revision: 2,
+    }))
+    view.rerender(<MemoryRouter initialEntries={['/deliveries']}><DeliveriesScreen onSave={onSave} /></MemoryRouter>)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'עדכון לקוחה דריפט לסטטוס מוכנה' }))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('הנתונים השתנו')
   })
 })

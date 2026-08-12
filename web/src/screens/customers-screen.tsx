@@ -1,17 +1,23 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { generatePath, Link } from 'react-router'
 import type { To } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
+  applyCustomerMetadataToStore,
   buildCustomersDirectory,
+  type CustomerFinanceSaveHandler,
   type CustomerDirectoryEntry,
   type CustomerFinanceWarning,
+  type CustomerMetadataUpdate,
   type CustomerOrderHistoryItem,
 } from '../domain/customers-finance.ts'
+import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 const compactLinkClassName =
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
@@ -19,8 +25,27 @@ const compactLinkClassName =
 const primaryLinkClassName =
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground shadow-[0_8px_24px_rgba(99,33,40,0.12)] transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
+type CustomerSaveState =
+  | { readonly kind: 'idle'; readonly message: '' }
+  | { readonly kind: 'saving'; readonly message: string }
+  | { readonly kind: 'saved'; readonly message: string }
+  | { readonly kind: 'error'; readonly message: string }
+
+interface CustomersInitialization {
+  readonly baseEnvelope: Readonly<VersionedStateEnvelope> | null
+  readonly baseStore: Readonly<LegacyStore>
+}
+
+interface AcceptedCustomerSave {
+  readonly nextStore: LegacyStore
+  readonly customerKey: string
+  readonly update: CustomerMetadataUpdate
+}
+
+const IDLE_CUSTOMER_SAVE: CustomerSaveState = { kind: 'idle', message: '' }
+
 function orderRoute(orderId: string): string {
-  return generatePath(APP_ROUTES.editOrder, { orderId: encodeURIComponent(orderId) })
+  return generatePath(APP_ROUTES.editOrder, { orderId })
 }
 
 function repeatOrderRoute(orderId: string): To {
@@ -76,7 +101,22 @@ function HistoryRow({ item, customerName }: { item: CustomerOrderHistoryItem; cu
   )
 }
 
-function CustomerCard({ customer }: { customer: CustomerDirectoryEntry }) {
+function CustomerCard({
+  customer,
+  notes,
+  saveState,
+  onNotesChange,
+  onSaveNotes,
+  onToggleVip,
+}: {
+  customer: CustomerDirectoryEntry
+  notes: string
+  saveState: CustomerSaveState
+  onNotesChange: (notes: string) => void
+  onSaveNotes: () => void
+  onToggleVip: () => void
+}) {
+  const saving = saveState.kind === 'saving'
   return (
     <article className="relative overflow-hidden rounded-[2.5rem] border border-border bg-card shadow-sm">
       {customer.vip && <div className="absolute inset-y-0 right-0 w-2.5 bg-accent" aria-hidden="true" />}
@@ -156,13 +196,50 @@ function CustomerCard({ customer }: { customer: CustomerDirectoryEntry }) {
                 <span>הזמנה חדשה כמו הקודמת</span>
               </Link>
             )}
+            <button
+              type="button"
+              onClick={onToggleVip}
+              disabled={saving}
+              aria-label={`${customer.vip ? 'הסרת' : 'סימון'} VIP עבור ${customer.name}`}
+              className="min-h-10 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-black text-primary hover:bg-secondary disabled:cursor-wait disabled:opacity-50"
+            >
+              {customer.vip ? 'הסרת VIP' : 'סימון VIP'}
+            </button>
           </div>
 
-          <section aria-label={`הערות על ${customer.name}`}>
-            <h3 className="text-[0.6875rem] font-black text-muted-foreground">הערות על הלקוח</h3>
-            <div className="mt-2 min-h-24 whitespace-pre-wrap rounded-2xl border border-border bg-secondary/30 p-4 text-xs font-medium leading-6 text-foreground">
-              {customer.notes || 'אין הערות שמורות.'}
-            </div>
+          <section aria-label={`עריכת פרטי ${customer.name}`}>
+            <label
+              htmlFor={`customer-notes-${customer.key}`}
+              className="text-[0.6875rem] font-black text-muted-foreground"
+            >
+              הערות על הלקוח
+            </label>
+            <textarea
+              id={`customer-notes-${customer.key}`}
+              value={notes}
+              maxLength={10_000}
+              onChange={(event) => onNotesChange(event.currentTarget.value)}
+              disabled={saving}
+              placeholder="אלרגיות, העדפות ומה הלקוח מזמין בדרך כלל..."
+              className="mt-2 min-h-24 w-full resize-y rounded-2xl border border-border bg-secondary/30 p-4 text-xs font-medium leading-6 text-foreground outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={onSaveNotes}
+              disabled={saving || notes === customer.notes}
+              aria-label={`שמירת הערות על ${customer.name}`}
+              className="mt-2 min-h-10 w-full rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              שמירת הערות
+            </button>
+            {saveState.kind !== 'idle' && (
+              <p
+                className={`mt-2 text-xs font-bold ${saveState.kind === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+                role={saveState.kind === 'error' ? 'alert' : 'status'}
+              >
+                {saveState.message}
+              </p>
+            )}
           </section>
         </div>
 
@@ -228,10 +305,63 @@ function CustomerWarnings({ warnings }: { warnings: readonly CustomerFinanceWarn
   )
 }
 
-export function CustomersScreen() {
+export function CustomersScreen({ onSave }: { readonly onSave?: CustomerFinanceSaveHandler }) {
   const storeQuery = useStore()
+  const initializationRef = useRef<CustomersInitialization | null>(null)
+  const acceptedSaveRef = useRef<AcceptedCustomerSave | null>(null)
   const [query, setQuery] = useState('')
+  const [noteDrafts, setNoteDrafts] = useState<Readonly<Record<string, string>>>({})
+  const [confirmedUpdates, setConfirmedUpdates] = useState<
+    Readonly<Record<string, CustomerMetadataUpdate>>
+  >({})
+  const [saveStates, setSaveStates] = useState<Readonly<Record<string, CustomerSaveState>>>({})
   const searchInput = useRef<HTMLInputElement>(null)
+
+  if (initializationRef.current === null && storeQuery.data?.data != null) {
+    initializationRef.current = {
+      baseEnvelope: isVersionedStateEnvelope(storeQuery.data) ? storeQuery.data : null,
+      baseStore: storeQuery.data.data,
+    }
+  }
+  const acceptedSave = acceptedSaveRef.current
+  const acknowledgedEnvelope =
+    acceptedSave !== null &&
+    storeQuery.data !== undefined &&
+    isVersionedStateEnvelope(storeQuery.data) &&
+    JSON.stringify(storeQuery.data.data) === JSON.stringify(acceptedSave.nextStore)
+      ? storeQuery.data
+      : null
+
+  useEffect(() => {
+    if (
+      acceptedSave === null ||
+      acknowledgedEnvelope === null ||
+      acceptedSaveRef.current !== acceptedSave
+    ) return
+
+    initializationRef.current = {
+      baseEnvelope: acknowledgedEnvelope,
+      baseStore: acknowledgedEnvelope.data,
+    }
+    acceptedSaveRef.current = null
+    setConfirmedUpdates((current) => {
+      if (JSON.stringify(current[acceptedSave.customerKey]) !== JSON.stringify(acceptedSave.update)) {
+        return current
+      }
+      const next = { ...current }
+      delete next[acceptedSave.customerKey]
+      return next
+    })
+    if (acceptedSave.update.kind === 'notes') {
+      const acknowledgedNotes = acceptedSave.update.notes
+      setNoteDrafts((current) => {
+        if (current[acceptedSave.customerKey] !== acknowledgedNotes) return current
+        const next = { ...current }
+        delete next[acceptedSave.customerKey]
+        return next
+      })
+    }
+  }, [acceptedSave, acknowledgedEnvelope])
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את הלקוחות" />
   if (storeQuery.isError) {
@@ -247,7 +377,15 @@ export function CustomersScreen() {
     )
   }
 
-  const directory = buildCustomersDirectory(storeQuery.data.data ?? { orders: [] }, { query })
+  let displayStore = storeQuery.data.data ?? { orders: [] }
+  for (const update of Object.values(confirmedUpdates)) {
+    try {
+      displayStore = applyCustomerMetadataToStore(displayStore, update)
+    } catch {
+      // A confirmed update is shown only while its canonical customer still exists.
+    }
+  }
+  const directory = buildCustomersDirectory(displayStore, { query })
   if (directory.globallyEmpty) {
     return (
       <ScreenState
@@ -257,6 +395,74 @@ export function CustomersScreen() {
         action={{ label: 'הזמנה חדשה', icon: 'ph:plus-bold', to: APP_ROUTES.newOrder }}
       />
     )
+  }
+
+  const saveCustomer = async (customer: CustomerDirectoryEntry, update: CustomerMetadataUpdate) => {
+    const initialization = initializationRef.current
+    if (!onSave) {
+      setSaveStates((current) => ({
+        ...current,
+        [customer.key]: {
+          kind: 'error',
+          message: 'השמירה המוגנת עדיין אינה מחוברת. לא בוצע שינוי בשרת.',
+        },
+      }))
+      return
+    }
+    if (
+      initialization?.baseEnvelope == null ||
+      !isSameVersionedStateEnvelope(storeQuery.data, initialization.baseEnvelope)
+    ) {
+      setSaveStates((current) => ({
+        ...current,
+        [customer.key]: {
+          kind: 'error',
+          message: 'הנתונים התעדכנו מאז פתיחת המסך. הטיוטה נשמרה כאן ולא נשלחה.',
+        },
+      }))
+      return
+    }
+
+    let nextStore: LegacyStore
+    try {
+      nextStore = applyCustomerMetadataToStore(initialization.baseStore, update)
+    } catch {
+      setSaveStates((current) => ({
+        ...current,
+        [customer.key]: {
+          kind: 'error',
+          message: 'זהות הלקוח או ההערות אינן בטוחות לשמירה. לא בוצע שינוי.',
+        },
+      }))
+      return
+    }
+
+    setSaveStates((current) => ({
+      ...current,
+      [customer.key]: { kind: 'saving', message: 'שומרת...' },
+    }))
+    try {
+      await onSave({
+        reason: 'customers',
+        baseEnvelope: initialization.baseEnvelope,
+        baseStore: initialization.baseStore,
+        nextStore,
+      })
+      acceptedSaveRef.current = { nextStore, customerKey: customer.key, update }
+      setConfirmedUpdates((current) => ({ ...current, [customer.key]: update }))
+      setSaveStates((current) => ({
+        ...current,
+        [customer.key]: { kind: 'saved', message: 'פרטי הלקוח נשמרו.' },
+      }))
+    } catch {
+      setSaveStates((current) => ({
+        ...current,
+        [customer.key]: {
+          kind: 'error',
+          message: 'השמירה נכשלה. הטיוטה נשארה כאן והנתונים הקיימים לא הוחלפו.',
+        },
+      }))
+    }
   }
 
   return (
@@ -314,7 +520,34 @@ export function CustomersScreen() {
               </p>
             )}
             {directory.customers.map((customer) => (
-              <CustomerCard key={customer.key} customer={customer} />
+              <CustomerCard
+                key={customer.key}
+                customer={customer}
+                notes={Object.prototype.hasOwnProperty.call(noteDrafts, customer.key)
+                  ? noteDrafts[customer.key]!
+                  : customer.notes}
+                saveState={saveStates[customer.key] ?? IDLE_CUSTOMER_SAVE}
+                onNotesChange={(notes) => {
+                  setNoteDrafts((current) => ({ ...current, [customer.key]: notes }))
+                  setSaveStates((current) => ({ ...current, [customer.key]: IDLE_CUSTOMER_SAVE }))
+                }}
+                onSaveNotes={() => {
+                  void saveCustomer(customer, {
+                    kind: 'notes',
+                    customerKey: customer.key,
+                    notes: Object.prototype.hasOwnProperty.call(noteDrafts, customer.key)
+                      ? noteDrafts[customer.key]!
+                      : customer.notes,
+                  })
+                }}
+                onToggleVip={() => {
+                  void saveCustomer(customer, {
+                    kind: 'vip',
+                    customerKey: customer.key,
+                    vip: !customer.vip,
+                  })
+                }}
+              />
             ))}
           </>
         )}

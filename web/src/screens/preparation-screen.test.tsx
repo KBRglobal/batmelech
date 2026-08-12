@@ -4,13 +4,16 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ConfirmedStoreSaveHandler } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import type { PreparationCatalog } from '../domain/preparation.ts'
 import type { LegacyStore } from '../domain/store.ts'
+import type { VersionedStateEnvelope } from '../services/state-api.ts'
 import { PreparationScreen } from './preparation-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
 const mockedUseStore = vi.mocked(useStore)
+const HASH = 'b'.repeat(64)
 
 const CATALOG: PreparationCatalog = {
   items: [
@@ -35,17 +38,35 @@ function queryResult(options: {
   readonly error?: boolean
   readonly store?: LegacyStore | null
   readonly refetch?: ReturnType<typeof vi.fn>
+  readonly revision?: number
 } = {}): ReturnType<typeof useStore> {
   return {
     isPending: options.pending === true,
     isError: options.error === true,
-    data: options.pending || options.error ? undefined : { ts: 1, data: options.store ?? { orders: [] } },
+    data: options.pending || options.error ? undefined : {
+      revision: options.revision ?? 1,
+      ts: options.revision ?? 1,
+      hash: HASH,
+      data: options.store ?? { orders: [] },
+    },
     refetch: options.refetch ?? vi.fn(),
   } as unknown as ReturnType<typeof useStore>
 }
 
-function renderPreparation(path = '/preparation') {
-  return render(<MemoryRouter initialEntries={[path]}><PreparationScreen /></MemoryRouter>)
+function renderPreparation(path = '/preparation', onSave?: ConfirmedStoreSaveHandler) {
+  return render(<MemoryRouter initialEntries={[path]}><PreparationScreen onSave={onSave} /></MemoryRouter>)
+}
+
+function confirmedEnvelope(data: LegacyStore, revision = 2): VersionedStateEnvelope {
+  return { revision, ts: revision, hash: HASH, data }
+}
+
+function successfulSave() {
+  let revision = 1
+  return vi.fn<ConfirmedStoreSaveHandler>().mockImplementation(async ({ nextStore }) => {
+    revision += 1
+    return confirmedEnvelope(nextStore, revision)
+  })
 }
 
 afterEach(cleanup)
@@ -116,6 +137,11 @@ describe('PreparationScreen', () => {
     expect(screen.getByRole('link', { name: 'רשימת קניות לתאריך' }).getAttribute('href')).toBe(
       '/shopping-list?date=2099-08-14',
     )
+    const labelsLink = screen.getByRole('link', { name: 'מדבקות הכנה' })
+    expect(labelsLink.getAttribute('href')).toBe('/preparation/labels')
+    expect(labelsLink.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(
+      'ph-package-bold.svg',
+    )
     expect(screen.getByRole('button', { name: 'סימון הושלם לא זמין' }).hasAttribute('disabled')).toBe(true)
 
     await userEvent.setup().selectOptions(screen.getByLabelText('תאריך הכנה'), '2099-08-15')
@@ -152,5 +178,152 @@ describe('PreparationScreen', () => {
     expect(screen.getAllByText('לא מלא').length).toBeGreaterThan(0)
     expect(screen.getByRole('alert').textContent).toContain('הסיכום הכספי אינו מלא')
     expect(screen.queryByText('$123.00')).toBeNull()
+  })
+
+  it('persists and reloads one legacy-compatible completion key without touching another date', async () => {
+    const store = {
+      orders: [{
+        id: 'prep-order',
+        date: '2099-08-14',
+        name: 'לקוחה',
+        mains: { 'עיקרית אמיתית': 2 },
+      }],
+      preparationCatalog: CATALOG,
+      prepDone: {
+        '2099-08-13': { 'mains|יום קודם': true },
+        '2099-08-14': { 'future|opaque': { keep: true } },
+      },
+      unknownStoreField: { keep: ['exact'] },
+    } as unknown as LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    const first = renderPreparation('/preparation?date=2099-08-14', onSave)
+
+    expect(onSave).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'סיום הכנת עיקרית אמיתית' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const firstRequest = onSave.mock.calls[0]![0]
+    expect(firstRequest.reason).toBe('preparation')
+    expect(firstRequest.baseStore).toBe(store)
+    expect(firstRequest.nextStore.prepDone).toEqual({
+      '2099-08-13': { 'mains|יום קודם': true },
+      '2099-08-14': { 'future|opaque': { keep: true }, 'mains|עיקרית אמיתית': true },
+    })
+    expect((firstRequest.nextStore as Record<string, unknown>).unknownStoreField).toEqual({ keep: ['exact'] })
+    expect(screen.getByRole('button', { name: 'פתיחת הכנת עיקרית אמיתית' })).toBeTruthy()
+    expect(screen.getByText('סומן כהושלם.')).toBeTruthy()
+
+    first.unmount()
+    onSave.mockClear()
+    mockedUseStore.mockReturnValue(queryResult({ store: firstRequest.nextStore, revision: 2 }))
+    renderPreparation('/preparation?date=2099-08-14', onSave)
+    expect(screen.getByRole('button', { name: 'פתיחת הכנת עיקרית אמיתית' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'פתיחת הכנת עיקרית אמיתית' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.prepDone).toEqual({
+      '2099-08-13': { 'mains|יום קודם': true },
+      '2099-08-14': { 'future|opaque': { keep: true } },
+    })
+    expect(screen.getByText('הסימון נפתח מחדש.')).toBeTruthy()
+  })
+
+  it('retains an unsuccessful completion and reports the conflict', async () => {
+    const onSave = vi.fn<ConfirmedStoreSaveHandler>().mockRejectedValue(new Error('conflict'))
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'prep-conflict', date: '2099-08-14', mains: { 'עיקרית אמיתית': 1 } }],
+        preparationCatalog: CATALOG,
+      } as LegacyStore,
+    }))
+    renderPreparation('/preparation?date=2099-08-14', onSave)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'סיום הכנת עיקרית אמיתית' }))
+
+    expect(screen.getByRole('alert').textContent).toContain('השמירה נכשלה או התנגשה')
+    expect(screen.getByRole('button', { name: 'סיום הכנת עיקרית אמיתית' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('adopts merged server preparation data and allows a second guarded completion write', async () => {
+    const store = {
+      orders: [{
+        id: 'prep-merge',
+        date: '2099-08-14',
+        mains: { 'עיקרית אמיתית': 1 },
+      }],
+      preparationCatalog: CATALOG,
+    } as LegacyStore
+    let mergedStore: LegacyStore | null = null
+    const onSave = vi.fn<ConfirmedStoreSaveHandler>()
+      .mockImplementationOnce(async ({ nextStore }) => {
+        mergedStore = {
+          ...nextStore,
+          remoteOnly: { keep: true },
+          orders: [
+            ...nextStore.orders,
+            {
+              id: 'prep-remote',
+              date: '2099-08-14',
+              mains: { 'עיקרית אמיתית': 3 },
+            },
+          ],
+        }
+        return confirmedEnvelope(mergedStore, 2)
+      })
+      .mockImplementationOnce(async ({ nextStore }) => confirmedEnvelope(nextStore, 3))
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const view = renderPreparation('/preparation?date=2099-08-14', onSave)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'סיום הכנת עיקרית אמיתית' }))
+
+    const itemRow = screen.getByText('עיקרית אמיתית').closest('li')
+    expect(itemRow).not.toBeNull()
+    expect(within(itemRow!).getByText('4')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'פתיחת הכנת עיקרית אמיתית' }).hasAttribute('disabled')).toBe(true)
+
+    mockedUseStore.mockReturnValue(queryResult({ store: mergedStore!, revision: 2 }))
+    view.rerender(
+      <MemoryRouter initialEntries={['/preparation?date=2099-08-14']}>
+        <PreparationScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+
+    const reopenButton = screen.getByRole('button', { name: 'פתיחת הכנת עיקרית אמיתית' })
+    expect(reopenButton.hasAttribute('disabled')).toBe(false)
+    await user.click(reopenButton)
+
+    expect(onSave).toHaveBeenCalledTimes(2)
+    expect(onSave.mock.calls[1]![0].baseStore).toEqual(mergedStore)
+    expect(onSave.mock.calls[1]![0].nextStore.orders).toHaveLength(2)
+    expect((onSave.mock.calls[1]![0].nextStore as Record<string, unknown>).remoteOnly).toEqual({ keep: true })
+    expect(onSave.mock.calls[1]![0].nextStore.prepDone?.['2099-08-14']).toEqual({})
+  })
+
+  it('rejects a background state change with zero operational write', async () => {
+    const store = {
+      orders: [{ id: 'prep-drift', date: '2099-08-14', mains: { 'עיקרית אמיתית': 1 } }],
+      preparationCatalog: CATALOG,
+    } as LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const view = renderPreparation('/preparation?date=2099-08-14', onSave)
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { ...store, remoteUnknown: true },
+      revision: 2,
+    }))
+    view.rerender(
+      <MemoryRouter initialEntries={['/preparation?date=2099-08-14']}>
+        <PreparationScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'סיום הכנת עיקרית אמיתית' }))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('הנתונים השתנו')
   })
 })

@@ -6,7 +6,11 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_ROUTES } from '../app/routes.ts'
 import { useStore } from '../data/use-store.ts'
-import type { AIReview } from '../domain/order-editor.ts'
+import {
+  buildOrderEditorMenu,
+  createOrderDraft,
+  type AIReview,
+} from '../domain/order-editor.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { OrderImportReviewScreen } from './order-import-review-screen.tsx'
 
@@ -14,17 +18,29 @@ vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
 
 const mockedUseStore = vi.mocked(useStore)
 
+function versionedEnvelope(store: LegacyStore = { orders: [] }, revision = 1) {
+  return {
+    revision,
+    ts: revision,
+    hash: (revision === 1 ? 'a' : 'b').repeat(64),
+    data: store,
+  }
+}
+
 function queryResult(options: {
   readonly pending?: boolean
   readonly error?: boolean
   readonly store?: LegacyStore
   readonly refetch?: ReturnType<typeof vi.fn>
 } = {}): ReturnType<typeof useStore> {
+  const data = options.pending || options.error
+    ? undefined
+    : versionedEnvelope(options.store)
   return {
     isPending: options.pending === true,
     isError: options.error === true,
-    data: options.pending || options.error ? undefined : { ts: 1, data: options.store ?? { orders: [] } },
-    refetch: options.refetch ?? vi.fn(),
+    data,
+    refetch: options.refetch ?? vi.fn().mockResolvedValue({ data }),
   } as unknown as ReturnType<typeof useStore>
 }
 
@@ -33,15 +49,45 @@ function LocationProbe() {
   return <output data-testid="location">{`${location.pathname}|${JSON.stringify(location.state)}`}</output>
 }
 
-function renderReview(message = '') {
+function renderReview(message = '', extraState: Record<string, unknown> = {}) {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: APP_ROUTES.orderImportReview, state: { message } }]}>
+    <MemoryRouter initialEntries={[{ pathname: APP_ROUTES.orderImportReview, state: { message, ...extraState } }]}>
       <Routes>
         <Route path={APP_ROUTES.orderImportReview} element={<><OrderImportReviewScreen /><LocationProbe /></>} />
         <Route path={APP_ROUTES.newOrder} element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
   )
+}
+
+function bm1Message(payload: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload))
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return `הזמנה מהטופס\n#BM1#${btoa(binary)}#`
+}
+
+function publicPayload(patch: Record<string, unknown> = {}) {
+  return {
+    date: '2026-08-14',
+    name: 'לקוחה מובנית',
+    phone: '050-1111111',
+    place: 'מלון בדובאי',
+    address: 'Lobby',
+    time: '14:00',
+    pickup: false,
+    meals: 1,
+    challot: 2,
+    salads: { 'כרוב לבן קלאסי': 1 },
+    firsts: { 'פילה דג ברוטב מרוקאי': 1 },
+    heat: 'לא חריף',
+    mains: { 'קציצות בשר ברוטב אדום עשיר': 1 },
+    sides: { 'אורז לבן': 1 },
+    desserts: { 'סופלה שוקולד': 2 },
+    extras: { 'תוספת יין': { q: 1, note: '' }, 'משלוח': { q: 1, note: '' } },
+    notes: 'בלי בצל',
+    ...patch,
+  }
 }
 
 function completeReview(): AIReview {
@@ -211,12 +257,213 @@ describe('OrderImportReviewScreen', () => {
     const preview = screen.getByText('הטיוטה שהוחלה בזיכרון בלבד').closest('section')!
     expect(within(preview).getByText('לקוחה מההודעה')).toBeTruthy()
     expect(within(preview).getByText('ארוחות זוגיות: 2')).toBeTruthy()
+    expect(within(preview).getByText('חלות: 4')).toBeTruthy()
     expect(within(preview).getByText('תוספת יין ×1')).toBeTruthy()
     expect(screen.getByText('שום דבר לא נשמר במסד הנתונים')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'מעבר לטופס והשלמה ידנית' }))
-    expect(screen.getByTestId('location').textContent).toContain(`${APP_ROUTES.newOrder}|`)
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toContain(`${APP_ROUTES.newOrder}|`))
     expect(screen.getByTestId('location').textContent).toContain('"reviewOnly":true')
+    expect(screen.getByTestId('location').textContent).toContain('"reviewedHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"')
+    expect(screen.getByTestId('location').textContent).toContain('"challot":4')
+  })
+
+  it('rejects application when the state revision or catalog changes after the AI response', async () => {
+    const initialStore: LegacyStore = {
+      orders: [],
+      menu: { extras: [{ name: 'תוספת יין', price: 5 }] },
+    }
+    mockedUseStore.mockReturnValue(queryResult({ store: initialStore }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ review: completeReview() }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const user = userEvent.setup()
+    const rendered = renderReview('2 זוגיות ויין אחד')
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+    expect(await screen.findByRole('button', { name: 'החלה על טיוטה בזיכרון' })).toBeTruthy()
+
+    mockedUseStore.mockReturnValue({
+      ...queryResult({
+        store: {
+          orders: [],
+          menu: { extras: [{ name: 'פריט אחר', price: 5 }] },
+        },
+      }),
+      data: {
+        revision: 2,
+        ts: 2,
+        hash: 'b'.repeat(64),
+        data: {
+          orders: [],
+          menu: { extras: [{ name: 'פריט אחר', price: 5 }] },
+        },
+      },
+    } as ReturnType<typeof useStore>)
+    rendered.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.orderImportReview]}>
+        <Routes>
+          <Route path={APP_ROUTES.orderImportReview} element={<><OrderImportReviewScreen /><LocationProbe /></>} />
+          <Route path={APP_ROUTES.newOrder} element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await user.click(screen.getByRole('button', { name: 'החלה על טיוטה בזיכרון' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('הנתונים או התפריט השתנו')
+    expect(screen.queryByText('הטיוטה שהוחלה בזיכרון בלבד')).toBeNull()
+  })
+
+  it('refetches before application and rejects unseen cross-tab drift with no in-memory application', async () => {
+    const initialStore: LegacyStore = {
+      orders: [],
+      menu: { extras: [{ name: 'תוספת יין', price: 5 }] },
+    }
+    const changedStore: LegacyStore = {
+      orders: [{ id: 'remote-order', name: 'Remote customer' }],
+      menu: { extras: [{ name: 'תוספת יין', price: 5 }] },
+    }
+    const refetch = vi.fn()
+      .mockResolvedValueOnce({ data: versionedEnvelope(initialStore) })
+      .mockResolvedValueOnce({ data: versionedEnvelope(changedStore, 2) })
+    mockedUseStore.mockReturnValue(queryResult({ store: initialStore, refetch }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ review: completeReview() }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    const user = userEvent.setup()
+    renderReview('2 זוגיות ויין אחד')
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+    await user.click(await screen.findByRole('button', { name: 'החלה על טיוטה בזיכרון' }))
+
+    expect(refetch).toHaveBeenCalledTimes(2)
+    expect((await screen.findByRole('alert')).textContent).toContain('הנתונים או התפריט השתנו')
+    expect(screen.queryByText('הטיוטה שהוחלה בזיכרון בלבד')).toBeNull()
+  })
+
+  it('refetches again before editor handoff and rejects state drift after a valid in-memory application', async () => {
+    const initialStore: LegacyStore = {
+      orders: [],
+      menu: { extras: [{ name: 'תוספת יין', price: 5 }] },
+    }
+    const changedStore: LegacyStore = {
+      orders: [{ id: 'remote-order', name: 'Remote customer' }],
+      menu: { extras: [{ name: 'תוספת יין', price: 5 }] },
+    }
+    const refetch = vi.fn()
+      .mockResolvedValueOnce({ data: versionedEnvelope(initialStore) })
+      .mockResolvedValueOnce({ data: versionedEnvelope(initialStore) })
+      .mockResolvedValueOnce({ data: versionedEnvelope(changedStore, 2) })
+    mockedUseStore.mockReturnValue(queryResult({ store: initialStore, refetch }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ review: completeReview() }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    const user = userEvent.setup()
+    renderReview('2 זוגיות ויין אחד')
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+    await user.click(await screen.findByRole('button', { name: 'החלה על טיוטה בזיכרון' }))
+    expect(await screen.findByText('הטיוטה שהוחלה בזיכרון בלבד')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'מעבר לטופס והשלמה ידנית' }))
+
+    expect(refetch).toHaveBeenCalledTimes(3)
+    expect((await screen.findByRole('alert')).textContent).toContain('הנתונים או התפריט השתנו')
+    expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.orderImportReview)
+  })
+
+  it('decodes exact public BM1 quantities locally and transfers the reviewed draft without calling AI', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const user = userEvent.setup()
+    renderReview(bm1Message(publicPayload()))
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+
+    expect(await screen.findByText('הכמויות נקראו ישירות מקוד ההזמנה המובנה ולא הוסקו מטקסט חופשי.')).toBeTruthy()
+    expect(screen.getByText(/כרוב לבן קלאסי — 1/)).toBeTruthy()
+    expect(screen.getByText(/סופלה שוקולד — 2/)).toBeTruthy()
+    expect(fetchSpy).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'החלה על טיוטה בזיכרון' }))
+    const preview = await screen.findByText('הטיוטה שהוחלה בזיכרון בלבד')
+    expect(within(preview.closest('section')!).getByText('כרוב לבן קלאסי ×1')).toBeTruthy()
+    expect(within(preview.closest('section')!).getByText('סופלה שוקולד ×2')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'מעבר לטופס והשלמה ידנית' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.newOrder))
+    expect(screen.getByTestId('location').textContent).toContain('"reviewedDraft"')
+    expect(screen.getByTestId('location').textContent).toContain('"ordered":1')
+    expect(screen.getByTestId('location').textContent).not.toContain('"משלוח":{"quantity"')
+  })
+
+  it('fails closed on malformed or unknown BM1 items instead of dropping a selection', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const user = userEvent.setup()
+    renderReview(bm1Message(publicPayload({ mains: { 'מנה שלא קיימת': 1 } })))
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('פריט שאינו קיים בתפריט')
+    expect(screen.getByRole('button', { name: 'החלה על טיוטה בזיכרון' }).hasAttribute('disabled')).toBe(true)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('starts standalone AI intake from zero couples and preserves explicit fish surcharge intent', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const standalone = completeReview()
+    standalone.draft.items = [{
+      catalogItemId: 'first:0',
+      catalogItemName: 'פילה דג ברוטב מרוקאי',
+      category: 'first',
+      quantity: 1,
+      sourceText: 'דג מרוקאי אחד בלי זוגית',
+      confidence: 1,
+    }]
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ review: standalone }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    const user = userEvent.setup()
+    renderReview('דג מרוקאי אחד בלי זוגית')
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+    await user.click(await screen.findByRole('button', { name: 'החלה על טיוטה בזיכרון' }))
+
+    const preview = screen.getByText('הטיוטה שהוחלה בזיכרון בלבד').closest('section')!
+    expect(within(preview).getByText('ארוחות זוגיות: 0')).toBeTruthy()
+    expect(within(preview).getByText('פילה דג ברוטב מרוקאי ×1')).toBeTruthy()
+  })
+
+  it('preserves a validated manual base draft through review and editor handoff', async () => {
+    const menu = buildOrderEditorMenu({ orders: [] })
+    const baseDraft = {
+      ...createOrderDraft(menu),
+      name: 'שם שכבר הוקלד',
+      address: 'הוראות קבלה ידניות',
+      notes: 'הערה ידנית',
+    }
+    const review = completeReview()
+    review.draft.customerName = null
+    review.draft.customerPhone = null
+    review.draft.deliveryLocation = null
+    review.draft.items = []
+    review.draft.notes = []
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ review }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderReview('רק תבדקי את הטקסט', { baseDraft })
+
+    await user.click(screen.getByRole('button', { name: 'פענוח ההזמנה' }))
+    await user.click(await screen.findByRole('button', { name: 'החלה על טיוטה בזיכרון' }))
+    const preview = screen.getByText('הטיוטה שהוחלה בזיכרון בלבד').closest('section')!
+    expect(within(preview).getByText('שם שכבר הוקלד')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'מעבר לטופס והשלמה ידנית' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.newOrder))
+    expect(screen.getByTestId('location').textContent).toContain('הוראות קבלה ידניות')
+    expect(screen.getByTestId('location').textContent).toContain('הערה ידנית')
   })
 
   it('rejects malformed or failed provider responses without rendering or applying a draft', async () => {

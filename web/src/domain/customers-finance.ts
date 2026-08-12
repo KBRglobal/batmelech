@@ -1,6 +1,7 @@
-import { checkedAdd } from './money.ts'
+import { checkedAdd, requireNonNegativeSafeInteger } from './money.ts'
 import { normalizeWhatsAppPhone } from './orders-dashboard.ts'
 import type { LegacyOrder, LegacyStore } from './store.ts'
+import type { VersionedStateEnvelope } from '../services/state-api.ts'
 
 const DEFAULT_LOCALE = 'he-IL'
 const DEFAULT_BUSINESS_TIME_ZONE = 'Asia/Dubai'
@@ -132,6 +133,31 @@ export interface FinanceDashboardOptions {
   readonly timeZone?: string
   readonly locale?: string
 }
+
+export interface CustomerFinanceSaveRequest {
+  readonly reason: 'customers' | 'finance'
+  readonly baseEnvelope: Readonly<VersionedStateEnvelope>
+  readonly baseStore: Readonly<LegacyStore>
+  readonly nextStore: LegacyStore
+}
+
+export type CustomerFinanceSaveHandler = (request: CustomerFinanceSaveRequest) => Promise<void>
+
+export type CustomerMetadataUpdate =
+  | {
+      readonly kind: 'vip'
+      readonly customerKey: string
+      readonly vip: boolean
+    }
+  | {
+      readonly kind: 'notes'
+      readonly customerKey: string
+      readonly notes: string
+    }
+
+export type ExpenseInputValidation =
+  | { readonly valid: true; readonly minorUnits: number }
+  | { readonly valid: false; readonly message: string }
 
 interface CustomerIdentity {
   readonly key: string
@@ -423,14 +449,31 @@ function compareCustomerOrders(left: CustomerOrderContext, right: CustomerOrderC
   )
 }
 
-function metaCandidates(orders: readonly CustomerOrderContext[]): string[] {
+function metaCandidates(
+  orders: readonly CustomerOrderContext[],
+  allOrders: readonly CustomerOrderContext[],
+): string[] {
   const candidates: string[] = []
   const append = (value: string): void => {
     if (value !== '' && !candidates.includes(value)) candidates.push(value)
   }
+
   for (const context of orders) {
     append(context.identity.rawPhoneDigits)
     append(context.identity.normalizedPhone ?? '')
+  }
+
+  const ownersByName = new Map<string, Set<string>>()
+  for (const context of allOrders) {
+    const name = context.identity.normalizedName
+    if (name === '') continue
+    const owners = ownersByName.get(name) ?? new Set<string>()
+    owners.add(context.identity.key)
+    ownersByName.set(name, owners)
+  }
+  for (const context of orders) {
+    const owners = ownersByName.get(context.identity.normalizedName)
+    if (owners?.size !== 1 || !owners.has(context.identity.key)) continue
     const originalName = text(context.source.name)
     if (originalName !== '') append(`שם:${originalName}`)
   }
@@ -440,13 +483,14 @@ function metaCandidates(orders: readonly CustomerOrderContext[]): string[] {
 function readCustomerMeta(
   store: Readonly<LegacyStore>,
   group: MutableCustomerGroup,
+  allOrders: readonly CustomerOrderContext[],
   warnings: CustomerFinanceWarning[],
 ): ParsedCustomerMeta {
   const source = store.customerMeta
   if (source === undefined) return { vip: false, notes: '' }
   const parsed: ParsedCustomerMeta[] = []
   const representative = group.orders[0]?.source
-  for (const key of metaCandidates(group.orders)) {
+  for (const key of [group.key, ...metaCandidates(group.orders, allOrders)]) {
     if (!Object.prototype.hasOwnProperty.call(source, key)) continue
     const value = source[key]
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -479,6 +523,142 @@ function readCustomerMeta(
     vip: parsed.some((meta) => meta.vip),
     notes: distinctNotes.length === 1 ? distinctNotes[0]! : '',
   }
+}
+
+function customerContexts(
+  store: Readonly<LegacyStore>,
+): CustomerOrderContext[] {
+  const warnings: CustomerFinanceWarning[] = []
+  return store.orders
+    .map((order, sourceIndex): CustomerOrderContext => {
+      const identity = identityForOrder(order, sourceIndex, DEFAULT_LOCALE, warnings)
+      return {
+        sourceIndex,
+        source: order,
+        id: legacyOrderId(order.id),
+        routeId: null,
+        name: displayName(order),
+        phone: text(order.phone),
+        identity,
+        rawDate: text(order.date),
+        serviceDate: null,
+        cancelled: isCancelled(order),
+        total: { state: 'absent', minorUnits: 0 },
+        meals: 0,
+        status: text(order.status) || 'חדשה',
+      }
+    })
+}
+
+function mutableMetadataRecord(value: unknown, path: string): Record<string, unknown> {
+  if (value === undefined) return {}
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError(`${path} must remain an object`)
+  }
+  return structuredClone(value as Record<string, unknown>)
+}
+
+export function applyCustomerMetadataToStore(
+  store: Readonly<LegacyStore>,
+  update: Readonly<CustomerMetadataUpdate>,
+): LegacyStore {
+  if (typeof update.customerKey !== 'string' || update.customerKey.length === 0 || update.customerKey.length > MAX_TEXT_LENGTH) {
+    throw new RangeError('customerKey must be a bounded canonical customer identity')
+  }
+  if (update.customerKey.startsWith('anonymous:')) {
+    throw new RangeError('anonymous orders cannot receive shared customer metadata')
+  }
+  if (update.kind === 'vip') {
+    if (typeof update.vip !== 'boolean') throw new TypeError('vip must be boolean')
+  } else if (update.kind === 'notes') {
+    if (typeof update.notes !== 'string' || update.notes.length > MAX_TEXT_LENGTH) {
+      throw new RangeError('notes must be bounded text')
+    }
+  } else {
+    throw new TypeError('customer metadata update kind is not supported')
+  }
+
+  const allContexts = customerContexts(store)
+  const contexts = allContexts.filter((context) => context.identity.key === update.customerKey)
+  if (contexts.length === 0) throw new RangeError('customerKey does not exist in the loaded store')
+
+  const sourceMetadata = store.customerMeta ?? {}
+  const compatibilityAliases = metaCandidates(contexts, allContexts)
+  const targetKeys = [...new Set([update.customerKey, ...compatibilityAliases])]
+  const nextStore = structuredClone(store) as LegacyStore
+  const nextMetadata = structuredClone(sourceMetadata) as Record<string, unknown>
+
+  for (const key of targetKeys) {
+    const current = mutableMetadataRecord(sourceMetadata[key], `customerMeta.${key}`)
+    nextMetadata[key] = {
+      ...current,
+      ...(update.kind === 'vip' ? { vip: update.vip } : { notes: update.notes.trim() }),
+    }
+  }
+  nextStore.customerMeta = nextMetadata
+  return nextStore
+}
+
+export function validateExpenseInput(value: string): ExpenseInputValidation {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return { valid: false, message: 'יש להזין סכום בדולרים או להשתמש בכפתור ניקוי.' }
+  }
+  const parsed = parseLegacyUsdAmount(value)
+  if (parsed.state === 'invalid') {
+    return {
+      valid: false,
+      message:
+        parsed.reason === 'overflow'
+          ? 'הסכום גדול מדי לשמירה בטוחה.'
+          : 'יש להזין סכום לא שלילי עם עד שתי ספרות אחרי הנקודה.',
+    }
+  }
+  if (parsed.state === 'absent') {
+    return { valid: false, message: 'יש להזין סכום בדולרים או להשתמש בכפתור ניקוי.' }
+  }
+  return { valid: true, minorUnits: parsed.minorUnits }
+}
+
+function expenseStorageValue(minorUnits: number): string {
+  const safeMinorUnits = requireNonNegativeSafeInteger(minorUnits, 'expense minor units')
+  const amount = BigInt(safeMinorUnits)
+  const dollars = amount / 100n
+  const cents = String(amount % 100n).padStart(2, '0')
+  return `${dollars}.${cents}`
+}
+
+export function expenseInputValue(store: Readonly<LegacyStore>, serviceDate: string): string {
+  const value = store.expenses?.[serviceDate]
+  if (typeof value === 'string') return value.slice(0, MAX_NUMERIC_TOKEN_LENGTH)
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  return ''
+}
+
+export function hasStoredExpense(store: Readonly<LegacyStore>, serviceDate: string): boolean {
+  return Boolean(
+    store.expenses && Object.prototype.hasOwnProperty.call(store.expenses, serviceDate),
+  )
+}
+
+export function applyDailyExpenseToStore(
+  store: Readonly<LegacyStore>,
+  serviceDate: string,
+  minorUnits: number,
+): LegacyStore {
+  if (!isRealIsoDate(serviceDate)) throw new RangeError('expense date must be a real ISO calendar date')
+  requireNonNegativeSafeInteger(minorUnits, 'expense minor units')
+  const nextStore = structuredClone(store) as LegacyStore
+
+  if (minorUnits === 0) {
+    if (nextStore.expenses !== undefined) delete nextStore.expenses[serviceDate]
+    return nextStore
+  }
+
+  nextStore.expenses = {
+    ...(nextStore.expenses ?? {}),
+    [serviceDate]: expenseStorageValue(minorUnits),
+  }
+  return nextStore
 }
 
 function checkedAggregate(
@@ -583,7 +763,7 @@ export function buildCustomersDirectory(
         spend = checkedAggregate(spend, context.total.minorUnits, 'customer.totalSpend', warnings, context.source)
       }
     }
-    const meta = readCustomerMeta(store, group, warnings)
+    const meta = readCustomerMeta(store, group, contexts, warnings)
     const repeat = active.find((context) => context.routeId !== null)
     const normalizedPhone = latestPhoned?.identity.normalizedPhone ?? null
     const phone = latestPhoned?.phone ?? ''
@@ -661,7 +841,7 @@ export function buildCustomersDirectory(
 }
 
 function resolveFinanceMonth(months: readonly string[], requested: string, current: string): string | null {
-  if (months.includes(requested)) return requested
+  if (/^\d{4}-(?:0[1-9]|1[0-2])$/.test(requested)) return requested
   const ascending = [...months].sort()
   return ascending.filter((month) => month <= current).at(-1) ?? ascending[0] ?? null
 }

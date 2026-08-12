@@ -94,6 +94,71 @@ describe('delivery dashboard', () => {
     expect(reverse.groups[0]?.destinations[0]?.destination).toBe('Hotel A')
   })
 
+  it('prefers a validated stored hotel navigation URL and groups matching Abu Dhabi stops', () => {
+    const navigationUrl = 'https://www.google.com/maps/search/?api=1&query=Al%20Maryah%20Island%2C%20Abu%20Dhabi'
+    const dashboard = buildDeliveryDashboard({
+      orders: [
+        {
+          id: 'one',
+          date: '2026-08-14',
+          place: 'Rosewood Abu Dhabi',
+          address: 'למסור בקבלה',
+          hotelAddress: 'Al Maryah Island, Abu Dhabi',
+          navigationUrl,
+        },
+        {
+          id: 'two',
+          date: '2026-08-14',
+          place: 'Rosewood Abu Dhabi',
+          address: 'חדר 42',
+          hotelAddress: 'Al Maryah Island, Abu Dhabi',
+          navigationUrl,
+        },
+      ],
+    })
+
+    expect(dashboard.groups[0]?.destinations).toHaveLength(1)
+    expect(dashboard.groups[0]?.destinations[0]?.navigationHref).toBe(navigationUrl)
+    expect(dashboard.groups[0]?.destinations[0]?.orders).toHaveLength(2)
+    expect(dashboard.groups[0]?.destinations[0]?.navigationHref).not.toContain('Dubai')
+  })
+
+  it('rejects an untrusted stored URL and falls back to the saved hotel address', () => {
+    const dashboard = buildDeliveryDashboard({
+      orders: [{
+        id: 'unsafe-url',
+        date: '2026-08-14',
+        place: 'Hotel',
+        address: 'room instructions',
+        hotelAddress: 'Corniche Rd, Abu Dhabi',
+        navigationUrl: 'javascript:alert(1)',
+      }],
+    })
+
+    expect(dashboard.groups[0]?.destinations[0]?.navigationHref).toBe(
+      'https://www.google.com/maps/search/?api=1&query=Corniche%20Rd%2C%20Abu%20Dhabi',
+    )
+  })
+
+  it('routes a free-text hotel by hotel identity instead of reception instructions', () => {
+    const dashboard = buildDeliveryDashboard({
+      orders: [{
+        id: 'free-text-hotel',
+        date: '2026-08-14',
+        place: 'New Abu Dhabi Hotel',
+        hotelName: 'New Abu Dhabi Hotel',
+        hotelAddress: '',
+        address: 'מסירה בקבלה',
+        navigationUrl: '',
+      }],
+    })
+
+    expect(dashboard.groups[0]?.destinations[0]?.navigationHref).toBe(
+      'https://www.google.com/maps/search/?api=1&query=New%20Abu%20Dhabi%20Hotel',
+    )
+    expect(dashboard.groups[0]?.destinations[0]?.orders[0]?.address).toBe('מסירה בקבלה')
+  })
+
   it('keeps malformed active orders visible while blocking unsafe actions and totals', () => {
     const dashboard = buildDeliveryDashboard({
       orders: [
@@ -139,6 +204,19 @@ describe('delivery dashboard', () => {
       dashboard.groups[0]?.destinations.flatMap(({ orders }) => orders).map(({ orderId }) => orderId),
     ).toEqual([null, null])
     expect(dashboard.warnings.filter(({ code }) => code === 'DUPLICATE_ORDER_ID')).toHaveLength(2)
+  })
+
+  it('keeps a unique numeric legacy ID visible without exposing a string mutation route', () => {
+    const dashboard = buildDeliveryDashboard({
+      orders: [{ id: 7, date: '2026-08-14', name: 'Legacy numeric', place: 'Hotel' }],
+    })
+
+    expect(dashboard.activeOrderCount).toBe(1)
+    expect(dashboard.groups[0]?.destinations[0]?.orders[0]).toMatchObject({
+      customerName: 'Legacy numeric',
+      orderId: null,
+    })
+    expect(dashboard.warnings.map(({ code }) => code)).toContain('MISSING_ORDER_ID')
   })
 
   it('does not mutate the persisted state while deriving deterministic groups', () => {

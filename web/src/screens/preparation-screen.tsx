@@ -1,9 +1,19 @@
+import { useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import {
+  isSameVersionedStateEnvelope,
+  type ConfirmedStoreSaveHandler,
+} from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import { getUsdMinorUnits } from '../domain/money.ts'
+import {
+  applyPreparationCompletion,
+  isPreparationCompleted,
+  type PreparationCompletionCategory,
+} from '../domain/operational-state.ts'
 import {
   buildPreparationPlan,
   type PreparationCatalog,
@@ -14,6 +24,7 @@ import {
 } from '../domain/preparation.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 const EMPTY_CATALOG: PreparationCatalog = { items: [], lunchItems: [] }
 
@@ -21,6 +32,23 @@ const linkClassName =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-5 py-3 text-sm font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
 type CatalogState = 'configured' | 'missing' | 'invalid'
+
+interface PreparationInitialization {
+  readonly baseEnvelope: VersionedStateEnvelope | null
+  readonly baseStore: LegacyStore
+}
+
+interface CompletionSaveState {
+  readonly kind: 'saving' | 'saved' | 'error'
+  readonly message: string
+}
+
+type ToggleCompletion = (
+  serviceDate: string,
+  category: PreparationCompletionCategory,
+  itemName: string,
+  completed: boolean,
+) => void
 
 function storedCatalog(store: LegacyStore): unknown {
   return (store as Readonly<Record<string, unknown>>).preparationCatalog
@@ -131,7 +159,87 @@ function Metric({ label, value, invalid = false }: { label: string; value: strin
   )
 }
 
-function NumberCategory({ title, values }: { title: string; values: Readonly<Record<string, number>> }) {
+function completionStateKey(
+  serviceDate: string,
+  category: PreparationCompletionCategory,
+  itemName: string,
+): string {
+  return JSON.stringify([serviceDate, category, itemName])
+}
+
+function CompletionControl({
+  serviceDate,
+  category,
+  itemName,
+  store,
+  onToggle,
+  saveState,
+  saveBlocked,
+}: {
+  serviceDate: string
+  category: PreparationCompletionCategory
+  itemName: string
+  store: Readonly<LegacyStore>
+  onToggle?: ToggleCompletion
+  saveState?: CompletionSaveState
+  saveBlocked: boolean
+}) {
+  const completed = isPreparationCompleted(store, serviceDate, category, itemName)
+  const unavailable = onToggle === undefined
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <button
+        type="button"
+        aria-pressed={completed}
+        aria-label={
+          unavailable
+            ? `סימון הכנת ${itemName} לא זמין`
+            : completed
+              ? `פתיחת הכנת ${itemName}`
+              : `סיום הכנת ${itemName}`
+        }
+        disabled={unavailable || saveBlocked || saveState?.kind === 'saving'}
+        onClick={() => onToggle?.(serviceDate, category, itemName, !completed)}
+        className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-60 ${
+          completed
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-border bg-card text-primary hover:bg-secondary'
+        }`}
+      >
+        <LocalIcon name="ph:check-circle-bold" className="text-base" />
+        <span>{saveState?.kind === 'saving' ? 'שומרת...' : completed ? 'הושלם' : 'סימון הושלם'}</span>
+      </button>
+      {saveState !== undefined && saveState.kind !== 'saving' && (
+        <span
+          className={`max-w-56 text-left text-[0.6875rem] font-bold ${saveState.kind === 'error' ? 'text-destructive' : 'text-emerald-700'}`}
+          role={saveState.kind === 'error' ? 'alert' : 'status'}
+        >
+          {saveState.message}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function NumberCategory({
+  title,
+  category,
+  values,
+  serviceDate,
+  store,
+  onToggle,
+  saveStates,
+  saveBlocked,
+}: {
+  title: string
+  category: Exclude<PreparationCompletionCategory, 'salads'>
+  values: Readonly<Record<string, number>>
+  serviceDate: string
+  store: Readonly<LegacyStore>
+  onToggle?: ToggleCompletion
+  saveStates: Readonly<Record<string, CompletionSaveState>>
+  saveBlocked: boolean
+}) {
   const entries = Object.entries(values)
   if (entries.length === 0) return null
   return (
@@ -143,8 +251,17 @@ function NumberCategory({ title, values }: { title: string; values: Readonly<Rec
       <ul className="mt-4 divide-y divide-border">
         {entries.map(([name, quantity]) => (
           <li key={name} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <span className="text-sm font-bold text-foreground">{name}</span>
+            <span className="min-w-0 flex-1 text-sm font-bold text-foreground">{name}</span>
             <strong className="rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity}</strong>
+            <CompletionControl
+              serviceDate={serviceDate}
+              category={category}
+              itemName={name}
+              store={store}
+              onToggle={onToggle}
+              saveState={saveStates[completionStateKey(serviceDate, category, name)]}
+              saveBlocked={saveBlocked}
+            />
           </li>
         ))}
       </ul>
@@ -152,7 +269,21 @@ function NumberCategory({ title, values }: { title: string; values: Readonly<Rec
   )
 }
 
-function SaladCategory({ values }: { values: PreparationCategoryGroups['salads'] }) {
+function SaladCategory({
+  values,
+  serviceDate,
+  store,
+  onToggle,
+  saveStates,
+  saveBlocked,
+}: {
+  values: PreparationCategoryGroups['salads']
+  serviceDate: string
+  store: Readonly<LegacyStore>
+  onToggle?: ToggleCompletion
+  saveStates: Readonly<Record<string, CompletionSaveState>>
+  saveBlocked: boolean
+}) {
   const entries = Object.entries(values)
   if (entries.length === 0) return null
   return (
@@ -164,7 +295,7 @@ function SaladCategory({ values }: { values: PreparationCategoryGroups['salads']
       <ul className="mt-4 divide-y divide-border">
         {entries.map(([name, quantity]) => (
           <li key={name} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <div>
+            <div className="min-w-0 flex-1">
               <span className="text-sm font-bold text-foreground">{name}</span>
               {quantity.gift > 0 && (
                 <span className="mt-0.5 block text-[0.6875rem] font-bold text-muted-foreground">
@@ -173,6 +304,15 @@ function SaladCategory({ values }: { values: PreparationCategoryGroups['salads']
               )}
             </div>
             <strong className="rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity.total}</strong>
+            <CompletionControl
+              serviceDate={serviceDate}
+              category="salads"
+              itemName={name}
+              store={store}
+              onToggle={onToggle}
+              saveState={saveStates[completionStateKey(serviceDate, 'salads', name)]}
+              saveBlocked={saveBlocked}
+            />
           </li>
         ))}
       </ul>
@@ -226,7 +366,19 @@ function Notes({ group }: { group: PreparationDateGroup }) {
   )
 }
 
-function DatePreparation({ group }: { group: PreparationDateGroup }) {
+function DatePreparation({
+  group,
+  store,
+  onToggle,
+  saveStates,
+  saveBlocked,
+}: {
+  group: PreparationDateGroup
+  store: Readonly<LegacyStore>
+  onToggle?: ToggleCompletion
+  saveStates: Readonly<Record<string, CompletionSaveState>>
+  saveBlocked: boolean
+}) {
   const categories = group.categories
   const financeValid = group.finance.valid
   return (
@@ -267,14 +419,14 @@ function DatePreparation({ group }: { group: PreparationDateGroup }) {
       </div>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <SaladCategory values={categories.salads} />
-        <NumberCategory title="מנות ראשונות" values={categories.firsts} />
-        <NumberCategory title="מנות עיקריות" values={categories.mains} />
-        <NumberCategory title="תוספות" values={categories.sides} />
-        <NumberCategory title="קינוחים" values={categories.desserts} />
-        <NumberCategory title="אקסטרות" values={categories.extras} />
-        <NumberCategory title="פריטים מותאמים" values={categories.custom} />
-        <NumberCategory title="תפריט צהריים" values={categories.lunch} />
+        <SaladCategory values={categories.salads} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="מנות ראשונות" category="firsts" values={categories.firsts} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="מנות עיקריות" category="mains" values={categories.mains} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="תוספות" category="sides" values={categories.sides} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="קינוחים" category="desserts" values={categories.desserts} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="אקסטרות" category="extras" values={categories.extras} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="פריטים מותאמים" category="custom" values={categories.custom} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="תפריט צהריים" category="lunch" values={categories.lunch} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
       </div>
 
       <Notes group={group} />
@@ -282,9 +434,31 @@ function DatePreparation({ group }: { group: PreparationDateGroup }) {
   )
 }
 
-export function PreparationScreen() {
+export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStoreSaveHandler }) {
   const storeQuery = useStore()
+  const initializationRef = useRef<PreparationInitialization | null>(null)
+  const acceptedEnvelopeRef = useRef<VersionedStateEnvelope | null>(null)
+  const writeInFlightRef = useRef(false)
   const [searchParams, setSearchParams] = useSearchParams()
+  const [writeInFlight, setWriteInFlight] = useState(false)
+  const [saveStates, setSaveStates] = useState<Readonly<Record<string, CompletionSaveState>>>({})
+
+  if (initializationRef.current === null && storeQuery.data?.data != null) {
+    initializationRef.current = {
+      baseEnvelope: isVersionedStateEnvelope(storeQuery.data) ? storeQuery.data : null,
+      baseStore: storeQuery.data.data,
+    }
+  }
+  if (
+    acceptedEnvelopeRef.current !== null &&
+    isSameVersionedStateEnvelope(storeQuery.data, acceptedEnvelopeRef.current)
+  ) {
+    initializationRef.current = {
+      baseEnvelope: acceptedEnvelopeRef.current,
+      baseStore: acceptedEnvelopeRef.current.data,
+    }
+    acceptedEnvelopeRef.current = null
+  }
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את סיכום ההכנות" />
   if (storeQuery.isError) {
@@ -298,12 +472,101 @@ export function PreparationScreen() {
     )
   }
 
-  const store = storeQuery.data.data ?? { orders: [] }
+  const initialization = initializationRef.current
+  if (initialization === null) {
+    return <ScreenState kind="error" title="לא הצלחנו לטעון את ההכנות" retry={() => void storeQuery.refetch()} />
+  }
+  const store = initialization.baseStore
   const { plan, catalogState } = safePreparationPlan(store)
   const requestedDate = searchParams.get('date')?.trim() ?? ''
   const visibleDates = requestedDate === ''
     ? plan.dates
     : plan.dates.filter(({ serviceDate }) => serviceDate === requestedDate)
+
+  const toggleCompletion = onSave === undefined
+    ? undefined
+    : async (
+        serviceDate: string,
+        category: PreparationCompletionCategory,
+        itemName: string,
+        completed: boolean,
+      ) => {
+        const stateKey = completionStateKey(serviceDate, category, itemName)
+        const baseEnvelope = initialization.baseEnvelope
+        if (
+          baseEnvelope === null ||
+          acceptedEnvelopeRef.current !== null ||
+          writeInFlightRef.current ||
+          !isSameVersionedStateEnvelope(storeQuery.data, baseEnvelope)
+        ) {
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'error',
+              message: 'הנתונים השתנו. הסימון לא נשמר; צריך לטעון מחדש.',
+            },
+          }))
+          return
+        }
+
+        let nextStore: LegacyStore
+        try {
+          nextStore = applyPreparationCompletion(
+            initialization.baseStore,
+            serviceDate,
+            category,
+            itemName,
+            completed,
+          )
+        } catch {
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'error',
+              message: 'זהות שורת ההכנה או מפת הסימונים אינן בטוחות. לא בוצע שינוי.',
+            },
+          }))
+          return
+        }
+
+        setSaveStates((current) => ({
+          ...current,
+          [stateKey]: { kind: 'saving', message: 'שומרת...' },
+        }))
+        writeInFlightRef.current = true
+        setWriteInFlight(true)
+        try {
+          const confirmedEnvelope = await onSave({
+            reason: 'preparation',
+            baseEnvelope,
+            baseStore: initialization.baseStore,
+            nextStore,
+          })
+          acceptedEnvelopeRef.current = confirmedEnvelope
+          initializationRef.current = {
+            baseEnvelope: confirmedEnvelope,
+            baseStore: confirmedEnvelope.data,
+          }
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'saved',
+              message: completed ? 'סומן כהושלם.' : 'הסימון נפתח מחדש.',
+            },
+          }))
+        } catch {
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'error',
+              message: 'השמירה נכשלה או התנגשה בעדכון אחר. הסימון הקיים נשאר.',
+            },
+          }))
+        } finally {
+          writeInFlightRef.current = false
+          setWriteInFlight(false)
+        }
+      }
 
   if (plan.dates.length === 0 && plan.warnings.length === 0) {
     return (
@@ -324,6 +587,10 @@ export function PreparationScreen() {
           <p className="mt-2 text-sm font-bold text-muted-foreground">כמויות, הערות וגבייה מתוך ההזמנות השמורות.</p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
+          <Link to={APP_ROUTES.preparationLabels} className={linkClassName}>
+            <LocalIcon name="ph:package-bold" className="text-lg" />
+            <span>מדבקות הכנה</span>
+          </Link>
           <label className="flex flex-col gap-1 text-xs font-black text-muted-foreground">
             תאריך הכנה
             <select
@@ -343,14 +610,16 @@ export function PreparationScreen() {
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            disabled
-            title="סימון הכנות יופעל רק אחרי חיבור השמירה המוגנת"
-            className="min-h-11 cursor-not-allowed rounded-full border border-border bg-muted px-5 text-sm font-bold text-muted-foreground opacity-70"
-          >
-            סימון הושלם לא זמין
-          </button>
+          {onSave === undefined && (
+            <button
+              type="button"
+              disabled
+              title="סימון הכנות דורש חיבור לשמירה המוגנת"
+              className="min-h-11 cursor-not-allowed rounded-full border border-border bg-muted px-5 text-sm font-bold text-muted-foreground opacity-70"
+            >
+              סימון הושלם לא זמין
+            </button>
+          )}
         </div>
       </header>
 
@@ -365,7 +634,16 @@ export function PreparationScreen() {
             className="px-0"
           />
         ) : (
-          visibleDates.map((group) => <DatePreparation key={group.serviceDate} group={group} />)
+          visibleDates.map((group) => (
+            <DatePreparation
+              key={group.serviceDate}
+              group={group}
+              store={store}
+              onToggle={toggleCompletion}
+              saveStates={saveStates}
+              saveBlocked={writeInFlight || acceptedEnvelopeRef.current !== null}
+            />
+          ))
         )}
       </div>
     </div>

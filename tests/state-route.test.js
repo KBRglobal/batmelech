@@ -38,6 +38,11 @@ async function withServer(service, run, logger = { error() {} }) {
   }
 }
 
+function assertNoStore(response) {
+  assert.match(response.headers.get('cache-control') || '', /no-store/);
+  assert.equal(response.headers.get('pragma'), 'no-cache');
+}
+
 test('state route accepts only the exact versioned command shape', () => {
   assert.equal(isExactCommand(command()), true);
   assert.equal(isExactCommand({ data: LOCAL }), false);
@@ -56,6 +61,7 @@ test('GET returns the exact revision-bound state envelope', async () => {
   await withServer(service, async (origin) => {
     const response = await fetch(`${origin}/api/state`);
     assert.equal(response.status, 200);
+    assertNoStore(response);
     assert.deepEqual(await response.json(), envelope);
   });
 });
@@ -86,6 +92,7 @@ test('POST forwards one exact command and returns a merged success', async () =>
       body: JSON.stringify(command()),
     });
     assert.equal(response.status, 200);
+    assertNoStore(response);
     assert.deepEqual(await response.json(), saved);
   });
   assert.deepEqual(calls, [command()]);
@@ -120,6 +127,7 @@ test('POST returns persisted merge conflicts without applying another write', as
       body: JSON.stringify(command()),
     });
     assert.equal(response.status, 409);
+    assertNoStore(response);
     assert.deepEqual(await response.json(), conflict);
   });
   assert.equal(calls, 1);
@@ -143,6 +151,7 @@ test('legacy and malformed writes fail closed before reaching persistence', asyn
         body: JSON.stringify(body),
       });
       assert.equal(response.status, 400);
+      assertNoStore(response);
       assert.deepEqual(await response.json(), {
         error: 'versioned state command required',
       });
@@ -167,6 +176,7 @@ test('client validation and internal failures are sanitized', async (t) => {
         body: JSON.stringify(command()),
       });
       assert.equal(response.status, 400);
+      assertNoStore(response);
       assert.deepEqual(await response.json(), { error: 'invalid state command' });
     });
   });
@@ -181,6 +191,7 @@ test('client validation and internal failures are sanitized', async (t) => {
     await withServer(service, async (origin) => {
       const load = await fetch(`${origin}/api/state`);
       assert.equal(load.status, 500);
+      assertNoStore(load);
       assert.deepEqual(await load.json(), { error: 'state unavailable' });
 
       const save = await fetch(`${origin}/api/state`, {
@@ -189,6 +200,7 @@ test('client validation and internal failures are sanitized', async (t) => {
         body: JSON.stringify(command()),
       });
       assert.equal(save.status, 500);
+      assertNoStore(save);
       assert.deepEqual(await save.json(), { error: 'state unavailable' });
     }, { error: (...args) => errors.push(args) });
     assert.equal(errors.length, 2);

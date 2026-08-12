@@ -70,6 +70,12 @@ describe('calculateFishPricing', () => {
       quantities: { [FISH_CAKE_PORTION_NAME]: 1 },
       expected: { selectedUnits: 2, includedUnits: 0, extraUnits: 2, surchargeMinorUnits: 6_000 },
     },
+    {
+      name: 'charges a renamed or newly configured first-course row as one fish unit',
+      coupleMeals: 0,
+      quantities: { 'פילה דג עונתי': 2 },
+      expected: { selectedUnits: 2, includedUnits: 0, extraUnits: 2, surchargeMinorUnits: 6_000 },
+    },
   ])('$name', ({ coupleMeals, quantities, expected }) => {
     const result = calculateFishPricing({ coupleMeals, quantities })
 
@@ -89,6 +95,7 @@ describe('calculateFishPricing', () => {
     { coupleMeals: 1, quantities: { [FISH_CAKE_PORTION_NAME]: '1' } },
     { coupleMeals: 1, quantities: { [MOROCCAN_FILLET_NAME]: undefined } },
     { coupleMeals: 1, quantities: { [MOROCCAN_FILLET_NAME]: Number.MAX_SAFE_INTEGER + 1 } },
+    { coupleMeals: 1, quantities: { 'מנה חדשה': undefined } },
   ])('rejects invalid quantities instead of silently undercharging: %j', (input) => {
     expect(() => calculateFishPricing(input)).toThrow(RangeError)
   })

@@ -1,9 +1,19 @@
+import { useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import {
+  isSameVersionedStateEnvelope,
+  type ConfirmedStoreSaveHandler,
+} from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import { checkedAdd } from '../domain/money.ts'
+import {
+  applyShoppingCompletion,
+  isShoppingCompleted,
+  shoppingCompletionScope,
+} from '../domain/operational-state.ts'
 import {
   buildPreparationPlan,
   type PreparationCatalog,
@@ -13,14 +23,31 @@ import {
 import type { RecipeDefinition } from '../domain/recipes.ts'
 import {
   buildShoppingList,
+  type ShoppingListItem,
   type ShoppingListResult,
   type ShoppingListWarning,
 } from '../domain/shopping-list.ts'
 import type { LegacyStore } from '../domain/store.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 const EMPTY_CATALOG: PreparationCatalog = { items: [], lunchItems: [] }
 
 type ConfigurationState = 'configured' | 'missing' | 'invalid'
+
+interface ShoppingInitialization {
+  readonly baseEnvelope: VersionedStateEnvelope | null
+  readonly baseStore: LegacyStore
+}
+
+interface ShoppingSaveState {
+  readonly kind: 'saving' | 'saved' | 'error'
+  readonly message: string
+}
+
+type ToggleShoppingCompletion = (
+  item: ShoppingListItem,
+  completed: boolean,
+) => void
 
 function storedValue(store: LegacyStore, key: string): unknown {
   return (store as Readonly<Record<string, unknown>>)[key]
@@ -145,9 +172,114 @@ function ShoppingWarnings({ result, demands }: { result: ShoppingListResult; dem
   )
 }
 
-export function ShoppingListScreen() {
+function shoppingSaveStateKey(
+  serviceDate: string | null,
+  ingredientId: string,
+  unit: string,
+): string {
+  return JSON.stringify([shoppingCompletionScope(serviceDate), ingredientId, unit])
+}
+
+function ShoppingRow({
+  item,
+  store,
+  serviceDate,
+  onToggle,
+  saveState,
+  saveBlocked,
+}: {
+  item: ShoppingListItem
+  store: Readonly<LegacyStore>
+  serviceDate: string | null
+  onToggle?: ToggleShoppingCompletion
+  saveState?: ShoppingSaveState
+  saveBlocked: boolean
+}) {
+  const completed = isShoppingCompleted(store, serviceDate, item.ingredientId, item.unit)
+  const unavailable = onToggle === undefined
+  return (
+    <article className={`rounded-3xl border bg-card p-5 shadow-sm ${completed ? 'border-emerald-200' : 'border-border'}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className={`text-lg font-black ${completed ? 'text-emerald-700 line-through' : 'text-primary'}`}>{item.ingredientName}</h2>
+          <p className="mt-1 text-xs font-bold text-muted-foreground">
+            עבור: {item.sources.map(({ itemName }) => itemName).filter((name, index, names) => names.indexOf(name) === index).join(', ')}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className="rounded-full bg-secondary px-4 py-2 text-base font-black text-primary" dir="ltr">
+            {item.quantity} {item.unit}
+          </strong>
+          <button
+            type="button"
+            aria-pressed={completed}
+            aria-label={
+              unavailable
+                ? `סימון ${item.ingredientName} לא זמין`
+                : completed
+                  ? `פתיחת קניית ${item.ingredientName}`
+                  : `סימון ${item.ingredientName} כנקנה`
+            }
+            disabled={unavailable || saveBlocked || saveState?.kind === 'saving'}
+            onClick={() => onToggle?.(item, !completed)}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-60 ${
+              completed
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
+            }`}
+          >
+            <LocalIcon name="ph:check-circle-bold" className="text-base" />
+            <span>{saveState?.kind === 'saving' ? 'שומרת...' : completed ? 'נקנה' : 'סימון נקנה'}</span>
+          </button>
+        </div>
+      </div>
+      {saveState !== undefined && saveState.kind !== 'saving' && (
+        <p
+          className={`mt-3 text-xs font-black ${saveState.kind === 'error' ? 'text-destructive' : 'text-emerald-700'}`}
+          role={saveState.kind === 'error' ? 'alert' : 'status'}
+        >
+          {saveState.message}
+        </p>
+      )}
+      <details className="mt-4 rounded-2xl bg-secondary/50 px-4 py-3">
+        <summary className="cursor-pointer text-xs font-black text-primary">פירוט החישוב</summary>
+        <ul className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
+          {item.sources.map((source) => (
+            <li key={`${source.serviceDate}-${source.itemId}`}>
+              {formatServiceDate(source.serviceDate)} · {source.itemName} ×{source.demandedQuantity} · {source.ingredientQuantity} {item.unit}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </article>
+  )
+}
+
+export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStoreSaveHandler }) {
   const storeQuery = useStore()
+  const initializationRef = useRef<ShoppingInitialization | null>(null)
+  const acceptedEnvelopeRef = useRef<VersionedStateEnvelope | null>(null)
+  const writeInFlightRef = useRef(false)
   const [searchParams, setSearchParams] = useSearchParams()
+  const [writeInFlight, setWriteInFlight] = useState(false)
+  const [saveStates, setSaveStates] = useState<Readonly<Record<string, ShoppingSaveState>>>({})
+
+  if (initializationRef.current === null && storeQuery.data?.data != null) {
+    initializationRef.current = {
+      baseEnvelope: isVersionedStateEnvelope(storeQuery.data) ? storeQuery.data : null,
+      baseStore: storeQuery.data.data,
+    }
+  }
+  if (
+    acceptedEnvelopeRef.current !== null &&
+    isSameVersionedStateEnvelope(storeQuery.data, acceptedEnvelopeRef.current)
+  ) {
+    initializationRef.current = {
+      baseEnvelope: acceptedEnvelopeRef.current,
+      baseStore: acceptedEnvelopeRef.current.data,
+    }
+    acceptedEnvelopeRef.current = null
+  }
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את רשימת הקניות" />
   if (storeQuery.isError) {
@@ -161,7 +293,11 @@ export function ShoppingListScreen() {
     )
   }
 
-  const store = storeQuery.data.data ?? { orders: [] }
+  const initialization = initializationRef.current
+  if (initialization === null) {
+    return <ScreenState kind="error" title="לא הצלחנו לטעון את רשימת הקניות" retry={() => void storeQuery.refetch()} />
+  }
+  const store = initialization.baseStore
   const { plan, catalogState } = safePreparation(store)
   const recipeConfiguration = storedRecipes(store)
   const requestedDate = searchParams.get('date')?.trim() ?? ''
@@ -174,6 +310,87 @@ export function ShoppingListScreen() {
     : plan.dates.filter(({ serviceDate }) => serviceDate === requestedDate)
   const orderCount = safeCountSum(preparationGroups.map(({ orderCount: count }) => count))
   const mealCount = safeCountSum(preparationGroups.map(({ meals }) => meals))
+  const completionDate = requestedDate === '' ? null : requestedDate
+
+  const toggleShopping = onSave === undefined
+    ? undefined
+    : async (item: ShoppingListItem, completed: boolean) => {
+        const stateKey = shoppingSaveStateKey(completionDate, item.ingredientId, item.unit)
+        const baseEnvelope = initialization.baseEnvelope
+        if (
+          baseEnvelope === null ||
+          acceptedEnvelopeRef.current !== null ||
+          writeInFlightRef.current ||
+          !isSameVersionedStateEnvelope(storeQuery.data, baseEnvelope)
+        ) {
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'error',
+              message: 'הנתונים השתנו. הסימון לא נשמר; צריך לטעון מחדש.',
+            },
+          }))
+          return
+        }
+
+        let nextStore: LegacyStore
+        try {
+          nextStore = applyShoppingCompletion(
+            initialization.baseStore,
+            completionDate,
+            item.ingredientId,
+            item.unit,
+            completed,
+          )
+        } catch {
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'error',
+              message: 'זהות המצרך או מפת הסימונים אינן בטוחות. לא בוצע שינוי.',
+            },
+          }))
+          return
+        }
+
+        setSaveStates((current) => ({
+          ...current,
+          [stateKey]: { kind: 'saving', message: 'שומרת...' },
+        }))
+        writeInFlightRef.current = true
+        setWriteInFlight(true)
+        try {
+          const confirmedEnvelope = await onSave({
+            reason: 'shopping',
+            baseEnvelope,
+            baseStore: initialization.baseStore,
+            nextStore,
+          })
+          acceptedEnvelopeRef.current = confirmedEnvelope
+          initializationRef.current = {
+            baseEnvelope: confirmedEnvelope,
+            baseStore: confirmedEnvelope.data,
+          }
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'saved',
+              message: completed ? 'המצרך סומן כנקנה.' : 'הסימון נפתח מחדש.',
+            },
+          }))
+        } catch {
+          setSaveStates((current) => ({
+            ...current,
+            [stateKey]: {
+              kind: 'error',
+              message: 'השמירה נכשלה או התנגשה בעדכון אחר. הסימון הקיים נשאר.',
+            },
+          }))
+        } finally {
+          writeInFlightRef.current = false
+          setWriteInFlight(false)
+        }
+      }
 
   if (store.orders.length === 0) {
     return (
@@ -213,14 +430,16 @@ export function ShoppingListScreen() {
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            disabled
-            title="סימון קניות יופעל רק אחרי חיבור השמירה המוגנת"
-            className="min-h-11 cursor-not-allowed rounded-full border border-border bg-muted px-5 text-sm font-bold text-muted-foreground opacity-70"
-          >
-            סימון נקנה לא זמין
-          </button>
+          {onSave === undefined && (
+            <button
+              type="button"
+              disabled
+              title="סימון קניות דורש חיבור לשמירה המוגנת"
+              className="min-h-11 cursor-not-allowed rounded-full border border-border bg-muted px-5 text-sm font-bold text-muted-foreground opacity-70"
+            >
+              סימון נקנה לא זמין
+            </button>
+          )}
         </div>
       </header>
 
@@ -262,29 +481,15 @@ export function ShoppingListScreen() {
         ) : (
           <section className="space-y-3" aria-label="מצרכים לקנייה">
             {result.items.map((item) => (
-              <article key={`${item.ingredientId}-${item.unit}`} className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-primary">{item.ingredientName}</h2>
-                    <p className="mt-1 text-xs font-bold text-muted-foreground">
-                      עבור: {item.sources.map(({ itemName }) => itemName).filter((name, index, names) => names.indexOf(name) === index).join(', ')}
-                    </p>
-                  </div>
-                  <strong className="rounded-full bg-secondary px-4 py-2 text-base font-black text-primary" dir="ltr">
-                    {item.quantity} {item.unit}
-                  </strong>
-                </div>
-                <details className="mt-4 rounded-2xl bg-secondary/50 px-4 py-3">
-                  <summary className="cursor-pointer text-xs font-black text-primary">פירוט החישוב</summary>
-                  <ul className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
-                    {item.sources.map((source) => (
-                      <li key={`${source.serviceDate}-${source.itemId}`}>
-                        {formatServiceDate(source.serviceDate)} · {source.itemName} ×{source.demandedQuantity} · {source.ingredientQuantity} {item.unit}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </article>
+              <ShoppingRow
+                key={`${item.ingredientId}-${item.unit}`}
+                item={item}
+                store={store}
+                serviceDate={completionDate}
+                onToggle={toggleShopping}
+                saveState={saveStates[shoppingSaveStateKey(completionDate, item.ingredientId, item.unit)]}
+                saveBlocked={writeInFlight || acceptedEnvelopeRef.current !== null}
+              />
             ))}
           </section>
         )}

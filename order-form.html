@@ -27,6 +27,10 @@ h2.sec{
   display:flex;align-items:center;gap:8px;font-size:1.02rem;font-weight:800;
   color:#B0446B;margin:22px 0 8px;
 }
+h2.sec::before{
+  content:'';width:20px;height:20px;flex:0 0 20px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23F2B8C9' stroke='%234a2c2a' stroke-width='1.7'%3E%3Cellipse cx='20' cy='9.5' rx='5.2' ry='8'/%3E%3Cellipse cx='20' cy='9.5' rx='5.2' ry='8' transform='rotate(72 20 20)'/%3E%3Cellipse cx='20' cy='9.5' rx='5.2' ry='8' transform='rotate(144 20 20)'/%3E%3Cellipse cx='20' cy='9.5' rx='5.2' ry='8' transform='rotate(216 20 20)'/%3E%3Cellipse cx='20' cy='9.5' rx='5.2' ry='8' transform='rotate(288 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.6' fill='%23D98A2B' stroke='%234a2c2a' stroke-width='1.7'/%3E%3C/svg%3E") center/contain no-repeat;
+}
 h2.sec .badge{background:#F7DFE4;color:#B0446B;border-radius:999px;padding:1px 10px;font-size:.8rem;font-weight:700}
 .hint{color:#a3838a;font-size:.85rem}
 .card{background:#fff;border:1.5px solid #F2CDD6;border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(90,48,51,.06)}
@@ -57,6 +61,7 @@ textarea{min-height:66px;resize:vertical}
 .btn:hover{border-color:#B0446B;color:#B0446B}
 .btn.primary{background:#B0446B;border-color:#B0446B;color:#fff}
 .btn.primary:hover{filter:brightness(1.07);color:#fff}
+.btn:disabled,.btn[aria-disabled="true"]{cursor:not-allowed;opacity:.48;filter:none;pointer-events:none}
 .sendbar{
   position:fixed;bottom:0;right:0;left:0;background:#fff;border-top:2px solid #F2CDD6;
   padding:10px 14px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;direction:rtl;z-index:9;
@@ -70,17 +75,17 @@ textarea{min-height:66px;resize:vertical}
 <div id="page" lang="he">
   <header class="head">
     <div class="bsd">בס"ד</div>
-    <h1>✿ מטעמי בת מלך ✿</h1>
+    <h1>מטעמי בת מלך</h1>
     <div class="sub">מטבח ביתי אותנטי · שבת קודש</div>
     <div class="kosher">כשר</div>
   </header>
   <p class="hint" style="text-align:center">
-    ממלאים את ההזמנה, לוחצים על «שליחה בוואטסאפ» למטה — ואנחנו כבר מאשרים לך הכול חזרה 🌸
+    ממלאים את ההזמנה, לוחצים על «שליחה בוואטסאפ» למטה — ואנחנו כבר מאשרים לך הכול חזרה.
   </p>
 
   <div class="card" style="border-width:2px;border-color:#EFA9BC">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
-      <b style="font-size:1.05rem">✿ ארוחה זוגית לשבת</b>
+      <b style="font-size:1.05rem">ארוחה זוגית לשבת</b>
       <b style="color:#B0446B;font-size:1.2rem">230$</b>
     </div>
     <div style="font-size:.9rem;margin-top:6px;line-height:1.7">
@@ -89,11 +94,11 @@ textarea{min-height:66px;resize:vertical}
       ערכת אירוח מהודרת לשבת (נרות, כוס קידוש ומיץ ענבים, צלחות, סכו"ם ומפיות)
     </div>
     <div class="hint" style="margin-top:6px">
-      כל מה שמעבר לכלול מופיע עם מחיר ליד, ומסוכם למטה ב«סיכום מחיר» — בלי הפתעות 🌸
+      כל מה שמעבר לכלול מופיע עם מחיר ליד, ומסוכם למטה ב«סיכום מחיר» — בלי הפתעות.
     </div>
   </div>
 
-  <h2 class="sec">🗓️ פרטי ההזמנה</h2>
+  <h2 class="sec">פרטי ההזמנה</h2>
   <div class="card">
     <div class="grid2">
       <div class="field"><label>לאיזה תאריך? (שישי)</label><input type="date" data-bind="date"></div>
@@ -133,12 +138,12 @@ textarea{min-height:66px;resize:vertical}
     </div>
   </div>
 
-  <h2 class="sec">🥗 סלטים <span class="badge" id="saladBadge"></span></h2>
-  <p class="hint"><b>4 סלטים כלולים</b> בכל ארוחה זוגית. סלטים מעבר לכך: <b>25$ לכל 4 סלטים נוספים</b> — התוספת מחושבת אוטומטית בסיכום המחיר למטה.</p>
+  <h2 class="sec">סלטים <span class="badge" id="saladBadge"></span></h2>
+  <p class="hint"><b>4 סלטים כלולים</b> בכל ארוחה זוגית. מעבר לכלול: כל בלוק מלא של 4 עולה <b>25$</b>, וכל סלט נוסף בשארית עולה <b>7$</b> — החיוב מחושב אוטומטית.</p>
   <div class="card" id="saladList"></div>
 
-  <h2 class="sec">🐟 מנה ראשונה <span class="badge" id="fishBadge"></span></h2>
-  <p class="hint"><b>2 דגים כלולים</b> בכל ארוחה זוגית — אפשר לפצל (למשל 1 מרוקאי + 1 חריימה). דגים נוספים — המחיר יתואם בוואטסאפ.</p>
+  <h2 class="sec">מנה ראשונה <span class="badge" id="fishBadge"></span></h2>
+  <p class="hint"><b>2 יחידות דג כלולות</b> בכל ארוחה זוגית — אפשר לפצל בין פילה מרוקאי לחריימה. מנת קציצות דגים אחת שווה לזוגית מלאה. כל יחידת דג מעבר לכלול מחויבת אוטומטית ב־<b>30$</b>.</p>
   <div class="card" id="firstList"></div>
   <div class="card" style="margin-top:10px">
     <div class="field"><label>חריפות</label><select data-bind="heat">
@@ -147,20 +152,20 @@ textarea{min-height:66px;resize:vertical}
     </select></div>
   </div>
 
-  <h2 class="sec">🍖 עיקרית</h2>
+  <h2 class="sec">עיקרית</h2>
   <p class="hint"><b>עיקרית אחת כלולה</b> בכל ארוחה זוגית — אפשר גם להחליף למגש שניצלים או רולדת בשר (במקום העיקרית).</p>
   <div class="card" id="mainList"></div>
 
-  <h2 class="sec">🍚 תוספת</h2>
+  <h2 class="sec">תוספת</h2>
   <div class="card" id="sideList"></div>
 
-  <h2 class="sec">🍫 סיום מתוק</h2>
+  <h2 class="sec">סיום מתוק</h2>
   <div class="card" id="dessertList"></div>
 
-  <h2 class="sec">✨ משדרגים את השולחן</h2>
+  <h2 class="sec">משדרגים את השולחן</h2>
   <div class="card" id="extraList"></div>
 
-  <h2 class="sec">🥖 חלות</h2>
+  <h2 class="sec">חלות</h2>
   <div class="card">
     <div class="row" style="justify-content:space-between">
       <span>כמה חלות? <span class="hint">(זוג חלות ביתיות כלול בכל ארוחה זוגית, חלה נוספת 10$)</span></span>
@@ -168,26 +173,26 @@ textarea{min-height:66px;resize:vertical}
     </div>
   </div>
 
-  <h2 class="sec">💰 סיכום מחיר</h2>
+  <h2 class="sec">סיכום מחיר</h2>
   <div class="card" id="priceBreakdown"></div>
 
-  <h2 class="sec">📝 הערות</h2>
+  <h2 class="sec">הערות</h2>
   <div class="card">
     <textarea data-bind="notes" placeholder="אלרגיות, בקשות מיוחדות, כל דבר שחשוב שנדע..."></textarea>
   </div>
 
   <div class="foot">
-    ההזמנה נסגרת סופית רק לאחר הודעת אישור ומקדמה בוואטסאפ 🤝<br>
-    מלאי ההזמנות מוגבל — למהרים מראש 🌸<br>
+    ההזמנה נסגרת סופית רק לאחר הודעת אישור ומקדמה בוואטסאפ.<br>
+    מלאי ההזמנות מוגבל — למהרים מראש.<br>
     להזמנות ופרטים נוספים: 586288776 971+
   </div>
 </div>
 
 <div class="sendbar">
   <span class="total" id="totalEst">משוער: 0$</span>
-  <a id="waSend" class="btn primary" target="_blank" rel="noopener" href="#">💬 שליחת ההזמנה בוואטסאפ</a>
-  <button type="button" class="btn" id="copyBtn">📋 העתקה</button>
-  <span id="copyMsg" class="hint">הועתק ✓</span>
+  <a id="waSend" class="btn primary" target="_blank" rel="noopener" href="#">שליחת ההזמנה בוואטסאפ</a>
+  <button type="button" class="btn" id="copyBtn">העתקה</button>
+  <span id="copyMsg" class="hint">הועתק</span>
 </div>
 
 <script>
@@ -206,18 +211,40 @@ const EXTRAS=[
   {name:'רולדת בשר פריך ברוטב פטריות עשיר', price:100},
   {name:'מגש שניצלים (זוגי, כ־13–15 יח\')', price:100},
   {name:'מגש תפו"א קריספיים', price:30},
-  {name:'מגש אורז / קוסקוס / פסטה אדומה', price:25},
+  {name:'אורז', price:25},
+  {name:'פסטה אדומה', price:25},
+  {name:'קוסקוס', price:25},
   {name:'צלחת פתיחה (זיתים וחמוצים)', price:15},
   {name:'צלחת חריפים', price:15},
   {name:'תוספת חומוס ישראלי לניגוב', price:15},
   {name:'מארז הבדלה', price:20},
   {name:'סיר קובה סלק בתוספת אורז (ל־4 אנשים)', price:125},
   {name:'מנת ילדים — פסטה אדומה ושניצלונים', price:35},
-  {name:'חלת שניצל (ספיישל סופ"ש)', price:28}
+  {name:'חלת שניצל (ספיישל סופ"ש)', price:28},
+  {name:'מרק ירקות לקוסקוס ללא עוף', price:70},
+  {name:'מרק ירקות לקוסקוס עם עוף', price:100},
+  {name:'סט עריכה', price:10},
+  {name:'תוספת יין', price:5}
 ];
-const SALAD_BLOCK_PRICE=25, DELIVERY_PRICE=15;
-const o={date:'',name:'',phone:'',place:'',address:'',time:'',pickup:false,
+const SALAD_BLOCK_PRICE=25, SALAD_REMAINDER_PRICE=7, DELIVERY_PRICE=15, EXTRA_FISH_UNIT_PRICE=30;
+const FISH_CAKES_NAME='קציצות דגים ברוטב מרוקאי';
+const DUBAI_TIME_ZONE='Asia/Dubai';
+function nextFridayDubai(now=new Date()){
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
+    timeZone:DUBAI_TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(now).filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+  const date=new Date(Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day)));
+  date.setUTCDate(date.getUTCDate()+(5-date.getUTCDay()+7)%7);
+  return date.toISOString().slice(0,10);
+}
+function isRealIsoDate(value){
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year,month,day]=value.split('-').map(Number), date=new Date(Date.UTC(year,month-1,day));
+  return date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day;
+}
+const o={date:nextFridayDubai(),name:'',phone:'',place:'',address:'',time:'',pickup:false,
   meals:1,challot:2,salads:{},firsts:{},heat:'',mains:{},sides:{},desserts:{},extras:{},notes:''};
+let challotOverridden=false;
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -246,10 +273,20 @@ $('#extraList').innerHTML=EXTRAS.map((ex,i)=>`<div class="item-row" style="displ
 </div>`).join('');
 $('#mealsStep').innerHTML=stepper('meals',0,1);
 $('#challotStep').innerHTML=stepper('challot',0,2);
+$('[data-bind="date"]').value=o.date;
 
 function groupArr(g){ return {salads:SALADS,firsts:FIRSTS,mains:MAINS,sides:SIDES,desserts:DESSERTS}[g]; }
 function bump(g,i,d){
-  if(g==='meals'||g==='challot'){ o[g]=Math.max(0,o[g]+d); return o[g]; }
+  if(g==='meals'){
+    o.meals=Math.max(0,o.meals+d);
+    if(!challotOverridden) o.challot=2*o.meals;
+    return o.meals;
+  }
+  if(g==='challot'){
+    challotOverridden=true;
+    o.challot=Math.max(0,o.challot+d);
+    return o.challot;
+  }
   if(g==='extras'){
     const name=EXTRAS[i].name;
     const e=o.extras[name]||(o.extras[name]={q:0,note:''});
@@ -263,23 +300,31 @@ function bump(g,i,d){
   return nv;
 }
 function estLines(){
-  const lines=[], warns=[];
+  const lines=[], blockingWarnings=[];
   if(o.meals>0) lines.push({l:`ארוחה זוגית ×${o.meals}`, a:o.meals*COUPLE_PRICE});
   const nS=Object.values(o.salads).reduce((s,x)=>s+x,0);
   const inclS=4*o.meals;
   const extraS=Math.max(0,nS-inclS);
-  const saladBlocks=Math.ceil(extraS/4);
-  if(extraS>0) lines.push({l:`סלטים נוספים (${extraS} מעבר לכלול)`, a:saladBlocks*SALAD_BLOCK_PRICE});
+  const saladBlocks=Math.floor(extraS/4), saladRemainder=extraS%4;
+  if(extraS>0) lines.push({l:`סלטים נוספים (${extraS} מעבר לכלול)`, a:saladBlocks*SALAD_BLOCK_PRICE+saladRemainder*SALAD_REMAINDER_PRICE});
+  const fishUnits=Object.entries(o.firsts).reduce((sum,[name,quantity])=>sum+(name===FISH_CAKES_NAME?quantity*2:quantity),0);
+  const includedFishUnits=2*o.meals;
+  const extraFishUnits=Math.max(0,fishUnits-includedFishUnits);
+  if(extraFishUnits>0) lines.push({l:`יחידות דג נוספות ×${extraFishUnits}`, a:extraFishUnits*EXTRA_FISH_UNIT_PRICE});
   for(const ex of EXTRAS){ const e=o.extras[ex.name]; if(e&&e.q) lines.push({l:`${ex.name} ×${e.q}`, a:e.q*ex.price}); }
   const extraCh=Math.max(0,o.challot-2*o.meals);
   if(extraCh>0) lines.push({l:`חלות נוספות ×${extraCh}`, a:extraCh*CHALLAH_PRICE});
   if(!o.pickup) lines.push({l:'משלוח ברחבי דובאי', a:DELIVERY_PRICE});
-  const nF=Object.values(o.firsts).reduce((s,x)=>s+x,0);
-  if(nF>2*o.meals) warns.push(`בחרת ${nF-2*o.meals} דגים מעבר לכלול — המחיר לדגים הנוספים יתואם בוואטסאפ`);
   const nM=Object.values(o.mains).reduce((s,x)=>s+x,0);
-  if(o.meals>0&&nM>o.meals) warns.push('בחרת עיקריות מעבר לכלול — התוספת תתואם בוואטסאפ');
-  if(o.meals===0&&(nF>0||nM>0)) warns.push('בחרת מנות בלי ארוחה זוגית — המחיר יתואם בוואטסאפ');
-  return {lines, warns, saladBlocks, total:lines.reduce((s,x)=>s+x.a,0)};
+  const nSides=Object.values(o.sides).reduce((s,x)=>s+x,0);
+  const unknownDesserts=Object.entries(o.desserts).filter(([name,quantity])=>quantity>0&&!DESSERTS.includes(name));
+  const dessertUnits=(o.desserts[DESSERTS[0]]||0)+2*(o.desserts[DESSERTS[1]]||0);
+  if(!isRealIsoDate(o.date)) blockingWarnings.push('יש לבחור תאריך הזמנה תקין לפני השליחה');
+  if(nM>o.meals) blockingWarnings.push('כמות העיקריות גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
+  if(nSides>o.meals) blockingWarnings.push('כמות התוספות גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
+  if(unknownDesserts.length>0) blockingWarnings.push('נבחר קינוח שהמערכת אינה יודעת לסווג ולתמחר');
+  if(dessertUnits>2*o.meals) blockingWarnings.push('כמות הקינוחים גדולה מהכמות הכלולה ואין לה מחיר אוטומטי');
+  return {lines, warns:blockingWarnings, blockingWarnings, saladBlocks, saladRemainder, fishUnits, extraFishUnits, total:lines.reduce((s,x)=>s+x.a,0)};
 }
 function estTotal(){ return estLines().total; }
 function fmtDateHe(ds){
@@ -290,7 +335,7 @@ function fmtDateHe(ds){
   return `${wd} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 function buildText(){
-  const L=['היי! אשמח להזמין 🌸'];
+  const L=['היי! אשמח להזמין'];
   if(o.date) L.push(`תאריך: ${fmtDateHe(o.date)}`);
   if(o.name) L.push(`שם: ${o.name}`);
   if(o.phone) L.push(`טלפון: ${o.phone}`);
@@ -312,9 +357,8 @@ function buildText(){
   L.push('פירוט מחיר (משוער):');
   for(const ln of est.lines) L.push(`• ${ln.l} — ${ln.a}$`);
   L.push(`סה"כ משוער: ${est.total}$`);
-  for(const w of est.warns) L.push(`⚠️ ${w}`);
+  for(const w of est.warns) L.push(`לתשומת לב: ${w}`);
   const exp=JSON.parse(JSON.stringify(o));
-  if(est.saladBlocks>0) exp.extras['תוספת 4 סלטים לבחירה']={q:est.saladBlocks,note:''};
   if(!o.pickup) exp.extras['משלוח']={q:1,note:''};
   const code=btoa(unescape(encodeURIComponent(JSON.stringify(exp))));
   L.push('');
@@ -324,8 +368,10 @@ function buildText(){
 function refresh(){
   const inclS=4*o.meals, nS=Object.values(o.salads).reduce((s,x)=>s+x,0);
   $('#saladBadge').textContent=o.meals>0?`${nS}/${inclS} כלולים`:`${nS}`;
-  const inclF=2*o.meals, nF=Object.values(o.firsts).reduce((s,x)=>s+x,0);
-  $('#fishBadge').textContent=o.meals>0?`${nF}/${inclF} כלולים`:`${nF}`;
+  const inclF=2*o.meals;
+  const nF=Object.entries(o.firsts).reduce((sum,[name,quantity])=>sum+(name===FISH_CAKES_NAME?quantity*2:quantity),0);
+  const extraF=Math.max(0,nF-inclF);
+  $('#fishBadge').textContent=o.meals>0?`${nF}/${inclF} יחידות כלולות${extraF?` · ${extraF} בתשלום`:''}`:`${nF} יחידות בתשלום`;
   const est=estLines();
   $('#priceBreakdown').innerHTML=
     (est.lines.length?est.lines.map(ln=>`<div class="item-row" style="justify-content:space-between">
@@ -335,10 +381,20 @@ function refresh(){
     +(est.lines.length?`<div class="item-row" style="justify-content:space-between;border-top:2px solid #F2CDD6;border-bottom:none;padding-top:10px">
         <b>סה"כ משוער</b><b style="color:#B0446B;font-size:1.15rem;font-variant-numeric:tabular-nums">${est.total}$</b>
       </div>`:'')
-    +est.warns.map(w=>`<p style="color:#B0446B;font-size:.88rem;font-weight:600;margin:8px 0 0">⚠️ ${esc(w)}</p>`).join('')
-    +`<p class="hint" style="margin:8px 0 0">המחיר משוער — מאושר סופית בהודעה חוזרת בוואטסאפ 🌸</p>`;
+    +est.blockingWarnings.map(w=>`<p role="alert" style="color:#B0446B;font-size:.88rem;font-weight:600;margin:8px 0 0">אי אפשר לשלוח עדיין: ${esc(w)}</p>`).join('')
+    +`<p class="hint" style="margin:8px 0 0">המחיר משוער — מאושר סופית בהודעה חוזרת בוואטסאפ.</p>`;
   $('#totalEst').textContent=`סה"כ משוער: ${est.total}$`;
-  $('#waSend').href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(buildText())}`;
+  const send=$('#waSend'), copy=$('#copyBtn'), blocked=est.blockingWarnings.length>0;
+  copy.disabled=blocked;
+  if(blocked){
+    send.removeAttribute('href');
+    send.setAttribute('aria-disabled','true');
+    send.tabIndex=-1;
+  }else{
+    send.href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(buildText())}`;
+    send.setAttribute('aria-disabled','false');
+    send.tabIndex=0;
+  }
 }
 document.addEventListener('click',e=>{
   const btn=e.target.closest('[data-act="bump"]');
@@ -347,6 +403,10 @@ document.addEventListener('click',e=>{
   const nv=bump(g,i,d);
   const cell=document.querySelector(`[data-cell="${g}|${i}"]`);
   if(cell){ cell.textContent=nv; cell.classList.toggle('has',nv>0); }
+  if(g==='meals'&&!challotOverridden){
+    const challotCell=document.querySelector('[data-cell="challot|0"]');
+    if(challotCell){ challotCell.textContent=o.challot; challotCell.classList.toggle('has',o.challot>0); }
+  }
   if(g==='extras'){
     const note=document.querySelector(`[data-note-cell="extras|${i}"]`);
     if(note) note.classList.toggle('hidden',nv===0);
@@ -374,7 +434,11 @@ document.addEventListener('input',handleBind);
 document.addEventListener('change',e=>{
   if(e.target.type==='checkbox'||e.target.tagName==='SELECT'||e.target.type==='date') handleBind(e);
 });
+$('#waSend').addEventListener('click',event=>{
+  if(estLines().blockingWarnings.length>0) event.preventDefault();
+});
 $('#copyBtn').addEventListener('click',()=>{
+  if(estLines().blockingWarnings.length>0) return;
   const t=buildText();
   const done=()=>{ const m=$('#copyMsg'); m.style.display='inline'; setTimeout(()=>m.style.display='none',1800); };
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done).catch(()=>{}); }

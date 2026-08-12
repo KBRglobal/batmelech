@@ -17,25 +17,56 @@ vi.mock('./screens/orders-screen.tsx', () => ({
   OrdersScreen: () => <h1>מסך ההזמנות המחובר</h1>,
 }))
 vi.mock('./screens/preparation-screen.tsx', () => ({
-  PreparationScreen: () => <h1>מסך ההכנות המחובר</h1>,
+  PreparationScreen: ({ onSave }: { onSave?: unknown }) => (
+    <h1 data-save-bound={typeof onSave === 'function'}>מסך ההכנות המחובר</h1>
+  ),
 }))
 vi.mock('./screens/shopping-list-screen.tsx', () => ({
-  ShoppingListScreen: () => <h1>מסך הקניות המחובר</h1>,
+  ShoppingListScreen: ({ onSave }: { onSave?: unknown }) => (
+    <h1 data-save-bound={typeof onSave === 'function'}>מסך הקניות המחובר</h1>
+  ),
 }))
 vi.mock('./screens/deliveries-screen.tsx', () => ({
-  DeliveriesScreen: () => <h1>מסך המשלוחים המחובר</h1>,
+  DeliveriesScreen: ({ onSave }: { onSave?: unknown }) => (
+    <h1 data-save-bound={typeof onSave === 'function'}>מסך המשלוחים המחובר</h1>
+  ),
 }))
 vi.mock('./screens/customers-screen.tsx', () => ({
-  CustomersScreen: () => <h1>מסך הלקוחות המחובר</h1>,
+  CustomersScreen: ({ onSave }: { onSave?: unknown }) => (
+    <h1 data-save-bound={typeof onSave === 'function'}>מסך הלקוחות המחובר</h1>
+  ),
 }))
 vi.mock('./screens/finance-screen.tsx', () => ({
-  FinanceScreen: () => <h1>מסך הכספים המחובר</h1>,
+  FinanceScreen: ({ onSave }: { onSave?: unknown }) => (
+    <h1 data-save-bound={typeof onSave === 'function'}>מסך הכספים המחובר</h1>
+  ),
 }))
 vi.mock('./screens/order-editor-screen.tsx', () => ({
   OrderEditorScreen: () => <h1>מסך עריכת ההזמנה המחובר</h1>,
 }))
 vi.mock('./screens/order-import-review-screen.tsx', () => ({
   OrderImportReviewScreen: () => <h1>מסך בדיקת הוואטסאפ המחובר</h1>,
+}))
+vi.mock('./screens/order-bon-screen.tsx', () => ({
+  OrderBonScreen: () => <h1>מסך בון ההזמנה המחובר</h1>,
+}))
+vi.mock('./screens/labels-screen.tsx', () => ({
+  LabelsScreen: () => <h1>מסך המדבקות המחובר</h1>,
+}))
+vi.mock('./screens/settings-backup-screen.tsx', () => ({
+  SettingsBackupScreen: () => <h1>מסך ההגדרות המחובר</h1>,
+}))
+vi.mock('./screens/menu-editor-screen.tsx', () => ({
+  MenuEditorScreen: () => <h1>מסך עריכת התפריט המחובר</h1>,
+}))
+vi.mock('./screens/recipes-screen.tsx', () => ({
+  RecipesScreen: () => <h1>מסך המתכונים המחובר</h1>,
+}))
+vi.mock('./screens/customer-order-screen.tsx', () => ({
+  CustomerOrderScreen: () => <h1>מסך הזמנת הלקוח המחובר</h1>,
+}))
+vi.mock('./data/versioned-screen-save.tsx', () => ({
+  default: () => ({ onSave: vi.fn() }),
 }))
 
 const LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES = [
@@ -84,21 +115,6 @@ describe('AppRoutes', () => {
     expect(document.querySelector('#main-content')).toBeTruthy()
   })
 
-  it.each([
-    ['/orders/order%201/bon', 'בון הזמנה'],
-    [APP_ROUTES.preparationLabels, 'מדבקות הכנה'],
-    [APP_ROUTES.settings, 'הגדרות וגיבוי'],
-    [APP_ROUTES.menuSettings, 'עריכת תפריט'],
-    [APP_ROUTES.recipeSettings, 'מתכונים ומצרכים'],
-  ])('registers %s as an explicit non-writing operator destination', (path, title) => {
-    const { container } = renderRoute(path)
-
-    expect(container.querySelector('[data-route-status="pending"]')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: title })).toBeTruthy()
-    expect(screen.getAllByRole('navigation')).toHaveLength(2)
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
   it('registers the real read-only Orders screen inside the shared shell', () => {
     const { container } = renderRoute(APP_ROUTES.orders)
 
@@ -116,6 +132,11 @@ describe('AppRoutes', () => {
     [APP_ROUTES.newOrder, 'מסך עריכת ההזמנה המחובר'],
     ['/orders/order%201/edit', 'מסך עריכת ההזמנה המחובר'],
     [APP_ROUTES.orderImportReview, 'מסך בדיקת הוואטסאפ המחובר'],
+    ['/orders/order%201/bon', 'מסך בון ההזמנה המחובר'],
+    [APP_ROUTES.preparationLabels, 'מסך המדבקות המחובר'],
+    [APP_ROUTES.settings, 'מסך ההגדרות המחובר'],
+    [APP_ROUTES.menuSettings, 'מסך עריכת התפריט המחובר'],
+    [APP_ROUTES.recipeSettings, 'מסך המתכונים המחובר'],
   ])('registers the real read-only operational screen at %s', (path, title) => {
     const { container } = renderRoute(path)
 
@@ -124,13 +145,24 @@ describe('AppRoutes', () => {
     expect(screen.getAllByRole('navigation')).toHaveLength(2)
   })
 
+  it.each([
+    [APP_ROUTES.customers, 'מסך הלקוחות המחובר'],
+    [APP_ROUTES.finance, 'מסך הכספים המחובר'],
+    [APP_ROUTES.deliveries, 'מסך המשלוחים המחובר'],
+    [APP_ROUTES.preparation, 'מסך ההכנות המחובר'],
+    [APP_ROUTES.shoppingList, 'מסך הקניות המחובר'],
+  ])('binds the guarded save boundary at %s', (path, title) => {
+    renderRoute(path)
+
+    expect(screen.getByRole('heading', { name: title }).getAttribute('data-save-bound')).toBe('true')
+  })
+
   it('registers the canonical customer route without the operator navigation', () => {
     const { container } = renderRoute(APP_ROUTES.customerOrder)
 
-    expect(container.querySelector('[data-route-status="pending"]')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'טופס הזמנה ללקוחות' })).toBeTruthy()
+    expect(container.querySelector('[data-route-status="pending"]')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'מסך הזמנת הלקוח המחובר' })).toBeTruthy()
     expect(screen.queryByRole('navigation')).toBeNull()
-    expect(screen.getByText(/אינו שולח או שומר הזמנות/)).toBeTruthy()
   })
 
   it.each(LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES)(
@@ -141,7 +173,7 @@ describe('AppRoutes', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('current route').textContent).toBe(APP_ROUTES.customerOrder)
       })
-      expect(screen.getByRole('heading', { name: 'טופס הזמנה ללקוחות' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'מסך הזמנת הלקוח המחובר' })).toBeTruthy()
       expect(screen.queryByRole('navigation')).toBeNull()
     },
   )

@@ -18,6 +18,8 @@ import {
 export const LEGACY_FISH_DISH_EXTRA_NAME = 'תוספת מנת דג'
 export const LEGACY_FISH_CAKE_EXTRA_NAME = 'תוספת קציצות דגים'
 export const LEGACY_SALAD_BLOCK_EXTRA_NAME = 'תוספת 4 סלטים לבחירה'
+export const LEGACY_CHALLAH_EXTRA_NAME = 'תוספת חלה'
+export const DELIVERY_EXTRA_NAME = 'משלוח'
 
 export type ChargeSource = 'legacy-extra' | 'custom' | 'lunch' | 'delivery' | 'other'
 
@@ -72,15 +74,21 @@ const SUPPORTED_CHARGE_SOURCES = new Set<ChargeSource>([
   'other',
 ])
 
-function canonicalName(value: string): string {
+export function canonicalizeChargeName(value: string): string {
   return value.normalize('NFKC').trim().replace(/\s+/gu, ' ')
 }
 
-const AUTOMATIC_LEGACY_EXTRA_NAMES = new Set([
-  canonicalName(LEGACY_FISH_DISH_EXTRA_NAME),
-  canonicalName(LEGACY_FISH_CAKE_EXTRA_NAME),
-  canonicalName(LEGACY_SALAD_BLOCK_EXTRA_NAME),
+const AUTOMATIC_CHARGE_NAMES = new Set([
+  canonicalizeChargeName(LEGACY_FISH_DISH_EXTRA_NAME),
+  canonicalizeChargeName(LEGACY_FISH_CAKE_EXTRA_NAME),
+  canonicalizeChargeName(LEGACY_SALAD_BLOCK_EXTRA_NAME),
+  canonicalizeChargeName(LEGACY_CHALLAH_EXTRA_NAME),
+  canonicalizeChargeName(DELIVERY_EXTRA_NAME),
 ])
+
+export function isAutomaticChargeName(value: string): boolean {
+  return AUTOMATIC_CHARGE_NAMES.has(canonicalizeChargeName(value))
+}
 
 function requireChargeLine(value: unknown, index: number): ChargeLineInput {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -108,7 +116,7 @@ function requireChargeLine(value: unknown, index: number): ChargeLineInput {
     throw new TypeError(`chargeLines[${index}].source is not supported`)
   }
 
-  if (typeof line.name !== 'string' || canonicalName(line.name).length === 0) {
+  if (typeof line.name !== 'string' || canonicalizeChargeName(line.name).length === 0) {
     throw new TypeError(`chargeLines[${index}].name must be a non-empty string`)
   }
 
@@ -183,7 +191,7 @@ export function calculateOrderTotal({
 
   chargeLines.forEach((rawLine, index) => {
     const line = requireChargeLine(rawLine, index)
-    const name = canonicalName(line.name)
+    const name = canonicalizeChargeName(line.name)
     const quantity = requireNonNegativeSafeInteger(
       line.quantity,
       `chargeLines[${index}].quantity`,
@@ -193,7 +201,7 @@ export function calculateOrderTotal({
       `chargeLines[${index}].unitPriceMinorUnits`,
     )
 
-    if (line.source === 'legacy-extra' && AUTOMATIC_LEGACY_EXTRA_NAMES.has(name)) {
+    if (line.source !== 'delivery' && AUTOMATIC_CHARGE_NAMES.has(name)) {
       if (quantity > 0) {
         excludedLegacyExtras.push({ index, name, quantity })
       }

@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_ROUTES } from '../app/routes.ts'
 import { useStore } from '../data/use-store.ts'
+import type { CustomerFinanceSaveHandler } from '../domain/customers-finance.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { CustomersScreen } from './customers-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
 
 const mockedUseStore = vi.mocked(useStore)
+const HASH = 'a'.repeat(64)
 
 function queryResult(
   options: {
@@ -19,6 +21,7 @@ function queryResult(
     readonly error?: boolean
     readonly store?: LegacyStore | null
     readonly refetch?: ReturnType<typeof vi.fn>
+    readonly revision?: number
   } = {},
 ): ReturnType<typeof useStore> {
   return {
@@ -27,15 +30,20 @@ function queryResult(
     data:
       options.pending === true || options.error === true
         ? undefined
-        : { ts: 1, data: options.store ?? { orders: [] } },
+        : {
+            revision: options.revision ?? 1,
+            ts: options.revision ?? 1,
+            hash: HASH,
+            data: options.store ?? { orders: [] },
+          },
     refetch: options.refetch ?? vi.fn(),
   } as unknown as ReturnType<typeof useStore>
 }
 
-function renderCustomers() {
+function renderCustomers(onSave?: CustomerFinanceSaveHandler) {
   return render(
     <MemoryRouter initialEntries={[APP_ROUTES.customers]}>
-      <CustomersScreen />
+      <CustomersScreen onSave={onSave} />
     </MemoryRouter>,
   )
 }
@@ -75,6 +83,19 @@ describe('CustomersScreen', () => {
     expect(screen.getByRole('link', { name: 'הזמנה חדשה' }).getAttribute('href')).toBe(
       APP_ROUTES.newOrder,
     )
+  })
+
+  it('builds history and repeat links for a canonical colon ID with one encoding pass', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'order:1', date: '2099-08-14', name: 'לקוח קנוני' }] },
+    }))
+
+    renderCustomers()
+
+    expect(screen.getByRole('link', { name: /פתיחת ההזמנה של לקוח קנוני/ }).getAttribute('href'))
+      .toBe('/orders/order%3A1/edit')
+    expect(screen.getByRole('link', { name: 'הזמנה חדשה כמו הקודמת' }).getAttribute('href'))
+      .toBe('/orders/new?duplicate=order%3A1')
   })
 
   it('renders only injected customer history, metadata, exact spend, and navigation', () => {
@@ -131,8 +152,10 @@ describe('CustomersScreen', () => {
     ).toBe(true)
     expect(screen.queryByText('שרה לוי')).toBeNull()
     expect(screen.queryByText('אברהם שלום')).toBeNull()
-    expect(container.querySelector('textarea')).toBeNull()
-    expect(screen.queryByRole('button', { name: /VIP/ })).toBeNull()
+    expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+      'העדפה אמיתית מהשרת',
+    )
+    expect(screen.getByRole('button', { name: 'הסרת VIP עבור לקוחה אמיתית' })).toBeTruthy()
   })
 
   it('searches real names, phones, and customer notes and restores focus on clear', async () => {
@@ -201,5 +224,161 @@ describe('CustomersScreen', () => {
     ).toBe(true)
     expect(screen.queryByRole('link', { name: 'וואטסאפ' })).toBeNull()
     expect(screen.queryByRole('link', { name: /פתיחת ההזמנה/ })).toBeNull()
+  })
+
+  it('persists notes only after explicit save and includes the confirmed note in search', async () => {
+    const store = {
+      orders: [{ id: 'real', name: 'לקוחה אמיתית', phone: '0501234567' }],
+      customerMeta: { '0501234567': { notes: 'ישן', unknown: 'keep' } },
+      unknownRoot: { exact: true },
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 7 }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderCustomers(onSave)
+
+    const notes = screen.getByLabelText('הערות על הלקוח')
+    await user.clear(notes)
+    await user.type(notes, 'רגישות לשומשום')
+    expect(onSave).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'שמירת הערות על לקוחה אמיתית' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const request = onSave.mock.calls[0]![0]
+    expect(request.reason).toBe('customers')
+    expect(request.baseEnvelope).toMatchObject({ revision: 7, hash: HASH, data: store })
+    expect(request.baseStore).toBe(store)
+    expect(request.nextStore.orders).toEqual(store.orders)
+    expect((request.nextStore as Record<string, unknown>).unknownRoot).toEqual({ exact: true })
+    expect(request.nextStore.customerMeta).toMatchObject({
+      'phone:972501234567': { notes: 'רגישות לשומשום' },
+      '0501234567': { notes: 'רגישות לשומשום', unknown: 'keep' },
+    })
+    expect(await screen.findByText('פרטי הלקוח נשמרו.')).toBeTruthy()
+
+    const search = screen.getByLabelText('חיפוש לקוחות')
+    await user.type(search, 'שומשום')
+    expect(screen.getByRole('heading', { name: 'לקוחה אמיתית' })).toBeTruthy()
+    expect(screen.getByText('נמצאו 1 לקוחות')).toBeTruthy()
+  })
+
+  it('persists an explicit VIP toggle without implicitly saving an unsaved note draft', async () => {
+    const store = {
+      orders: [{ id: 'real', name: 'לקוחה אמיתית', phone: '0501234567' }],
+      customerMeta: { '0501234567': { notes: 'הערה שמורה', vip: false } },
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderCustomers(onSave)
+
+    await user.type(screen.getByLabelText('הערות על הלקוח'), ' טיוטה')
+    expect(onSave).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'סימון VIP עבור לקוחה אמיתית' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.customerMeta).toMatchObject({
+      'phone:972501234567': { vip: true },
+      '0501234567': { vip: true, notes: 'הערה שמורה' },
+    })
+    expect((screen.getByLabelText('הערות על הלקוח') as HTMLTextAreaElement).value).toBe(
+      'הערה שמורה טיוטה',
+    )
+  })
+
+  it('toggles VIP without erasing ambiguous alias notes or saving a blank replacement', async () => {
+    const store = {
+      orders: [
+        { id: 'old', name: 'לקוחה', phone: '050-123-4567' },
+        { id: 'new', name: 'לקוחה', phone: '+972 50 123 4567' },
+      ],
+      customerMeta: {
+        '0501234567': { notes: 'הערה מקומית', localOnly: true },
+        '972501234567': { notes: 'הערה בינלאומית', internationalOnly: true },
+      },
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderCustomers(onSave)
+
+    expect((screen.getByLabelText('הערות על הלקוח') as HTMLTextAreaElement).value).toBe('')
+    await user.click(screen.getByRole('button', { name: 'סימון VIP עבור לקוחה' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.customerMeta).toMatchObject({
+      '0501234567': { vip: true, notes: 'הערה מקומית', localOnly: true },
+      '972501234567': { vip: true, notes: 'הערה בינלאומית', internationalOnly: true },
+    })
+  })
+
+  it('drops the confirmed note overlay after cache acknowledgement so a later remote note is visible', async () => {
+    const store = {
+      orders: [{ id: 'real', name: 'לקוחה', phone: '0501234567' }],
+      customerMeta: { '0501234567': { notes: 'ישן' } },
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    const view = renderCustomers(onSave)
+
+    const notes = screen.getByLabelText('הערות על הלקוח')
+    await user.clear(notes)
+    await user.type(notes, 'נשמר מקומית')
+    await user.click(screen.getByRole('button', { name: 'שמירת הערות על לקוחה' }))
+    const acknowledgedStore = onSave.mock.calls[0]![0].nextStore
+
+    mockedUseStore.mockReturnValue(queryResult({ store: acknowledgedStore, revision: 2 }))
+    view.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.customers]}>
+        <CustomersScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+    await waitFor(() => {
+      expect((screen.getByLabelText('הערות על הלקוח') as HTMLTextAreaElement).value).toBe('נשמר מקומית')
+    })
+
+    const remoteStore = structuredClone(acknowledgedStore)
+    remoteStore.customerMeta = {
+      ...remoteStore.customerMeta,
+      'phone:972501234567': { notes: 'עודכן מטאב אחר' },
+      '0501234567': { notes: 'עודכן מטאב אחר' },
+      '972501234567': { notes: 'עודכן מטאב אחר' },
+      'שם:לקוחה': { notes: 'עודכן מטאב אחר' },
+    }
+    mockedUseStore.mockReturnValue(queryResult({ store: remoteStore, revision: 3 }))
+    view.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.customers]}>
+        <CustomersScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('הערות על הלקוח') as HTMLTextAreaElement).value).toBe('עודכן מטאב אחר')
+    })
+  })
+
+  it('retains the note draft and performs zero writes when the loaded envelope becomes stale', async () => {
+    const store = { orders: [{ id: 'real', name: 'לקוחה', phone: '0501234567' }] } as LegacyStore
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const user = userEvent.setup()
+    const view = renderCustomers(onSave)
+    await user.type(screen.getByLabelText('הערות על הלקוח'), 'טיוטה חשובה')
+
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 2 }))
+    view.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.customers]}>
+        <CustomersScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+    await user.click(screen.getByRole('button', { name: 'שמירת הערות על לקוחה' }))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('הערות על הלקוח') as HTMLTextAreaElement).value).toBe(
+      'טיוטה חשובה',
+    )
+    expect(screen.getByRole('alert').textContent).toContain('הנתונים התעדכנו')
   })
 })

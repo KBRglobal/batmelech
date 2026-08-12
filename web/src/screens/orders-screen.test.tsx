@@ -83,6 +83,23 @@ describe('OrdersScreen', () => {
     )
   })
 
+  it('builds canonical colon ID links with exactly one encoding pass', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'order:1', date: '2099-08-14', name: 'לקוח קנוני' }] },
+    }))
+
+    renderOrders()
+
+    expect(screen.getByRole('link', { name: 'פתיחת ההזמנה של לקוח קנוני' }).getAttribute('href'))
+      .toBe('/orders/order%3A1/edit')
+    expect(screen.getByRole('link', { name: 'עריכה' }).getAttribute('href'))
+      .toBe('/orders/order%3A1/edit')
+    expect(screen.getByRole('link', { name: 'בון' }).getAttribute('href'))
+      .toBe('/orders/order%3A1/bon')
+    expect(screen.getByRole('link', { name: 'שכפול' }).getAttribute('href'))
+      .toBe('/orders/new?duplicate=order%3A1')
+  })
+
   it('renders only injected store data with linked families, statuses, exact money, and real routes', () => {
     mockedUseStore.mockReturnValue(
       queryResult({
@@ -166,9 +183,9 @@ describe('OrdersScreen', () => {
       /^https:\/\/wa\.me\/972501234567\?text=/,
     )
     expect(
-      screen.getAllByRole('button', { name: 'שכפול לא זמין' }).every((button) =>
-        button.hasAttribute('disabled'),
-      ),
+      screen
+        .getAllByRole('link', { name: 'שכפול' })
+        .some((link) => link.getAttribute('href') === '/orders/new?duplicate=actual-1'),
     ).toBe(true)
     const pastDisclosure = screen.getByText('הזמנות שעברו (1)').closest('details')
     expect(pastDisclosure?.hasAttribute('open')).toBe(false)
@@ -267,6 +284,8 @@ describe('OrdersScreen', () => {
     expect(screen.getAllByText('אין מזהה לפתיחה')).toHaveLength(2)
     expect(screen.queryByRole('link', { name: 'עריכה' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'בון' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'שכפול' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'שכפול לא זמין' })).toHaveLength(2)
     expect(screen.getByRole('alert').textContent).toContain('המזהה כפול')
   })
 })

@@ -40,6 +40,12 @@ function createStateRouter({ service, logger = console } = {}) {
 
   const router = express.Router();
 
+  router.use((_request, response, next) => {
+    response.set('Cache-Control', 'no-store');
+    response.set('Pragma', 'no-cache');
+    next();
+  });
+
   router.get('/', async (_request, response) => {
     try {
       response.json(await service.loadState());

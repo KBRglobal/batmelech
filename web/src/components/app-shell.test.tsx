@@ -41,6 +41,11 @@ describe('AppShell', () => {
       expect(links.map((link) => link.getAttribute('href'))).toEqual([route, route])
     }
 
+    const legacyLinks = screen.getAllByRole('link', { name: 'המערכת הישנה' })
+    expect(legacyLinks).toHaveLength(2)
+    expect(legacyLinks.map((link) => link.getAttribute('href'))).toEqual(['/legacy/', '/legacy/'])
+    expect(legacyLinks.every((link) => link.getAttribute('target') === null)).toBe(true)
+
     expect(container.querySelector('a[href="#"]')).toBeNull()
     expect(container.querySelector('svg')).toBeNull()
     expect(container.innerHTML).not.toContain('api.iconify.design')

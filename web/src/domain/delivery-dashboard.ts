@@ -144,6 +144,11 @@ function legacyOrderId(value: unknown): LegacyOrderId {
   return normalized === '' ? null : normalized
 }
 
+function safeStringOrderId(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > MAX_ORDER_ID_LENGTH) return null
+  return value !== '' && value.trim() === value ? value : null
+}
+
 function warningContext(order: Readonly<LegacyOrder>): Pick<DeliveryWarning, 'orderId' | 'customerName'> {
   return { orderId: legacyOrderId(order.id), customerName: customerName(order) }
 }
@@ -269,6 +274,22 @@ export function buildGoogleMapsSearchHref(destination: string): string | null {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
+function validatedNavigationHref(value: unknown): string | null {
+  const raw = boundedText(value)
+  if (raw === '') return null
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'https:') return null
+    const hostname = parsed.hostname.toLocaleLowerCase('en-US')
+    if (hostname !== 'google.com' && hostname !== 'www.google.com' && !hostname.endsWith('.google.com')) {
+      return null
+    }
+    return parsed.toString()
+  } catch {
+    return null
+  }
+}
+
 function validOrderIds(orders: readonly LegacyOrder[]): ReadonlyMap<string, number> {
   const counts = new Map<string, number>()
   for (const order of orders) {
@@ -361,9 +382,11 @@ export function buildDeliveryDashboard(
     }
     validateDirectText(order, warnings)
     const id = legacyOrderId(order.id)
-    if (id === null) {
+    const routeIdCandidate = safeStringOrderId(order.id)
+    if (id === null || routeIdCandidate === null) {
       pushWarning(warnings, order, 'MISSING_ORDER_ID', 'id', 'active order is missing a safe route ID')
-    } else if ((idCounts.get(String(id)) ?? 0) > 1) {
+    }
+    if (id !== null && (idCounts.get(String(id)) ?? 0) > 1) {
       pushWarning(warnings, order, 'DUPLICATE_ORDER_ID', 'id', 'order ID collides with another order')
     }
 
@@ -380,8 +403,12 @@ export function buildDeliveryDashboard(
     }
     const place = boundedText(order.place)
     const address = boundedText(order.address)
-    const navigationQuery = address || place
-    if (order.pickup !== true && navigationQuery === '') {
+    const hotelName = boundedText(order.hotelName)
+    const hotelAddress = boundedText(order.hotelAddress)
+    const storedNavigationHref = validatedNavigationHref(order.navigationUrl)
+    const navigationQuery = hotelAddress || hotelName || address || place
+    const navigationIdentity = storedNavigationHref || navigationQuery
+    if (order.pickup !== true && navigationIdentity === '') {
       pushWarning(
         warnings,
         order,
@@ -390,7 +417,10 @@ export function buildDeliveryDashboard(
         'delivery has no stored destination or address',
       )
     }
-    const routeId = id !== null && (idCounts.get(String(id)) ?? 0) === 1 ? String(id) : null
+    const routeId =
+      routeIdCandidate !== null && (idCounts.get(routeIdCandidate) ?? 0) === 1
+        ? routeIdCandidate
+        : null
     const view: DeliveryOrderView = {
       sourceIndex,
       orderId: routeId,
@@ -400,7 +430,7 @@ export function buildDeliveryDashboard(
       pickup: order.pickup === true,
       destination: order.pickup === true ? 'איסוף עצמי' : place || address || 'יעד לא צוין',
       address: order.pickup === true || address === place ? '' : address,
-      navigationHref: order.pickup === true ? null : buildGoogleMapsSearchHref(navigationQuery),
+      navigationHref: order.pickup === true ? null : storedNavigationHref || buildGoogleMapsSearchHref(navigationQuery),
       phone,
       telephoneHref: phoneHref,
       status: boundedText(order.status) || 'חדשה',
@@ -414,9 +444,9 @@ export function buildDeliveryDashboard(
     }
 
     const destinationKey =
-      navigationQuery === ''
+      navigationIdentity === ''
         ? `missing:${routeId ?? `${sourceIndex}:${view.customerName}`}`
-        : navigationQuery.toLocaleLowerCase('en-US')
+        : navigationIdentity.toLocaleLowerCase('en-US')
     const destinationGroup =
       mutableGroup.deliveries.get(destinationKey) ??
       ({
@@ -438,7 +468,7 @@ export function buildDeliveryDashboard(
       (navigationQuery !== '' && compareText(navigationQuery, destinationGroup.navigationQuery) < 0)
     ) {
       destinationGroup.navigationQuery = navigationQuery
-      destinationGroup.navigationHref = buildGoogleMapsSearchHref(navigationQuery)
+      destinationGroup.navigationHref = storedNavigationHref || buildGoogleMapsSearchHref(navigationQuery)
     }
     destinationGroup.orders.push(view)
     mutableGroup.deliveries.set(destinationKey, destinationGroup)

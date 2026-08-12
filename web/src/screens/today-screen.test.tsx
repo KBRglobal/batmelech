@@ -85,6 +85,21 @@ describe('TodayScreen', () => {
     expect(screen.queryByText('אין הזמנות קרובות כרגע')).toBeNull()
   })
 
+  it('builds an edit link for a canonical colon ID with one encoding pass', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-12T08:00:00.000Z'))
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'order:1', date: '2026-08-12', name: 'לקוח קנוני' }] },
+    }))
+
+    renderToday()
+
+    expect(
+      screen.getAllByRole('link', { name: 'עריכה' })
+        .every((link) => link.getAttribute('href') === '/orders/order%3A1/edit'),
+    ).toBe(true)
+  })
+
   it('renders actual store customers, operational summaries, and router-only actions', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-12T08:00:00.000Z'))

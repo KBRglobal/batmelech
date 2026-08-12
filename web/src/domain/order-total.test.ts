@@ -9,6 +9,8 @@ import {
   LEGACY_FISH_CAKE_EXTRA_NAME,
   LEGACY_FISH_DISH_EXTRA_NAME,
   LEGACY_SALAD_BLOCK_EXTRA_NAME,
+  LEGACY_CHALLAH_EXTRA_NAME,
+  DELIVERY_EXTRA_NAME,
   calculateOrderTotal,
   type ChargeLineInput,
   type OrderTotalInput,
@@ -152,8 +154,8 @@ describe('calculateOrderTotal', () => {
       orderInput({
         chargeLines: [
           {
-            source: 'legacy-extra',
-            name: 'משלוח',
+            source: 'delivery',
+            name: DELIVERY_EXTRA_NAME,
             quantity: 1,
             unitPriceMinorUnits: 1_500,
           },
@@ -175,6 +177,20 @@ describe('calculateOrderTotal', () => {
 
     expect(result.totalMinorUnits).toBe(1_500 + 4_400 + 375)
     expect(result.lines.map((line) => line.amountMinorUnits)).toEqual([1_500, 4_400, 375])
+  })
+
+  it('excludes automatic-name aliases from custom and legacy rows but permits the one generated delivery line', () => {
+    const result = calculateOrderTotal(orderInput({
+      chargeLines: [
+        { source: 'custom', name: '  תוספת   מנת דג ', quantity: 1, unitPriceMinorUnits: 99_900 },
+        { source: 'custom', name: 'משלוח', quantity: 1, unitPriceMinorUnits: 99_900 },
+        { source: 'legacy-extra', name: `  ${LEGACY_CHALLAH_EXTRA_NAME} `, quantity: 1, unitPriceMinorUnits: 1_000 },
+        { source: 'delivery', name: DELIVERY_EXTRA_NAME, quantity: 1, unitPriceMinorUnits: 1_500 },
+      ],
+    }))
+
+    expect(result.totalMinorUnits).toBe(1_500)
+    expect(result.excludedLegacyExtras).toHaveLength(3)
   })
 
   it('does not mutate the order or any nested pricing input', () => {

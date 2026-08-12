@@ -3,10 +3,11 @@
 // a sync script is injected into HTML at serve time so app files stay untouched.
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const { execFile } = require('child_process');
 const { Pool } = require('pg');
 const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
+const { createCustomerOrderRouter } = require('./server/customer-order-route');
+const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
+const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
@@ -29,54 +30,15 @@ function requireServerCredential(name) {
 const AUTH_USER = requireServerCredential('BM_USER');
 const AUTH_PASS = requireServerCredential('BM_PASS');
 
-// --- self-updating content: pull latest main from GitHub (public repo, no token) ---
-// Build sessions push app HTML to claude/* branches; the automerge workflow lands
-// them on main; this picks them up within REFRESH_MS without redeploying.
-const REPO = process.env.BM_REPO || 'KBRglobal/batmelech';
-const BRANCH = process.env.BM_BRANCH || 'main';
-const REFRESH_MS = Number(process.env.BM_REFRESH_MS || 5 * 60 * 1000);
-const CACHE = '/tmp/bm-content';
-let contentRoot = ROOT; // fallback: files baked into the image
-let currentSha = null;
-let previousDir = null;
-
-async function refreshContent() {
-  try {
-    const head = await fetch(
-      `https://api.github.com/repos/${REPO}/commits/${BRANCH}`,
-      { headers: { Accept: 'application/vnd.github.sha', 'User-Agent': 'bm-server' } }
-    );
-    if (!head.ok) return;
-    const sha = (await head.text()).trim();
-    if (!sha || sha === currentSha) return;
-    const res = await fetch(`https://codeload.github.com/${REPO}/tar.gz/${sha}`);
-    if (!res.ok) return;
-    fs.mkdirSync(CACHE, { recursive: true });
-    const tgz = path.join(CACHE, 'content.tgz');
-    fs.writeFileSync(tgz, Buffer.from(await res.arrayBuffer()));
-    const dest = path.join(CACHE, sha.slice(0, 12));
-    fs.rmSync(dest, { recursive: true, force: true });
-    fs.mkdirSync(dest, { recursive: true });
-    await new Promise((ok, no) =>
-      execFile('tar', ['xzf', tgz, '-C', dest, '--strip-components=1'], (e) =>
-        e ? no(e) : ok()
-      )
-    );
-    const old = previousDir;
-    previousDir = contentRoot !== ROOT ? contentRoot : null;
-    contentRoot = dest;
-    currentSha = sha;
-    console.log(`content refreshed to ${sha.slice(0, 12)}`);
-    if (old) fs.rm(old, { recursive: true, force: true }, () => {});
-  } catch (e) {
-    console.error('content refresh failed:', e.message);
-  }
-}
-refreshContent();
-setInterval(refreshContent, REFRESH_MS).unref();
+// Production serves only the exact source tree baked into the deployed image.
+// Releases therefore stay attributable to one reviewed Git commit.
+const contentRoot = ROOT;
 
 // --- health check (no auth, used by Railway) ---
 app.get('/healthz', (req, res) => res.send('ok'));
+
+// --- Public customer form: no manager sync, state API, or admin authentication ---
+app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
 
 // --- basic auth on everything else ---
 app.use((req, res, next) => {
@@ -95,6 +57,9 @@ app.use(express.json({ limit: '15mb' }));
 // --- AI-assisted order interpretation (review-only; never persists state) ---
 app.use('/api/ai/order-intake', createOrderIntakeRouter());
 
+// --- Explicit staff-triggered hotel search; no customer or order state ---
+app.use('/api/hotels/search', createHotelSearchRouter());
+
 // --- Versioned Postgres-backed app state with merge, history, and idempotency ---
 let pool = null;
 let stateRepository = null;
@@ -109,32 +74,46 @@ if (process.env.DATABASE_URL) {
   }));
 } else {
   app.use('/api/state', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.set('Pragma', 'no-cache');
     response.status(503).json({ error: 'state unavailable' });
   });
 }
+
+// --- Permanent legacy manager backup: authenticated, same versioned state ---
+app.get(/^\/legacy$/, (req, res) => res.redirect(308, '/legacy/'));
+app.use('/legacy', createLegacyManagerRouter({ getContentRoot: () => contentRoot }));
+
+// Retire stale HTML entry points before the generic legacy file handler. Old
+// bookmarks must never execute obsolete pricing or whole-state persistence.
+app.get('/app.html', (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.redirect(302, '/app/today');
+});
+app.get('/order.html', (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.redirect(302, '/order-form.html');
+});
+
+// React's asset-safe history fallback rejects extension-looking paths. Retire
+// old customer-form bookmarks explicitly before the /app router sees them.
+app.get(['/app/order-form.html', '/app/order.html'], (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.redirect(302, '/order-form.html');
+});
 
 // --- React operator application: authenticated, isolated below /app/ ---
 app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
 app.use('/app', createReactAppRouter({ reactRoot: REACT_ROOT }));
 
-// --- HTML: inject the sync script at serve time, files on disk stay untouched ---
-app.use((req, res, next) => {
-  if (req.method !== 'GET') return next();
-  let p = decodeURIComponent(req.path);
-  if (p.endsWith('/')) p += 'index.html';
-  if (!p.endsWith('.html')) return next();
-  const base = contentRoot;
-  const file = path.normalize(path.join(base, p));
-  if (!file.startsWith(base + path.sep)) return res.status(400).end();
-  fs.readFile(file, 'utf8', (err, html) => {
-    if (err) return next();
-    const tag = '<script src="/bm-sync.js"></script>';
-    const out = html.includes('<head>')
-      ? html.replace('<head>', '<head>' + tag)
-      : tag + html;
-    res.type('html').send(out);
-  });
+// --- Authenticated manager entry: React is primary; legacy remains permanent ---
+app.get(/^\/$/, (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.redirect(302, '/app/today');
 });
+
+// --- Explicit emergency legacy entry; unrelated HTML never receives app state ---
+app.use('/index.html', createLegacyManagerRouter({ getContentRoot: () => contentRoot }));
 
 // bm-sync.js always comes from the server image (server-owned, not repo content)
 app.get('/bm-sync.js', (req, res) => res.sendFile(path.join(ROOT, 'bm-sync.js')));

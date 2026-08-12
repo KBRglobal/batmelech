@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyCustomerMetadataToStore,
+  applyDailyExpenseToStore,
   buildCustomersDirectory,
   buildFinanceDashboard,
+  expenseInputValue,
   formatFinanceMonth,
   formatSignedUsdMinorUnits,
+  hasStoredExpense,
   parseLegacyUsdAmount,
+  validateExpenseInput,
 } from './customers-finance.ts'
 import type { LegacyStore } from './store.ts'
 
@@ -174,6 +179,31 @@ describe('buildCustomersDirectory', () => {
     expect(result.warnings.some((warning) => warning.code === 'AMBIGUOUS_CUSTOMER_META')).toBe(true)
   })
 
+  it('never shares a name metadata alias between two phone-identified customers with the same name', () => {
+    const result = buildCustomersDirectory({
+      orders: [
+        { id: 'first', name: 'שרה', phone: '0501111111' },
+        { id: 'second', name: 'שרה', phone: '0502222222' },
+      ],
+      customerMeta: {
+        'שם:שרה': { vip: true, notes: 'אסור לשתף' },
+        '0501111111': { notes: 'ראשונה בלבד' },
+        '0502222222': { notes: 'שנייה בלבד' },
+      },
+    })
+
+    expect(result.customers).toHaveLength(2)
+    expect(result.customers.find((customer) => customer.key === 'phone:972501111111')).toMatchObject({
+      vip: false,
+      notes: 'ראשונה בלבד',
+    })
+    expect(result.customers.find((customer) => customer.key === 'phone:972502222222')).toMatchObject({
+      vip: false,
+      notes: 'שנייה בלבד',
+    })
+    expect(result.warnings.some((warning) => warning.code === 'AMBIGUOUS_CUSTOMER_META')).toBe(false)
+  })
+
   it('ignores malformed metadata fields and reports them', () => {
     const result = buildCustomersDirectory({
       orders: [{ id: 'a', name: 'לקוחה', phone: '0501234567' }],
@@ -224,6 +254,173 @@ describe('buildCustomersDirectory', () => {
     expect(result.globallyEmpty).toBe(true)
     expect(result.customers).toEqual([])
     expect(result.warnings).toEqual([])
+  })
+})
+
+describe('guarded customer metadata mutations', () => {
+  it('writes one canonical identity and every existing alias without losing unknown data', () => {
+    const store = {
+      orders: [
+        { id: 'old', name: 'שרה', phone: '050-123-4567' },
+        { id: 'new', name: 'שרה', phone: '+972 50 123 4567' },
+      ],
+      customerMeta: {
+        '0501234567': { notes: 'ישן', legacyFlag: 'keep-local' },
+        '972501234567': { vip: false, remoteFlag: 'keep-normalized' },
+        unrelated: { notes: 'do not touch', custom: true },
+      },
+      preserved: { exact: true },
+    } as LegacyStore
+    const snapshot = structuredClone(store)
+    const next = applyCustomerMetadataToStore(store, {
+      kind: 'notes',
+      customerKey: 'phone:972501234567',
+      notes: 'ללא גלוטן',
+    })
+
+    expect(store).toEqual(snapshot)
+    expect((next as Record<string, unknown>).preserved).toEqual({ exact: true })
+    expect(next.orders).toEqual(store.orders)
+    expect(next.customerMeta).toMatchObject({
+      'phone:972501234567': { notes: 'ללא גלוטן' },
+      '0501234567': { notes: 'ללא גלוטן', legacyFlag: 'keep-local' },
+      '972501234567': { vip: false, notes: 'ללא גלוטן', remoteFlag: 'keep-normalized' },
+      unrelated: { notes: 'do not touch', custom: true },
+    })
+    expect(buildCustomersDirectory(next, { query: 'גלוטן' }).customers).toEqual([
+      expect.objectContaining({ key: 'phone:972501234567', vip: false, notes: 'ללא גלוטן' }),
+    ])
+  })
+
+  it('fails closed for unknown, anonymous, oversized, or malformed target metadata', () => {
+    const store = { orders: [{ name: 'שרה', phone: '0501234567' }] } as LegacyStore
+    expect(() =>
+      applyCustomerMetadataToStore(store, { kind: 'vip', customerKey: 'phone:971000000000', vip: true }),
+    ).toThrow(/does not exist/)
+    expect(() =>
+      applyCustomerMetadataToStore({ orders: [{}] }, { kind: 'vip', customerKey: 'anonymous:0', vip: true }),
+    ).toThrow(/anonymous/)
+    expect(() =>
+      applyCustomerMetadataToStore(store, {
+        kind: 'notes',
+        customerKey: 'phone:972501234567',
+        notes: 'x'.repeat(10_001),
+      }),
+    ).toThrow(/bounded text/)
+    expect(() =>
+      applyCustomerMetadataToStore(
+        {
+          orders: [{ name: 'שרה', phone: '0501234567' }],
+          customerMeta: { 'phone:972501234567': ['unsafe replacement'] },
+        },
+        { kind: 'vip', customerKey: 'phone:972501234567', vip: true },
+      ),
+    ).toThrow(/must remain an object/)
+  })
+
+  it('updates VIP independently without erasing conflicting legacy alias notes', () => {
+    const store = {
+      orders: [
+        { id: 'old', name: 'שרה', phone: '050-123-4567' },
+        { id: 'new', name: 'שרה', phone: '+972 50 123 4567' },
+      ],
+      customerMeta: {
+        '0501234567': { notes: 'הערה מקומית', localOnly: true },
+        '972501234567': { notes: 'הערה בינלאומית', internationalOnly: true },
+      },
+    } as LegacyStore
+
+    const next = applyCustomerMetadataToStore(store, {
+      kind: 'vip',
+      customerKey: 'phone:972501234567',
+      vip: true,
+    })
+
+    expect(next.customerMeta).toMatchObject({
+      'phone:972501234567': { vip: true },
+      '0501234567': { vip: true, notes: 'הערה מקומית', localOnly: true },
+      '972501234567': { vip: true, notes: 'הערה בינלאומית', internationalOnly: true },
+    })
+    expect(buildCustomersDirectory(next).customers[0]).toMatchObject({ vip: true, notes: '' })
+    expect(buildCustomersDirectory(next).warnings).toContainEqual(
+      expect.objectContaining({ code: 'AMBIGUOUS_CUSTOMER_META' }),
+    )
+  })
+
+  it('updates phone aliases but neither creates nor changes an ambiguous shared name alias', () => {
+    const store = {
+      orders: [
+        { id: 'first', name: 'שרה', phone: '0501111111' },
+        { id: 'second', name: 'שרה', phone: '0502222222' },
+      ],
+      customerMeta: {
+        'שם:שרה': { notes: 'shared legacy value', untouched: true },
+        '0501111111': { notes: 'old first', firstOnly: true },
+        '0502222222': { notes: 'old second', secondOnly: true },
+      },
+    } as LegacyStore
+
+    const next = applyCustomerMetadataToStore(store, {
+      kind: 'notes',
+      customerKey: 'phone:972501111111',
+      notes: 'new first',
+    })
+
+    expect(next.customerMeta).toMatchObject({
+      'phone:972501111111': { notes: 'new first' },
+      '0501111111': { notes: 'new first', firstOnly: true },
+      '972501111111': { notes: 'new first' },
+      '0502222222': { notes: 'old second', secondOnly: true },
+      'שם:שרה': { notes: 'shared legacy value', untouched: true },
+    })
+  })
+})
+
+describe('guarded daily expense mutations', () => {
+  it('validates exact non-negative minor-unit input without floating-point rounding', () => {
+    expect(validateExpenseInput('12.34')).toEqual({ valid: true, minorUnits: 1_234 })
+    expect(validateExpenseInput('.05')).toEqual({ valid: true, minorUnits: 5 })
+    expect(validateExpenseInput('0')).toEqual({ valid: true, minorUnits: 0 })
+    for (const invalid of ['', ' ', '-1', '1.001', '1e2', '1,2,3', '90071992547409.92']) {
+      expect(validateExpenseInput(invalid).valid).toBe(false)
+    }
+  })
+
+  it('adds and edits one dated expense while preserving the complete store', () => {
+    const store = {
+      orders: [{ id: 'real-order' }],
+      expenses: { '2026-08-11': '1.00', legacy: { keep: true } },
+      unknownRoot: { keep: true },
+    } as LegacyStore
+    const snapshot = structuredClone(store)
+    const added = applyDailyExpenseToStore(store, '2026-08-12', 1_234)
+    const edited = applyDailyExpenseToStore(added, '2026-08-12', 5)
+
+    expect(store).toEqual(snapshot)
+    expect(added.expenses).toMatchObject({
+      '2026-08-11': '1.00',
+      '2026-08-12': '12.34',
+      legacy: { keep: true },
+    })
+    expect(edited.expenses?.['2026-08-12']).toBe('0.05')
+    expect((edited as Record<string, unknown>).unknownRoot).toEqual({ keep: true })
+    expect(edited.orders).toEqual(store.orders)
+    expect(expenseInputValue(edited, '2026-08-12')).toBe('0.05')
+    expect(hasStoredExpense(edited, '2026-08-12')).toBe(true)
+  })
+
+  it('clears only the selected expense key and rejects unsafe date or amount input', () => {
+    const store = {
+      orders: [],
+      expenses: { '2026-08-12': '10.00', '2026-08-13': '20.00', metadata: 'keep' },
+    } as LegacyStore
+    const cleared = applyDailyExpenseToStore(store, '2026-08-12', 0)
+
+    expect(cleared.expenses).toEqual({ '2026-08-13': '20.00', metadata: 'keep' })
+    expect(store.expenses?.['2026-08-12']).toBe('10.00')
+    expect(hasStoredExpense(cleared, '2026-08-12')).toBe(false)
+    expect(() => applyDailyExpenseToStore(store, '2026-02-30', 100)).toThrow(/real ISO/)
+    expect(() => applyDailyExpenseToStore(store, '2026-08-12', 0.5)).toThrow(/safe integer/)
   })
 })
 
@@ -357,6 +554,18 @@ describe('buildFinanceDashboard', () => {
 
     expect(historical.selectedMonth).toBe('2025-02')
     expect(future.selectedMonth).toBe('2030-05')
+  })
+
+  it('keeps an explicitly selected valid empty month available for a new daily expense', () => {
+    const result = buildFinanceDashboard(
+      { orders: [{ date: '2026-08-12', name: 'אוגוסט', total: 1 }] },
+      { selectedMonth: '2026-09', now: new Date('2026-08-12T00:00:00Z') },
+    )
+
+    expect(result.selectedMonth).toBe('2026-09')
+    expect(result.localizedMonth).toContain('ספטמבר')
+    expect(result.days).toEqual([])
+    expect(result.revenueMinorUnits).toBe(0)
   })
 
   it('fails each affected total closed when money, expenses, dates, or meals are malformed', () => {

@@ -3,24 +3,46 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import {
+  createVersionedRequestId,
+  prepareVersionedStateChange,
+  useVersionedStateMutation,
+  type PreparedVersionedStateChange,
+} from '../data/use-save-order.ts'
 import { useStore } from '../data/use-store.ts'
 import {
   AIReviewSchema,
+  CANONICAL_ORDER_ID_PATTERN,
   HOTEL_OPTIONS,
   applyAIReviewToDraft,
+  applyCoupleMealQuantity,
+  applyHotelDestinationInput,
+  applyHotelNavigationInput,
   applyHotelSelection,
   buildAIOrderCatalog,
   buildOrderEditorMenu,
   calculateOrderDraftPricing,
+  classifyStoredOrderIds,
+  classifyDraftSelectionMode,
+  createCanonicalOrderId,
+  createDuplicateOrderDraft,
   createOrderDraft,
   createOrderDraftFromLegacy,
+  formatUsdInputMinorUnits,
+  applyOrderDraftToStore,
+  legacyOrderEditIssue,
+  orderPricingFingerprint,
+  parseHotelSearchResponse,
+  serializeOrderDraft,
   validateOrderDraft,
   type CustomDraftItem,
   type LunchDraftSelection,
+  type HotelSearchResult,
   type OrderDraft,
   type OrderEditorMenu,
 } from '../domain/order-editor.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 const STATUS_OPTIONS = ['חדשה', 'אושרה', 'מוכנה', 'במשלוח', 'נמסרה', 'בוטלה'] as const
 const HEAT_OPTIONS = ['', 'לא חריף', 'חריף', 'מעורב — חלק חריף וחלק לא'] as const
@@ -43,9 +65,67 @@ const SECTIONS = [
 const inputClassName =
   'min-h-11 w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20'
 
-function readReviewState(value: unknown) {
+type SaveFeedback =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'network-error'; readonly message: string }
+  | { readonly kind: 'conflict'; readonly message: string }
+  | { readonly kind: 'blocked'; readonly message: string }
+
+interface SaveAttempt {
+  readonly draftSignature: string
+  readonly change: PreparedVersionedStateChange
+}
+
+function isExactEnvelopeSnapshot(
+  candidate: VersionedStateEnvelope,
+  captured: VersionedStateEnvelope,
+): boolean {
+  return candidate.revision === captured.revision &&
+    candidate.hash === captured.hash &&
+    JSON.stringify(candidate.data) === JSON.stringify(captured.data)
+}
+
+function currentCatalogSignature(menu: OrderEditorMenu): string {
+  return JSON.stringify(buildAIOrderCatalog(menu).items)
+}
+
+function readReviewState(
+  value: unknown,
+  expectedCatalogSignature: string,
+  expectedEnvelope: VersionedStateEnvelope,
+  menu: OrderEditorMenu,
+):
+  | { readonly kind: 'draft'; readonly draft: OrderDraft }
+  | { readonly kind: 'review'; readonly review: ReturnType<typeof AIReviewSchema.parse> }
+  | null {
   if (typeof value !== 'object' || value === null) return null
-  return AIReviewSchema.safeParse((value as { review?: unknown }).review).data ?? null
+  const state = value as {
+    review?: unknown
+    reviewedDraft?: unknown
+    reviewedCatalogSignature?: unknown
+    reviewedRevision?: unknown
+    reviewedHash?: unknown
+    reviewedTs?: unknown
+  }
+  if (
+    state.reviewedCatalogSignature !== expectedCatalogSignature ||
+    state.reviewedRevision !== expectedEnvelope.revision ||
+    state.reviewedHash !== expectedEnvelope.hash ||
+    state.reviewedTs !== expectedEnvelope.ts
+  ) return null
+  if (Object.hasOwn(state, 'reviewedDraft')) {
+    try {
+      const stored = serializeOrderDraft(state.reviewedDraft as OrderDraft, 'reviewed-draft')
+      return {
+        kind: 'draft',
+        draft: { ...createOrderDraftFromLegacy(stored, menu), id: null },
+      }
+    } catch {
+      return null
+    }
+  }
+  const review = AIReviewSchema.safeParse(state.review)
+  return review.success ? { kind: 'review', review: review.data } : null
 }
 
 function Section({
@@ -178,41 +258,174 @@ function countRecord(record: Readonly<Record<string, number>>): number {
   return Object.values(record).reduce((total, quantity) => total + quantity, 0)
 }
 
-function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames = [] }: {
+function OrderEditorContent({
+  draft,
+  menu,
+  onDraftChange,
+  onSave,
+  mode,
+  outOfStockNames = [],
+  persistenceReady,
+  isSaving,
+  saveFeedback,
+  requiresCurrentPricing,
+  autoConvertUntouchedDefaultMeal,
+}: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
   readonly onDraftChange: (draft: OrderDraft) => void
+  readonly onSave: (allowMixedLunchAndShabbat: boolean) => void
   readonly mode: 'new' | 'edit'
   readonly outOfStockNames?: readonly string[]
+  readonly persistenceReady: boolean
+  readonly isSaving: boolean
+  readonly saveFeedback: SaveFeedback
+  readonly requiresCurrentPricing: boolean
+  readonly autoConvertUntouchedDefaultMeal: boolean
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
+  const [hotelQuery, setHotelQuery] = useState(draft.place)
+  const [hotelResults, setHotelResults] = useState<readonly HotelSearchResult[]>([])
+  const [hotelSearchState, setHotelSearchState] = useState<
+    | { readonly kind: 'idle' }
+    | { readonly kind: 'loading' }
+    | { readonly kind: 'error'; readonly message: string }
+    | { readonly kind: 'empty' }
+  >({ kind: 'idle' })
+  const [staticHotelName, setStaticHotelName] = useState('')
+  const [mixedOrderConfirmed, setMixedOrderConfirmed] = useState(false)
+  const hotelRequest = useRef(0)
+  const untouchedDefaultMeal = useRef(autoConvertUntouchedDefaultMeal)
   const outOfStock = useMemo(() => new Set(outOfStockNames), [outOfStockNames])
-  const pricing = calculateOrderDraftPricing(draft, menu)
-  const validationIssues = validateOrderDraft(draft)
+  const selectionMode = classifyDraftSelectionMode(draft)
+  const pricing = calculateOrderDraftPricing(draft, menu, {
+    allowMixedLunchAndShabbat: mixedOrderConfirmed,
+  })
+  const validationIssues = validateOrderDraft(
+    draft,
+    requiresCurrentPricing ? pricing.result?.totalMinorUnits : undefined,
+  )
   const allIssues = [...validationIssues, ...pricing.issues]
+  const hasBlockingIssue = allIssues.some((issue) => issue.blocking)
+  const saveIsSafelyBlocked =
+    !persistenceReady ||
+    hasBlockingIssue ||
+    pricing.result === null ||
+    isSaving ||
+    saveFeedback.kind === 'conflict' ||
+    saveFeedback.kind === 'blocked'
   const orderedSalads = Object.values(draft.salads).reduce((total, item) => total + item.ordered, 0)
   const giftSalads = Object.values(draft.salads).reduce((total, item) => total + item.gift, 0)
   const patch = (next: Partial<OrderDraft>) => onDraftChange({ ...draft, ...next })
+
+  const markShabbatSelectionChanged = () => {
+    untouchedDefaultMeal.current = false
+    setMixedOrderConfirmed(false)
+  }
 
   const updateCategory = (
     key: 'firsts' | 'mains' | 'sides' | 'desserts',
     name: string,
     quantity: number,
-  ) => patch({ [key]: updateQuantityRecord(draft[key], name, quantity) })
+  ) => {
+    markShabbatSelectionChanged()
+    patch({ [key]: updateQuantityRecord(draft[key], name, quantity) })
+  }
+
+  const updateMeals = (meals: number) => {
+    markShabbatSelectionChanged()
+    onDraftChange(applyCoupleMealQuantity(draft, menu, meals))
+  }
+
+  const updateChallahs = (challot: number) => {
+    markShabbatSelectionChanged()
+    patch({ challot })
+  }
+
+  const updateSalad = (
+    name: string,
+    selection: { readonly ordered: number; readonly gift: number },
+  ) => {
+    markShabbatSelectionChanged()
+    patch({ salads: updateSaladRecord(draft.salads, name, selection) })
+  }
 
   const updateLunch = (key: string, next: Partial<LunchDraftSelection>) => {
     const current = draft.lunch[key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
-    const updated = { ...current, ...next }
+    const merged = { ...current, ...next }
+    const updated = merged.quantity === 0
+      ? { ...merged, sides: {}, addonQuantity: 0 }
+      : merged
     const lunch = { ...draft.lunch }
-    if (updated.quantity === 0 && updated.addonQuantity === 0 && Object.keys(updated.sides).length === 0) delete lunch[key]
+    const {
+      quantity: _quantity,
+      variantKey: _variantKey,
+      sides: _sides,
+      addonQuantity: _addonQuantity,
+      ...unknown
+    } = updated
+    if (updated.quantity === 0 && Object.keys(unknown).length === 0) delete lunch[key]
     else lunch[key] = updated
-    patch({ lunch })
+
+    const hadLunchSelection = Object.values(draft.lunch).some(
+      (selection) => selection.quantity > 0,
+    )
+    const convertDefaultMeal =
+      untouchedDefaultMeal.current &&
+      !hadLunchSelection &&
+      current.quantity === 0 &&
+      updated.quantity > 0
+    if (convertDefaultMeal) untouchedDefaultMeal.current = false
+    setMixedOrderConfirmed(false)
+    patch({
+      lunch,
+      ...(convertDefaultMeal ? { meals: 0, challot: 0 } : {}),
+    })
+  }
+
+  const searchHotels = async () => {
+    const query = hotelQuery.normalize('NFKC').trim().replace(/\s+/gu, ' ')
+    if (query.length < 2 || query.length > 100) {
+      setHotelResults([])
+      setHotelSearchState({ kind: 'error', message: 'יש לכתוב לפחות שני תווים בשם המלון.' })
+      return
+    }
+    const requestId = hotelRequest.current + 1
+    hotelRequest.current = requestId
+    setHotelResults([])
+    setHotelSearchState({ kind: 'loading' })
+    try {
+      const response = await fetch(`/api/hotels/search?${new URLSearchParams({ q: query }).toString()}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      })
+      if (!response.ok) throw new Error('hotel search failed')
+      const parsed = parseHotelSearchResponse(await response.json())
+      if (!parsed) throw new Error('hotel search response was invalid')
+      if (hotelRequest.current !== requestId) return
+      setHotelResults(parsed.results)
+      setHotelSearchState(parsed.results.length > 0 ? { kind: 'idle' } : { kind: 'empty' })
+    } catch {
+      if (hotelRequest.current !== requestId) return
+      setHotelResults([])
+      setHotelSearchState({
+        kind: 'error',
+        message: 'חיפוש המלונות אינו זמין כרגע. אפשר לבחור מהרשימה הקבועה למטה.',
+      })
+    }
+  }
+
+  const selectHotel = (hotel: HotelSearchResult | (typeof HOTEL_OPTIONS)[number]) => {
+    onDraftChange(applyHotelSelection(draft, hotel))
+    setHotelQuery(hotel.name)
+    setHotelResults([])
+    setHotelSearchState({ kind: 'idle' })
   }
 
   return (
-    <div className="pb-36" dir="rtl">
+    <div className="pb-36" dir="rtl" aria-busy={isSaving || undefined}>
       <nav aria-label="מעבר בין חלקי ההזמנה" className="sticky top-0 z-20 flex gap-2 overflow-x-auto border-b border-border bg-card/95 px-5 py-3 backdrop-blur sm:px-8">
         {SECTIONS.map(([id, label]) => (
           <button
@@ -228,11 +441,22 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
 
       <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-8 sm:py-10">
         <header>
-          <p className="text-xs font-black text-accent-foreground">טיוטה מקומית בלבד · עדיין לא נשמרת</p>
+          <p className="text-xs font-black text-accent-foreground">השינויים נשמרים רק אחרי אישור מהשרת</p>
           <h1 className="mt-2 font-heading text-3xl font-black text-primary">
             {mode === 'edit' ? `עריכת הזמנה ${String(draft.id ?? '')}` : 'הזמנה חדשה'}
           </h1>
         </header>
+
+        {!persistenceReady && (
+          <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-black text-amber-950">
+            השמירה חסומה כי הגרסה המאובטחת של הנתונים לא נטענה. הטיוטה נשארת במסך ושום הזמנה לא משתנה.
+          </p>
+        )}
+        {saveFeedback.kind !== 'idle' && (
+          <p role="alert" className={`rounded-2xl border p-4 text-sm font-black ${saveFeedback.kind === 'network-error' ? 'border-amber-200 bg-amber-50 text-amber-950' : 'border-rose-200 bg-rose-50 text-destructive'}`}>
+            {saveFeedback.message}
+          </p>
+        )}
 
         {mode === 'new' && (
           <section className="rounded-[2rem] border border-border bg-secondary p-5 sm:p-7">
@@ -282,9 +506,9 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <QuantityStepper label="ארוחות זוגיות" value={draft.meals} onChange={(meals) => patch({ meals })} />
+            <QuantityStepper label="ארוחות זוגיות" value={draft.meals} onChange={updateMeals} />
             <QuantityStepper label="עריכה לכמה אנשים" value={draft.aricha} onChange={(aricha) => patch({ aricha })} />
-            <QuantityStepper label="חלות" value={draft.challot} onChange={(challot) => patch({ challot })} />
+            <QuantityStepper label="חלות" value={draft.challot} onChange={updateChallahs} />
           </div>
           <Field label="קבוצה / יעד משותף">
             <input aria-label="קבוצה / יעד משותף" value={draft.group} onChange={(event) => patch({ group: event.currentTarget.value })} className={inputClassName} />
@@ -310,24 +534,103 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
                 <Field label="שם מלון / יעד">
                   <input
                     aria-label="שם מלון / יעד"
-                    list="bat-melech-hotels"
-                    value={draft.place}
-                    onChange={(event) => onDraftChange(applyHotelSelection(draft, event.currentTarget.value))}
+                    value={hotelQuery}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value
+                      hotelRequest.current += 1
+                      setHotelQuery(value)
+                      setHotelResults([])
+                      setHotelSearchState({ kind: 'idle' })
+                      onDraftChange(applyHotelDestinationInput(draft, value))
+                    }}
                     className={inputClassName}
                   />
-                  <datalist id="bat-melech-hotels">
-                    {HOTEL_OPTIONS.map((hotel) => <option key={hotel.name} value={hotel.name}>{hotel.city} · {hotel.fullAddress}</option>)}
-                  </datalist>
+                  <button
+                    type="button"
+                    disabled={hotelSearchState.kind === 'loading'}
+                    onClick={() => { void searchHotels() }}
+                    className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <LocalIcon name="ph:map-pin-bold" className="text-base" />
+                    <span>{hotelSearchState.kind === 'loading' ? 'מחפשת מלון' : 'חיפוש מלון'}</span>
+                  </button>
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-block text-[0.65rem] font-bold text-muted-foreground underline"
+                  >
+                    נתוני החיפוש: OpenStreetMap contributors
+                  </a>
                 </Field>
                 <Field label="שעת הגעה">
                   <input aria-label="שעת הגעה" value={draft.time} onChange={(event) => patch({ time: event.currentTarget.value })} className={inputClassName} />
                 </Field>
               </div>
+              {hotelSearchState.kind === 'error' && (
+                <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs font-black text-amber-950">
+                  {hotelSearchState.message}
+                </p>
+              )}
+              {hotelSearchState.kind === 'empty' && (
+                <p role="status" className="rounded-xl bg-secondary p-3 text-xs font-black text-primary">
+                  לא נמצאו מלונות מתאימים בדובאי או באבו דאבי. אפשר לבחור מהרשימה הקבועה.
+                </p>
+              )}
+              {hotelResults.length > 0 && (
+                <ul aria-label="תוצאות חיפוש מלונות" className="space-y-2 rounded-2xl border border-border bg-background/60 p-3">
+                  {hotelResults.map((hotel) => (
+                    <li key={hotel.id}>
+                      <button
+                        type="button"
+                        onClick={() => selectHotel(hotel)}
+                        className="flex min-h-12 w-full items-start gap-3 rounded-xl bg-card p-3 text-right hover:bg-secondary"
+                      >
+                        <LocalIcon name="ph:map-pin-bold" className="mt-0.5 shrink-0 text-lg text-primary" />
+                        <span>
+                          <span className="block text-sm font-black text-primary">{hotel.name}</span>
+                          <span className="mt-1 block text-xs font-bold text-muted-foreground">{hotel.fullAddress}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="grid grid-cols-1 gap-2 rounded-2xl border border-border bg-background/60 p-3 md:grid-cols-[1fr_auto]">
+                <label className="space-y-2">
+                  <span className="text-xs font-black text-muted-foreground">רשימת מלונות קבועה</span>
+                  <select
+                    aria-label="מלון מהרשימה הקבועה"
+                    value={staticHotelName}
+                    onChange={(event) => setStaticHotelName(event.currentTarget.value)}
+                    className={inputClassName}
+                  >
+                    <option value="">— בחירה —</option>
+                    {HOTEL_OPTIONS.map((hotel) => (
+                      <option key={hotel.name} value={hotel.name}>{hotel.city} · {hotel.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={!staticHotelName}
+                  onClick={() => {
+                    const hotel = HOTEL_OPTIONS.find((candidate) => candidate.name === staticHotelName)
+                    if (hotel) selectHotel(hotel)
+                  }}
+                  className="min-h-11 self-end rounded-xl border border-primary/20 bg-card px-4 text-xs font-black text-primary hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <LocalIcon name="ph:map-pin-bold" />
+                    בחירת המלון
+                  </span>
+                </button>
+              </div>
               <Field label="כתובת מלאה / הוראות לקבלה">
-                <input aria-label="כתובת מלאה" value={draft.address} onChange={(event) => patch({ address: event.currentTarget.value, hotelAddress: event.currentTarget.value })} className={inputClassName} />
+                <input aria-label="כתובת מלאה" value={draft.address} onChange={(event) => patch({ address: event.currentTarget.value })} className={inputClassName} />
               </Field>
               <Field label="קישור ניווט">
-                <input aria-label="קישור ניווט" value={draft.navigationUrl} onChange={(event) => patch({ navigationUrl: event.currentTarget.value })} className={inputClassName} />
+                <input aria-label="קישור ניווט" value={draft.navigationUrl} onChange={(event) => onDraftChange(applyHotelNavigationInput(draft, event.currentTarget.value))} className={inputClassName} />
               </Field>
             </div>
           )}
@@ -343,8 +646,8 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
                   <p className="mb-3 text-sm font-black text-primary">{name}</p>
                   {outOfStock.has(name) && <p className="mb-2 text-xs font-black text-destructive">אזל מהמלאי — הבחירה עדיין פתוחה</p>}
                   <div className="grid grid-cols-2 gap-2">
-                    <div><span className="mb-1 block text-center text-[0.65rem] font-black text-muted-foreground">הוזמן</span><QuantityStepper compact label={`${name} הוזמן`} value={selection.ordered} onChange={(ordered) => patch({ salads: updateSaladRecord(draft.salads, name, { ...selection, ordered }) })} /></div>
-                    <div><span className="mb-1 block text-center text-[0.65rem] font-black text-accent-foreground">פינוק</span><QuantityStepper compact label={`${name} פינוק`} value={selection.gift} onChange={(gift) => patch({ salads: updateSaladRecord(draft.salads, name, { ...selection, gift }) })} /></div>
+                    <div><span className="mb-1 block text-center text-[0.65rem] font-black text-muted-foreground">הוזמן</span><QuantityStepper compact label={`${name} הוזמן`} value={selection.ordered} onChange={(ordered) => updateSalad(name, { ...selection, ordered })} /></div>
+                    <div><span className="mb-1 block text-center text-[0.65rem] font-black text-accent-foreground">פינוק</span><QuantityStepper compact label={`${name} פינוק`} value={selection.gift} onChange={(gift) => updateSalad(name, { ...selection, gift })} /></div>
                   </div>
                 </div>
               )
@@ -419,6 +722,17 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
               )
             })}
           </div>
+          {selectionMode === 'mixed' && (
+            <label className="flex min-h-12 items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-black text-amber-950">
+              <input
+                type="checkbox"
+                checked={mixedOrderConfirmed}
+                onChange={(event) => setMixedOrderConfirmed(event.currentTarget.checked)}
+                className="mt-0.5 size-5 shrink-0 accent-primary"
+              />
+              <span>אני מאשרת שזו הזמנה משולבת של שבת וצהריים</span>
+            </label>
+          )}
         </Section>
 
         <Section id="extras" title="אקסטרות ופריטים חופשיים">
@@ -466,7 +780,7 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
                 </div>
               ))}
               <div className="flex justify-between border-t border-border pt-3 text-lg font-black text-primary"><span>מחיר מוצע</span><span dir="ltr">{formatUsdMinorUnits(pricing.result.totalMinorUnits)}</span></div>
-              <button type="button" onClick={() => patch({ total: (pricing.result!.totalMinorUnits / 100).toFixed(2) })} className="min-h-11 w-full rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background">להשתמש במחיר המוצע</button>
+              <button type="button" onClick={() => patch({ total: formatUsdInputMinorUnits(pricing.result!.totalMinorUnits) })} className="min-h-11 w-full rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background">להשתמש במחיר המוצע</button>
             </div>
           ) : <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">אי אפשר לחשב מחיר בטוח.</p>}
           {allIssues.length > 0 && (
@@ -487,12 +801,20 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-[0.65rem] font-black text-muted-foreground">הטיוטה לא שונה את מסד הנתונים</p>
+            <p className="text-[0.65rem] font-black text-muted-foreground">{isSaving ? 'ממתינה לאישור שמירה מהשרת' : 'עד לאישור השמירה, הטיוטה לא משנה את מסד הנתונים'}</p>
             <p className="text-lg font-black text-primary" dir="ltr">{pricing.result ? formatUsdMinorUnits(pricing.result.totalMinorUnits) : '—'}</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={() => navigate(APP_ROUTES.orders)} className="min-h-11 rounded-full border border-border px-5 text-sm font-black text-primary hover:bg-secondary">ביטול</button>
-            <button type="button" disabled title="השמירה תופעל רק עם מנגנון גרסאות שמונע דריסת הזמנות" className="min-h-11 cursor-not-allowed rounded-full bg-muted px-7 text-sm font-black text-muted-foreground opacity-70">שמירה תופעל לאחר חיבור מוגן</button>
+            <button type="button" disabled={isSaving} onClick={() => navigate(APP_ROUTES.orders)} className="min-h-11 rounded-full border border-border px-5 text-sm font-black text-primary hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60">ביטול</button>
+            <button
+              type="button"
+              disabled={saveIsSafelyBlocked}
+              onClick={() => onSave(mixedOrderConfirmed)}
+              title={!persistenceReady ? 'השמירה דורשת מעטפת נתונים עם גרסה מאומתת' : hasBlockingIssue ? 'יש לתקן את השדות המסומנים לפני השמירה' : undefined}
+              className="min-h-11 rounded-full bg-primary px-7 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            >
+              {isSaving ? 'שומרת בבטחה' : saveFeedback.kind === 'network-error' ? 'בדיקת ניסיון השמירה מחדש' : mode === 'edit' ? 'שמירת השינויים' : 'שמירת ההזמנה'}
+            </button>
           </div>
         </div>
       </footer>
@@ -503,32 +825,262 @@ function OrderEditorContent({ draft, menu, onDraftChange, mode, outOfStockNames 
 export function OrderEditorScreen() {
   const { orderId } = useParams<{ orderId?: string }>()
   const storeQuery = useStore()
+  const saveMutation = useVersionedStateMutation()
   const location = useLocation()
+  const navigate = useNavigate()
   const [draft, setDraft] = useState<OrderDraft | null>(null)
+  const [editLoadIssue, setEditLoadIssue] = useState<string | null>(null)
+  const [duplicateLoadIssue, setDuplicateLoadIssue] = useState<string | null>(null)
+  const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>({ kind: 'idle' })
   const initializedFor = useRef('')
+  const baseEnvelope = useRef<VersionedStateEnvelope | null>(null)
+  const retryAttempt = useRef<SaveAttempt | null>(null)
+  const createdOrderId = useRef<string | null>(null)
+  const submissionLocked = useRef(false)
+  const initialPricingFingerprint = useRef<string | null>(null)
+  const initialDraftKind = useRef<'fresh' | 'other'>('other')
 
   const store = storeQuery.data?.data ?? null
   const menu = useMemo(() => buildOrderEditorMenu(store ?? { orders: [] }), [store])
   const mode = orderId === undefined ? 'new' : 'edit'
-  const initializationKey = `${mode}:${orderId ?? ''}:${storeQuery.data?.ts ?? ''}`
+  const initializationKey = `${mode}:${orderId ?? ''}:${location.search}`
+  const storedOrderIdStatus = store ? classifyStoredOrderIds(store.orders) : 'safe'
 
   useEffect(() => {
     if (!storeQuery.data || initializedFor.current === initializationKey) return
     initializedFor.current = initializationKey
+    baseEnvelope.current = isVersionedStateEnvelope(storeQuery.data)
+      ? structuredClone(storeQuery.data)
+      : null
+    if (storedOrderIdStatus !== 'safe') {
+      initialDraftKind.current = 'other'
+      setDraft(null)
+      return
+    }
     if (mode === 'edit') {
-      const matches = (store?.orders ?? []).filter((order) => String(order.id) === orderId)
-      setDraft(matches.length === 1 ? createOrderDraftFromLegacy(matches[0]!, menu) : null)
+      initialDraftKind.current = 'other'
+      const matches = (store?.orders ?? []).filter((order) => order.id === orderId)
+      if (matches.length !== 1) {
+        setDraft(null)
+        return
+      }
+      const issue = legacyOrderEditIssue(matches[0]!)
+      if (issue !== null) {
+        setEditLoadIssue(issue)
+        setDraft(null)
+        return
+      }
+      const nextDraft = createOrderDraftFromLegacy(matches[0]!, menu)
+      initialPricingFingerprint.current = orderPricingFingerprint(nextDraft)
+      setEditLoadIssue(null)
+      setDuplicateLoadIssue(null)
+      setDraft(nextDraft)
+      return
+    }
+    const duplicateValues = new URLSearchParams(location.search).getAll('duplicate')
+    if (duplicateValues.length > 0) {
+      initialDraftKind.current = 'other'
+      const duplicateId = duplicateValues.length === 1 ? duplicateValues[0]! : ''
+      if (!CANONICAL_ORDER_ID_PATTERN.test(duplicateId)) {
+        setDuplicateLoadIssue('מזהה הזמנת המקור אינו תקין. לא נפתחה טיוטה חדשה.')
+        setEditLoadIssue(null)
+        setDraft(null)
+        return
+      }
+      const matches = (store?.orders ?? []).filter((order) => order.id === duplicateId)
+      if (matches.length !== 1) {
+        setDuplicateLoadIssue(
+          matches.length === 0
+            ? 'הזמנת המקור לא נמצאה. לא נפתחה טיוטה חדשה.'
+            : 'מזהה הזמנת המקור אינו ייחודי. לא נפתחה טיוטה חדשה.',
+        )
+        setEditLoadIssue(null)
+        setDraft(null)
+        return
+      }
+      try {
+        const nextDraft = createDuplicateOrderDraft(matches[0]!, menu)
+        initialPricingFingerprint.current = orderPricingFingerprint(nextDraft)
+        setDuplicateLoadIssue(null)
+        setEditLoadIssue(null)
+        setDraft(nextDraft)
+      } catch {
+        setDuplicateLoadIssue('הזמנת המקור כוללת נתון ישן שלא ניתן לשכפל בבטחה. לא נפתחה טיוטה חדשה.')
+        setEditLoadIssue(null)
+        setDraft(null)
+      }
       return
     }
     const base = createOrderDraft(menu)
-    const review = readReviewState(location.state)
-    setDraft(review ? applyAIReviewToDraft(base, review, buildAIOrderCatalog(menu).targetsById) : base)
-  }, [initializationKey, location.state, menu, mode, orderId, store, storeQuery.data])
+    const reviewHandoff = isVersionedStateEnvelope(storeQuery.data)
+      ? readReviewState(
+          location.state,
+          currentCatalogSignature(menu),
+          storeQuery.data,
+          menu,
+        )
+      : null
+    const nextDraft = reviewHandoff?.kind === 'draft'
+      ? reviewHandoff.draft
+      : reviewHandoff?.kind === 'review'
+        ? applyAIReviewToDraft(base, reviewHandoff.review, buildAIOrderCatalog(menu).targetsById, menu)
+        : base
+    initialDraftKind.current = reviewHandoff ? 'other' : 'fresh'
+    initialPricingFingerprint.current = orderPricingFingerprint(nextDraft)
+    setEditLoadIssue(null)
+    setDuplicateLoadIssue(null)
+    setDraft(nextDraft)
+  }, [initializationKey, location.search, location.state, menu, mode, orderId, store, storedOrderIdStatus, storeQuery.data])
+
+  const updateDraft = (nextDraft: OrderDraft) => {
+    if (submissionLocked.current) return
+    setDraft(nextDraft)
+    if (saveFeedback.kind === 'network-error') {
+      retryAttempt.current = null
+      saveMutation.reset()
+      setSaveFeedback({ kind: 'idle' })
+    }
+  }
+
+  const saveDraft = async (allowMixedLunchAndShabbat: boolean) => {
+    if (!draft || submissionLocked.current || saveMutation.isPending) return
+    const loadedBase = baseEnvelope.current
+    if (!loadedBase) {
+      setSaveFeedback({
+        kind: 'blocked',
+        message: 'אי אפשר לשמור בלי גרסת בסיס מאומתת. הטיוטה לא נשלחה ושום הזמנה לא שונתה.',
+      })
+      return
+    }
+    const draftSignature = JSON.stringify(draft)
+    let attempt = retryAttempt.current
+    if (!attempt || attempt.draftSignature !== draftSignature) {
+      retryAttempt.current = null
+      const pricing = calculateOrderDraftPricing(draft, menu, { allowMixedLunchAndShabbat })
+      const requiresCurrentPricing =
+        mode === 'new' || orderPricingFingerprint(draft) !== initialPricingFingerprint.current
+      const blockingIssues = [
+        ...validateOrderDraft(
+          draft,
+          requiresCurrentPricing ? pricing.result?.totalMinorUnits : undefined,
+        ),
+        ...pricing.issues,
+      ].filter((issue) => issue.blocking)
+      if (blockingIssues.length > 0) return
+
+      let refreshedEnvelope: VersionedStateEnvelope | null = null
+      try {
+        const refreshed = await storeQuery.refetch()
+        const refreshedData = refreshed.data
+        refreshedEnvelope = refreshedData !== undefined && isVersionedStateEnvelope(refreshedData)
+          ? refreshedData
+          : null
+      } catch {
+        refreshedEnvelope = null
+      }
+      if (!refreshedEnvelope || !isExactEnvelopeSnapshot(refreshedEnvelope, loadedBase)) {
+        setSaveFeedback({
+          kind: 'blocked',
+          message: 'הנתונים או התפריט השתנו מאז פתיחת הטיוטה. שום שמירה לא נשלחה. יש לפתוח את ההזמנה מחדש ולבדוק אותה מול הנתונים העדכניים.',
+        })
+        return
+      }
+
+      try {
+        const targetOrderId =
+          mode === 'new'
+            ? createdOrderId.current ?? createCanonicalOrderId(loadedBase.data)
+            : typeof draft.id === 'string'
+              ? draft.id
+              : ''
+        if (!targetOrderId || (mode === 'edit' && targetOrderId !== orderId)) {
+          throw new Error('Edited order identity is unsafe.')
+        }
+        if (mode === 'new') createdOrderId.current = targetOrderId
+        const requestId = createVersionedRequestId(
+          mode === 'new' ? 'order-create' : 'order-edit',
+        )
+        attempt = {
+          draftSignature,
+          change: prepareVersionedStateChange(
+            loadedBase,
+            requestId,
+            (baseStateCopy) => applyOrderDraftToStore(baseStateCopy, draft, {
+              mode,
+              orderId: targetOrderId,
+            }),
+          ),
+        }
+        retryAttempt.current = attempt
+      } catch {
+        retryAttempt.current = null
+        setSaveFeedback({
+          kind: 'blocked',
+          message: 'לא ניתן להכין שמירה בטוחה מהנתונים שנטענו. הטיוטה נשארה במסך ושום הזמנה לא שונתה.',
+        })
+        return
+      }
+    }
+
+    if (!attempt) return
+
+    submissionLocked.current = true
+    setSaveFeedback({ kind: 'idle' })
+    let confirmed = false
+    try {
+      const result = await saveMutation.mutateAsync(attempt.change)
+      if (!result.ok) {
+        retryAttempt.current = null
+        setSaveFeedback({
+          kind: 'conflict',
+          message: 'נמצאה התנגשות עם שינוי אחר. שום הזמנה לא נדרסה והטיוטה נשארה במסך. יש לחזור לרשימת ההזמנות ולפתוח מחדש לפני שמירה נוספת.',
+        })
+        return
+      }
+      retryAttempt.current = null
+      confirmed = true
+      navigate(APP_ROUTES.orders, { replace: true })
+    } catch {
+      setSaveFeedback({
+        kind: 'network-error',
+        message: 'לא התקבל אישור שמירה מהשרת. הטיוטה נשארה במסך; ניסיון נוסף ישתמש באותו מזהה שמירה כדי למנוע כפילות.',
+      })
+    } finally {
+      if (!confirmed) submissionLocked.current = false
+    }
+  }
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את טופס ההזמנה" />
   if (storeQuery.isError) return <ScreenState kind="error" title="לא הצלחנו לטעון את ההזמנה" retry={() => { void storeQuery.refetch() }} />
+  if (storedOrderIdStatus !== 'safe') {
+    return (
+      <ScreenState
+        kind="error"
+        title={storedOrderIdStatus === 'collision' ? 'מזהה ההזמנה אינו ייחודי' : 'מזהה הזמנה שנטען אינו תקין'}
+        description="לא נפתחה טיוטה ולא תישלח שמירה עד לטעינת נתונים עם מזהי הזמנות בטוחים."
+      />
+    )
+  }
+  if (editLoadIssue !== null) {
+    return (
+      <ScreenState
+        kind="error"
+        title="ההזמנה כוללת נתון ישן שלא ניתן לערוך בבטחה"
+        description={`${editLoadIssue} לא נפתחה טיוטה ושום נתון לא השתנה.`}
+      />
+    )
+  }
+  if (duplicateLoadIssue !== null) {
+    return (
+      <ScreenState
+        kind="error"
+        title="לא ניתן לשכפל את ההזמנה"
+        description={`${duplicateLoadIssue} שום נתון לא השתנה.`}
+      />
+    )
+  }
   if (mode === 'edit') {
-    const matches = (store?.orders ?? []).filter((order) => String(order.id) === orderId)
+    const matches = (store?.orders ?? []).filter((order) => order.id === orderId)
     if (matches.length !== 1) {
       return <ScreenState kind="error" title={matches.length === 0 ? 'ההזמנה לא נמצאה' : 'מזהה ההזמנה אינו ייחודי'} description="לא נפתחה טיוטה כדי למנוע עריכת הזמנה לא נכונה." />
     }
@@ -541,11 +1093,20 @@ export function OrderEditorScreen() {
 
   return (
     <OrderEditorContent
+      key={initializationKey}
       draft={draft}
       menu={menu}
-      onDraftChange={setDraft}
+      onDraftChange={updateDraft}
+      onSave={(allowMixedLunchAndShabbat) => { void saveDraft(allowMixedLunchAndShabbat) }}
       mode={mode}
       outOfStockNames={outOfStockNames}
+      persistenceReady={baseEnvelope.current !== null}
+      isSaving={saveMutation.isPending || submissionLocked.current}
+      saveFeedback={saveFeedback}
+      requiresCurrentPricing={
+        mode === 'new' || orderPricingFingerprint(draft) !== initialPricingFingerprint.current
+      }
+      autoConvertUntouchedDefaultMeal={initialDraftKind.current === 'fresh'}
     />
   )
 }

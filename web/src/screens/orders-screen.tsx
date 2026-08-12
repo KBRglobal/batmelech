@@ -23,13 +23,20 @@ const compactLinkClassName =
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
 function orderRoute(pattern: string, orderId: string): string {
-  return generatePath(pattern, { orderId: encodeURIComponent(orderId) })
+  return generatePath(pattern, { orderId })
 }
 
 function preparationRoute(serviceDate: string): To {
   return {
     pathname: APP_ROUTES.preparation,
     search: `?${new URLSearchParams({ date: serviceDate }).toString()}`,
+  }
+}
+
+function duplicateOrderRoute(orderId: string): To {
+  return {
+    pathname: APP_ROUTES.newOrder,
+    search: `?${new URLSearchParams({ duplicate: orderId }).toString()}`,
   }
 }
 
@@ -126,14 +133,10 @@ function OrderNavigation({ order }: { order: OrdersOrderView }) {
           וואטסאפ לא זמין
         </button>
       )}
-      <button
-        type="button"
-        disabled
-        title="שכפול יופעל רק אחרי חיבור השמירה המוגנת"
-        className="min-h-10 cursor-not-allowed rounded-xl border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground opacity-70"
-      >
-        שכפול לא זמין
-      </button>
+      <Link to={duplicateOrderRoute(order.orderId)} className={compactLinkClassName}>
+        <LocalIcon name="ph:plus-circle-bold" className="text-base" />
+        <span>שכפול</span>
+      </Link>
     </div>
   )
 }

@@ -1,0 +1,342 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { LocalIcon } from '../components/local-icon.tsx'
+import { ScreenState } from '../components/screen-state.tsx'
+import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
+import { useStore } from '../data/use-store.ts'
+import {
+  AUTHORITATIVE_ALLOWANCES,
+  MENU_CATEGORY_KEYS,
+  applyCatalogToStore,
+  loadSettingsCatalog,
+  updateLunchPrice,
+  validateSettingsCatalog,
+  type CatalogResult,
+  type LunchPricePath,
+  type MenuCategoryKey,
+  type SettingsCatalog,
+  type StoreSaveHandler,
+} from '../domain/settings-catalog.ts'
+import { parseLegacyUsdAmount } from '../domain/customers-finance.ts'
+import type { LegacyStore } from '../domain/store.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
+
+const CATEGORY_LABELS: Readonly<Record<MenuCategoryKey, string>> = {
+  salads: 'סלטים',
+  firsts: 'ראשונות',
+  mains: 'עיקריות',
+  sides: 'תוספות',
+  desserts: 'קינוחים',
+}
+
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
+interface MenuInitialization {
+  readonly baseEnvelope: VersionedStateEnvelope | null
+  readonly baseStore: LegacyStore
+  readonly loaded: CatalogResult
+}
+
+function displayDollarInput(minorUnits: number): string {
+  const dollars = Math.floor(minorUnits / 100)
+  const cents = String(minorUnits % 100).padStart(2, '0')
+  return minorUnits % 100 === 0 ? String(dollars) : `${dollars}.${cents}`
+}
+
+function priceInput(value: string): number | null {
+  if (value.trim() === '') return null
+  const parsed = parseLegacyUsdAmount(value)
+  return parsed.state === 'valid' ? parsed.minorUnits : null
+}
+
+function SaveStatus({ state, message }: { state: SaveState; message: string }) {
+  if (state === 'idle') return null
+  return (
+    <p
+      className={`text-xs font-black ${state === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+      role={state === 'error' ? 'alert' : 'status'}
+    >
+      {state === 'saving' ? 'שומרת...' : state === 'saved' ? 'נשמר' : message}
+    </p>
+  )
+}
+
+function PriceField({
+  label,
+  value,
+  onCommit,
+  fieldId,
+  onValidityChange,
+  fixed = false,
+}: {
+  label: string
+  value: number
+  onCommit: (value: number) => void
+  fieldId?: string
+  onValidityChange?: (fieldId: string, invalid: boolean) => void
+  fixed?: boolean
+}) {
+  const [input, setInput] = useState(displayDollarInput(value))
+  useEffect(() => {
+    setInput(displayDollarInput(value))
+    if (fieldId !== undefined) onValidityChange?.(fieldId, false)
+  }, [value, fieldId, onValidityChange])
+  const parsed = priceInput(input)
+  return (
+    <label className="block rounded-2xl border border-border bg-card p-4">
+      <span className="text-xs font-black text-muted-foreground">{label}</span>
+      <div className="mt-2 flex items-center gap-2" dir="ltr">
+        <span className="font-black text-primary">$</span>
+        <input
+          aria-label={label}
+          inputMode="decimal"
+          value={input}
+          disabled={fixed}
+          onChange={(event) => {
+            const next = event.currentTarget.value
+            setInput(next)
+            if (fieldId !== undefined) onValidityChange?.(fieldId, priceInput(next) === null)
+          }}
+          onBlur={() => {
+            if (!fixed && parsed !== null) onCommit(parsed)
+          }}
+          className={`min-h-10 min-w-0 flex-1 rounded-xl border px-3 text-sm font-black outline-none focus:ring-2 focus:ring-primary/20 ${
+            parsed === null ? 'border-destructive bg-rose-50 text-destructive' : 'border-border bg-secondary/40 text-primary'
+          } ${fixed ? 'cursor-not-allowed opacity-70' : ''}`}
+        />
+      </div>
+      {parsed === null && <span className="mt-1 block text-xs font-bold text-destructive">מחיר לא תקין</span>}
+    </label>
+  )
+}
+
+function FixedValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <p className="text-xs font-black text-muted-foreground">{label}</p>
+      <p className="mt-3 text-lg font-black text-primary">{value}</p>
+    </div>
+  )
+}
+
+function CategoryEditor({
+  category,
+  catalog,
+}: {
+  category: MenuCategoryKey
+  catalog: SettingsCatalog
+}) {
+  const items = catalog.categories[category]
+  return (
+    <details className="rounded-2xl border border-border bg-card p-4">
+      <summary className="cursor-pointer text-sm font-black text-primary">
+        {CATEGORY_LABELS[category]} ({items.length})
+      </summary>
+      <div className="mt-4 space-y-2">
+        {items.map((item) => (
+          <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-secondary/40 p-3">
+            <span className="min-w-0 flex-1 text-sm font-bold text-primary">{item.name}</span>
+            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
+          </div>
+        ))}
+        <p className="rounded-xl bg-secondary/60 p-3 text-xs font-bold text-muted-foreground">
+          מנות השבת קבועות כרגע כדי שטופס הלקוחות, המחיר, ההכנות ורשימת הקניות יישארו זהים.
+        </p>
+      </div>
+    </details>
+  )
+}
+
+function ExtrasEditor({ catalog }: { catalog: SettingsCatalog }) {
+  return (
+    <details className="rounded-2xl border border-border bg-card p-4">
+      <summary className="cursor-pointer text-sm font-black text-primary">
+        אקסטרות ומחירים ({catalog.extras.length})
+      </summary>
+      <p className="mt-3 text-xs font-bold text-muted-foreground">
+        האקסטרות מוצגות בלבד כרגע, כדי שטופס הלקוחות, המחיר וההכנות יישארו זהים.
+      </p>
+      <div className="mt-4 space-y-2">
+        {catalog.extras.map((item) => (
+          <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-secondary/40 p-3">
+            <span className="min-w-48 flex-1 text-sm font-bold text-primary">{item.name}</span>
+            <PriceField
+              label={`מחיר ${item.name}`}
+              value={item.priceMinorUnits}
+              fixed
+              onCommit={() => undefined}
+            />
+            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+function LunchPriceField({ catalog, path, label, value, onChange, onValidityChange }: { catalog: SettingsCatalog; path: LunchPricePath; label: string; value: number; onChange: (catalog: SettingsCatalog) => void; onValidityChange: (fieldId: string, invalid: boolean) => void }) {
+  const fieldId = `lunch-${path.itemKey}-${path.kind}-${'variantKey' in path ? path.variantKey : ''}`
+  return <PriceField label={label} value={value} fieldId={fieldId} onValidityChange={onValidityChange} onCommit={(price) => onChange(updateLunchPrice(catalog, path, price))} />
+}
+
+function LunchEditor({ catalog, onChange, onValidityChange }: { catalog: SettingsCatalog; onChange: (catalog: SettingsCatalog) => void; onValidityChange: (fieldId: string, invalid: boolean) => void }) {
+  return (
+    <details className="rounded-2xl border border-border bg-card p-4">
+      <summary className="cursor-pointer text-sm font-black text-primary">תפריט צהריים ({catalog.lunch.length})</summary>
+      <p className="mt-3 text-xs font-bold text-muted-foreground">פריטי הצהריים קבועים — כאן עורכים מחירים בלבד, כולל וריאציות ותוספות.</p>
+      <div className="mt-4 space-y-4">
+        {catalog.lunch.map((item) => (
+          <section key={item.key} className="rounded-2xl bg-secondary/40 p-4">
+            <h3 className="font-black text-primary">{item.name}</h3>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {item.priceMinorUnits !== null && (
+                <LunchPriceField catalog={catalog} path={{ kind: 'base', itemKey: item.key }} label={`מחיר ${item.name}`} value={item.priceMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+              )}
+              {item.variants.map((variant) => (
+                <div key={variant.key} className="space-y-2">
+                  <LunchPriceField catalog={catalog} path={{ kind: 'variant', itemKey: item.key, variantKey: variant.key }} label={`${item.name} — ${variant.name}`} value={variant.priceMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+                  {variant.weekendOnly && <p className="text-xs font-black text-amber-800">זמין בסוף שבוע בלבד</p>}
+                  {variant.includedSides > 0 && <p className="text-xs font-bold text-muted-foreground">כולל {variant.includedSides} תוספות</p>}
+                  {variant.extraSideMinorUnits !== null && (
+                    <LunchPriceField catalog={catalog} path={{ kind: 'side', itemKey: item.key, variantKey: variant.key }} label={`תוספת בחירה — ${variant.name}`} value={variant.extraSideMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+                  )}
+                </div>
+              ))}
+              {item.addon !== null && (
+                <LunchPriceField catalog={catalog} path={{ kind: 'addon', itemKey: item.key }} label={`${item.name} — ${item.addon.name}`} value={item.addon.priceMinorUnits} onChange={onChange} onValidityChange={onValidityChange} />
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
+  const storeQuery = useStore()
+  const initializationRef = useRef<MenuInitialization | null>(null)
+  const [catalog, setCatalog] = useState<SettingsCatalog | null>(null)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [saveMessage, setSaveMessage] = useState('')
+  const [invalidPriceFields, setInvalidPriceFields] = useState<ReadonlySet<string>>(new Set())
+
+  if (initializationRef.current === null && storeQuery.data?.data != null) {
+    initializationRef.current = {
+      baseEnvelope: isVersionedStateEnvelope(storeQuery.data) ? storeQuery.data : null,
+      baseStore: storeQuery.data.data,
+      loaded: loadSettingsCatalog(storeQuery.data.data),
+    }
+  }
+  const setPriceValidity = useCallback((fieldId: string, invalid: boolean) => {
+    setInvalidPriceFields((previous) => {
+      if (previous.has(fieldId) === invalid) return previous
+      const next = new Set(previous)
+      if (invalid) next.add(fieldId)
+      else next.delete(fieldId)
+      return next
+    })
+  }, [])
+
+  if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את התפריט" />
+  if (storeQuery.isError || initializationRef.current === null) {
+    return <ScreenState kind="error" title="לא הצלחנו לטעון את התפריט" retry={() => void storeQuery.refetch()} />
+  }
+  const initialization = initializationRef.current
+  const { baseEnvelope, baseStore, loaded } = initialization
+  const current = catalog ?? loaded.catalog
+  const validation = validateSettingsCatalog(current)
+  const blockingLoadWarnings = loaded.warnings.filter((warning) => warning.code !== 'SUPERSEDED_EXTRA_REMOVED')
+  const visibleWarnings = [...loaded.warnings, ...validation].filter(
+    (warning, index, all) =>
+      all.findIndex(
+        (candidate) =>
+          candidate.code === warning.code &&
+          candidate.path === warning.path &&
+          candidate.message === warning.message,
+      ) === index,
+  )
+
+  const commit = async () => {
+    if (!onSave) {
+      setSaveState('error')
+      setSaveMessage('השמירה המוגנת עדיין אינה מחוברת. לא בוצע שינוי בשרת.')
+      return
+    }
+    if (baseEnvelope === null || !isSameVersionedStateEnvelope(storeQuery.data, baseEnvelope)) {
+      setSaveState('error')
+      setSaveMessage('הנתונים התעדכנו מאז פתיחת הטיוטה. לא בוצעה שמירה; צריך לפתוח מחדש את המסך.')
+      return
+    }
+    if (validation.length > 0 || blockingLoadWarnings.length > 0 || invalidPriceFields.size > 0) {
+      setSaveState('error')
+      setSaveMessage('יש לתקן את שגיאות התפריט לפני שמירה.')
+      return
+    }
+    setSaveState('saving')
+    try {
+      await onSave({
+        reason: 'menu',
+        baseEnvelope,
+        baseStore,
+        nextStore: applyCatalogToStore(baseStore, current),
+      })
+      setSaveState('saved')
+      setSaveMessage('')
+    } catch {
+      setSaveState('error')
+      setSaveMessage('השמירה נכשלה. הנתונים בשרת לא סומנו כנשמרו.')
+    }
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-primary sm:text-4xl">מחירון ותפריט</h1>
+          <p className="mt-2 text-sm font-bold text-muted-foreground">המנות ומחירי הצהריים נבדקים לפני שמירה אחת מוגנת.</p>
+        </div>
+        <button type="button" onClick={() => void commit()} disabled={saveState === 'saving'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground disabled:opacity-50">
+          <LocalIcon name="ph:check-circle-bold" />
+          <span>שמירת התפריט</span>
+        </button>
+      </header>
+      <div className="mt-3"><SaveStatus state={saveState} message={saveMessage} /></div>
+
+      {visibleWarnings.length > 0 && (
+        <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5" role="alert">
+          <h2 className="font-black text-primary">יש פרטי תפריט שדורשים בדיקה</h2>
+          <ul className="mt-2 list-inside list-disc text-xs font-bold leading-6 text-amber-900">
+            {visibleWarnings.map((warning, index) => <li key={`${warning.path}-${index}`}>{warning.message}</li>)}
+          </ul>
+        </section>
+      )}
+
+      <section className="mt-8 rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
+        <h2 className="text-xl font-black text-primary">כללי הארוחה הזוגית</h2>
+        <p className="mt-2 text-xs font-bold text-muted-foreground">
+          מחיר הארוחה, החלה והאקסטרות מוצגים בלבד במהדורה הזו, כי טופס הלקוחות עדיין משתמש במחירים קבועים.
+        </p>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <PriceField label="מחיר ארוחה זוגית" value={current.couplePriceMinorUnits} fixed onCommit={() => undefined} />
+          <PriceField label="מחיר חלה נוספת" value={current.extraChallahMinorUnits} fixed onCommit={() => undefined} />
+          <FixedValue label="סלטים כלולים בזוגית" value={String(AUTHORITATIVE_ALLOWANCES.includedSaladsPerCouple)} />
+          <FixedValue label="דגים כלולים בזוגית" value={String(AUTHORITATIVE_ALLOWANCES.includedFishUnitsPerCouple)} />
+          <PriceField label="מחיר פילה דג נוסף" value={AUTHORITATIVE_ALLOWANCES.extraFishFilletMinorUnits} fixed onCommit={() => undefined} />
+        </div>
+        <div className="mt-5 rounded-2xl bg-secondary p-4 text-sm font-bold leading-7 text-primary">
+          <p>בכל ארוחה זוגית כלולים שני פילטים, בכל שילוב של מרוקאי וחריימה. כל פילה מעבר לכמות הכלולה עולה 30$. מנת קציצות דגים אחת שווה למנת דג זוגית מלאה.</p>
+          <p className="mt-2">סלטים: 4 כלולים, כל בלוק נוסף של 4 עולה 25$, והיתרה עולה 7$ לסלט.</p>
+          <p className="mt-2">קינוח: 2 סופלה או מנת סוכריות בקלוואה אחת לכל זוגית.</p>
+        </div>
+      </section>
+
+      <section className="mt-8 space-y-3">
+        {MENU_CATEGORY_KEYS.map((category) => <CategoryEditor key={category} category={category} catalog={current} />)}
+        <ExtrasEditor catalog={current} />
+        <LunchEditor catalog={current} onChange={setCatalog} onValidityChange={setPriceValidity} />
+      </section>
+    </div>
+  )
+}
+
+export default MenuEditorScreen

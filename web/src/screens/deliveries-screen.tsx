@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { generatePath, Link } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
+import {
+  isSameVersionedStateEnvelope,
+  type ConfirmedStoreSaveHandler,
+} from '../data/versioned-screen-save.tsx'
 import {
   buildDeliveryDashboard,
   type DeliveryDateGroup,
@@ -11,13 +15,29 @@ import {
   type DeliveryOrderView,
   type DeliveryWarning,
 } from '../domain/delivery-dashboard.ts'
+import {
+  applyNextDeliveryStatus,
+  nextDeliveryStatus,
+} from '../domain/operational-state.ts'
+import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
+import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 const actionClassName =
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
+interface DeliveriesInitialization {
+  readonly baseEnvelope: VersionedStateEnvelope | null
+  readonly baseStore: LegacyStore
+}
+
+interface DeliverySaveState {
+  readonly kind: 'saving' | 'saved' | 'error'
+  readonly message: string
+}
+
 function editOrderHref(orderId: string): string {
-  return generatePath(APP_ROUTES.editOrder, { orderId: encodeURIComponent(orderId) })
+  return generatePath(APP_ROUTES.editOrder, { orderId })
 }
 
 function statusClassName(status: string): string {
@@ -75,35 +95,81 @@ function Collection({ order }: { order: DeliveryOrderView }) {
   )
 }
 
-function OrderActions({ order }: { order: DeliveryOrderView }) {
+function OrderActions({
+  order,
+  onAdvance,
+  saveState,
+  saveBlocked,
+}: {
+  order: DeliveryOrderView
+  onAdvance?: (order: DeliveryOrderView) => void
+  saveState?: DeliverySaveState
+  saveBlocked: boolean
+}) {
+  const nextStatus = nextDeliveryStatus(order.status)
+  const canAdvance = order.orderId !== null && nextStatus !== null && onAdvance !== undefined
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {order.telephoneHref && (
-        <a href={order.telephoneHref} className={actionClassName}>
-          <span>טלפון</span>
-        </a>
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        {order.telephoneHref && (
+          <a href={order.telephoneHref} className={actionClassName}>
+            <span>טלפון</span>
+          </a>
+        )}
+        {order.orderId === null ? (
+          <span className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-destructive">עריכה לא זמינה</span>
+        ) : (
+          <Link to={editOrderHref(order.orderId)} className={actionClassName}>
+            <LocalIcon name="ph:pencil-simple-bold" className="text-base" />
+            <span>עריכה</span>
+          </Link>
+        )}
+        <button
+          type="button"
+          disabled={!canAdvance || saveBlocked || saveState?.kind === 'saving'}
+          aria-label={canAdvance ? `עדכון ${order.customerName} לסטטוס ${nextStatus}` : undefined}
+          title={canAdvance ? undefined : 'עדכון סטטוס דורש מזהה הזמנה יחיד ושמירה מוגנת'}
+          onClick={() => {
+            if (canAdvance) onAdvance(order)
+          }}
+          className={`min-h-10 rounded-xl border px-3 py-2 text-xs font-bold ${
+            canAdvance
+              ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60'
+              : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-70'
+          }`}
+        >
+          {saveState?.kind === 'saving'
+            ? 'שומרת...'
+            : canAdvance
+              ? `מעבר ל${nextStatus}`
+              : 'עדכון סטטוס לא זמין'}
+        </button>
+      </div>
+      {saveState !== undefined && saveState.kind !== 'saving' && (
+        <p
+          className={`mt-2 text-xs font-black ${saveState.kind === 'error' ? 'text-destructive' : 'text-emerald-700'}`}
+          role={saveState.kind === 'error' ? 'alert' : 'status'}
+        >
+          {saveState.message}
+        </p>
       )}
-      {order.orderId === null ? (
-        <span className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-destructive">עריכה לא זמינה</span>
-      ) : (
-        <Link to={editOrderHref(order.orderId)} className={actionClassName}>
-          <LocalIcon name="ph:pencil-simple-bold" className="text-base" />
-          <span>עריכה</span>
-        </Link>
-      )}
-      <button
-        type="button"
-        disabled
-        title="עדכון סטטוס יופעל רק אחרי חיבור השמירה המוגנת"
-        className="min-h-10 cursor-not-allowed rounded-xl border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground opacity-70"
-      >
-        עדכון סטטוס לא זמין
-      </button>
     </div>
   )
 }
 
-function DeliveryOrder({ order, sequence }: { order: DeliveryOrderView; sequence: number }) {
+function DeliveryOrder({
+  order,
+  sequence,
+  onAdvance,
+  saveState,
+  saveBlocked,
+}: {
+  order: DeliveryOrderView
+  sequence: number
+  onAdvance?: (order: DeliveryOrderView) => void
+  saveState?: DeliverySaveState
+  saveBlocked: boolean
+}) {
   return (
     <li className="rounded-2xl bg-background/70 p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -119,13 +185,28 @@ function DeliveryOrder({ order, sequence }: { order: DeliveryOrderView; sequence
             <div className="mt-2"><Collection order={order} /></div>
           </div>
         </div>
-        <OrderActions order={order} />
+        <OrderActions
+          order={order}
+          onAdvance={onAdvance}
+          saveState={saveState}
+          saveBlocked={saveBlocked}
+        />
       </div>
     </li>
   )
 }
 
-function Destination({ destination }: { destination: DeliveryDestinationGroup }) {
+function Destination({
+  destination,
+  onAdvance,
+  saveStates,
+  saveBlocked,
+}: {
+  destination: DeliveryDestinationGroup
+  onAdvance?: (order: DeliveryOrderView) => void
+  saveStates: Readonly<Record<string, DeliverySaveState>>
+  saveBlocked: boolean
+}) {
   return (
     <article className="rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
@@ -153,14 +234,31 @@ function Destination({ destination }: { destination: DeliveryDestinationGroup })
       </div>
       <ol className="mt-5 space-y-3">
         {destination.orders.map((order, index) => (
-          <DeliveryOrder key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`} order={order} sequence={index + 1} />
+          <DeliveryOrder
+            key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`}
+            order={order}
+            sequence={index + 1}
+            onAdvance={onAdvance}
+            saveState={order.orderId === null ? undefined : saveStates[order.orderId]}
+            saveBlocked={saveBlocked}
+          />
         ))}
       </ol>
     </article>
   )
 }
 
-function Pickups({ orders }: { orders: readonly DeliveryOrderView[] }) {
+function Pickups({
+  orders,
+  onAdvance,
+  saveStates,
+  saveBlocked,
+}: {
+  orders: readonly DeliveryOrderView[]
+  onAdvance?: (order: DeliveryOrderView) => void
+  saveStates: Readonly<Record<string, DeliverySaveState>>
+  saveBlocked: boolean
+}) {
   if (orders.length === 0) return null
   return (
     <section className="rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
@@ -170,7 +268,14 @@ function Pickups({ orders }: { orders: readonly DeliveryOrderView[] }) {
       </div>
       <ol className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {orders.map((order, index) => (
-          <DeliveryOrder key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`} order={order} sequence={index + 1} />
+          <DeliveryOrder
+            key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`}
+            order={order}
+            sequence={index + 1}
+            onAdvance={onAdvance}
+            saveState={order.orderId === null ? undefined : saveStates[order.orderId]}
+            saveBlocked={saveBlocked}
+          />
         ))}
       </ol>
     </section>
@@ -202,9 +307,31 @@ function DateSummary({ group }: { group: DeliveryDateGroup }) {
   )
 }
 
-export function DeliveriesScreen() {
+export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreSaveHandler }) {
   const storeQuery = useStore()
+  const initializationRef = useRef<DeliveriesInitialization | null>(null)
+  const acceptedEnvelopeRef = useRef<VersionedStateEnvelope | null>(null)
+  const writeInFlightRef = useRef(false)
   const [selectedGroupKey, setSelectedGroupKey] = useState('')
+  const [writeInFlight, setWriteInFlight] = useState(false)
+  const [saveStates, setSaveStates] = useState<Readonly<Record<string, DeliverySaveState>>>({})
+
+  if (initializationRef.current === null && storeQuery.data?.data != null) {
+    initializationRef.current = {
+      baseEnvelope: isVersionedStateEnvelope(storeQuery.data) ? storeQuery.data : null,
+      baseStore: storeQuery.data.data,
+    }
+  }
+  if (
+    acceptedEnvelopeRef.current !== null &&
+    isSameVersionedStateEnvelope(storeQuery.data, acceptedEnvelopeRef.current)
+  ) {
+    initializationRef.current = {
+      baseEnvelope: acceptedEnvelopeRef.current,
+      baseStore: acceptedEnvelopeRef.current.data,
+    }
+    acceptedEnvelopeRef.current = null
+  }
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את האספקות" />
   if (storeQuery.isError) {
@@ -218,7 +345,12 @@ export function DeliveriesScreen() {
     )
   }
 
-  const dashboard = buildDeliveryDashboard(storeQuery.data.data ?? { orders: [] })
+  const initialization = initializationRef.current
+  if (initialization === null) {
+    return <ScreenState kind="error" title="לא הצלחנו לטעון את האספקות" retry={() => void storeQuery.refetch()} />
+  }
+  const displayStore = initialization.baseStore
+  const dashboard = buildDeliveryDashboard(displayStore)
   if (dashboard.globallyEmpty) {
     return (
       <ScreenState
@@ -241,6 +373,80 @@ export function DeliveriesScreen() {
   }
 
   const selectedGroup = dashboard.groups.find(({ key }) => key === selectedGroupKey) ?? dashboard.groups[0]!
+
+  const advanceStatus = onSave === undefined
+    ? undefined
+    : async (order: DeliveryOrderView) => {
+        if (order.orderId === null) return
+        const baseEnvelope = initialization.baseEnvelope
+        if (
+          baseEnvelope === null ||
+          acceptedEnvelopeRef.current !== null ||
+          writeInFlightRef.current ||
+          !isSameVersionedStateEnvelope(storeQuery.data, baseEnvelope)
+        ) {
+          setSaveStates((current) => ({
+            ...current,
+            [order.orderId!]: {
+              kind: 'error',
+              message: 'הנתונים השתנו מאז פתיחת המסך. לא בוצע עדכון; צריך לטעון מחדש.',
+            },
+          }))
+          return
+        }
+
+        let nextStore: LegacyStore
+        let nextStatus: string
+        try {
+          const change = applyNextDeliveryStatus(initialization.baseStore, order.orderId)
+          nextStore = change.nextStore
+          nextStatus = change.nextStatus
+        } catch {
+          setSaveStates((current) => ({
+            ...current,
+            [order.orderId!]: {
+              kind: 'error',
+              message: 'מזהה ההזמנה או הסטטוס אינם בטוחים לעדכון. לא בוצע שינוי.',
+            },
+          }))
+          return
+        }
+
+        setSaveStates((current) => ({
+          ...current,
+          [order.orderId!]: { kind: 'saving', message: 'שומרת...' },
+        }))
+        writeInFlightRef.current = true
+        setWriteInFlight(true)
+        try {
+          const confirmedEnvelope = await onSave({
+            reason: 'deliveries',
+            baseEnvelope,
+            baseStore: initialization.baseStore,
+            nextStore,
+          })
+          acceptedEnvelopeRef.current = confirmedEnvelope
+          initializationRef.current = {
+            baseEnvelope: confirmedEnvelope,
+            baseStore: confirmedEnvelope.data,
+          }
+          setSaveStates((current) => ({
+            ...current,
+            [order.orderId!]: { kind: 'saved', message: `הסטטוס עודכן ל${nextStatus}.` },
+          }))
+        } catch {
+          setSaveStates((current) => ({
+            ...current,
+            [order.orderId!]: {
+              kind: 'error',
+              message: 'השמירה נכשלה או התנגשה בעדכון אחר. הסטטוס הקיים נשאר ללא שינוי.',
+            },
+          }))
+        } finally {
+          writeInFlightRef.current = false
+          setWriteInFlight(false)
+        }
+      }
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
@@ -270,8 +476,21 @@ export function DeliveriesScreen() {
             <span>{selectedGroup.localizedDate}</span>
           </h2>
           <DateSummary group={selectedGroup} />
-          {selectedGroup.destinations.map((destination) => <Destination key={destination.key} destination={destination} />)}
-          <Pickups orders={selectedGroup.pickups} />
+          {selectedGroup.destinations.map((destination) => (
+            <Destination
+              key={destination.key}
+              destination={destination}
+              onAdvance={advanceStatus}
+              saveStates={saveStates}
+              saveBlocked={writeInFlight || acceptedEnvelopeRef.current !== null}
+            />
+          ))}
+          <Pickups
+            orders={selectedGroup.pickups}
+            onAdvance={advanceStatus}
+            saveStates={saveStates}
+            saveBlocked={writeInFlight || acceptedEnvelopeRef.current !== null}
+          />
         </section>
       </div>
     </div>

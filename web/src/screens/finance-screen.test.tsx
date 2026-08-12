@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_ROUTES } from '../app/routes.ts'
 import { useStore } from '../data/use-store.ts'
+import type { CustomerFinanceSaveHandler } from '../domain/customers-finance.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { FinanceScreen } from './finance-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
 
 const mockedUseStore = vi.mocked(useStore)
+const HASH = 'b'.repeat(64)
 
 function queryResult(
   options: {
@@ -19,6 +21,7 @@ function queryResult(
     readonly error?: boolean
     readonly store?: LegacyStore | null
     readonly refetch?: ReturnType<typeof vi.fn>
+    readonly revision?: number
   } = {},
 ): ReturnType<typeof useStore> {
   return {
@@ -27,15 +30,20 @@ function queryResult(
     data:
       options.pending === true || options.error === true
         ? undefined
-        : { ts: 1, data: options.store ?? { orders: [] } },
+        : {
+            revision: options.revision ?? 1,
+            ts: options.revision ?? 1,
+            hash: HASH,
+            data: options.store ?? { orders: [] },
+          },
     refetch: options.refetch ?? vi.fn(),
   } as unknown as ReturnType<typeof useStore>
 }
 
-function renderFinance() {
+function renderFinance(onSave?: CustomerFinanceSaveHandler) {
   return render(
     <MemoryRouter initialEntries={[APP_ROUTES.finance]}>
-      <FinanceScreen />
+      <FinanceScreen onSave={onSave} />
     </MemoryRouter>,
   )
 }
@@ -66,12 +74,14 @@ describe('FinanceScreen', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
-  it('renders a genuine empty state and no month selector', () => {
+  it('renders a genuine empty state with a current-month expense editor', () => {
     mockedUseStore.mockReturnValue(queryResult({ store: { orders: [], expenses: {} } }))
     renderFinance()
 
     expect(screen.getByText('עדיין אין נתונים כספיים')).toBeTruthy()
-    expect(screen.queryByLabelText('חודש')).toBeNull()
+    expect(screen.getByLabelText('חודש')).toBeTruthy()
+    expect(screen.getByLabelText('תאריך ההוצאה')).toBeTruthy()
+    expect(screen.getByLabelText('סכום ההוצאה בדולרים')).toBeTruthy()
   })
 
   it('renders exact injected month and day financials, deposits, expenses, and normalized top customers', () => {
@@ -117,7 +127,7 @@ describe('FinanceScreen', () => {
     expect(screen.getByText('לקוחה אמיתית')).toBeTruthy()
     expect(screen.getByText('2 הזמנות בחודש')).toBeTruthy()
     expect(screen.queryByText('שרה לוי')).toBeNull()
-    expect(container.querySelector('input')).toBeNull()
+    expect(container.querySelectorAll('input')).toHaveLength(2)
     expect(container.querySelectorAll('select')).toHaveLength(1)
   })
 
@@ -145,7 +155,8 @@ describe('FinanceScreen', () => {
     expect(screen.getAllByText('$2.00').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('שומר...')).toBeNull()
     expect(screen.queryByText('נשמר אוטומטית')).toBeNull()
-    expect(container.querySelector('input')).toBeNull()
+    expect(container.querySelectorAll('input')).toHaveLength(2)
+    expect((screen.getByLabelText('תאריך ההוצאה') as HTMLInputElement).value).toBe('2099-09-01')
   })
 
   it('shows negative profit exactly instead of clamping or hiding it', () => {
@@ -201,5 +212,144 @@ describe('FinanceScreen', () => {
     expect(screen.getAllByText('$0.00').length).toBeGreaterThanOrEqual(4)
     expect(screen.getAllByText('$10.00').length).toBeGreaterThanOrEqual(2)
     expect(screen.getAllByText('-$10.00').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('persists one exact daily expense only after explicit save and preserves unknown state', async () => {
+    const store = {
+      orders: [{ id: 'real', date: '2099-08-12', name: 'לקוחה', total: '20.00' }],
+      expenses: { '2099-08-11': '1.00', metadata: { keep: true } },
+      unknownRoot: { exact: true },
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 9 }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderFinance(onSave)
+
+    const date = screen.getByLabelText('תאריך ההוצאה')
+    const amount = screen.getByLabelText('סכום ההוצאה בדולרים')
+    fireEvent.change(date, { target: { value: '2099-08-12' } })
+    await user.type(amount, '12.34')
+    expect(onSave).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'שמירת הוצאה' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const request = onSave.mock.calls[0]![0]
+    expect(request.reason).toBe('finance')
+    expect(request.baseEnvelope).toMatchObject({ revision: 9, hash: HASH, data: store })
+    expect(request.baseStore).toBe(store)
+    expect(request.nextStore.expenses).toEqual({
+      '2099-08-11': '1.00',
+      '2099-08-12': '12.34',
+      metadata: { keep: true },
+    })
+    expect(request.nextStore.orders).toEqual(store.orders)
+    expect((request.nextStore as Record<string, unknown>).unknownRoot).toEqual({ exact: true })
+    expect(await screen.findByText('ההוצאה נשמרה.')).toBeTruthy()
+    expect(screen.getByText('$12.34')).toBeTruthy()
+    expect(screen.getAllByText('$13.34').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('clears only the selected existing expense key', async () => {
+    const store = {
+      orders: [{ date: '2099-08-12', name: 'לקוחה', total: 1 }],
+      expenses: {
+        '2099-08-12': '10.00',
+        '2099-08-13': '20.00',
+        unknownExpenseField: 'keep',
+      },
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderFinance(onSave)
+
+    await user.click(screen.getAllByRole('button', { name: /עריכת הוצאה עבור/ })[0]!)
+    expect((screen.getByLabelText('סכום ההוצאה בדולרים') as HTMLInputElement).value).toBe('10.00')
+    await user.click(screen.getByRole('button', { name: 'ניקוי הוצאה' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.expenses).toEqual({
+      '2099-08-13': '20.00',
+      unknownExpenseField: 'keep',
+    })
+  })
+
+  it('drops the confirmed expense overlay after cache acknowledgement so a later remote amount is visible', async () => {
+    const store = {
+      orders: [{ date: '2099-08-12', name: 'לקוחה', total: '20.00' }],
+      expenses: {},
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    const view = renderFinance(onSave)
+
+    fireEvent.change(screen.getByLabelText('תאריך ההוצאה'), { target: { value: '2099-08-12' } })
+    await user.type(screen.getByLabelText('סכום ההוצאה בדולרים'), '12.34')
+    await user.click(screen.getByRole('button', { name: 'שמירת הוצאה' }))
+    const acknowledgedStore = onSave.mock.calls[0]![0].nextStore
+
+    mockedUseStore.mockReturnValue(queryResult({ store: acknowledgedStore, revision: 2 }))
+    view.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.finance]}>
+        <FinanceScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getAllByText('$12.34').length).toBeGreaterThanOrEqual(2))
+
+    const remoteStore = structuredClone(acknowledgedStore)
+    remoteStore.expenses = { ...remoteStore.expenses, '2099-08-12': '99.00' }
+    mockedUseStore.mockReturnValue(queryResult({ store: remoteStore, revision: 3 }))
+    view.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.finance]}>
+        <FinanceScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(screen.getAllByText('$99.00').length).toBeGreaterThanOrEqual(2))
+    expect(screen.queryByText('$12.34')).toBeNull()
+  })
+
+  it('rejects malformed expense input and retains a stale draft with zero writes', async () => {
+    const store = {
+      orders: [{ date: '2099-08-12', name: 'לקוחה', total: 1 }],
+    } as LegacyStore
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 1 }))
+    const user = userEvent.setup()
+    const view = renderFinance(onSave)
+    const amount = screen.getByLabelText('סכום ההוצאה בדולרים')
+    await user.type(amount, '1.001')
+    await user.click(screen.getByRole('button', { name: 'שמירת הוצאה' }))
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('עד שתי ספרות')
+
+    await user.clear(amount)
+    await user.type(amount, '5.25')
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 2 }))
+    view.rerender(
+      <MemoryRouter initialEntries={[APP_ROUTES.finance]}>
+        <FinanceScreen onSave={onSave} />
+      </MemoryRouter>,
+    )
+    await user.click(screen.getByRole('button', { name: 'שמירת הוצאה' }))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('סכום ההוצאה בדולרים') as HTMLInputElement).value).toBe('5.25')
+    expect(screen.getByRole('alert').textContent).toContain('הנתונים התעדכנו')
+  })
+
+  it('does not claim persistence when the injected save boundary is absent', async () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({ store: { orders: [{ date: '2099-08-12', name: 'לקוחה', total: 1 }] } }),
+    )
+    const user = userEvent.setup()
+    renderFinance()
+    await user.type(screen.getByLabelText('סכום ההוצאה בדולרים'), '5.00')
+    await user.click(screen.getByRole('button', { name: 'שמירת הוצאה' }))
+
+    expect(screen.getByRole('alert').textContent).toContain('לא בוצע שינוי בשרת')
+    expect(screen.queryByText('ההוצאה נשמרה.')).toBeNull()
   })
 })

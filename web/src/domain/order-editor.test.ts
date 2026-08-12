@@ -1,26 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import {
   AIReviewSchema,
+  DEFAULT_MENU_CATEGORIES,
   HOTEL_OPTIONS,
   applyAIReviewToDraft,
+  applyCoupleMealQuantity,
+  applyHotelNavigationInput,
+  applyOrderDraftToStore,
   applyHotelSelection,
   buildAIOrderCatalog,
   buildOrderEditorMenu,
   calculateDessertAllowance,
   calculateOrderDraftPricing,
+  classifyDraftSelectionMode,
+  classifyStoredOrderIds,
+  createCanonicalOrderId,
+  createDuplicateOrderDraft,
   createOrderDraft,
   createOrderDraftFromLegacy,
+  formatUsdInputMinorUnits,
+  legacyOrderEditIssue,
   nextFridayIso,
+  parseUsdInputMinorUnits,
+  parseHotelSearchResponse,
+  serializeOrderDraft,
   validateOrderDraft,
   type AIReview,
+  type HotelSearchResult,
   type OrderDraft,
 } from './order-editor.ts'
 import type { LegacyStore } from './store.ts'
+import { buildDeliveryDashboard } from './delivery-dashboard.ts'
 
 const emptyStore: LegacyStore = { orders: [] }
 
 function draftWith(patch: Partial<OrderDraft>): OrderDraft {
-  return { ...createOrderDraft(buildOrderEditorMenu(emptyStore), new Date(2026, 7, 12)), ...patch }
+  return {
+    ...createOrderDraft(buildOrderEditorMenu(emptyStore), new Date(2026, 7, 12)),
+    pickup: true,
+    ...patch,
+  }
 }
 
 function reviewWith(patch: Partial<AIReview> = {}): AIReview {
@@ -57,6 +76,11 @@ describe('nextFridayIso', () => {
   it('handles month and year boundaries in local calendar time', () => {
     expect(nextFridayIso(new Date(2026, 11, 31))).toBe('2027-01-01')
   })
+
+  it('uses the Dubai business calendar across a UTC midnight boundary', () => {
+    expect(nextFridayIso(new Date('2026-08-13T21:30:00.000Z'))).toBe('2026-08-14')
+    expect(nextFridayIso(new Date('2026-08-14T21:00:00.000Z'))).toBe('2026-08-21')
+  })
 })
 
 describe('order editor menu and drafts', () => {
@@ -79,6 +103,8 @@ describe('order editor menu and drafts', () => {
     )
     expect(menu.extras.map(({ name }) => name)).not.toContain('תוספת מנת דג')
     expect(menu.extras.map(({ name }) => name)).not.toContain('תוספת קציצות דגים')
+    expect(menu.extras.map(({ name }) => name)).not.toContain('תוספת 4 סלטים לבחירה')
+    expect(menu.extras.map(({ name }) => name)).not.toContain('תוספת חלה')
     expect(menu.lunch.find((item) => item.key === 'schnitzel-plate')?.variants).toHaveLength(3)
   })
 
@@ -101,6 +127,37 @@ describe('order editor menu and drafts', () => {
     expect(menu.includedChallahs).toBe(3)
 
     expect(buildOrderEditorMenu({ orders: [], menu: { includedChallot: 'invalid' } }).includedChallahs).toBe(2)
+  })
+
+  it('filters every superseded automatic charge from persisted extras', () => {
+    const menu = buildOrderEditorMenu({
+      orders: [],
+      menu: {
+        extras: [
+          { name: 'תוספת 4 סלטים לבחירה', price: 25 },
+          { name: 'תוספת מנת דג', price: 35 },
+          { name: 'תוספת קציצות דגים', price: 70 },
+          { name: ' תוספת  חלה ', price: 10 },
+          { name: 'תוספת יין', price: 5 },
+        ],
+      },
+    })
+
+    expect(menu.extras).toEqual([{ name: 'תוספת יין', priceMinorUnits: 500 }])
+  })
+
+  it('honors intentional empty configurable categories and extras without resurrecting defaults', () => {
+    const menu = buildOrderEditorMenu({
+      orders: [],
+      menu: { salads: [], mains: [], sides: [], desserts: [], extras: [] },
+    })
+
+    expect(menu.salads).toEqual([])
+    expect(menu.mains).toEqual([])
+    expect(menu.sides).toEqual([])
+    expect(menu.desserts).toEqual([])
+    expect(menu.extras).toEqual([])
+    expect(menu.firsts).toEqual([...DEFAULT_MENU_CATEGORIES.firsts])
   })
 
   it('creates the complete fresh draft and preserves unknown legacy fields on edit', () => {
@@ -137,6 +194,136 @@ describe('order editor menu and drafts', () => {
       challot: 2,
     })
   })
+
+  it('preserves unknown nested legacy fields without retaining duplicate storage aliases', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const edited = createOrderDraftFromLegacy({
+      id: 'order-existing',
+      salads: { טחינה: { o: 2, p: 1, ordered: 99, future: 'salad' } },
+      extras: { יין: { q: 1, quantity: 99, note: 'קר', future: 'extra' } },
+      custom: [{ name: 'מיוחד', qty: 1, price: '0.10', future: 'custom' }],
+      lunch: { baguette: { q: 1, v: '', sides: {}, addon: 0, future: 'lunch' } },
+    }, menu)
+
+    expect(edited.salads.טחינה).toEqual({ ordered: 2, gift: 1, future: 'salad' })
+    expect(edited.extras.יין).toEqual({ quantity: 1, note: 'קר', future: 'extra' })
+    expect(edited.custom[0]).toEqual({ name: 'מיוחד', quantity: 1, unitPrice: '0.10', note: '', future: 'custom' })
+    expect(edited.lunch.baguette).toEqual({ quantity: 1, variantKey: '', sides: {}, addonQuantity: 0, future: 'lunch' })
+    expect(createOrderDraftFromLegacy({
+      salads: { עתידי: { o: 0, p: 0, future: 'salad' } },
+      extras: { עתידי: { q: 0, future: 'extra' } },
+      lunch: { future: { q: 0, future: 'lunch' } },
+    }, menu)).toMatchObject({
+      salads: { עתידי: { ordered: 0, gift: 0, future: 'salad' } },
+      extras: { עתידי: { quantity: 0, note: '', future: 'extra' } },
+      lunch: { future: { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0, future: 'lunch' } },
+    })
+  })
+
+  it('fails closed before opaque legacy collection values can be dropped by an edit', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const malformedOrders = [
+      { id: 'bad-firsts', firsts: { דג: { quantity: 1 } } },
+      { id: 'bad-salad', salads: { טחינה: 'one' } },
+      { id: 'bad-extra', extras: { יין: { q: '1e2' } } },
+      { id: 'bad-custom', custom: ['opaque'] },
+      { id: 'bad-lunch', lunch: { baguette: { sides: ['אורז'] } } },
+    ]
+
+    for (const order of malformedOrders) {
+      expect(legacyOrderEditIssue(order)).not.toBeNull()
+      expect(() => createOrderDraftFromLegacy(order, menu)).toThrow()
+    }
+  })
+})
+
+describe('guarded order persistence projection', () => {
+  const UUID_A = '123e4567-e89b-42d3-a456-426614174000'
+  const UUID_B = '123e4567-e89b-42d3-a456-426614174001'
+
+  it('generates a canonical string ID, skips a collision, and never mutates the base store', () => {
+    const existing = `order-${UUID_A}`
+    const store: LegacyStore = {
+      orders: [{ id: existing }],
+      futureTopLevel: { keep: true },
+    }
+    const original = structuredClone(store)
+    const ids = [UUID_A, UUID_B]
+    const generated = createCanonicalOrderId(store, () => ids.shift()!)
+    const saved = applyOrderDraftToStore(
+      store,
+      draftWith({ name: 'לקוחה', total: '0.10', deposit: '0.20' }),
+      { mode: 'new', orderId: generated },
+    )
+
+    expect(generated).toBe(`order-${UUID_B}`)
+    expect(saved.orders).toHaveLength(2)
+    expect(saved.orders[1]).toMatchObject({ id: generated, total: '0.10', deposit: '0.20' })
+    expect(saved.futureTopLevel).toEqual({ keep: true })
+    expect(store).toEqual(original)
+  })
+
+  it('edits exactly one canonical string ID and preserves every unknown legacy field', () => {
+    const store: LegacyStore = {
+      orders: [{
+        id: 'live-1',
+        name: 'לפני',
+        futureOrderField: { keep: true },
+        salads: { טחינה: { o: 1, p: 0, ordered: 99, gift: 99, future: 'salad' } },
+        extras: { יין: { q: 1, quantity: 99, note: 'קר', future: 'extra' } },
+        custom: [{ name: 'מיוחד', qty: 1, quantity: 99, price: '0.10', unitPrice: '99.00', future: 'custom' }],
+        lunch: { baguette: { q: 1, quantity: 99, v: '', variantKey: 'bad', sides: {}, addon: 0, addonQuantity: 99, future: 'lunch' } },
+      }],
+      futureTopLevel: { keep: true },
+    }
+    const draft = createOrderDraftFromLegacy(store.orders[0]!, buildOrderEditorMenu(store))
+    const saved = applyOrderDraftToStore(store, { ...draft, name: 'אחרי', total: '1.2' }, {
+      mode: 'edit',
+      orderId: 'live-1',
+    })
+
+    expect(saved.orders[0]).toMatchObject({
+      id: 'live-1',
+      name: 'אחרי',
+      total: '1.20',
+      futureOrderField: { keep: true },
+      salads: { טחינה: { o: 1, p: 0, future: 'salad' } },
+      extras: { יין: { q: 1, note: 'קר', future: 'extra' } },
+      custom: [{ name: 'מיוחד', qty: 1, price: '0.10', note: '', future: 'custom' }],
+      lunch: { baguette: { q: 1, v: '', sides: {}, addon: 0, future: 'lunch' } },
+    })
+    expect(saved.futureTopLevel).toEqual({ keep: true })
+  })
+
+  it('fails closed for malformed, numeric, or collision-equivalent IDs', () => {
+    expect(classifyStoredOrderIds([{ id: 'live-1' }])).toBe('safe')
+    expect(classifyStoredOrderIds([{ id: 7 }])).toBe('unsafe')
+    expect(classifyStoredOrderIds([{ id: 'bad id' }])).toBe('unsafe')
+    expect(classifyStoredOrderIds([{ id: 7 }, { id: '7' }])).toBe('collision')
+    expect(() => applyOrderDraftToStore(
+      { orders: [{ id: 7 }] },
+      draftWith({ name: 'לקוחה' }),
+      { mode: 'new', orderId: `order-${UUID_A}` },
+    )).toThrow('unsafe order ID')
+    expect(() => applyOrderDraftToStore(
+      { orders: [{ id: 'bad id' }] },
+      draftWith({ name: 'לקוחה' }),
+      { mode: 'new', orderId: `order-${UUID_A}` },
+    )).toThrow('unsafe order ID')
+    expect(() => applyOrderDraftToStore(
+      { orders: [{ id: '7' }, { id: '7' }] },
+      draftWith({ name: 'לקוחה' }),
+      { mode: 'edit', orderId: '7' },
+    )).toThrow('duplicate order IDs')
+  })
+
+  it('keeps money as exact integer-minor-unit canonical input strings', () => {
+    expect(parseUsdInputMinorUnits('90071992547409.91')).toBe(Number.MAX_SAFE_INTEGER)
+    expect(parseUsdInputMinorUnits('90071992547409.92')).toBeNull()
+    expect(formatUsdInputMinorUnits(10)).toBe('0.10')
+    expect(formatUsdInputMinorUnits(26_701)).toBe('267.01')
+    expect(formatUsdInputMinorUnits(Number.MAX_SAFE_INTEGER)).toBe('90071992547409.91')
+  })
 })
 
 describe('hotel preservation', () => {
@@ -151,21 +338,296 @@ describe('hotel preservation', () => {
     expect(selected.address).toBe('Al Maryah Island, Abu Dhabi')
     expect(selected.navigationUrl).toContain('Al%20Maryah%20Island%2C%20Abu%20Dhabi')
     expect(selected.navigationUrl).not.toContain('Dubai')
+    expect(selected.hotelProviderId).toBe('')
+    expect(selected.hotelLatitude).toBeNull()
+    expect(selected.hotelLongitude).toBeNull()
   })
 
-  it('never erases an address or navigation value already typed by the operator', () => {
+  it('replaces stale custom navigation when the hotel changes without erasing delivery instructions', () => {
     const selected = applyHotelSelection(
       draftWith({ address: 'הוראה שנכתבה', hotelAddress: 'כתובת שמורה', navigationUrl: 'https://maps.example/custom' }),
       'Atlantis The Palm',
     )
 
     expect(selected.address).toBe('הוראה שנכתבה')
-    expect(selected.hotelAddress).toBe('כתובת שמורה')
+    expect(selected.hotelAddress).toBe('Crescent Rd, Palm Jumeirah, Dubai')
+    expect(selected.navigationUrl).toContain('Palm%20Jumeirah%2C%20Dubai')
+  })
+
+  it('retains a manual navigation override while reselecting the same hotel', () => {
+    const selected = applyHotelSelection(
+      draftWith({
+        place: 'Atlantis The Palm',
+        hotelName: 'Atlantis The Palm',
+        hotelAddress: 'Crescent Rd, Palm Jumeirah, Dubai',
+        address: 'הוראה שנכתבה',
+        navigationUrl: 'https://maps.example/custom',
+      }),
+      'Atlantis The Palm',
+    )
+
     expect(selected.navigationUrl).toBe('https://maps.example/custom')
+  })
+
+  it('replaces only previous auto-filled hotel values when selecting another hotel', () => {
+    const first = applyHotelSelection(
+      draftWith({ address: '', hotelAddress: '', navigationUrl: '' }),
+      'Atlantis The Palm',
+    )
+    const second = applyHotelSelection(first, 'Rosewood Abu Dhabi')
+
+    expect(second.hotelName).toBe('Rosewood Abu Dhabi')
+    expect(second.address).toBe('Al Maryah Island, Abu Dhabi')
+    expect(second.hotelAddress).toBe('Al Maryah Island, Abu Dhabi')
+    expect(second.navigationUrl).toContain('Abu%20Dhabi')
+    expect(second.navigationUrl).not.toContain('Dubai')
+  })
+
+  it('replaces a provider Hotel A custom route with static or provider Hotel B navigation', () => {
+    const hotelA: HotelSearchResult = {
+      id: 'N123',
+      name: 'Hotel A Dubai',
+      fullAddress: 'Hotel A, Dubai, United Arab Emirates',
+      latitude: 25.2,
+      longitude: 55.3,
+      navigationUrl: 'https://www.google.com/maps/search/?api=1&query=25.2%2C55.3',
+    }
+    const hotelB: HotelSearchResult = {
+      id: 'W456',
+      name: 'Hotel B Abu Dhabi',
+      fullAddress: 'Hotel B, Abu Dhabi, United Arab Emirates',
+      latitude: 24.5,
+      longitude: 54.4,
+      navigationUrl: 'https://www.google.com/maps/search/?api=1&query=24.5%2C54.4',
+    }
+    const hotelACustomRoute = applyHotelNavigationInput(
+      applyHotelSelection(draftWith({ address: 'מסירה בקבלה', pickup: false }), hotelA),
+      'https://www.google.com/maps/search/?api=1&query=25.21%2C55.31',
+    )
+
+    const staticB = applyHotelSelection(hotelACustomRoute, 'Rosewood Abu Dhabi')
+    expect(staticB.navigationUrl).toContain('Al%20Maryah%20Island%2C%20Abu%20Dhabi')
+    expect(staticB.navigationUrl).not.toContain('25.21')
+    expect(staticB.address).toBe('מסירה בקבלה')
+
+    const providerB = applyHotelSelection(hotelACustomRoute, hotelB)
+    expect(providerB.navigationUrl).toBe(hotelB.navigationUrl)
+    expect(providerB.hotelProviderId).toBe(hotelB.id)
+    expect(providerB.address).toBe('מסירה בקבלה')
+    const stored = serializeOrderDraft({ ...providerB, name: 'לקוחה', total: '230.00' }, 'hotel-b')
+    const reloaded = createOrderDraftFromLegacy(
+      stored,
+      buildOrderEditorMenu(emptyStore),
+    )
+    expect(reloaded.navigationUrl).toBe(hotelB.navigationUrl)
+    expect(reloaded.hotelAddress).toBe(hotelB.fullAddress)
+    expect(buildDeliveryDashboard({ orders: [stored] }).groups[0]?.destinations[0]?.navigationHref)
+      .toBe(hotelB.navigationUrl)
+  })
+
+  it('validates provider responses, rejects duplicate or forged rows, and applies a dynamic result', () => {
+    const hotel: HotelSearchResult = {
+      id: 'N123',
+      name: 'Rosewood Abu Dhabi',
+      fullAddress: 'Rosewood Abu Dhabi, Al Maryah Island, Abu Dhabi, United Arab Emirates',
+      latitude: 24.5012,
+      longitude: 54.3875,
+      navigationUrl: 'https://www.google.com/maps/search/?api=1&query=24.5012%2C54.3875',
+    }
+    const response = {
+      results: [hotel],
+      attribution: {
+        label: 'OpenStreetMap contributors',
+        url: 'https://www.openstreetmap.org/copyright',
+      },
+    }
+
+    expect(parseHotelSearchResponse(response)?.results).toEqual([hotel])
+    expect(parseHotelSearchResponse({ ...response, results: [hotel, hotel] })).toBeNull()
+    expect(parseHotelSearchResponse({
+      ...response,
+      results: [{ ...hotel, navigationUrl: 'javascript:alert(1)' }],
+    })).toBeNull()
+
+    const selected = applyHotelSelection(
+      draftWith({ address: 'להשאיר בקבלה' }),
+      hotel,
+    )
+    expect(selected).toMatchObject({
+      place: 'Rosewood Abu Dhabi',
+      hotelName: 'Rosewood Abu Dhabi',
+      hotelProviderId: 'N123',
+      hotelAddress: hotel.fullAddress,
+      hotelLatitude: 24.5012,
+      hotelLongitude: 54.3875,
+      navigationUrl: hotel.navigationUrl,
+      address: 'להשאיר בקבלה',
+    })
+  })
+
+  it('safely round-trips pickup, static, dynamic, and operator-navigation hotel drafts', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const dynamicHotel: HotelSearchResult = {
+      id: 'W456',
+      name: 'Dynamic Abu Dhabi Hotel',
+      fullAddress: 'Saadiyat Island, Abu Dhabi, United Arab Emirates',
+      latitude: 24.539,
+      longitude: 54.435,
+      navigationUrl: 'https://www.google.com/maps/search/?api=1&query=24.539%2C54.435',
+    }
+    const pickup = draftWith({ pickup: true })
+    const staticHotel = applyHotelSelection(draftWith({}), 'Atlantis The Palm')
+    const dynamic = applyHotelSelection(draftWith({ address: 'מסירה בקבלה' }), dynamicHotel)
+    const manualNavigation = applyHotelNavigationInput(dynamic, 'https://maps.example/operator-route')
+    const cases = [pickup, staticHotel, dynamic, manualNavigation]
+
+    cases.forEach((draft, index) => {
+      const stored = serializeOrderDraft({ ...draft, name: 'לקוחה', total: '0.00' }, `hotel-${index}`)
+      const reloaded = createOrderDraftFromLegacy(stored, menu)
+      expect(legacyOrderEditIssue(stored)).toBeNull()
+      expect(reloaded.navigationUrl).toBe(draft.navigationUrl)
+      expect(reloaded.hotelAddress).toBe(draft.hotelAddress)
+      if (draft.hotelProviderId) {
+        expect(stored).toMatchObject({
+          hotelProviderId: draft.hotelProviderId,
+          hotelLatitude: draft.hotelLatitude,
+          hotelLongitude: draft.hotelLongitude,
+        })
+      } else {
+        expect(stored).not.toHaveProperty('hotelProviderId')
+        expect(stored).not.toHaveProperty('hotelLatitude')
+        expect(stored).not.toHaveProperty('hotelLongitude')
+      }
+    })
+
+    expect(manualNavigation.hotelProviderId).toBe('')
+    expect(manualNavigation.hotelLatitude).toBeNull()
+    expect(manualNavigation.hotelLongitude).toBeNull()
+    expect(() => serializeOrderDraft({
+      ...dynamic,
+      navigationUrl: 'https://maps.example/forged-with-provider-id',
+    }, 'hotel-inconsistent')).toThrow('Hotel provider identity is inconsistent')
+  })
+
+  it('keeps explicit reception instructions separate from a free-text hotel destination on reload', () => {
+    const reloaded = createOrderDraftFromLegacy({
+      id: 'free-text-hotel',
+      place: 'New Abu Dhabi Hotel',
+      hotelName: 'New Abu Dhabi Hotel',
+      hotelAddress: '',
+      address: 'מסירה בקבלה',
+      navigationUrl: '',
+    }, buildOrderEditorMenu(emptyStore))
+
+    expect(reloaded.hotelName).toBe('New Abu Dhabi Hotel')
+    expect(reloaded.hotelAddress).toBe('')
+    expect(reloaded.address).toBe('מסירה בקבלה')
+  })
+})
+
+describe('duplicate order projection', () => {
+  it('retains customer, fulfillment, and item data while resetting new-order identity and payment state', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const source = {
+      id: 'source-1',
+      date: '2026-08-01',
+      name: 'לקוחה',
+      phone: '050-1234567',
+      place: 'Rosewood Abu Dhabi',
+      address: 'מסירה בקבלה',
+      time: '14:00',
+      status: 'נמסרה',
+      paid: 'כן',
+      deposit: '100.00',
+      total: '245.00',
+      meals: 1,
+      mains: { 'קציצות בשר ברוטב אדום עשיר': 1 },
+      salads: { טחינה: { o: 1, p: 0 } },
+      futureField: { keep: true },
+    }
+    const original = structuredClone(source)
+    const duplicate = createDuplicateOrderDraft(source, menu, new Date(2026, 7, 12))
+
+    expect(duplicate).toMatchObject({
+      id: null,
+      date: '2026-08-14',
+      name: 'לקוחה',
+      phone: '050-1234567',
+      place: 'Rosewood Abu Dhabi',
+      address: 'מסירה בקבלה',
+      time: '14:00',
+      status: 'חדשה',
+      paid: 'לא',
+      deposit: '',
+      total: '245.00',
+      meals: 1,
+      mains: { 'קציצות בשר ברוטב אדום עשיר': 1 },
+      futureField: { keep: true },
+    })
+    expect(source).toEqual(original)
+  })
+
+  it('fails closed instead of dropping malformed legacy collection data', () => {
+    expect(() => createDuplicateOrderDraft(
+      { id: 'source-opaque', custom: ['opaque'] },
+      buildOrderEditorMenu(emptyStore),
+    )).toThrow()
   })
 })
 
 describe('deterministic draft pricing and allowances', () => {
+  it('synchronizes included challahs with couple meals only while the prior automatic value is untouched', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const automatic = applyCoupleMealQuantity(
+      draftWith({ meals: 1, challot: menu.includedChallahs }),
+      menu,
+      2,
+    )
+    expect(automatic).toMatchObject({ meals: 2, challot: 4 })
+
+    const overridden = applyCoupleMealQuantity({ ...automatic, challot: 5 }, menu, 3)
+    expect(overridden).toMatchObject({ meals: 3, challot: 5 })
+  })
+
+  it('prices lunch-only without the default couple meal and blocks mixed orders until explicit confirmation', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const lunch = {
+      baguette: { quantity: 1, variantKey: '', sides: {}, addonQuantity: 0 },
+    }
+    const lunchOnly = draftWith({ meals: 0, challot: 0, lunch })
+    const accidentalMixed = draftWith({ lunch })
+
+    expect(classifyDraftSelectionMode(lunchOnly)).toBe('lunch')
+    expect(calculateOrderDraftPricing(lunchOnly, menu)).toMatchObject({
+      result: { totalMinorUnits: 2_200 },
+      issues: [],
+    })
+    expect(classifyDraftSelectionMode(accidentalMixed)).toBe('mixed')
+    expect(calculateOrderDraftPricing(accidentalMixed, menu).issues).toContainEqual(
+      expect.objectContaining({ code: 'MIXED_LUNCH_SHABBAT_UNCONFIRMED', blocking: true }),
+    )
+    expect(calculateOrderDraftPricing(accidentalMixed, menu, {
+      allowMixedLunchAndShabbat: true,
+    })).toMatchObject({
+      result: { totalMinorUnits: 25_200 },
+      issues: [],
+    })
+  })
+
+  it('blocks blank, mismatched, and over-deposited totals against deterministic pricing', () => {
+    const expected = 23_000
+    expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '' }), expected)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'INVALID_TOTAL', blocking: true })]),
+    )
+    expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '1.00' }), expected)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'TOTAL_MISMATCH', blocking: true })]),
+    )
+    expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '230.00', deposit: '231.00' }), expected)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'DEPOSIT_EXCEEDS_TOTAL', blocking: true })]),
+    )
+    expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '230.00', deposit: '230.00' }), expected)).toEqual([])
+  })
+
   it('uses two fish units per couple through the sole authoritative automatic charge', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const pricing = calculateOrderDraftPricing(
@@ -252,6 +714,74 @@ describe('deterministic draft pricing and allowances', () => {
     )
   })
 
+  it.each([
+    'תוספת מנת דג',
+    '  תוספת   מנת דג  ',
+    'תוספת קציצות דגים',
+    'תוספת 4 סלטים לבחירה',
+    'משלוח',
+  ])('blocks a custom automatic-charge alias without double charging: %s', (name) => {
+    const pricing = calculateOrderDraftPricing(
+      draftWith({
+        meals: 1,
+        firsts: { 'פילה דג ברוטב מרוקאי': 3 },
+        custom: [{ name, quantity: 1, unitPrice: '999.00', note: '' }],
+      }),
+      buildOrderEditorMenu(emptyStore),
+    )
+
+    expect(pricing.issues).toContainEqual(expect.objectContaining({ code: 'RESERVED_CUSTOM_ITEM', blocking: true }))
+    expect(pricing.result?.totalMinorUnits).toBe(26_000)
+  })
+
+  it('adds exactly one delivery charge and no charge for pickup', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const delivery = calculateOrderDraftPricing(draftWith({ pickup: false }), menu)
+    const pickup = calculateOrderDraftPricing(draftWith({ pickup: true }), menu)
+
+    expect(delivery.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 1_500 }))
+    expect(delivery.result?.totalMinorUnits).toBe(24_500)
+    expect(pickup.result?.totalMinorUnits).toBe(23_000)
+  })
+
+  it('blocks unpriced Shabbat main and side overages, including standalone selections', () => {
+    const pricing = calculateOrderDraftPricing(
+      draftWith({
+        meals: 1,
+        mains: {
+          'קציצות בשר ברוטב אדום עשיר': 1,
+          'קציצות בשר עם אפונה וארטישוק': 1,
+        },
+        sides: { 'אורז לבן': 2 },
+      }),
+      buildOrderEditorMenu(emptyStore),
+    )
+    expect(pricing.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'MAIN_OVERAGE', blocking: true }),
+      expect.objectContaining({ code: 'SIDE_OVERAGE', blocking: true }),
+    ]))
+    expect(pricing.result?.lines.some((line) => /עיקר|תוספות שבת/u.test(line.name))).toBe(false)
+
+    const standalone = calculateOrderDraftPricing(
+      draftWith({ meals: 0, challot: 0, mains: { 'קציצות בשר ברוטב אדום עשיר': 1 } }),
+      buildOrderEditorMenu(emptyStore),
+    )
+    expect(standalone.issues).toContainEqual(expect.objectContaining({ code: 'MAIN_OVERAGE', blocking: true }))
+  })
+
+  it('charges every challah when there are zero couple meals', () => {
+    const pricing = calculateOrderDraftPricing(
+      draftWith({ meals: 0, challot: 2 }),
+      buildOrderEditorMenu(emptyStore),
+    )
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'חלות נוספות',
+      quantity: 2,
+      amountMinorUnits: 2_000,
+    }))
+    expect(pricing.result?.totalMinorUnits).toBe(2_000)
+  })
+
   it('models two souffles or one baklava portion per couple and flags excess without inventing a price', () => {
     expect(calculateDessertAllowance(draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 2 } }))).toMatchObject({ selectedHalfUnits: 2, includedHalfUnits: 2, excessHalfUnits: 0 })
     expect(calculateDessertAllowance(draftWith({ meals: 2, desserts: { 'סוכריות בקלאווה': 2 } }))).toMatchObject({ selectedHalfUnits: 4, includedHalfUnits: 4, excessHalfUnits: 0 })
@@ -259,12 +789,16 @@ describe('deterministic draft pricing and allowances', () => {
       draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 1, 'סוכריות בקלאווה': 1 } }),
       buildOrderEditorMenu(emptyStore),
     )
-    expect(pricing.issues).toContainEqual(expect.objectContaining({ code: 'DESSERT_OVERAGE' }))
+    expect(pricing.issues).toContainEqual(expect.objectContaining({ code: 'DESSERT_OVERAGE', blocking: true }))
     expect(pricing.result?.lines.some((line) => line.name.includes('קינוח'))).toBe(false)
   })
 })
 
 describe('validation and AI review application', () => {
+  it('accepts a real ISO calendar date independently of the browser time zone', () => {
+    expect(validateOrderDraft(draftWith({ date: '2026-08-14', name: 'לקוחה', total: '230.00' }))).toEqual([])
+  })
+
   it('fails closed on the required identity fields and malformed manual money', () => {
     const issues = validateOrderDraft(
       draftWith({ date: '2026-02-30', name: '  ', total: '1,2,3', deposit: '-1' }),
@@ -310,9 +844,16 @@ describe('validation and AI review application', () => {
         notes: ['ללא חריף'],
       },
     })
-    const applied = applyAIReviewToDraft(draft, review, catalog.targetsById)
+    const applied = applyAIReviewToDraft(draft, review, catalog.targetsById, menu)
 
     expect(applied).toMatchObject({ name: 'לקוחה', phone: '050-1111111', meals: 2, place: 'Address Downtown', time: '14:00' })
+    expect(applied.challot).toBe(4)
+    expect(applied.hotelName).toBe('Address Downtown')
+    expect(applied.hotelAddress).toBe('')
+    expect(applied.hotelProviderId).toBe('')
+    expect(applied.hotelLatitude).toBeNull()
+    expect(applied.hotelLongitude).toBeNull()
+    expect(applied.navigationUrl).toBe('')
     expect(applied.extras['תוספת יין']).toEqual({ quantity: 1, note: '' })
     expect(applied.notes).toBe('ללא חריף')
     expect(draft).toEqual(createOrderDraft(menu, new Date(2026, 7, 12)))
@@ -334,5 +875,125 @@ describe('validation and AI review application', () => {
     })
 
     expect(applyAIReviewToDraft(draft, review, {})).toEqual(draft)
+  })
+
+  it('does not retain an orphan AI lunch add-on when its parent lunch item is absent', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const catalog = buildAIOrderCatalog(menu)
+    const addon = catalog.items.find((item) => item.name === 'מנת מפרום ביתי')!
+    const review = reviewWith({
+      draft: {
+        customerName: null,
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [{
+          catalogItemId: addon.id,
+          catalogItemName: addon.name,
+          category: addon.category,
+          quantity: 2,
+          sourceText: 'שתי מנות מפרום',
+          confidence: 1,
+        }],
+        notes: [],
+      },
+    })
+    const applied = applyAIReviewToDraft(
+      draftWith({ meals: 0, challot: 0, lunch: {} }),
+      review,
+      catalog.targetsById,
+      menu,
+    )
+
+    expect(applied.lunch).toEqual({})
+    expect(calculateOrderDraftPricing(applied, menu).result?.lines).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: expect.stringContaining('מפרום') })]),
+    )
+  })
+
+  it('applies a paid lunch add-on after its parent regardless of review item order', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const catalog = buildAIOrderCatalog(menu)
+    const parent = catalog.items.find((item) => item.name === 'ספיישל קוסקוס')!
+    const addon = catalog.items.find((item) => item.name === 'מנת מפרום ביתי')!
+    const parentItem = {
+      catalogItemId: parent.id,
+      catalogItemName: parent.name,
+      category: parent.category,
+      quantity: 1,
+      sourceText: 'ספיישל קוסקוס אחד',
+      confidence: 1,
+    }
+    const addonItem = {
+      catalogItemId: addon.id,
+      catalogItemName: addon.name,
+      category: addon.category,
+      quantity: 2,
+      sourceText: 'ושתי מנות מפרום',
+      confidence: 1,
+    }
+    const apply = (items: AIReview['draft']['items']) => applyAIReviewToDraft(
+      draftWith({ meals: 0, challot: 0, lunch: {} }),
+      reviewWith({
+        draft: {
+          customerName: null,
+          customerPhone: null,
+          serviceDate: null,
+          serviceTime: null,
+          fulfillmentMethod: 'pickup',
+          deliveryLocation: null,
+          items,
+          notes: [],
+        },
+      }),
+      catalog.targetsById,
+      menu,
+    )
+
+    const addonFirst = apply([addonItem, parentItem])
+    const parentFirst = apply([parentItem, addonItem])
+
+    expect(addonFirst.lunch).toEqual(parentFirst.lunch)
+    expect(addonFirst.lunch.couscous).toMatchObject({ quantity: 1, addonQuantity: 2 })
+    expect(calculateOrderDraftPricing(addonFirst, menu).result?.totalMinorUnits).toBe(7_500)
+  })
+
+  it('replaces the complete stale hotel tuple when AI delivery location changes', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const oldHotel: HotelSearchResult = {
+      id: 'N123',
+      name: 'Old Dubai Hotel',
+      fullAddress: 'Old Dubai Hotel, Dubai, United Arab Emirates',
+      latitude: 25.2,
+      longitude: 55.3,
+      navigationUrl: 'https://www.google.com/maps/search/?api=1&query=25.2%2C55.3',
+    }
+    const draft = applyHotelSelection(draftWith({ address: 'מסירה בקבלה' }), oldHotel)
+    const review = reviewWith({
+      draft: {
+        customerName: null,
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'delivery',
+        deliveryLocation: 'New Abu Dhabi Hotel',
+        items: [],
+        notes: [],
+      },
+    })
+    const applied = applyAIReviewToDraft(draft, review, {}, menu)
+
+    expect(applied).toMatchObject({
+      place: 'New Abu Dhabi Hotel',
+      hotelName: 'New Abu Dhabi Hotel',
+      hotelAddress: '',
+      hotelProviderId: '',
+      hotelLatitude: null,
+      hotelLongitude: null,
+      navigationUrl: '',
+      address: 'מסירה בקבלה',
+    })
   })
 })

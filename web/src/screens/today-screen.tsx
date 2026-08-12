@@ -32,7 +32,7 @@ function preparationRoute(serviceDate?: string): To {
 }
 
 function editOrderRoute(orderId: string): string {
-  return generatePath(APP_ROUTES.editOrder, { orderId: encodeURIComponent(orderId) })
+  return generatePath(APP_ROUTES.editOrder, { orderId })
 }
 
 function statusClassName(status: string): string {
