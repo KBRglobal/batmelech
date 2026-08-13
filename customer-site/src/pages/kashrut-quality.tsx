@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react'
 import { PageHero } from '../components/page-hero'
+import { Footer } from '../components/footer'
 
 export function KashrutQuality() {
   return (
@@ -54,6 +55,7 @@ export function KashrutQuality() {
           </a>
         </section>
       </main>
+      <Footer />
     </div>
   )
 }

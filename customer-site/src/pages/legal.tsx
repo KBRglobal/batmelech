@@ -1,4 +1,5 @@
 import { PageHero } from '../components/page-hero'
+import { Footer } from '../components/footer'
 
 export function Legal() {
   return (
@@ -30,6 +31,18 @@ export function Legal() {
               <li>הפרטים האישיים (שם, טלפון, כתובת) משמשים למטרת ביצוע ההזמנה והמשלוח בלבד.</li>
               <li>איננו מעבירים מידע לצד ג׳ ללא הסכמה מפורשת.</li>
               <li>המידע נשמר במערכות מאובטחות לצורך שיפור השירות.</li>
+              <li>האתר אינו משתמש בעוגיות מעקב או פרסום — רק במה שנדרש כדי לשלוח את ההזמנה בוואטסאפ.</li>
+              <li>ניתן לבקש בכל עת לעיין, לתקן או למחוק את הפרטים שנשמרו — פנייה בטלפון או בוואטסאפ.</li>
+            </ul>
+          </div>
+        </section>
+        <section>
+          <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">כללי</h2>
+          <div className="space-y-4 text-lg font-bold text-[#3B151A]/80 leading-relaxed">
+            <ul className="list-disc pr-6 space-y-2">
+              <li>תנאים אלה כפופים לחוקי איחוד האמירויות הערביות.</li>
+              <li>אנו רשאים לעדכן את התנאים מעת לעת; הגרסה המעודכנת תמיד מתפרסמת בעמוד זה.</li>
+              <li>אנו שומרים לעצמנו את הזכות לסרב לקבל הזמנה, לרבות בשל אזור משלוח שאינו בטווח השירות.</li>
             </ul>
           </div>
         </section>
@@ -42,6 +55,7 @@ export function Legal() {
           </p>
         </section>
       </main>
+      <Footer />
     </div>
   )
 }

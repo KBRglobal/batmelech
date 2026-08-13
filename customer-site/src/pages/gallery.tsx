@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { PageHero } from '../components/page-hero'
 import { Reveal } from '../components/reveal'
+import { Footer } from '../components/footer'
 
 const PHOTOS = [
   'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Hgw2QN4Smv3.jpeg',
@@ -45,6 +46,7 @@ export function Gallery() {
           </section>
         </Reveal>
       </main>
+      <Footer />
     </div>
   )
 }

@@ -34,20 +34,35 @@ export function Nav({ active }: { active: string }) {
 
 export function PhoneBadge() {
   return (
-    <a href="tel:+971586288776" className="flex items-center gap-4 text-white" dir="ltr">
-      <Icon icon="ph:phone-fill" className="text-2xl" />
-      <span className="font-bold tracking-wider">+971 58 628 8776</span>
+    <a
+      href="tel:+971586288776"
+      className="flex items-center gap-3 text-white bg-black/20 backdrop-blur-xl border border-white/20 rounded-full px-5 py-2.5 shadow-xl"
+      dir="ltr"
+    >
+      <Icon icon="ph:phone-fill" className="text-xl" />
+      <span className="font-bold tracking-wider text-sm">+971 58 628 8776</span>
     </a>
+  )
+}
+
+export function Logo() {
+  return (
+    <Link to="/" className="block w-14 h-14 rounded-full overflow-hidden border-2 border-white/40 shadow-xl shrink-0">
+      <img src="/site/assets/logo.jpg" alt="בת מלך" className="w-full h-full object-cover" />
+    </Link>
   )
 }
 
 export function NavHeader({ active }: { active: string }) {
   return (
     <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="order-1 md:order-2">
+      <div className="order-1 md:order-1">
+        <Logo />
+      </div>
+      <div className="order-2 md:order-2">
         <Nav active={active} />
       </div>
-      <div className="order-2 md:order-1">
+      <div className="order-3 md:order-3">
         <PhoneBadge />
       </div>
     </header>

@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
 import { PageHero } from '../components/page-hero'
+import { Footer } from '../components/footer'
 
 export function Story() {
   return (
@@ -68,12 +69,7 @@ export function Story() {
         </div>
       </main>
 
-      <footer className="relative z-10 py-16 text-center">
-        <img src="/site/assets/logo-cream.png" className="w-24 mx-auto mb-10 opacity-30" alt="" />
-        <p className="text-sm font-black text-[#EDB2C1] tracking-widest uppercase italic">
-          Made with Love from Israel | Bat Melech Dubai
-        </p>
-      </footer>
+      <Footer />
     </div>
   )
 }

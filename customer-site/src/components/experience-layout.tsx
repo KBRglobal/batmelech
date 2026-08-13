@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { PageHero } from './page-hero'
 import { Reveal } from './reveal'
+import { Footer } from './footer'
 
 export type ExperienceContent = {
   tag: string
@@ -70,6 +71,7 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
           </section>
         </Reveal>
       </main>
+      <Footer />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
 import { PageHero } from '../components/page-hero'
+import { Footer } from '../components/footer'
 import { useCart } from '../cart-context'
 import { buildOrderMessage, waLink } from '../whatsapp'
 
@@ -26,6 +27,7 @@ export function Checkout() {
             או להרכבת מארז שבת
           </Link>
         </div>
+        <Footer />
       </div>
     )
   }

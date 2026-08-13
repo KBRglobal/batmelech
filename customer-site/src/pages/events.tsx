@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
 import { PageHero } from '../components/page-hero'
 import { Reveal } from '../components/reveal'
+import { Footer } from '../components/footer'
 
 const EXPERIENCES = [
   {
@@ -112,6 +113,7 @@ export function Events() {
           </section>
         </Reveal>
       </main>
+      <Footer />
     </div>
   )
 }
