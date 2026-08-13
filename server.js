@@ -15,6 +15,7 @@ const { createSiteOrderRouter } = require('./server/site-order-route');
 const businessDataRepository = require('./server/business-data/repository');
 const { wrapRepositoryWithInvoiceTrigger } = require('./server/business-data/invoice-trigger');
 const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route');
+const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-download-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
@@ -104,6 +105,16 @@ if (stateRepository) {
   app.use('/api/site/orders', (_request, response) => {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'order intake unavailable' });
+  });
+}
+// Public invoice-download link referenced from invoice emails — token-gated,
+// not just invoice number (numbers are sequential/guessable).
+if (pool) {
+  app.use('/invoices', createInvoiceDownloadRouter({ pool }));
+} else {
+  app.use('/invoices', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).send('Not available');
   });
 }
 // Root goes to the public site for customers; staff with saved credentials

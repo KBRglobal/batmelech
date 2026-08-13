@@ -6,11 +6,13 @@
 // state-service / state-route files. Fires after the save has already
 // succeeded and never blocks or fails the caller's response.
 
+const crypto = require('node:crypto');
 const { renderInvoicePdf, computeVatInclusiveBreakdown } = require('./invoice-pdf');
 const { sendInvoiceEmail } = require('./send-invoice-email');
 const { nextInvoiceNumber, recordInvoice, hasInvoiceForOrder } = require('./repository');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DOWNLOAD_BASE_URL = 'https://www.batmelech.ae/invoices';
 
 function dubaiDateString(now) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(now);
@@ -21,6 +23,8 @@ async function issueInvoice({ pool, resendApiKey, order, orderId, businessName, 
   const totalMinor = Number.isFinite(totalNumber) && totalNumber >= 0 ? Math.round(totalNumber * 100) : 0;
   const { subtotalMinor, vatMinor } = computeVatInclusiveBreakdown(totalMinor, Boolean(trn));
   const invoiceNumber = await nextInvoiceNumber(pool);
+  const accessToken = crypto.randomBytes(24).toString('hex');
+  const downloadUrl = `${DOWNLOAD_BASE_URL}/${invoiceNumber}/${accessToken}.pdf`;
   const description =
     order.source === 'site' && typeof order.notes === 'string' && order.notes.trim()
       ? order.notes.split('\n\n')[0].slice(0, 300)
@@ -50,9 +54,11 @@ async function issueInvoice({ pool, resendApiKey, order, orderId, businessName, 
     currency,
     customerName: order.name || '',
     customerEmail: email,
+    description,
     subtotalMinor,
     vatMinor,
     totalMinor,
+    accessToken,
   };
 
   try {
@@ -64,6 +70,7 @@ async function issueInvoice({ pool, resendApiKey, order, orderId, businessName, 
       businessName,
       customerName: order.name,
       deliveryAddress: typeof order.address === 'string' ? order.address : undefined,
+      downloadUrl,
     });
     await recordInvoice(pool, { ...base, status: 'sent' });
     logger.log(`invoice ${invoiceNumber} sent for order ${orderId}`);
