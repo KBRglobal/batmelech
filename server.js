@@ -12,6 +12,9 @@ const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
+const businessDataRepository = require('./server/business-data/repository');
+const { wrapRepositoryWithInvoiceTrigger } = require('./server/business-data/invoice-trigger');
+const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
@@ -54,7 +57,24 @@ if (process.env.DATABASE_URL) {
   // private network, no TLS needed. External URLs should carry ?sslmode=require.
   const commandSecret = requireServerCredential('BM_STATE_COMMAND_SECRET');
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  stateRepository = createStateRepository({ pool, commandSecret });
+  const rawStateRepository = createStateRepository({ pool, commandSecret });
+  // payment_credentials/invoices/invoice_number_seq are plain tables outside
+  // the schema-drift-validated bm_state system (see business-data/repository.js).
+  const combinedRepository = {
+    ...rawStateRepository,
+    async initialize() {
+      await rawStateRepository.initialize();
+      await businessDataRepository.initializeBusinessData(pool);
+    },
+  };
+  // Any successful state save (admin editor, site checkout, backup restore)
+  // can trigger a VAT invoice email when an order flips to paid with an email
+  // on file — wrapping here covers every save path with no change to the
+  // tested state-repository/service/route files.
+  stateRepository = wrapRepositoryWithInvoiceTrigger(combinedRepository, {
+    pool,
+    resendApiKey: process.env.RESEND_API_KEY,
+  });
 }
 
 // --- health check (no auth, used by Railway) ---
@@ -124,6 +144,16 @@ app.use('/api/ai/operations-review', createOperationsReviewRouter());
 
 // --- Explicit staff-triggered hotel search; no customer or order state ---
 app.use('/api/hotels/search', createHotelSearchRouter());
+
+// --- Admin-only, write-only payment provider key. Never echoed back. ---
+if (pool && process.env.BM_SECRETS_KEY) {
+  app.use('/api/settings/ziina-key', createZiinaKeyRouter({ pool, encryptionKey: process.env.BM_SECRETS_KEY }));
+} else {
+  app.use('/api/settings/ziina-key', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'not configured' });
+  });
+}
 
 // --- Versioned Postgres-backed app state with merge, history, and idempotency ---
 if (stateRepository) {

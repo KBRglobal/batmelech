@@ -1,22 +1,69 @@
-# STATE — batmelech (updated: 2026-08-14 01:58)
+# STATE — batmelech (updated: 2026-08-14 03:10)
 
-## Now (in progress)
-- Nothing in flight. Customer site v1 live at www.batmelech.ae, unified design + SEO/AEO copy pass shipped.
+## Now (in progress) — invoicing + payments build, mid-flight
+Moshe explicitly rejected installing an external ERP/OSS repo for this (asked directly, confirmed:
+extend the existing Node/Postgres system only). Building in increments, each committed once tests
+pass. Code for this whole feature is written and defensive (every new route 503s cleanly if its
+env var isn't set — nothing here can break the site if left unconfigured).
 
-## Next (priority order, per Moshe)
-1. **Real order-system connection — the big gap.** Checkout sends a plain WhatsApp text message
-   only. It does NOT write the hidden BM1 payload (`order-form.html`'s zero-width-unicode
-   encoding), so new-site orders do NOT auto-import into the admin's order-import-review screen —
-   Lin would have to retype every order by hand. Two paths were discussed with Moshe:
-   (a) implement the BM1 payload encoder in `customer-site/src/whatsapp.ts` so new-site orders
-   flow into the EXISTING working admin pipeline (fast, stays in-stack, no new hosting) — study
-   `order-form.html`'s `encodeHiddenBM1`/`buildText` functions first;
-   (b) adopt TastyIgniter (real OSS restaurant ordering, PHP/MySQL) — rejected earlier as wrong
-   stack (separate server, doesn't talk to the Node/Postgres ledger) unless there's an actual
-   integration plan. Default to (a) unless Moshe says otherwise.
-2. Real food/venue photography for everything still tagged "תמונה זמנית".
-3. Resume `wip/auth-boundary` branch when picking that work back up.
-4. SSR/prerendering for the customer site — see gap noted below, still open.
+Shipped and live:
+- Order email field (checkout + admin order editor) — `web/src/domain/order-editor.ts`,
+  `customer-site/src/cart-context.tsx`.
+- Invoice legal settings in admin Settings screen (business name, TRN, address, AED/USD) —
+  `web/src/domain/settings-backup.ts` + screen. Lin fills these in herself.
+- Customer-site checkout now POSTs orders to `/api/site/orders` (public, rate-limited) which
+  appends straight into the same bm_state `orders[]` the admin reads — **this replaces the planned
+  BM1-payload approach entirely**; site orders now show up in the admin Orders screen automatically,
+  no retyping. WhatsApp message still sends too (primary channel, unaffected).
+
+Written, committed but NOT yet live/configured (this session's WIP, uncommitted at last save):
+- `server/business-data/` — new, isolated from the bm_state schema-drift-validated system
+  (plain tables: `payment_credentials`, `invoices`, `invoice_number_seq` — NOT `bm_state*`-prefixed,
+  so the strict validator in state-repository.js never sees them).
+  - `secret-box.js` — AES-256-GCM encrypt/decrypt for Lin's Ziina key. Needs `BM_SECRETS_KEY` env
+    (32 random bytes, base64) — NOT SET on Railway yet.
+  - `repository.js` — payment_credentials/invoices tables + sequential invoice numbering.
+  - `invoice-pdf.js` — renders a VAT invoice PDF (pdf-lib). **English only, on purpose** — pdf-lib's
+    standard fonts have no Hebrew glyphs; a garbled Hebrew PDF is worse than a correct English one,
+    and English is FTA-accepted. VAT line only shown if a TRN is set; VAT is treated as
+    inclusive-in-total (5%). Currency comes straight from the settings toggle, no FX conversion —
+    Lin's own convention (she prices in whatever currency she wants and picks the matching label,
+    no exchange-rate math happening anywhere).
+  - `send-invoice-email.js` — Resend, HTML template in Hebrew (branded, RTL), PDF attached.
+    `FROM_ADDRESS` is `invoices@batmelech.ae` — **needs a verified Resend domain, not done yet**
+    (see Gotchas).
+  - `invoice-trigger.js` — wraps `stateRepository.saveState` (does NOT touch the tested
+    state-repository/service/route files) so ANY successful save — admin editor, site checkout,
+    backup restore — checks for orders that just flipped `paid` from not-'כן' to 'כן' with a valid
+    email, and fires an invoice async (non-blocking, never fails the caller). Idempotent via
+    `hasInvoiceForOrder` (checks the `invoices` table, not the order itself).
+  - `ziina-key-route.js` — `/api/settings/ziina-key` (admin-only, write-only: POST saves encrypted,
+    GET only returns `{configured: boolean}`, never the value). **No admin UI field wired to this
+    yet** — needs a small addition to the Settings screen.
+- `server.js` — wired all of the above; `pool`/`stateRepository` creation moved earlier so the
+  public `/api/site/orders` route can use it before the Basic Auth wall.
+- `package.json` — added `pdf-lib`, `resend`.
+- All 196 server tests + 548 web tests still pass. Build clean on all three apps.
+
+## Blocked on (external, not code)
+1. **Resend domain for batmelech.ae.** The existing Resend account (`maktuba-resend.txt`) is on
+   the free plan — 1 domain only, already used by `maktuba.app`. Adding `batmelech.ae` needs either
+   a $20/mo Pro upgrade on that account, or a separate new Resend account (Moshe has to create that
+   one himself — account creation isn't something Claude does). Moshe's call, not decided yet.
+2. **DNS for batmelech.ae is NOT at GoDaddy** — it's managed at aeserver.com (UAE .ae registrar).
+   Moshe is logging in himself in a Chrome tab Claude opened; once logged in, add whatever SPF/DKIM
+   records Resend's domain API returns for batmelech.ae.
+3. **Ziina API key** — Lin already has a Ziina account. She pastes her own key into the (not yet
+   built) Settings field once it exists; Claude/Moshe never see the raw value, only "configured: yes/no".
+4. Once 1–3 land: set `RESEND_API_KEY` (new/upgraded key) and `BM_SECRETS_KEY` (generate fresh,
+   32 random bytes base64) as Railway env vars on the `app` service.
+
+## Next (after the invoicing/payments build lands)
+1. Wire the Settings screen's Ziina-key field (UI only — backend route already exists).
+2. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's key first).
+3. Real food/venue photography for everything still tagged "תמונה זמנית".
+4. Resume `wip/auth-boundary` branch when picking that work back up.
+5. SSR/prerendering for the customer site — see gap noted below, still open.
 
 ## Recently done (2026-08-13/14, newest first)
 - SEO/AEO copy + image pass: every hero photo and content image across all 14 pages now has
@@ -60,5 +107,12 @@
 - PageHero (`customer-site/src/components/page-hero.tsx`) is the ONE hero component every page
   must use — do not give a page its own bespoke hero again, that's exactly what broke continuity
   twice today. Gradient recipe and rationale documented in `BRAND.md`.
-- TastyIgniter (OSS restaurant ordering) was researched and explicitly not adopted — wrong stack.
-  Don't re-propose without an integration plan; see "Next" item 1 above for the live decision.
+- TastyIgniter (OSS restaurant ordering) and ERPNext/Odoo (full ERP) were both researched and
+  explicitly rejected — Moshe wants the existing Node/Postgres system extended, not replaced. Don't
+  re-propose an external system without him asking again.
+- `server/state/state-repository.js` schema-drift-validates an EXACT table/column/constraint list
+  (`bm_state`, `bm_state_capability`, `bm_state_requests`, `bm_state_versions`) at every boot — it
+  will throw and crash startup if it sees ANY unexpected `bm_state%`-named relation. Any new table
+  MUST avoid that naming pattern entirely (see `server/business-data/` — `payment_credentials`,
+  `invoices`, `invoice_number_seq`, plain names, own migration, completely outside that validator).
+  Never try to extend the bm_state system itself for a new feature; it's deliberately rigid.
