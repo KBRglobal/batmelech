@@ -1,10 +1,15 @@
-import { BackHeader } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 
 export function Legal() {
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-20" dir="rtl">
-      <BackHeader />
-      <main className="max-w-4xl mx-auto px-6 pt-32 space-y-16 text-right">
+      <PageHero
+        active="/legal"
+        size="compact"
+        title={['תנאי שימוש', 'ופרטיות']}
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7zzOf0cSMJb.jpeg"
+      />
+      <main className="max-w-4xl mx-auto px-6 py-16 space-y-16 text-right">
         <section>
           <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">תנאי שימוש</h2>
           <div className="space-y-4 text-lg font-bold text-[#3B151A]/80 leading-relaxed">

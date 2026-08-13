@@ -1,20 +1,19 @@
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
-import { Nav, PhoneBadge } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 
 export function Story() {
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
-      <header className="relative z-10 w-full pt-10 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-8">
-        <div className="order-1 md:order-2">
-          <Nav active="/story" dark={false} />
-        </div>
-        <div className="order-2 md:order-1">
-          <PhoneBadge dark={false} />
-        </div>
-      </header>
+      <PageHero
+        active="/story"
+        size="tall"
+        badge="Our Story"
+        title={['הסיפור', 'שלנו']}
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
+      />
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 py-24 pb-32">
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-24 pb-32 -mt-24">
         <div className="bg-white rounded-[5rem] p-8 md:p-24 shadow-2xl border border-[#EDB2C1]/30">
           <div className="flex flex-col md:flex-row gap-16 md:gap-20 items-start">
             <div className="md:w-1/3 md:sticky md:top-10 w-full">
@@ -29,7 +28,6 @@ export function Story() {
               </div>
             </div>
             <div className="md:w-2/3 text-right">
-              <h1 className="text-5xl md:text-8xl font-black font-heading mb-16 tracking-tight">הסיפור שלנו</h1>
               <div className="space-y-10 text-xl md:text-3xl font-bold leading-relaxed text-[#3B151A]/90">
                 <p>אני לין, והמטבח תמיד היה חלק ממני.</p>
                 <p>

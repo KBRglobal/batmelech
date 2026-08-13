@@ -1,8 +1,9 @@
 import { Icon } from '@iconify/react'
-import { Nav, PhoneBadge } from '../components/nav'
+import { NavHeader } from '../components/nav'
 import { Footer } from '../components/footer'
 import { FloatingCartBar } from '../components/floating-cart-bar'
 import { Photo } from '../components/photo'
+import { Reveal } from '../components/reveal'
 import { useCart } from '../cart-context'
 
 type Variant = { id: string; label: string; price: number }
@@ -74,14 +75,7 @@ export function Weekdays() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#3B151A]/90 via-[#3B151A]/50 to-[#F7ECE6]" />
         </div>
         <div className="relative z-10 flex flex-col min-h-[70vh]">
-          <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="order-1 md:order-2">
-              <Nav active="/weekdays" />
-            </div>
-            <div className="order-2 md:order-1">
-              <PhoneBadge />
-            </div>
-          </header>
+          <NavHeader active="/weekdays" />
           <div className="flex-grow flex flex-col items-center justify-center text-center px-6">
             <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#F5A83A] text-white rounded-full text-xs font-black mb-8 shadow-xl tracking-widest uppercase">
               <span>Fresh Every Single Day</span>
@@ -115,9 +109,10 @@ export function Weekdays() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16">
-          {MENU.map((item) => (
-            <div
+          {MENU.map((item, i) => (
+            <Reveal
               key={item.id}
+              delay={(i % 3) * 100}
               className="bg-white rounded-[4rem] p-8 shadow-2xl border-2 border-[#EDB2C1]/20 transition-all duration-500 hover:-translate-y-3 flex flex-col"
             >
               <div className="relative aspect-square rounded-[3.5rem] overflow-hidden mb-8 shadow-xl">
@@ -161,7 +156,7 @@ export function Weekdays() {
                   </button>
                 </div>
               )}
-            </div>
+            </Reveal>
           ))}
         </div>
       </main>

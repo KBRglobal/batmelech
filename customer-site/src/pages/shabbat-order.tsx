@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useNavigate } from 'react-router'
-import { BackHeader } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 import { Photo } from '../components/photo'
+import { Reveal } from '../components/reveal'
 import { useCart } from '../cart-context'
 
 const BASE_PRICE = 230
@@ -157,27 +158,24 @@ export function ShabbatOrder() {
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-72" dir="rtl">
-      <BackHeader />
-      <div className="h-24" />
-
-      <div className="relative h-64 overflow-hidden mb-12">
-        <img
-          src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F7ECE6] via-transparent to-black/60" />
-        <div className="absolute bottom-8 right-8 left-8">
-          <div className="bg-[#3B151A] p-6 rounded-[2.5rem] shadow-2xl border-2 border-[#F5A83A]/30 inline-flex flex-col">
-            <span className="bg-[#F5A83A] text-[#3B151A] text-[10px] font-black px-2 py-0.5 rounded-full uppercase w-fit mb-1">
-              מחיר בסיס - ארוחה זוגית
-            </span>
-            <span className="text-4xl md:text-5xl font-black text-[#F5A83A] leading-none">${total.toFixed(2).replace(/\.00$/, '')}</span>
-            <span className="text-white text-xs font-black mt-2 tracking-widest uppercase italic">כשר - תפריט זוגי לכבוד שבת קודש</span>
-          </div>
+      <PageHero
+        active="/shabbat-order"
+        size="tall"
+        badge="The Shabbat Experience"
+        title={['שבת קודש', 'בלב דובאי']}
+        subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
+      >
+        <div className="bg-[#3B151A] p-6 rounded-[2.5rem] shadow-2xl border-2 border-[#F5A83A]/30 inline-flex flex-col mt-4">
+          <span className="bg-[#F5A83A] text-[#3B151A] text-[10px] font-black px-2 py-0.5 rounded-full uppercase w-fit mb-1">
+            מחיר בסיס - ארוחה זוגית
+          </span>
+          <span className="text-4xl md:text-5xl font-black text-[#F5A83A] leading-none">${total.toFixed(2).replace(/\.00$/, '')}</span>
+          <span className="text-white text-xs font-black mt-2 tracking-widest uppercase italic">כשר - תפריט זוגי לכבוד שבת קודש</span>
         </div>
-      </div>
+      </PageHero>
 
-      <main className="max-w-5xl mx-auto px-6 space-y-20">
+      <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
         <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">
           <Icon icon="ph:info-fill" className="text-amber-600 text-4xl shrink-0" />
           <div>
@@ -275,56 +273,60 @@ export function ShabbatOrder() {
           ))}
         </div>
 
-        <section className="space-y-10">
-          <div className="flex items-center gap-4">
-            <Icon icon="ph:star-fill" className="text-4xl text-[#F5A83A]" />
-            <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">משדרגים את השולחן</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {UPSELLS.map((u) => (
-              <label
-                key={u.id}
-                className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all cursor-pointer ${
-                  u.dark ? 'bg-[#3B151A] text-white border-[#F5A83A]/30' : 'bg-white border-[#EDB2C1]/20'
-                }`}
-              >
-                <div className="flex-grow">
-                  <h4 className={`text-lg font-black ${u.dark ? 'text-[#F5A83A]' : ''}`}>{u.name}</h4>
-                  {u.note && <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">{u.note}</p>}
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className={`text-xl font-black ${u.dark ? 'text-[#F5A83A]' : 'text-[#8D182C]'}`}>${u.price}</span>
-                  <input
-                    type="checkbox"
-                    checked={upsells.has(u.id)}
-                    onChange={() => toggleUpsell(u.id)}
-                    className="w-8 h-8 accent-[#3B151A] cursor-pointer"
-                  />
-                </div>
-              </label>
-            ))}
-          </div>
-          {upsellTotal > 0 && <p className="text-[#8D182C] font-black text-center">+${upsellTotal} תוספות</p>}
-        </section>
+        <Reveal>
+          <section className="space-y-10">
+            <div className="flex items-center gap-4">
+              <Icon icon="ph:star-fill" className="text-4xl text-[#F5A83A]" />
+              <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">משדרגים את השולחן</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {UPSELLS.map((u) => (
+                <label
+                  key={u.id}
+                  className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                    u.dark ? 'bg-[#3B151A] text-white border-[#F5A83A]/30' : 'bg-white border-[#EDB2C1]/20'
+                  }`}
+                >
+                  <div className="flex-grow">
+                    <h4 className={`text-lg font-black ${u.dark ? 'text-[#F5A83A]' : ''}`}>{u.name}</h4>
+                    {u.note && <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">{u.note}</p>}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className={`text-xl font-black ${u.dark ? 'text-[#F5A83A]' : 'text-[#8D182C]'}`}>${u.price}</span>
+                    <input
+                      type="checkbox"
+                      checked={upsells.has(u.id)}
+                      onChange={() => toggleUpsell(u.id)}
+                      className="w-8 h-8 accent-[#3B151A] cursor-pointer"
+                    />
+                  </div>
+                </label>
+              ))}
+            </div>
+            {upsellTotal > 0 && <p className="text-[#8D182C] font-black text-center">+${upsellTotal} תוספות</p>}
+          </section>
+        </Reveal>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
-          <SpecialCard
-            icon="ph:crown-fill"
-            title="ספיישל הבית"
-            desc="סיר קובה סלק בתוספת אורז (4 אנשים)"
-            price={125}
-            color="#8D182C"
-            onAdd={() => addLine({ id: 'special-kubbe-selek', name: 'ספיישל הבית — סיר קובה סלק (4 אנשים)', unitPrice: 125 })}
-          />
-          <SpecialCard
-            icon="ph:face-smile-fill"
-            title="מנת ילדים"
-            desc="מנת פסטה אדומה ושניצלונים"
-            price={35}
-            color="#3B151A"
-            onAdd={() => addLine({ id: 'special-kids', name: 'מנת ילדים — פסטה ושניצלונים', unitPrice: 35 })}
-          />
-        </section>
+        <Reveal>
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
+            <SpecialCard
+              icon="ph:crown-fill"
+              title="ספיישל הבית"
+              desc="סיר קובה סלק בתוספת אורז (4 אנשים)"
+              price={125}
+              color="#8D182C"
+              onAdd={() => addLine({ id: 'special-kubbe-selek', name: 'ספיישל הבית — סיר קובה סלק (4 אנשים)', unitPrice: 125 })}
+            />
+            <SpecialCard
+              icon="ph:face-smile-fill"
+              title="מנת ילדים"
+              desc="מנת פסטה אדומה ושניצלונים"
+              price={35}
+              color="#3B151A"
+              onAdd={() => addLine({ id: 'special-kids', name: 'מנת ילדים — פסטה ושניצלונים', unitPrice: 35 })}
+            />
+          </section>
+        </Reveal>
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 md:p-10 bg-[#F7ECE6]/95 backdrop-blur-3xl border-t-4 border-[#EDB2C1]/20 z-[200] shadow-[0_-30px_60px_rgba(0,0,0,0.15)]">

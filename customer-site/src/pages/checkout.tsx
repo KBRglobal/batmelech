@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
-import { BackHeader } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 import { useCart } from '../cart-context'
 import { buildOrderMessage, waLink } from '../whatsapp'
 
 const DELIVERY_FEE = 15
+const CHECKOUT_HERO_IMAGE =
+  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg'
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
@@ -13,15 +15,17 @@ export function Checkout() {
 
   if (lines.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans flex flex-col items-center justify-center gap-8 px-6 text-center" dir="rtl">
-        <Icon icon="ph:basket-bold" className="text-6xl text-[#EDB2C1]" />
-        <h1 className="text-3xl font-black">הסל שלכם ריק</h1>
-        <Link to="/weekdays" className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg">
-          לתפריט יום חול
-        </Link>
-        <Link to="/shabbat-order" className="text-[#8D182C] font-black underline">
-          או להרכבת מארז שבת
-        </Link>
+      <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
+        <PageHero active="/checkout" size="compact" title={['הסל שלכם', 'ריק']} image={CHECKOUT_HERO_IMAGE} />
+        <div className="flex flex-col items-center gap-8 px-6 py-20 text-center">
+          <Icon icon="ph:basket-bold" className="text-6xl text-[#EDB2C1]" />
+          <Link to="/weekdays" className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg">
+            לתפריט יום חול
+          </Link>
+          <Link to="/shabbat-order" className="text-[#8D182C] font-black underline">
+            או להרכבת מארז שבת
+          </Link>
+        </div>
       </div>
     )
   }
@@ -30,12 +34,9 @@ export function Checkout() {
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
-      <BackHeader backTo="/weekdays" />
-      <div className="h-24" />
+      <PageHero active="/checkout" size="compact" title={['סיכום', 'הזמנה']} image={CHECKOUT_HERO_IMAGE} />
 
-      <main className="max-w-3xl mx-auto px-6 py-6 space-y-12">
-        <h1 className="text-3xl font-black font-heading text-center">סיכום הזמנה</h1>
-
+      <main className="max-w-3xl mx-auto px-6 py-12 space-y-12">
         <section className="bg-white rounded-[3rem] p-6 md:p-8 shadow-xl border border-[#EDB2C1]/20">
           <h2 className="text-2xl font-black font-heading mb-6 border-b border-[#EDB2C1]/10 pb-4 flex items-center gap-3">
             <Icon icon="ph:basket-fill" className="text-[#F5A83A]" />

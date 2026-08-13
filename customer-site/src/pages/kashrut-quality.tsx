@@ -1,16 +1,21 @@
 import { Icon } from '@iconify/react'
-import { BackHeader } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 
 export function KashrutQuality() {
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
-      <BackHeader />
-      <main className="pt-32 max-w-4xl mx-auto px-6">
+      <PageHero
+        active="/kashrut"
+        size="compact"
+        badge="Kashrut & Premium Quality"
+        title={['כשרות', 'ואיכות']}
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7zzOf0cSMJb.jpeg"
+      />
+      <main className="pt-16 max-w-4xl mx-auto px-6">
         <section className="mb-20 text-center">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-[#3B151A] rounded-full text-[#F5A83A] text-5xl mb-8 shadow-2xl">
             <Icon icon="ph:certificate-fill" />
           </div>
-          <h2 className="text-5xl font-black font-heading mb-8">כשרות ללא פשרות בדובאי</h2>
           <p className="text-xl font-bold text-[#3B151A]/70 leading-relaxed mb-12">
             אנחנו מבינים שנושא הכשרות הוא הקריטי ביותר עבורכם. לכן, אנו מקפידים על הסטנדרטים המחמירים ביותר, תוך
             עבודה צמודה עם גופי הכשרות המוכרים והמוערכים ביותר באיחוד האמירויות.

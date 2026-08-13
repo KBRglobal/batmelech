@@ -83,3 +83,24 @@
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-transition {
+  animation: page-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .page-transition {
+    animation: none;
+  }
+}

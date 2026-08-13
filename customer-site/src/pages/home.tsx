@@ -1,7 +1,8 @@
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
-import { Nav, PhoneBadge } from '../components/nav'
+import { NavHeader } from '../components/nav'
 import { Footer } from '../components/footer'
+import { useReveal } from '../components/reveal'
 
 const EXPERIENCES = [
   {
@@ -71,6 +72,12 @@ const TESTIMONIALS = [
 ]
 
 export function Home() {
+  const storyReveal = useReveal<HTMLElement>()
+  const shabbatReveal = useReveal<HTMLElement>()
+  const weekdayReveal = useReveal<HTMLElement>()
+  const experiencesReveal = useReveal<HTMLElement>()
+  const testimonialsReveal = useReveal<HTMLElement>()
+
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 relative overflow-x-hidden" dir="rtl">
       <section className="relative min-h-screen flex flex-col overflow-hidden">
@@ -83,14 +90,7 @@ export function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
         </div>
         <div className="relative z-10 flex flex-col min-h-screen">
-          <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="order-1 md:order-2">
-              <Nav active="/" />
-            </div>
-            <div className="order-2 md:order-1">
-              <PhoneBadge />
-            </div>
-          </header>
+          <NavHeader active="/" />
           <div className="flex-grow flex flex-col items-center justify-center text-center px-6">
             <div className="w-48 h-48 md:w-72 md:h-72 mb-8 animate-float">
               <img
@@ -130,7 +130,7 @@ export function Home() {
       </section>
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 pb-32">
-        <section id="story" className="mb-32 scroll-mt-24 pt-32 text-center">
+        <section id="story" ref={storyReveal.ref} className={`mb-32 scroll-mt-24 pt-32 text-center ${storyReveal.className}`}>
           <div className="max-w-4xl mx-auto">
             <div className="mb-16 inline-block">
               <img
@@ -157,7 +157,7 @@ export function Home() {
           </div>
         </section>
 
-        <section id="shabbat-promo" className="mb-32 scroll-mt-24">
+        <section id="shabbat-promo" ref={shabbatReveal.ref} className={`mb-32 scroll-mt-24 ${shabbatReveal.className}`}>
           <div className="relative h-[30rem] md:h-[40rem] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white group">
             <img
               src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/NPPrDqcdlgE.jpeg"
@@ -188,7 +188,7 @@ export function Home() {
           </div>
         </section>
 
-        <section id="weekday-promo" className="mb-32 scroll-mt-24">
+        <section id="weekday-promo" ref={weekdayReveal.ref} className={`mb-32 scroll-mt-24 ${weekdayReveal.className}`}>
           <div className="relative h-[30rem] md:h-[40rem] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white group">
             <img
               src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/32nv8K7lIKf.jpeg"
@@ -218,7 +218,7 @@ export function Home() {
           </div>
         </section>
 
-        <section id="experiences" className="mb-32 scroll-mt-24">
+        <section id="experiences" ref={experiencesReveal.ref} className={`mb-32 scroll-mt-24 ${experiencesReveal.className}`}>
           <div className="mb-16 max-w-3xl">
             <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#3B151A] text-[#F5A83A] rounded-full text-xs font-black tracking-widest uppercase mb-6">
               <span>Exclusive Events &amp; Catering</span>
@@ -268,7 +268,7 @@ export function Home() {
           </div>
         </section>
 
-        <section id="testimonials" className="mb-16 scroll-mt-24">
+        <section id="testimonials" ref={testimonialsReveal.ref} className={`mb-16 scroll-mt-24 ${testimonialsReveal.className}`}>
           <div className="flex flex-col items-center text-center mb-16">
             <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#F5A83A]/10 text-[#F5A83A] rounded-full text-xs font-black tracking-widest uppercase mb-6">
               <span>The Wall of Love</span>

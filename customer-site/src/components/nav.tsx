@@ -11,13 +11,9 @@ const LINKS = [
   { to: '/kashrut', label: 'כשרות' },
 ]
 
-export function Nav({ active, dark = true }: { active: string; dark?: boolean }) {
+export function Nav({ active }: { active: string }) {
   return (
-    <nav
-      className={`flex items-center p-1.5 rounded-full shadow-2xl flex-wrap justify-center ${
-        dark ? 'bg-black/20 backdrop-blur-xl border border-white/20' : 'bg-white/60 backdrop-blur-md border border-[#EDB2C1]/60 shadow-lg'
-      }`}
-    >
+    <nav className="flex items-center p-1.5 rounded-full shadow-2xl flex-wrap justify-center bg-black/20 backdrop-blur-xl border border-white/20">
       {LINKS.map((link) => {
         const isActive = link.to === active
         return (
@@ -25,11 +21,7 @@ export function Nav({ active, dark = true }: { active: string; dark?: boolean })
             key={link.to}
             to={link.to}
             className={`px-6 py-2.5 rounded-full text-sm font-black transition-all ${
-              isActive
-                ? 'bg-white text-[#3B151A] shadow-lg'
-                : dark
-                  ? 'text-white hover:text-white/80'
-                  : 'text-[#3B151A] hover:text-[#3B151A]/80'
+              isActive ? 'bg-white text-[#3B151A] shadow-lg' : 'text-white hover:text-white/80'
             }`}
           >
             {link.label}
@@ -40,29 +32,23 @@ export function Nav({ active, dark = true }: { active: string; dark?: boolean })
   )
 }
 
-export function PhoneBadge({ dark = true }: { dark?: boolean }) {
+export function PhoneBadge() {
   return (
-    <a
-      href="tel:+971586288776"
-      className={`flex items-center gap-4 ${dark ? 'text-white' : 'text-[#3B151A]'}`}
-      dir="ltr"
-    >
+    <a href="tel:+971586288776" className="flex items-center gap-4 text-white" dir="ltr">
       <Icon icon="ph:phone-fill" className="text-2xl" />
       <span className="font-bold tracking-wider">+971 58 628 8776</span>
     </a>
   )
 }
 
-export function BackHeader({ backTo = '/' }: { backTo?: string }) {
+export function NavHeader({ active }: { active: string }) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#F7ECE6]/80 backdrop-blur-xl border-b border-[#EDB2C1]/20 p-6">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to={backTo} className="flex items-center gap-2 text-[#3B151A] font-black">
-          <Icon icon="ph:arrow-right-bold" className="text-2xl" /> חזרה
-        </Link>
-        <div className="w-12 h-12 flex items-center justify-center">
-          <img src="/site/assets/logo.jpg" className="h-full object-contain rounded-full" alt="בת מלך" />
-        </div>
+    <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="order-1 md:order-2">
+        <Nav active={active} />
+      </div>
+      <div className="order-2 md:order-1">
+        <PhoneBadge />
       </div>
     </header>
   )
