@@ -62,6 +62,8 @@ test('production serves only its immutable deployed source tree', () => {
 test('React production route remains behind auth and cannot shadow APIs or legacy HTML', () => {
   const source = fs.readFileSync(serverPath, 'utf8');
   const healthIndex = source.indexOf("app.get('/healthz'");
+  const siteStaticIndex = source.indexOf("app.use('/site', createReactAppRouter(");
+  const rootIndex = source.indexOf("app.get(/^\\/$/, (request, response) => {");
   const customerFormIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
   const authIndex = source.indexOf("app.use((req, res, next) => {");
   const operationsReviewIndex = source.indexOf("app.use('/api/ai/operations-review', createOperationsReviewRouter");
@@ -69,12 +71,13 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   const stateApiIndex = source.indexOf("app.use('/api/state'");
   const legacyManagerIndex = source.indexOf("app.use('/legacy', createLegacyManagerRouter");
   const reactIndex = source.indexOf("app.use('/app', createReactAppRouter");
-  const managerEntryIndex = source.indexOf("app.get(/^\\/$/, (_request, response) => {");
   const legacyHtmlIndex = source.indexOf("app.use('/index.html', createLegacyManagerRouter");
 
   assert.ok(healthIndex >= 0, 'health route must exist');
-  assert.ok(customerFormIndex > healthIndex, 'customer form must mount after health');
-  assert.ok(authIndex > customerFormIndex, 'only the isolated customer form may mount before auth');
+  assert.ok(siteStaticIndex > healthIndex, 'public site static mount must exist');
+  assert.ok(rootIndex > siteStaticIndex, 'root route must mount after the public site static files');
+  assert.ok(customerFormIndex > rootIndex, 'root must mount before the customer form');
+  assert.ok(authIndex > customerFormIndex, 'only public routes (site, root, customer form) may mount before auth');
   assert.ok(operationsReviewIndex > authIndex, 'operations AI review must remain behind Basic Auth');
   assert.ok(hotelSearchIndex > operationsReviewIndex, 'operations AI review must not shadow hotel search');
   assert.ok(hotelSearchIndex > authIndex, 'hotel search must remain behind Basic Auth');
@@ -82,8 +85,7 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.ok(stateApiIndex > authIndex, 'state API must remain behind Basic Auth');
   assert.ok(legacyManagerIndex > stateApiIndex, 'legacy manager backup must use the versioned state API');
   assert.ok(reactIndex > legacyManagerIndex, 'React must not shadow the legacy manager backup');
-  assert.ok(managerEntryIndex > reactIndex, 'authenticated root must enter the verified React manager');
-  assert.ok(legacyHtmlIndex > managerEntryIndex, 'legacy HTML serving must remain explicit after the root entry');
+  assert.ok(legacyHtmlIndex > reactIndex, 'legacy HTML serving must remain explicit after the React app mount');
   assert.match(source, /app\.get\('\/healthz'/);
   assert.match(source, /createCustomerOrderRouter\(\{ getContentRoot: \(\) => contentRoot \}\)/);
   assert.equal(source.match(/app\.use\('\/api\/hotels\/search'/g)?.length, 1);
@@ -93,7 +95,10 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /app\.get\(\/\^\\\/app\$\//);
   assert.match(source, /app\.get\(\/\^\\\/\$\//);
   assert.match(source, /response\.set\('Cache-Control', 'no-store'\)/);
-  assert.match(source, /response\.redirect\(302, '\/app\/today'\)/);
+  // Root only enters the authenticated React manager when the request already
+  // carries valid Basic Auth (checked explicitly, not by relying on route
+  // order) — everyone else gets the public site, never admin data.
+  assert.match(source, /hasValidBasicAuth\(request\) \? '\/app\/today' : '\/site\/'/);
   assert.match(source, /getContentRoot: \(\) => contentRoot/);
   assert.doesNotMatch(source, /app\.use\('\/'\s*,\s*createReactAppRouter/);
 });

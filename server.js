@@ -32,6 +32,14 @@ function requireServerCredential(name) {
 const AUTH_USER = requireServerCredential('BM_USER');
 const AUTH_PASS = requireServerCredential('BM_PASS');
 
+function hasValidBasicAuth(request) {
+  const header = request.headers.authorization || '';
+  const [scheme, b64] = header.split(' ');
+  if (scheme !== 'Basic' || !b64) return false;
+  const [user, ...rest] = Buffer.from(b64, 'base64').toString().split(':');
+  return user === AUTH_USER && rest.join(':') === AUTH_PASS;
+}
+
 // Production serves only the exact source tree baked into the deployed image.
 // Releases therefore stay attributable to one reviewed Git commit.
 const contentRoot = ROOT;
@@ -41,7 +49,7 @@ app.get('/healthz', (req, res) => res.send('ok'));
 
 // Public marketing entry point and public order form. Neither route receives
 // Basic Auth, the state sync script, or any administrative state.
-app.use('/', createPublicLandingRouter({ contentRoot }));
+app.use('/coming-soon', createPublicLandingRouter({ contentRoot }));
 app.use('/new-order', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
 // The landing page references only this curated, non-sensitive asset directory.
 // Keep it public so browsers can load the brand image and icons without exposing
@@ -50,6 +58,17 @@ app.use('/assets', express.static(path.join(contentRoot, 'public', 'assets'), {
   dotfiles: 'deny',
   index: false,
 }));
+
+// --- Public customer-facing site: no Basic Auth, no admin state. Same
+// static-plus-SPA-fallback shape as the authenticated React app so deep
+// links like /site/checkout resolve to the client router instead of 404. ---
+app.use('/site', createReactAppRouter({ reactRoot: path.join(contentRoot, 'site') }));
+// Root goes to the public site for customers; staff with saved credentials
+// (browser already sent Basic Auth) land straight in the admin app instead.
+app.get(/^\/$/, (request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.redirect(302, hasValidBasicAuth(request) ? '/app/today' : '/site/');
+});
 
 app.get('/robots.txt', (_request, response) => {
   response.type('text/plain').send([
@@ -66,12 +85,7 @@ app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => co
 
 // --- basic auth on everything else ---
 app.use((req, res, next) => {
-  const header = req.headers.authorization || '';
-  const [scheme, b64] = header.split(' ');
-  if (scheme === 'Basic' && b64) {
-    const [user, ...rest] = Buffer.from(b64, 'base64').toString().split(':');
-    if (user === AUTH_USER && rest.join(':') === AUTH_PASS) return next();
-  }
+  if (hasValidBasicAuth(req)) return next();
   res.set('WWW-Authenticate', 'Basic realm="Bat Melech"');
   res.status(401).send('Authentication required');
 });
@@ -142,12 +156,6 @@ app.use('/orders/admin', (request, response, next) => {
   next();
 }, createReactAppRouter({ reactRoot: REACT_ROOT }));
 
-
-// --- Authenticated manager entry: React is primary; legacy remains permanent ---
-app.get(/^\/$/, (_request, response) => {
-  response.set('Cache-Control', 'no-store');
-  response.redirect(302, '/app/today');
-});
 
 // --- Explicit emergency legacy entry; unrelated HTML never receives app state ---
 app.use('/index.html', createLegacyManagerRouter({ getContentRoot: () => contentRoot }));
