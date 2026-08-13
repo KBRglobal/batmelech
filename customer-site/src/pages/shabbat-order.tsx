@@ -165,15 +165,7 @@ export function ShabbatOrder() {
         title={['מטעמי', 'שבת קודש']}
         subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
-      >
-        <div className="bg-[#3B151A] p-6 rounded-[2.5rem] shadow-2xl border-2 border-[#F5A83A]/30 inline-flex flex-col mt-4">
-          <span className="bg-[#F5A83A] text-[#3B151A] text-[10px] font-black px-2 py-0.5 rounded-full uppercase w-fit mb-1">
-            מחיר בסיס - ארוחה זוגית
-          </span>
-          <span className="text-4xl md:text-5xl font-black text-[#F5A83A] leading-none">${total.toFixed(2).replace(/\.00$/, '')}</span>
-          <span className="text-white text-xs font-black mt-2 tracking-widest uppercase italic">כשר - תפריט זוגי לכבוד שבת קודש</span>
-        </div>
-      </PageHero>
+      />
 
       <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
         <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">

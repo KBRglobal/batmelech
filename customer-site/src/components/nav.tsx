@@ -47,8 +47,8 @@ export function PhoneBadge() {
 
 export function Logo() {
   return (
-    <Link to="/" className="block w-14 h-14 rounded-full overflow-hidden border-2 border-white/40 shadow-xl shrink-0">
-      <img src="/site/assets/logo.jpg" alt="בת מלך" className="w-full h-full object-cover" />
+    <Link to="/" className="block h-14 w-14 shrink-0 drop-shadow-[0_2px_10px_rgba(0,0,0,0.4)]">
+      <img src="/site/assets/logo-cream.png" alt="מטעמי בת מלך" className="h-full w-full object-contain" />
     </Link>
   )
 }
