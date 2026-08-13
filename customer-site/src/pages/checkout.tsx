@@ -34,6 +34,20 @@ export function Checkout() {
 
   const canSubmit = customer.name.trim() && customer.phone.trim() && customer.address.trim()
 
+  const submitOrderToKitchen = () => {
+    fetch('/api/site/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer,
+        lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
+        total,
+      }),
+    }).catch(() => {
+      // Best-effort — the WhatsApp message is the order of record either way.
+    })
+  }
+
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
       <PageHero active="/checkout" size="compact" title={['סיכום', 'הזמנה']} image={CHECKOUT_HERO_IMAGE} imageAlt="מטעמי בת מלך - מטבח ביתי כשר בדובאי" />
@@ -121,6 +135,18 @@ export function Checkout() {
               />
             </Field>
             <div className="md:col-span-2">
+              <Field label="אימייל (לקבלת חשבונית)">
+                <input
+                  type="email"
+                  value={customer.email}
+                  onChange={(e) => setCustomer({ email: e.target.value })}
+                  placeholder="name@example.com"
+                  dir="ltr"
+                  className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+                />
+              </Field>
+            </div>
+            <div className="md:col-span-2">
               <Field label="כתובת מלאה (מלון / דירה)">
                 <input
                   type="text"
@@ -163,6 +189,7 @@ export function Checkout() {
                 e.preventDefault()
                 return
               }
+              submitOrderToKitchen()
               clear()
             }}
             className={`w-full py-6 rounded-[2.5rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 group ${

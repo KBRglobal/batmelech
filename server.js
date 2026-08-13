@@ -11,6 +11,7 @@ const { createPublicLandingRouter } = require('./server/public-landing-route');
 const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
+const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
@@ -44,6 +45,18 @@ function hasValidBasicAuth(request) {
 // Releases therefore stay attributable to one reviewed Git commit.
 const contentRoot = ROOT;
 
+// Created early (before the public routes below) so the public site-order
+// intake route can use the same repository instance as /api/state.
+let pool = null;
+let stateRepository = null;
+if (process.env.DATABASE_URL) {
+  // Uses Railway private networking (railway.internal) — plain TCP inside the
+  // private network, no TLS needed. External URLs should carry ?sslmode=require.
+  const commandSecret = requireServerCredential('BM_STATE_COMMAND_SECRET');
+  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  stateRepository = createStateRepository({ pool, commandSecret });
+}
+
 // --- health check (no auth, used by Railway) ---
 app.get('/healthz', (req, res) => res.send('ok'));
 
@@ -63,6 +76,16 @@ app.use('/assets', express.static(path.join(contentRoot, 'public', 'assets'), {
 // static-plus-SPA-fallback shape as the authenticated React app so deep
 // links like /site/checkout resolve to the client router instead of 404. ---
 app.use('/site', createReactAppRouter({ reactRoot: path.join(contentRoot, 'site') }));
+// Public order intake from the customer site's checkout — persists straight
+// into the same orders[] the admin app reads, no admin auth, no state sync.
+if (stateRepository) {
+  app.use('/api/site/orders', createSiteOrderRouter({ repository: stateRepository }));
+} else {
+  app.use('/api/site/orders', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'order intake unavailable' });
+  });
+}
 // Root goes to the public site for customers; staff with saved credentials
 // (browser already sent Basic Auth) land straight in the admin app instead.
 app.get(/^\/$/, (request, response) => {
@@ -103,14 +126,7 @@ app.use('/api/ai/operations-review', createOperationsReviewRouter());
 app.use('/api/hotels/search', createHotelSearchRouter());
 
 // --- Versioned Postgres-backed app state with merge, history, and idempotency ---
-let pool = null;
-let stateRepository = null;
-if (process.env.DATABASE_URL) {
-  // Uses Railway private networking (railway.internal) — plain TCP inside the
-  // private network, no TLS needed. External URLs should carry ?sslmode=require.
-  const commandSecret = requireServerCredential('BM_STATE_COMMAND_SECRET');
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  stateRepository = createStateRepository({ pool, commandSecret });
+if (stateRepository) {
   app.use('/api/state', createStateRouter({
     service: createStateSafetyService({ repository: stateRepository }),
   }));

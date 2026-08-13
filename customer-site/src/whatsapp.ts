@@ -13,6 +13,7 @@ export function buildOrderMessage(lines: CartLine[], customer: CustomerDetails, 
     '',
     `שם: ${customer.name || '-'}`,
     `טלפון: ${customer.phone || '-'}`,
+    customer.email ? `אימייל: ${customer.email}` : undefined,
     `כתובת: ${customer.address || '-'}`,
     customer.notes ? `הערות: ${customer.notes}` : undefined,
   ].filter(Boolean)
