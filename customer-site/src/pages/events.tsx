@@ -57,6 +57,7 @@ export function Events() {
         title={['חוויות קולינריות', 'VIP בדובאי']}
         subtitle="אנחנו מביאים את השף ואת האוכל הכי טוב בדובאי – בדיוק לאן שאתם נמצאים. גלו את מגוון האפשרויות שלנו לאירועים פרטיים ויוקרתיים."
         image={EXPERIENCES[0].img}
+        imageAlt={EXPERIENCES[0].title}
       />
       <main className="pt-16 max-w-7xl mx-auto px-6">
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-32">
@@ -66,7 +67,7 @@ export function Events() {
                 to={exp.to}
                 className="group relative h-[28rem] md:h-[35rem] rounded-[4rem] overflow-hidden shadow-2xl border-2 border-white block"
               >
-                <img src={exp.img} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
+                <img src={exp.img} alt={exp.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
                 <div className="absolute bottom-10 right-10 left-10">
                   <div className="mb-4 flex items-center gap-3">

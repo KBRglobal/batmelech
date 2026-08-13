@@ -165,9 +165,13 @@ export function ShabbatOrder() {
         title={['מטעמי', 'שבת קודש']}
         subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
+        imageAlt="מארז שבת זוגי יוקרתי כשר בדובאי - מטעמי בת מלך"
       />
 
       <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
+        <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg -mb-4">
+          ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
+        </p>
         <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">
           <Icon icon="ph:info-fill" className="text-amber-600 text-4xl shrink-0" />
           <div>
@@ -190,7 +194,7 @@ export function ShabbatOrder() {
               className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all hover:shadow-xl text-right"
             >
               <div className="aspect-square overflow-hidden relative">
-                <Photo src={s.img} className="w-full h-full object-cover" real={s.realPhoto} />
+                <Photo src={s.img} alt={s.name} className="w-full h-full object-cover" real={s.realPhoto} />
                 {s.allergy && (
                   <span className="absolute top-2 left-2 bg-white/90 p-1.5 rounded-lg shadow-md">
                     <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
@@ -258,7 +262,7 @@ export function ShabbatOrder() {
               }`}
             >
               <div className="aspect-video overflow-hidden relative">
-                <Photo src={d.img} className="w-full h-full object-cover" />
+                <Photo src={d.img} alt={d.name} className="w-full h-full object-cover" />
                 <div className="absolute bottom-4 right-4 px-8 py-3 rounded-2xl bg-white font-black shadow-2xl">{d.name}</div>
               </div>
             </button>
@@ -374,7 +378,7 @@ function QtyCard({
   return (
     <div className="group relative bg-white rounded-[3.5rem] overflow-hidden border-4 border-transparent transition-all hover:shadow-xl">
       <div className={compact ? 'aspect-video overflow-hidden relative' : 'aspect-video overflow-hidden relative'}>
-        <Photo src={choice.img} className="w-full h-full object-cover" />
+        <Photo src={choice.img} alt={choice.name} className="w-full h-full object-cover" />
         {choice.allergy && (
           <span className="absolute top-4 left-4 bg-white/90 p-2 rounded-xl shadow-lg">
             <Icon icon={ALLERGY_ICON[choice.allergy]} className="text-lg" />

@@ -20,6 +20,11 @@ export function YachtPartyExperience() {
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/s3QaubcTbIN.jpeg',
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/OIC46tu7QUo.jpeg',
         ],
+        galleryAlt: [
+          'קייטרינג גורמה כשר על יאכטה בדובאי',
+          'הגשה מעוצבת ליד המרינה - קייטרינג יאכטה',
+          'אירוע יאכטה פרטי עם קייטרינג כשר יוקרתי',
+        ],
         ctaTitle: 'מפליגים בטעם שלכם',
         ctaBody: 'אנחנו כאן כדי להפוך את ההפלגה הבאה שלכם לחוויה קולינרית מושלמת. דברו איתנו להצעת מחיר.',
       }}

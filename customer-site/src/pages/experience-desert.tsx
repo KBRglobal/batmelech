@@ -20,6 +20,11 @@ export function DesertSafariExperience() {
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hQfhwTbpf9J.jpeg',
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg',
         ],
+        galleryAlt: [
+          'אירוח Majlis מפואר בלב דיונות המדבר בדובאי',
+          'סעודת גורמה כשרה תחת הכוכבים במדבר',
+          'שולחנות ערוכים לסעודת מדבר VIP כשרה',
+        ],
         ctaTitle: 'סעודה בלתי נשכחת',
         ctaBody: 'מוכנים למשהו אחר לגמרי? דברו איתנו לתיאום סעודת המדבר הבאה שלכם.',
       }}

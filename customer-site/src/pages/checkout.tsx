@@ -17,7 +17,7 @@ export function Checkout() {
   if (lines.length === 0) {
     return (
       <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
-        <PageHero active="/checkout" size="compact" title={['הסל שלכם', 'ריק']} image={CHECKOUT_HERO_IMAGE} />
+        <PageHero active="/checkout" size="compact" title={['הסל שלכם', 'ריק']} image={CHECKOUT_HERO_IMAGE} imageAlt="מטעמי בת מלך - מטבח ביתי כשר בדובאי" />
         <div className="flex flex-col items-center gap-8 px-6 py-20 text-center">
           <Icon icon="ph:basket-bold" className="text-6xl text-[#EDB2C1]" />
           <Link to="/weekdays" className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg">
@@ -36,7 +36,7 @@ export function Checkout() {
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
-      <PageHero active="/checkout" size="compact" title={['סיכום', 'הזמנה']} image={CHECKOUT_HERO_IMAGE} />
+      <PageHero active="/checkout" size="compact" title={['סיכום', 'הזמנה']} image={CHECKOUT_HERO_IMAGE} imageAlt="מטעמי בת מלך - מטבח ביתי כשר בדובאי" />
 
       <main className="max-w-3xl mx-auto px-6 py-12 space-y-12">
         <section className="bg-white rounded-[3rem] p-6 md:p-8 shadow-xl border border-[#EDB2C1]/20">

@@ -41,7 +41,17 @@ export default function App() {
     if (meta) {
       document.title = meta.title
       document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description)
+      document.querySelector('meta[property="og:title"]')?.setAttribute('content', meta.title)
+      document.querySelector('meta[property="og:description"]')?.setAttribute('content', meta.description)
+      document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', meta.title)
+      document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', meta.description)
     }
+    const canonicalUrl = `https://www.batmelech.ae/site${pathname === '/' ? '/' : pathname}`
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl)
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl)
+    document
+      .querySelector('meta[name="robots"]')
+      ?.setAttribute('content', pathname === '/checkout' ? 'noindex,nofollow' : 'index,follow,max-image-preview:large')
   }, [pathname])
 
   return (

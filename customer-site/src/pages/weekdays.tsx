@@ -72,11 +72,15 @@ export function Weekdays() {
         title={['מטעמי', 'יום חול']}
         subtitle="הטעם של הבית מחכה לכם בכל יום בשבוע. כשר, טרי ומבושל באהבה - במיוחד עבורכם בדובאי."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1zGIolEp4on.jpeg"
+        imageAlt="תפריט יום חול כשר וטרי - מטעמי בת מלך דובאי"
       />
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-20 pb-56">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-6xl font-black font-heading mb-6 tracking-tight">התפריט היומי שלנו</h2>
+          <p className="max-w-2xl mx-auto text-[#3B151A]/60 font-bold text-lg mb-8">
+            מטבח ביתי כשר בדובאי עם משלוח יומי — בגטים, קובה וסלטים טריים שמגיעים חמים לכל אזור בעיר.
+          </p>
           <div className="flex justify-center gap-4">
             <span className="flex items-center gap-1 text-[10px] font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
               <Icon icon="ph:bread-bold" className="text-amber-800" /> גלוטן

@@ -20,6 +20,11 @@ export function VillaPartyExperience() {
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Lh0FCekcbt7.jpeg',
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/twpm8363MgJ.jpeg',
         ],
+        galleryAlt: [
+          'בופט קייטרינג יוקרתי לצד הבריכה בוילה בדובאי',
+          'מסיבת וילה עם קייטרינג כשר מלא',
+          'הגשת מנות בוטיק באירוע וילה פרטי',
+        ],
         ctaTitle: 'חגיגה שלא תישכח',
         ctaBody: 'הופכים כל וילה למסעדת יוקרה. צרו איתנו קשר לתיאום האירוע שלכם.',
       }}

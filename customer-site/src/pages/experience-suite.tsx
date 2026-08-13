@@ -20,6 +20,11 @@ export function SuiteDiningExperience() {
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/SuJ0WdhHMRh.jpeg',
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ktV7lQAiCxj.jpeg',
         ],
+        galleryAlt: [
+          'ארוחת שף פרטית וכשרה בסוויטת מלון בדובאי',
+          'הגשה אינטימית ורומנטית בסוויטה פרטית',
+          'מנת גורמה כשרה מוגשת מול נוף דובאי',
+        ],
         ctaTitle: 'אינטימיות וטעם ללא פשרות',
         ctaBody: 'הופכים כל סוויטה לחוויה קולינרית יוצאת דופן. דברו איתנו עכשיו.',
       }}

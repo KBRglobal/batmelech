@@ -4,14 +4,14 @@ import { Reveal } from '../components/reveal'
 import { Footer } from '../components/footer'
 
 const PHOTOS = [
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Hgw2QN4Smv3.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/bq8wCPGKU11.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Tr7Zvl6EB0X.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hqJqmcg5k3O.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/T9Q0QhPImYP.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/XE7I0jbpGOl.jpeg',
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Hgw2QN4Smv3.jpeg', alt: 'אירוע קייטרינג כשר של מטעמי בת מלך בדובאי' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/bq8wCPGKU11.jpeg', alt: 'בשרים על האש - קייטרינג BBQ כשר בדובאי' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg', alt: 'שולחן ערוך לאירוח יוקרתי במדבר דובאי' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Tr7Zvl6EB0X.jpeg', alt: 'הגשה יוקרתית של מטעמי בת מלך' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg', alt: 'מנה עיקרית מהתפריט הכשר של מטעמי בת מלך' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hqJqmcg5k3O.jpeg', alt: 'מטבח ביתי כשר בדובאי - מטעמי בת מלך' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/T9Q0QhPImYP.jpeg', alt: 'רגע מאירועי מטעמי בת מלך בדובאי' },
+  { img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/XE7I0jbpGOl.jpeg', alt: 'הגשת מנות כשרות באירוע VIP בדובאי' },
 ]
 
 export function Gallery() {
@@ -23,13 +23,14 @@ export function Gallery() {
         badge="Our Luxury Moments"
         title={['הטעם', 'בעיניים']}
         subtitle='מבט קרוב על האירועים, המנות והאנשים שהופכים את "בת מלך" לחוויה הקולינרית הכשרה המובילה בדובאי.'
-        image={PHOTOS[0]}
+        image={PHOTOS[0].img}
+        imageAlt={PHOTOS[0].alt}
       />
       <main className="pt-16 max-w-7xl mx-auto px-6">
         <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
-          {PHOTOS.map((img, i) => (
-            <Reveal key={img} delay={(i % 4) * 80} className="break-inside-avoid">
-              <img src={img} className="w-full rounded-[2rem] shadow-lg border-2 border-white transition-transform hover:scale-[1.02]" />
+          {PHOTOS.map((p, i) => (
+            <Reveal key={p.img} delay={(i % 4) * 80} className="break-inside-avoid">
+              <img src={p.img} alt={p.alt} className="w-full rounded-[2rem] shadow-lg border-2 border-white transition-transform hover:scale-[1.02]" />
             </Reveal>
           ))}
         </div>

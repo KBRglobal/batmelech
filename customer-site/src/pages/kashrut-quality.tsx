@@ -11,6 +11,7 @@ export function KashrutQuality() {
         badge="Kashrut & Premium Quality"
         title={['כשרות', 'ואיכות']}
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg"
+        imageAlt="כשרות מהודרת - מטעמי בת מלך דובאי"
       />
       <main className="pt-16 max-w-4xl mx-auto px-6">
         <section className="mb-20 text-center">
@@ -24,6 +25,7 @@ export function KashrutQuality() {
           <div className="rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white aspect-video mb-20">
             <img
               src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7zzOf0cSMJb.jpeg"
+              alt="תעודת כשרות של מטעמי בת מלך"
               className="w-full h-full object-cover"
             />
           </div>
@@ -44,6 +46,12 @@ export function KashrutQuality() {
             </InfoCard>
           </div>
         </section>
+        <section className="mb-20 space-y-8">
+          <h2 className="text-3xl md:text-5xl font-black font-heading text-center mb-12">שאלות נפוצות על הכשרות</h2>
+          <FaqItem q="האם כל התפריט כשר?" a='כן. כל המנות שלנו מוכנות במטבח כשר ייעודי בדובאי, בהשגחת רבנים ובכשרות מהודרת, ללא יוצא מן הכלל.' />
+          <FaqItem q="איך נשמרת הכשרות במשלוח?" a="המזון נשלח בצידניות תרמיות אטומות וחתומות, כדי לשמור על הטמפרטורה, הטריות והכשרות עד לרגע ההגעה אליכם, בכל רחבי דובאי." />
+          <FaqItem q="מאיפה מגיעים חומרי הגלם?" a='כל חומרי הגלם נרכשים מספקים מורשים בלבד - ירקות איכותיים, בשר "חלק" בכשרות מהודרת ומוצרי חלב מוקפדים, העוברים בדיקה דקדקנית.' />
+        </section>
         <section className="bg-[#3B151A] p-12 rounded-[5rem] text-center shadow-2xl">
           <h4 className="text-2xl font-black text-white mb-6 font-heading italic">"השקט הנפשי שלכם הוא המשימה שלנו"</h4>
           <p className="text-white/60 font-bold mb-10">יש לכם שאלות ספציפיות על הכשרות? אנחנו כאן לענות על הכל.</p>
@@ -56,6 +64,15 @@ export function KashrutQuality() {
         </section>
       </main>
       <Footer />
+    </div>
+  )
+}
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  return (
+    <div className="bg-white p-8 rounded-[3rem] border-2 border-[#EDB2C1]/20 shadow-lg text-right">
+      <h3 className="text-xl font-black mb-3">{q}</h3>
+      <p className="font-bold text-[#3B151A]/70 leading-relaxed">{a}</p>
     </div>
   )
 }

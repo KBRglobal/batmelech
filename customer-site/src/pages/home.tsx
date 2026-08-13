@@ -87,6 +87,7 @@ export function Home() {
         title={['הטעם של הבית', 'בלב דובאי']}
         subtitle="אוכל ישראלי שורשי, טרי בכל יום, מבושל עם כל הלב. האיכות המוכרת מישראל - עכשיו בחופשה שלכם."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
+        imageAlt="אוכל ביתי כשר מוגש בדובאי - מטעמי בת מלך"
       >
         <div className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto justify-center mt-4">
           <Link
@@ -137,6 +138,7 @@ export function Home() {
           <div className="relative h-[30rem] md:h-[40rem] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white group">
             <img
               src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/NPPrDqcdlgE.jpeg"
+              alt="מארז שבת זוגי יוקרתי - מטעמי שבת קודש כשר בדובאי"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110"
             />
             <div className="absolute inset-0 bg-gradient-to-l from-black/80 via-black/20 to-transparent" />
@@ -168,6 +170,7 @@ export function Home() {
           <div className="relative h-[30rem] md:h-[40rem] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white group">
             <img
               src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/32nv8K7lIKf.jpeg"
+              alt="תפריט יום חול כשר וטרי - מטעמי בת מלך דובאי"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
@@ -215,7 +218,7 @@ export function Home() {
                 to={exp.to}
                 className="group relative h-[28rem] md:h-[35rem] rounded-[3.5rem] overflow-hidden shadow-2xl border-2 border-white block"
               >
-                <img src={exp.img} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
+                <img src={exp.img} alt={exp.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
                 <div className="absolute bottom-10 right-10 left-10">
                   <div className="mb-4 flex items-center gap-3">
@@ -259,7 +262,7 @@ export function Home() {
               <div key={t.name} className="shrink-0 w-[85vw] md:w-[28rem]">
                 <div className="bg-white rounded-[3.5rem] overflow-hidden shadow-2xl border-4 border-white transition-transform hover:-translate-y-2 duration-500">
                   <div className="aspect-square relative">
-                    <img src={t.img} className="w-full h-full object-cover" />
+                    <img src={t.img} alt={`${t.name} - ${t.place}`} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#3B151A]/80 to-transparent" />
                     <div className="absolute bottom-8 right-8 left-8 text-white">
                       <div className="flex gap-1 text-[#F5A83A] mb-3">
@@ -269,7 +272,7 @@ export function Home() {
                       </div>
                       <p className="text-lg font-bold leading-relaxed italic mb-6">{t.quote}</p>
                       <div className="flex items-center gap-3">
-                        <img src={t.avatar} className="w-12 h-12 rounded-full border-2 border-white shadow-lg" />
+                        <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full border-2 border-white shadow-lg" />
                         <div className="flex flex-col">
                           <span className="font-black text-sm">{t.name}</span>
                           <span className="text-[10px] text-white/60 font-bold tracking-widest uppercase">{t.place}</span>

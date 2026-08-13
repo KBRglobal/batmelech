@@ -9,6 +9,7 @@ export function Legal() {
         size="compact"
         title={['תנאי שימוש', 'ופרטיות']}
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ZEd1RfEEqbe.jpeg"
+        imageAlt="מטעמי בת מלך - מטבח ביתי כשר בדובאי"
       />
       <main className="max-w-4xl mx-auto px-6 py-16 space-y-16 text-right">
         <section>

@@ -12,14 +12,24 @@ export type ExperienceContent = {
   cornerImg: string
   galleryTitle: string
   gallery: [string, string, string]
+  galleryAlt: [string, string, string]
   ctaTitle: string
   ctaBody: string
 }
 
 export function ExperienceLayout({ content }: { content: ExperienceContent }) {
+  const pageTitle = content.title.join(' ')
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
-      <PageHero active="/events" size="tall" badge={content.tag} title={content.title} subtitle={content.body} image={content.heroImg} />
+      <PageHero
+        active="/events"
+        size="tall"
+        badge={content.tag}
+        title={content.title}
+        subtitle={content.body}
+        image={content.heroImg}
+        imageAlt={pageTitle}
+      />
 
       <main className="relative max-w-7xl mx-auto px-6">
         <section className="mb-32 pt-20">
@@ -34,10 +44,10 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
             </div>
             <div className="relative hidden lg:block">
               <div className="aspect-[4/5] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white">
-                <img src={content.heroImg} className="w-full h-full object-cover" />
+                <img src={content.heroImg} alt={pageTitle} className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-10 -left-10 w-64 aspect-square rounded-[3rem] overflow-hidden border-8 border-white shadow-2xl">
-                <img src={content.cornerImg} className="w-full h-full object-cover" />
+                <img src={content.cornerImg} alt={pageTitle} className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
@@ -47,9 +57,9 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
           <section className="mb-32">
             <h2 className="text-4xl font-black font-heading mb-12">{content.galleryTitle}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {content.gallery.map((img) => (
+              {content.gallery.map((img, i) => (
                 <div key={img} className="h-96 rounded-[3rem] overflow-hidden shadow-xl">
-                  <img src={img} className="w-full h-full object-cover" />
+                  <img src={img} alt={content.galleryAlt[i]} className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>

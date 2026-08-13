@@ -20,6 +20,11 @@ export function PrivateBBQExperience() {
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/EXGsZ8YfU8c.jpeg',
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nsSTu1IMHv0.jpeg',
         ],
+        galleryAlt: [
+          'שף מנגליסט פרטי צולה נתחי בשר פרימיום בווילה בדובאי',
+          'נתחי בשר כשרים מובחרים לצליה - קייטרינג BBQ פרטי',
+          'שולחן ערוך לחוויית גריל VIP כשרה בדובאי',
+        ],
         ctaTitle: 'בשר משובח בלב דובאי',
         ctaBody: 'מוכנים לחוויית בשרים שתשאיר את כולם פעורי פה? שלחו לנו הודעה ונתאים לכם תפריט שף מושלם.',
       }}
