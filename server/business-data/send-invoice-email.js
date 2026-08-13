@@ -58,4 +58,4 @@ async function sendInvoiceEmail({ apiKey, toEmail, invoiceNumber, pdfBytes, busi
   }
 }
 
-module.exports = { sendInvoiceEmail };
+module.exports = { sendInvoiceEmail, invoiceEmailHtml };
