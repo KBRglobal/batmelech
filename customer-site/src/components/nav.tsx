@@ -45,24 +45,13 @@ export function PhoneBadge() {
   )
 }
 
-export function Logo() {
-  return (
-    <Link to="/" className="block h-14 w-14 shrink-0 drop-shadow-[0_2px_10px_rgba(0,0,0,0.4)]">
-      <img src="/site/assets/logo-cream.png" alt="מטעמי בת מלך" className="h-full w-full object-contain" />
-    </Link>
-  )
-}
-
 export function NavHeader({ active }: { active: string }) {
   return (
     <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="order-1 md:order-1">
-        <Logo />
-      </div>
-      <div className="order-2 md:order-2">
+      <div className="order-1 md:order-2">
         <Nav active={active} />
       </div>
-      <div className="order-3 md:order-3">
+      <div className="order-2 md:order-1">
         <PhoneBadge />
       </div>
     </header>
