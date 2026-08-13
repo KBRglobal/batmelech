@@ -43,6 +43,13 @@ app.get('/healthz', (req, res) => res.send('ok'));
 // Basic Auth, the state sync script, or any administrative state.
 app.use('/', createPublicLandingRouter({ contentRoot }));
 app.use('/new-order', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
+// The landing page references only this curated, non-sensitive asset directory.
+// Keep it public so browsers can load the brand image and icons without exposing
+// the authenticated operator application or its data.
+app.use('/assets', express.static(path.join(contentRoot, 'public', 'assets'), {
+  dotfiles: 'deny',
+  index: false,
+}));
 
 app.get('/robots.txt', (_request, response) => {
   response.type('text/plain').send([
