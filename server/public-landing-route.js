@@ -15,7 +15,7 @@ function createPublicLandingRouter({ contentRoot } = {}) {
       const html = await fs.promises.readFile(landingPath, 'utf8');
       response
         .set('Cache-Control', 'no-store')
-        .set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'")
+        .set('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'none'; frame-ancestors 'none'")
         .set('X-Content-Type-Options', 'nosniff')
         .type('html')
         .send(html);
