@@ -10,7 +10,7 @@ const source = fs.readFileSync(path.join(projectRoot, 'server.js'), 'utf8');
 
 test('server mounts one injected versioned state router behind authentication', () => {
   const customerFormIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
-  const authIndex = source.indexOf("app.use((req, res, next) => {");
+  const authIndex = source.indexOf("app.use(createDecoyGate(SESSION_SECRET));");
   const stateIndex = source.indexOf("app.use('/api/state', createStateRouter");
   const legacyIndex = source.indexOf("app.use('/legacy', createLegacyManagerRouter");
   const reactIndex = source.indexOf("app.use('/app', createReactAppRouter");

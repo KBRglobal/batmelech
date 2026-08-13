@@ -1,6 +1,7 @@
-// Bat Melech — static server with basic auth + Postgres-backed state sync.
-// Serves the orders app (repo root) and the marketing site (/site) unchanged;
-// a sync script is injected into HTML at serve time so app files stay untouched.
+// Bat Melech — static server with a disguised staff gate + Postgres-backed
+// state sync. Serves the orders app (repo root) and the marketing site
+// (/site) unchanged; a sync script is injected into HTML at serve time so
+// app files stay untouched.
 const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
@@ -12,6 +13,8 @@ const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
+const { createDecoyGate, hasValidSession } = require('./server/auth/decoy-auth');
+const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
 const businessDataRepository = require('./server/business-data/repository');
 const { wrapRepositoryWithInvoiceTrigger } = require('./server/business-data/invoice-trigger');
 const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route');
@@ -22,6 +25,10 @@ const { createStateSafetyService } = require('./server/state/state-service');
 const { startAfterStateInitialization } = require('./server/state/state-startup');
 
 const app = express();
+// Railway sits as a single reverse-proxy hop in front of this service — trust
+// its X-Forwarded-For so req.ip is the real visitor, not Railway's edge IP.
+// The decoy login's per-IP lockout is meaningless without this.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const REACT_ROOT = path.join(ROOT, 'web', 'dist');
@@ -34,16 +41,11 @@ function requireServerCredential(name) {
   return value;
 }
 
+// Repurposed from Basic Auth: still the staff username/password, now checked
+// through the hidden two-step "contact form" flow instead of a browser prompt.
 const AUTH_USER = requireServerCredential('BM_USER');
 const AUTH_PASS = requireServerCredential('BM_PASS');
-
-function hasValidBasicAuth(request) {
-  const header = request.headers.authorization || '';
-  const [scheme, b64] = header.split(' ');
-  if (scheme !== 'Basic' || !b64) return false;
-  const [user, ...rest] = Buffer.from(b64, 'base64').toString().split(':');
-  return user === AUTH_USER && rest.join(':') === AUTH_PASS;
-}
+const SESSION_SECRET = requireServerCredential('BM_SESSION_SECRET');
 
 // Production serves only the exact source tree baked into the deployed image.
 // Releases therefore stay attributable to one reviewed Git commit.
@@ -107,6 +109,13 @@ if (stateRepository) {
     response.status(503).json({ error: 'order intake unavailable' });
   });
 }
+// Disguised staff login: a public "contact form" endpoint on the decoy page.
+// No admin auth of its own — it IS the auth, checked message by message.
+app.use('/api/site/contact', createDecoyLoginRouter({
+  authUser: AUTH_USER,
+  authPass: AUTH_PASS,
+  sessionSecret: SESSION_SECRET,
+}));
 // Public invoice-download link referenced from invoice emails — token-gated,
 // not just invoice number (numbers are sequential/guessable).
 if (pool) {
@@ -117,11 +126,11 @@ if (pool) {
     response.status(503).send('Not available');
   });
 }
-// Root goes to the public site for customers; staff with saved credentials
-// (browser already sent Basic Auth) land straight in the admin app instead.
+// Root goes to the public site for customers; staff with an active session
+// land straight in the admin app instead.
 app.get(/^\/$/, (request, response) => {
   response.set('Cache-Control', 'no-store');
-  response.redirect(302, hasValidBasicAuth(request) ? '/app/today' : '/site/');
+  response.redirect(302, hasValidSession(request, SESSION_SECRET) ? '/linaya/today' : '/site/');
 });
 
 app.get('/robots.txt', (_request, response) => {
@@ -138,12 +147,8 @@ app.get('/robots.txt', (_request, response) => {
 // --- Public customer form: no manager sync, state API, or admin authentication ---
 app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
 
-// --- basic auth on everything else ---
-app.use((req, res, next) => {
-  if (hasValidBasicAuth(req)) return next();
-  res.set('WWW-Authenticate', 'Basic realm="Bat Melech"');
-  res.status(401).send('Authentication required');
-});
+// --- staff gate on everything else: no valid session -> looks like a 404 ---
+app.use(createDecoyGate(SESSION_SECRET));
 
 app.use(express.json({ limit: '15mb' }));
 
@@ -204,6 +209,17 @@ app.get(['/app/order-form.html', '/app/order.html'], (_request, response) => {
 // --- React operator application: authenticated, isolated below /app/ ---
 app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
 app.use('/app', createReactAppRouter({ reactRoot: REACT_ROOT }));
+
+// /linaya is the real, non-obvious entry point Lin actually uses day to day.
+// /app and /orders/admin stay alive underneath the same decoy gate purely so
+// old bookmarks don't break — none of the three is easier to reach than the
+// others without a valid session, and search engines get told to ignore all.
+app.get(/^\/linaya$/, (req, res) => res.redirect(308, '/linaya/'));
+app.use('/linaya', (request, response, next) => {
+  response.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  response.set('Cache-Control', 'no-store');
+  next();
+}, createReactAppRouter({ reactRoot: REACT_ROOT }));
 
 // The operator application has a deliberately non-obvious, authenticated
 // entry path. Keep the old /app path working for existing bookmarks while

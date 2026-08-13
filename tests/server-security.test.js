@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -9,11 +9,48 @@ const test = require('node:test');
 const projectRoot = path.join(__dirname, '..');
 const serverPath = path.join(projectRoot, 'server.js');
 
+function startDecoyServer(port, env = {}) {
+  return spawn(process.execPath, [serverPath], {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      BM_USER: 'decoy-test-user',
+      BM_PASS: 'decoy-test-password',
+      BM_SESSION_SECRET: 'decoy-test-session-secret',
+      DATABASE_URL: '',
+      PORT: String(port),
+      ...env,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+async function waitForHealth(port, deadline = Date.now() + 5_000) {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/healthz`);
+    if (response.ok) return;
+  } catch {
+    // not up yet
+  }
+  if (Date.now() > deadline) throw new Error('server did not become healthy in time');
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  return waitForHealth(port, deadline);
+}
+
+function cookieFrom(response, name) {
+  const raw = response.headers.getSetCookie?.() ?? [];
+  for (const entry of raw) {
+    if (entry.startsWith(`${name}=`)) return entry.split(';')[0];
+  }
+  return null;
+}
+
 function startWithoutCredential(missingName) {
   const env = {
     ...process.env,
     BM_USER: 'configured-test-user',
     BM_PASS: 'configured-test-password',
+    BM_SESSION_SECRET: 'configured-test-session-secret',
     DATABASE_URL: '',
   };
   delete env[missingName];
@@ -26,8 +63,8 @@ function startWithoutCredential(missingName) {
   });
 }
 
-test('server fails closed when either Basic Auth credential is absent', async (t) => {
-  for (const missingName of ['BM_USER', 'BM_PASS']) {
+test('server fails closed when a staff-gate credential is absent', async (t) => {
+  for (const missingName of ['BM_USER', 'BM_PASS', 'BM_SESSION_SECRET']) {
     await t.test(missingName, () => {
       const result = startWithoutCredential(missingName);
       assert.notEqual(result.status, 0);
@@ -65,7 +102,7 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   const siteStaticIndex = source.indexOf("app.use('/site', createReactAppRouter(");
   const rootIndex = source.indexOf("app.get(/^\\/$/, (request, response) => {");
   const customerFormIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
-  const authIndex = source.indexOf("app.use((req, res, next) => {");
+  const authIndex = source.indexOf("app.use(createDecoyGate(SESSION_SECRET));");
   const operationsReviewIndex = source.indexOf("app.use('/api/ai/operations-review', createOperationsReviewRouter");
   const hotelSearchIndex = source.indexOf("app.use('/api/hotels/search', createHotelSearchRouter");
   const stateApiIndex = source.indexOf("app.use('/api/state'");
@@ -77,12 +114,12 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.ok(siteStaticIndex > healthIndex, 'public site static mount must exist');
   assert.ok(rootIndex > siteStaticIndex, 'root route must mount after the public site static files');
   assert.ok(customerFormIndex > rootIndex, 'root must mount before the customer form');
-  assert.ok(authIndex > customerFormIndex, 'only public routes (site, root, customer form) may mount before auth');
-  assert.ok(operationsReviewIndex > authIndex, 'operations AI review must remain behind Basic Auth');
+  assert.ok(authIndex > customerFormIndex, 'only public routes (site, root, customer form) may mount before the staff gate');
+  assert.ok(operationsReviewIndex > authIndex, 'operations AI review must remain behind the staff gate');
   assert.ok(hotelSearchIndex > operationsReviewIndex, 'operations AI review must not shadow hotel search');
-  assert.ok(hotelSearchIndex > authIndex, 'hotel search must remain behind Basic Auth');
+  assert.ok(hotelSearchIndex > authIndex, 'hotel search must remain behind the staff gate');
   assert.ok(stateApiIndex > hotelSearchIndex, 'hotel search must not shadow the state API');
-  assert.ok(stateApiIndex > authIndex, 'state API must remain behind Basic Auth');
+  assert.ok(stateApiIndex > authIndex, 'state API must remain behind the staff gate');
   assert.ok(legacyManagerIndex > stateApiIndex, 'legacy manager backup must use the versioned state API');
   assert.ok(reactIndex > legacyManagerIndex, 'React must not shadow the legacy manager backup');
   assert.ok(legacyHtmlIndex > reactIndex, 'legacy HTML serving must remain explicit after the React app mount');
@@ -96,9 +133,9 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /app\.get\(\/\^\\\/\$\//);
   assert.match(source, /response\.set\('Cache-Control', 'no-store'\)/);
   // Root only enters the authenticated React manager when the request already
-  // carries valid Basic Auth (checked explicitly, not by relying on route
+  // carries a valid session (checked explicitly, not by relying on route
   // order) — everyone else gets the public site, never admin data.
-  assert.match(source, /hasValidBasicAuth\(request\) \? '\/app\/today' : '\/site\/'/);
+  assert.match(source, /hasValidSession\(request, SESSION_SECRET\) \? '\/linaya\/today' : '\/site\/'/);
   assert.match(source, /getContentRoot: \(\) => contentRoot/);
   assert.doesNotMatch(source, /app\.use\('\/'\s*,\s*createReactAppRouter/);
 });
@@ -106,7 +143,7 @@ test('React production route remains behind auth and cannot shadow APIs or legac
 test('public customer form cannot receive the manager sync bootstrap or state API', () => {
   const source = fs.readFileSync(serverPath, 'utf8');
   const publicRouteIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
-  const authIndex = source.indexOf("app.use((req, res, next) => {");
+  const authIndex = source.indexOf("app.use(createDecoyGate(SESSION_SECRET));");
   const jsonIndex = source.indexOf('app.use(express.json');
   const stateApiIndex = source.indexOf("app.use('/api/state'");
   const htmlInjectionIndex = source.indexOf("app.use('/index.html', createLegacyManagerRouter");
@@ -149,6 +186,7 @@ test('server fails closed before a database connection when the state capability
     ...process.env,
     BM_USER: 'configured-test-user',
     BM_PASS: 'configured-test-password',
+    BM_SESSION_SECRET: 'configured-test-session-secret',
     DATABASE_URL: 'postgres://127.0.0.1:1/never_contact_this_database',
   };
   delete env.BM_STATE_COMMAND_SECRET;
@@ -163,4 +201,102 @@ test('server fails closed before a database connection when the state capability
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /BM_STATE_COMMAND_SECRET must be configured\./);
   assert.doesNotMatch(result.stderr, /ECONNREFUSED|connect ECONN/);
+});
+
+test('the decoy gate: unauthenticated staff routes look like a 404, the hidden two-step form logs in', async () => {
+  const port = 34871;
+  const server = startDecoyServer(port);
+  try {
+    await waitForHealth(port);
+
+    const before = await fetch(`http://127.0.0.1:${port}/linaya/today`);
+    assert.equal(before.status, 404);
+    const decoyBody = await before.text();
+    assert.match(decoyBody, /שלחו לנו הודעה/);
+    assert.doesNotMatch(decoyBody, /מסך היום המחובר|window\.__BM_STATE__/);
+
+    const wrongUser = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'not-the-username' }),
+    });
+    const wrongUserBody = await wrongUser.json();
+    assert.equal(wrongUser.status, 200);
+    assert.equal(wrongUserBody.ref, undefined);
+    assert.equal(cookieFrom(wrongUser, 'bm_rq'), null);
+
+    const rightUser = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'decoy-test-user' }),
+    });
+    const rightUserBody = await rightUser.json();
+    assert.equal(rightUser.status, 200);
+    assert.ok(rightUserBody.ref, 'a correct username should look like an ordinary ticket reply');
+    const challengeCookie = cookieFrom(rightUser, 'bm_rq');
+    assert.ok(challengeCookie, 'a challenge cookie should be set after the username step');
+
+    const wrongPass = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: challengeCookie },
+      body: JSON.stringify({ message: 'not-the-password' }),
+    });
+    const wrongPassBody = await wrongPass.json();
+    assert.equal(wrongPassBody.ref, undefined, 'a wrong password must look identical to a wrong username');
+
+    const restartUser = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'decoy-test-user' }),
+    });
+    const restartChallenge = cookieFrom(restartUser, 'bm_rq');
+    assert.ok(restartChallenge, 'the flow must restart from the username step after any wrong step');
+
+    const rightPass = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: restartChallenge },
+      body: JSON.stringify({ message: 'decoy-test-password' }),
+    });
+    const rightPassBody = await rightPass.json();
+    assert.ok(rightPassBody.ref, 'a correct password should look like an ordinary ticket reply');
+    const sessionCookie = cookieFrom(rightPass, 'bm_ref');
+    assert.ok(sessionCookie, 'a session cookie should be set after both steps succeed');
+
+    const after = await fetch(`http://127.0.0.1:${port}/linaya/today`, {
+      headers: { Cookie: sessionCookie },
+    });
+    assert.equal(after.status, 200);
+    const realBody = await after.text();
+    assert.match(realBody, /<div id="root"/);
+  } finally {
+    server.kill();
+  }
+});
+
+test('the decoy login locks an IP out after repeated wrong attempts, even once it finally guesses right', async () => {
+  const port = 34872;
+  const server = startDecoyServer(port);
+  try {
+    await waitForHealth(port);
+
+    for (let i = 0; i < 3; i += 1) {
+      const attempt = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `wrong-${i}` }),
+      });
+      const body = await attempt.json();
+      assert.equal(body.ref, undefined);
+    }
+
+    const nowCorrect = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'decoy-test-user' }),
+    });
+    const nowCorrectBody = await nowCorrect.json();
+    assert.equal(nowCorrectBody.ref, undefined, 'a blocked IP must not get in even with the right username');
+  } finally {
+    server.kill();
+  }
 });

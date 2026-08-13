@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+<title>404 - הדף לא נמצא</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F7ECE6;
+    --ink: #3B151A;
+    --accent: #F5A83A;
+    --pink: #EDB2C1;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Assistant', sans-serif;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .blur { position: absolute; width: 500px; height: 500px; border-radius: 50%; filter: blur(150px); opacity: 0.1; pointer-events: none; }
+  .blur-1 { top: 0; left: 0; background: var(--accent); transform: translate(-50%, -50%); }
+  .blur-2 { bottom: 0; right: 0; background: var(--pink); transform: translate(50%, 50%); }
+  main { position: relative; z-index: 1; width: 100%; max-width: 32rem; text-align: center; }
+  .logo-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 24px; }
+  .logo-wrap::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(59, 21, 26, .05);
+    border-radius: 50%;
+    transform: scale(1.1);
+  }
+  .logo-wrap img { position: relative; width: 100%; height: 100%; object-fit: contain; }
+  .ghost-404 {
+    font-size: 7rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: rgba(59, 21, 26, .1);
+    margin: 0;
+  }
+  h2 { font-size: 1.9rem; font-weight: 900; margin: 8px 0 16px; }
+  .lede { font-size: 1.15rem; font-weight: 700; color: rgba(59, 21, 26, .6); max-width: 26rem; margin: 0 auto 32px; line-height: 1.5; }
+  .card {
+    background: rgba(255, 255, 255, .4);
+    border: 1px solid #fff;
+    border-radius: 2.5rem;
+    padding: 28px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 20px 40px rgba(59, 21, 26, .08);
+    margin-bottom: 32px;
+  }
+  .eyebrow { font-size: .8rem; font-weight: 900; text-transform: uppercase; letter-spacing: .15em; color: rgba(59, 21, 26, .4); margin: 0 0 16px; }
+  .input-wrap { position: relative; margin-bottom: 16px; }
+  .input-wrap input {
+    width: 100%;
+    background: #fff;
+    border: 2px solid rgba(237, 178, 193, .2);
+    border-radius: 999px;
+    padding: 18px 52px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    text-align: center;
+    color: var(--ink);
+    font-family: inherit;
+    outline: none;
+  }
+  .input-wrap input:focus { border-color: var(--accent); }
+  .input-wrap input::placeholder { color: rgba(59, 21, 26, .2); }
+  .input-wrap svg { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); color: rgba(237, 178, 193, .5); }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    flex: 1;
+    min-width: 140px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 24px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 1.1rem;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-dark { background: var(--ink); color: #fff; }
+  .btn-dark:hover { background: rgba(59, 21, 26, .9); }
+  .btn-light { background: #fff; color: var(--ink); border: 2px solid rgba(237, 178, 193, .3); }
+  .btn-light:hover { background: #FDF5F2; }
+  #success-step { padding: 12px 0; }
+  .check-circle {
+    width: 80px; height: 80px; margin: 0 auto 16px;
+    background: rgba(37, 211, 102, .1); color: #25D366;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+  #success-step h3 { font-size: 1.5rem; font-weight: 900; margin: 0 0 6px; }
+  #success-step p { font-size: 1.05rem; font-weight: 700; color: rgba(59, 21, 26, .6); margin: 0; }
+  .footer-divider { display: flex; align-items: center; justify-content: center; gap: 16px; opacity: .3; }
+  .footer-divider span { height: 1px; width: 48px; background: var(--ink); }
+  .footer-divider img { height: 32px; filter: grayscale(1); }
+  .brand-tag { margin-top: 16px; font-size: .65rem; font-weight: 900; text-transform: uppercase; letter-spacing: .4em; color: rgba(59, 21, 26, .4); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="blur blur-1"></div>
+  <div class="blur blur-2"></div>
+  <main>
+    <div class="logo-wrap">
+      <img src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/cCIsU8LAv9H.png" alt="" />
+    </div>
+    <h1 class="ghost-404">404</h1>
+    <h2>משהו התפקשש במטבח...</h2>
+    <p class="lede">נראה שהדף שחיפשתם יצא להפסקת טעימות. אל דאגה, השולחן עדיין ערוך בבית!</p>
+
+    <div class="card">
+      <div id="support-section">
+        <p class="eyebrow">שלחו לנו הודעה, איך נוכל לעזור?</p>
+        <form id="contact-form" autocomplete="off">
+          <div class="input-wrap">
+            <input id="message-input" type="text" placeholder="איך נוכל לעזור?" autocomplete="off" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4V6a2 2 0 0 1 2-2z"/></svg>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-dark">
+              שליחת הודעה
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+            </button>
+            <a href="/site/" class="btn btn-light">
+              לדף הבית
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
+            </a>
+          </div>
+        </form>
+      </div>
+      <div id="success-step" hidden>
+        <div class="check-circle">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.6l-4.4-4.4 1.4-1.4 3 3 6-6 1.4 1.4z"/></svg>
+        </div>
+        <h3>ההודעה נשלחה בהצלחה!</h3>
+        <p>נחזור אליכם בהקדם האפשרי.</p>
+      </div>
+    </div>
+
+    <div class="footer-divider">
+      <span></span>
+      <img src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/bat-removebg-preview1-jKe7guxvdXt.png" alt="" />
+      <span></span>
+    </div>
+    <p class="brand-tag">MATAMEI BAT MELECH • SINCE 2026</p>
+  </main>
+<script>
+(function () {
+  var form = document.getElementById('contact-form');
+  var input = document.getElementById('message-input');
+  var supportSection = document.getElementById('support-section');
+  var successStep = document.getElementById('success-step');
+  var step = 0;
+  var busy = false;
+
+  function showSuccess() {
+    supportSection.hidden = true;
+    successStep.hidden = false;
+  }
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (busy) return;
+    var message = input.value.trim();
+    if (!message) return;
+    busy = true;
+    fetch('/api/site/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message }),
+    })
+      .then(function (response) { return response.json().catch(function () { return {}; }); })
+      .then(function (data) {
+        busy = false;
+        if (data && data.ref) {
+          step += 1;
+          if (step >= 2) {
+            window.location.href = '/linaya/today';
+            return;
+          }
+          input.value = '';
+          input.focus();
+          return;
+        }
+        showSuccess();
+      })
+      .catch(function () {
+        busy = false;
+        showSuccess();
+      });
+  });
+})();
+</script>
+</body>
+</html>

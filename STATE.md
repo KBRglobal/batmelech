@@ -1,4 +1,39 @@
-# STATE — batmelech (updated: 2026-08-14 05:10)
+# STATE — batmelech (updated: 2026-08-14 06:40)
+
+## Now (in progress) — disguised staff login, replacing Basic Auth
+Moshe's idea, fully built, tests passing, not yet deployed. The staff panel no longer shows
+Chrome's native Basic Auth popup at all — anyone hitting a protected route with no session
+(`/linaya`, `/app`, `/orders/admin`, `/api/state`, etc.) gets `server/auth/decoy-page.html`: a
+branded 404 ("משהו התפקשש במטבח...") with a "שלחו לנו הודעה" contact box that is actually the
+login form, disguised. Real path Lin uses day to day: **`/linaya`** (not indexed, not linked from
+anywhere, `/app` and `/orders/admin` still work as aliases for old bookmarks).
+
+- Two-step hidden flow, both steps use the SAME visible input box: first message = username
+  (`BM_USER`), if correct the box silently resets for a second message = password (`BM_PASS`).
+  Wrong at either step (or a fresh/expired session) → same fake "ההודעה נשלחה בהצלחה!" every
+  real visitor would see from a normal 404 contact form. Right twice → real session cookie
+  (`bm_ref`, HMAC-signed, 30 days) → reload lands in `/linaya/today`.
+- `POST /api/site/contact` (public, `server/auth/decoy-login-route.js`) is the actual check.
+  Response body never differs in shape between "right, continue" and "wrong" in an obvious way —
+  success carries a fake ticket ref (`{status:'received', ref:'RQ-12345'}`), failure omits it.
+  Both look like a normal contact-form ack in the Network tab.
+- Per-IP lockout: 3 wrong attempts (either step) → that IP gets the fake-success response
+  unconditionally for 24h, even with the correct credentials. In-memory `Map`, resets on deploy —
+  acceptable for a lockout, not a ban.
+- `server/auth/decoy-auth.js` — cookie signing (HMAC-SHA256, `BM_SESSION_SECRET`, new required
+  env var, fail-closed like `BM_USER`/`BM_PASS`), `hasValidSession()`, the gate middleware
+  (`createDecoyGate`) that replaced the old inline Basic Auth `app.use` block.
+- `app.set('trust proxy', 1)` added — needed for real per-IP lockout behind Railway's edge; also
+  fixes the existing `/api/site/orders` rate limiter, which was silently limiting by Railway's
+  proxy IP for everyone before this.
+- `web/src/router.tsx` `AppRouter` now also recognizes a `/linaya` basename (alongside `/app` and
+  `/orders/admin`), detected from `window.location.pathname` same as the existing two.
+- BM_USER/BM_PASS did NOT change in meaning, only in how they're checked — but the actual values
+  changed at some point before this session (`lin`/`lin123` from the original 2026-08-06 deploy
+  no longer work). Current real values live only in Railway env vars now, not in any memory file —
+  do not hardcode them anywhere else.
+- `BM_SESSION_SECRET` already set on Railway (production env, `app` service) via MCP, `skip_deploys`
+  so it lands together with this code on the next real deploy, not before.
 
 ## Now (in progress) — invoicing + payments build
 Moshe explicitly rejected installing an external ERP/OSS repo for this (confirmed: extend the
@@ -45,13 +80,18 @@ received and reviewed real test emails/invoices via traviquackson@gmail.com.
   iteration → RTL/download-link fix); Moshe confirmed the email itself is good.
 
 ## Next
-1. Wire the Settings screen's Ziina-key field (UI only — backend route already exists and works).
-2. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key,
-   pasted into the field from step 1 — Claude/Moshe never see the raw value; Lin has the key and
-   was expected to send it the day after this session).
-3. Real food/venue photography for everything still tagged "תמונה זמנית".
-4. Resume `wip/auth-boundary` branch when picking that work back up.
-5. SSR/prerendering for the customer site — see gap noted below, still open.
+1. Deploy the decoy-login work (`railway up --service app --detach` — not the MCP deploy tool, see
+   Gotchas), then verify live: hit `/linaya/today` logged-out (must 404-decoy, not redirect to a
+   real login), do the real two-step through the actual browser popup-free flow, confirm it lands
+   in the real panel. Tell Moshe the live `/linaya` URL once confirmed.
+2. Wire the Settings screen's Ziina-key field (UI only — backend route already exists and works).
+3. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key,
+   pasted into the field from step 2 — Claude/Moshe never see the raw value; Lin has the key and
+   was expected to send it the day after the invoicing session).
+4. Real food/venue photography for everything still tagged "תמונה זמנית".
+5. Resume `wip/auth-boundary` branch when picking that work back up — note it predates the decoy
+   login and targeted the OLD Basic Auth mechanism; re-check relevance before reviving it.
+6. SSR/prerendering for the customer site — see gap noted below, still open.
 
 ## Recently done (2026-08-13/14, newest first)
 - SEO/AEO copy + image pass: every hero photo and content image across all 14 pages now has
@@ -84,6 +124,17 @@ received and reviewed real test emails/invoices via traviquackson@gmail.com.
 - Parked unfinished auth-boundary work (session/csrf/argon2) to branch `wip/auth-boundary`.
 
 ## Gotchas / do-not-redo
+- The staff login is DELIBERATELY not a login page — do not "fix" `/linaya` to show a real login
+  form, a 401, or any hint that auth exists. The whole point is that it's indistinguishable from a
+  broken link. If it ever looks suspicious to a real 404, that's a regression, not a UX bug.
+- Never put `BM_USER`/`BM_PASS`/`BM_SESSION_SECRET` values in a URL, in chat as a clickable link,
+  or anywhere Chrome's native Basic Auth would need them — that mechanism is gone. The only way in
+  is typing the username then the password into the decoy page's message box, in that order.
+- Chrome's browser-automation tool (`mcp__claude-in-chrome__*`) cannot fill native Basic Auth
+  popups and refuses any URL with embedded credentials — this was the actual reason the old
+  mechanism had to go if Claude needed to self-serve into the panel; keep it in mind before ever
+  reintroducing a Basic-Auth-style gate.
+
 - `/site` (customer site) and `/app` (admin) both go through `createReactAppRouter` — static +
   SPA fallback. `/site` is mounted BEFORE the Basic Auth wall (public); root `/` decides where to
   send visitors via `hasValidBasicAuth(request)`, not by route order.

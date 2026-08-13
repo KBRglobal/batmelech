@@ -104,6 +104,15 @@ describe('AppRoutes', () => {
     expect(screen.getAllByRole('navigation')).toHaveLength(2)
   })
 
+  it('mounts BrowserRouter below the /linaya basename', () => {
+    window.history.pushState({}, '', '/linaya/today')
+
+    render(<AppRouter />)
+
+    expect(screen.getByRole('heading', { name: 'מסך היום המחובר' })).toBeTruthy()
+    expect(screen.getAllByRole('navigation')).toHaveLength(2)
+  })
+
   it('redirects the root route to Today and renders it inside the shared operator shell', async () => {
     renderRoute(APP_ROUTES.root)
 
