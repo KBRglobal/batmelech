@@ -4,7 +4,11 @@
 - Nothing in flight. Customer site v1 live at www.batmelech.ae, unified design pass shipped.
 
 ## Next (priority order, per Moshe)
-1. **Real order-system connection — the big gap.** Checkout sends a plain WhatsApp text message
+1. **On-page copy pass for SEO/AEO.** Only meta tags/schema were done (see below) — the actual
+   visible text (H1s, intros, product descriptions across all 14 pages) has NOT been reviewed for
+   keyword coverage or fact-extractability by AI answer engines. Real per-page task, needs a fresh
+   session (this one is context-exhausted).
+2. **Real order-system connection — the big gap.** Checkout sends a plain WhatsApp text message
    only. It does NOT write the hidden BM1 payload (`order-form.html`'s zero-width-unicode
    encoding), so new-site orders do NOT auto-import into the admin's order-import-review screen —
    Lin would have to retype every order by hand. Two paths were discussed with Moshe:
@@ -14,8 +18,8 @@
    (b) adopt TastyIgniter (real OSS restaurant ordering, PHP/MySQL) — rejected earlier as wrong
    stack (separate server, doesn't talk to the Node/Postgres ledger) unless there's an actual
    integration plan. Default to (a) unless Moshe says otherwise.
-2. Real food/venue photography for everything still tagged "תמונה זמנית".
-3. Resume `wip/auth-boundary` branch when picking that work back up.
+3. Real food/venue photography for everything still tagged "תמונה זמנית".
+4. Resume `wip/auth-boundary` branch when picking that work back up.
 
 ## Recently done (2026-08-13/14, newest first)
 - SEO/AEO baseline: OG/Twitter tags + Restaurant JSON-LD in index.html, per-page title/meta on
