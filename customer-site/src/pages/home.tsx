@@ -1,6 +1,6 @@
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
-import { NavHeader } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
 import { useReveal } from '../components/reveal'
 
@@ -80,54 +80,30 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 relative overflow-x-hidden" dir="rtl">
-      <section className="relative min-h-screen flex flex-col overflow-hidden">
-        <div className="absolute inset-0">
-          <img
-            src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
-            alt="Luxury Shabbat Dinner Dubai"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+      <PageHero
+        active="/"
+        size="screen"
+        badge="Authentic Home Kitchen"
+        title={['הטעם של הבית', 'בלב דובאי']}
+        subtitle="אוכל ישראלי שורשי, טרי בכל יום, מבושל עם כל הלב. האיכות המוכרת מישראל - עכשיו בחופשה שלכם."
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
+      >
+        <div className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto justify-center mt-4">
+          <Link
+            to="/shabbat-order"
+            className="bg-white text-[#3B151A] px-14 py-7 rounded-full font-black text-2xl shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-4 group"
+          >
+            <Icon icon="ph:calendar-heart-fill" className="text-3xl group-hover:animate-bounce" />
+            הרכיבו חבילת קידוש מושלמת
+          </Link>
+          <Link
+            to="/weekdays"
+            className="bg-[#3B151A] text-white px-14 py-7 rounded-full font-black text-2xl hover:bg-black transition-all flex items-center justify-center shadow-2xl border-2 border-[#EDB2C1]/30"
+          >
+            תפריט יום חול
+          </Link>
         </div>
-        <div className="relative z-10 flex flex-col min-h-screen">
-          <NavHeader active="/" />
-          <div className="flex-grow flex flex-col items-center justify-center text-center px-6">
-            <div className="w-48 h-48 md:w-72 md:h-72 mb-8 animate-float">
-              <img
-                src="/site/assets/logo-cream.png"
-                alt="Bat Melech Logo"
-                className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]"
-              />
-            </div>
-            <div className="max-w-4xl backdrop-blur-md bg-black/10 p-10 rounded-[4rem] border border-white/10 shadow-2xl">
-              <h1 className="text-5xl md:text-8xl font-black text-white mb-6 font-heading tracking-tight leading-none">
-                הטעם של הבית, <br />
-                <span className="text-[#F5A83A]">בלב דובאי</span>
-              </h1>
-              <p className="text-white/90 text-xl md:text-3xl font-bold mb-12 leading-relaxed">
-                אוכל ישראלי שורשי, טרי בכל יום, מבושל עם כל הלב.
-                <br className="hidden md:block" />
-                האיכות המוכרת מישראל - עכשיו בחופשה שלכם.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto justify-center">
-                <Link
-                  to="/shabbat-order"
-                  className="bg-white text-[#3B151A] px-14 py-7 rounded-full font-black text-2xl shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-4 group"
-                >
-                  <Icon icon="ph:calendar-heart-fill" className="text-3xl group-hover:animate-bounce" />
-                  הרכיבו חבילת קידוש מושלמת
-                </Link>
-                <Link
-                  to="/weekdays"
-                  className="bg-[#3B151A] text-white px-14 py-7 rounded-full font-black text-2xl hover:bg-black transition-all flex items-center justify-center shadow-2xl border-2 border-[#EDB2C1]/30"
-                >
-                  תפריט יום חול
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      </PageHero>
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 pb-32">
         <section id="story" ref={storyReveal.ref} className={`mb-32 scroll-mt-24 pt-32 text-center ${storyReveal.className}`}>
