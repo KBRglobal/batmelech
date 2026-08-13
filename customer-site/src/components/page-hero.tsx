@@ -28,7 +28,13 @@ export function PageHero({
     <section className={`relative ${SIZE_CLASS[size]} flex flex-col overflow-hidden`}>
       <div className="absolute inset-0">
         <img src={image} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#3B151A]/90 via-[#3B151A]/50 to-[#F7ECE6]" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(59,21,26,0.55) 0%, rgba(59,21,26,0.06) 45%, #F7ECE6 100%)',
+          }}
+        />
       </div>
       <div className="relative z-10 flex flex-col flex-grow">
         <NavHeader active={active} />
@@ -38,10 +44,14 @@ export function PageHero({
               <span>{badge}</span>
             </div>
           )}
-          <h1 className="text-4xl md:text-7xl font-black text-white font-heading tracking-tight leading-none mb-6">
+          <h1 className="text-4xl md:text-7xl font-black text-white font-heading tracking-tight leading-none mb-6 drop-shadow-[0_2px_16px_rgba(0,0,0,0.5)]">
             {title[0]} <span className="text-[#F5A83A]">{title[1]}</span>
           </h1>
-          {subtitle && <p className="text-white/90 text-lg md:text-2xl font-bold max-w-3xl leading-relaxed mb-4">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-white/90 text-lg md:text-2xl font-bold max-w-3xl leading-relaxed mb-4 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+              {subtitle}
+            </p>
+          )}
           {children}
         </div>
       </div>
