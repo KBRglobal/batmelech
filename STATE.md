@@ -1,58 +1,57 @@
-# STATE — batmelech (updated: 2026-08-14 03:55)
+# STATE — batmelech (updated: 2026-08-14 05:10)
 
 ## Now (in progress) — invoicing + payments build
-Moshe explicitly rejected installing an external ERP/OSS repo for this (asked directly, confirmed:
-extend the existing Node/Postgres system only). Full pipeline is coded, deployed, and live-tested
-(196 server tests + 548 web tests pass, healthz + /api/site/orders both verified 200/400 live).
+Moshe explicitly rejected installing an external ERP/OSS repo for this (confirmed: extend the
+existing Node/Postgres system only). Full pipeline is coded, deployed, live-tested, and Moshe has
+received and reviewed real test emails/invoices via traviquackson@gmail.com.
 
-Shipped and live:
+**Fully working and confirmed live end-to-end:**
 - Order email field (checkout + admin order editor).
 - Invoice legal settings in admin Settings screen (business name, TRN, address, AED/USD) — Lin
-  fills these in herself; nothing shown here required for the rest to work.
+  fills these in herself.
 - Customer-site checkout POSTs orders to `/api/site/orders` (public, rate-limited), appending
   straight into the same bm_state `orders[]` the admin reads — **replaces the planned BM1-payload
-  approach entirely**. Site orders now show up in the admin Orders screen automatically, no
-  retyping. WhatsApp message still sends too (primary channel, unaffected).
+  approach entirely**. Site orders show up in the admin Orders screen automatically.
 - `server/business-data/` — plain Postgres tables (`payment_credentials`, `invoices`,
   `invoice_number_seq`), deliberately outside the bm_state schema-drift-validated system (see
-  Gotchas). Migration ran clean on deploy, server boots fine (`db: on`, verified in deploy logs).
+  Gotchas).
   - `secret-box.js` — AES-256-GCM encrypt/decrypt for Lin's own Ziina key.
-  - `invoice-pdf.js` — VAT invoice PDF (pdf-lib), **English only on purpose** (pdf-lib has no
-    Hebrew glyphs; English is FTA-accepted). VAT line only if a TRN is set, treated as
-    inclusive-in-total (5%). Currency = whatever the settings toggle says, no FX math anywhere —
-    Lin's own convention.
-  - `send-invoice-email.js` — Resend, Hebrew HTML template (branded, RTL), PDF attached. Sends
-    from `invoices@batmelech.ae`.
-  - `invoice-trigger.js` — wraps `stateRepository.saveState` (does NOT touch the tested
+  - `invoice-pdf.js` — branded VAT invoice PDF (pdf-lib): dark header band with logo, gold "TAX
+    INVOICE" label, shaded line-item table, gold-highlighted total row, footer band. **English
+    only on purpose** (pdf-lib has no Hebrew glyphs; English is FTA-accepted). VAT line only if a
+    TRN is set, treated as inclusive-in-total (5%). Currency = whatever the settings toggle says,
+    no FX math anywhere.
+  - `send-invoice-email.js` — Resend, table-based **email-safe** HTML (no Tailwind/JS — real inbox
+    clients run no JavaScript, an earlier Tailwind-CDN version from Moshe would have rendered
+    broken). Warm Hebrew copy, hero photo, delivery-address callout, red no-show/re-delivery-fee
+    warning, Shabbat-plata deposit/hotel-coordination note, WhatsApp + "הורדת חשבונית" (download
+    invoice) buttons. Every RTL block has explicit `dir="rtl"` + `direction:rtl` (Gmail strips the
+    outer `<html dir>`) and punctuation uses numeric character refs so bidi can't flip `?`/`!`.
+  - `invoice-download-route.js` — public `GET /invoices/:invoiceNumber/:token.pdf`, regenerates
+    the PDF on request from stored fields (no blob storage). Token-gated, not just invoice number
+    (numbers are sequential/guessable — token prevents enumerating other customers' PII).
+  - `invoice-trigger.js` — wraps `stateRepository.saveState` (doesn't touch the tested
     state-repository/service/route files) so ANY successful save — admin editor, site checkout,
     backup restore — checks for orders that just flipped `paid` to 'כן' with a valid email, and
-    fires an invoice async, non-blocking. Idempotent via the `invoices` table, not the order itself.
+    fires an invoice async, non-blocking, idempotent via the `invoices` table.
   - `ziina-key-route.js` — `/api/settings/ziina-key`, admin-only, write-only (POST saves encrypted,
-    GET returns only `{configured: boolean}`, never the value). **No admin UI field wired to this
-    yet** — next task.
-- Railway env vars **SET AND LIVE**: `RESEND_API_KEY` (new dedicated `batmelech-sending` key,
-  Sending-access scope, on the same Resend org as maktuba/mykeyz — traviquackson@gmail.com),
-  `BM_SECRETS_KEY` (freshly generated, 32 random bytes base64). Deploy confirmed healthy after
-  setting both (`batmelech listening on :8080, db: on`, no crash).
-- Resend domain `batmelech.ae` added (region us-east-1) and all 4 DNS records (DKIM TXT, SPF MX +
-  TXT, DMARC TXT) added to AEserver DNS (Lin's registrar — **not GoDaddy**, confirmed by Moshe) and
-  saved successfully. Status was "Pending" as of this save — Resend's own notice says verification
-  "may take a few hours depending on your DNS provider's propagation time." Nothing to do here but
-  wait and re-check `https://resend.com/domains` (traviquackson@gmail.com account) — until it shows
-  "Verified", sending from `invoices@batmelech.ae` will fail (invoice-trigger already catches this
-  as a per-order failure, logs it, does not crash anything).
-- Resend account upgraded to paid (Transactional Pro, ~AED 76/mo) — Moshe explicitly approved this
-  exact charge in chat before it was clicked.
+    GET returns only `{configured: boolean}`). **No admin UI field wired to this yet** — next task.
+- Railway env vars live: `RESEND_API_KEY` (dedicated `batmelech-sending` key, Sending-access scope,
+  traviquackson@gmail.com org), `BM_SECRETS_KEY` (32 random bytes base64).
+- Resend domain `batmelech.ae` — **Verified** (confirmed by a successful real send). Resend account
+  upgraded to paid (Transactional Pro, ~AED 76/mo) — Moshe explicitly approved this exact charge in
+  chat before it was clicked.
+- Sent 3 real test invoice emails to traviquackson@gmail.com over the course of this build (design
+  iteration → RTL/download-link fix); Moshe confirmed the email itself is good.
 
 ## Next
-1. Re-check Resend domain verification status (`resend.com/domains`) — once "Verified", invoices
-   will actually start sending; nothing else to do for that.
-2. Wire the Settings screen's Ziina-key field (UI only — backend route already exists and works).
-3. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key,
-   pasted into the field from step 2 — Claude/Moshe never see the raw value).
-4. Real food/venue photography for everything still tagged "תמונה זמנית".
-5. Resume `wip/auth-boundary` branch when picking that work back up.
-6. SSR/prerendering for the customer site — see gap noted below, still open.
+1. Wire the Settings screen's Ziina-key field (UI only — backend route already exists and works).
+2. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key,
+   pasted into the field from step 1 — Claude/Moshe never see the raw value; Lin has the key and
+   was expected to send it the day after this session).
+3. Real food/venue photography for everything still tagged "תמונה זמנית".
+4. Resume `wip/auth-boundary` branch when picking that work back up.
+5. SSR/prerendering for the customer site — see gap noted below, still open.
 
 ## Recently done (2026-08-13/14, newest first)
 - SEO/AEO copy + image pass: every hero photo and content image across all 14 pages now has
