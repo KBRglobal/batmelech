@@ -1,14 +1,10 @@
-# STATE — batmelech (updated: 2026-08-14 00:35)
+# STATE — batmelech (updated: 2026-08-14 01:58)
 
 ## Now (in progress)
-- Nothing in flight. Customer site v1 live at www.batmelech.ae, unified design pass shipped.
+- Nothing in flight. Customer site v1 live at www.batmelech.ae, unified design + SEO/AEO copy pass shipped.
 
 ## Next (priority order, per Moshe)
-1. **On-page copy pass for SEO/AEO.** Only meta tags/schema were done (see below) — the actual
-   visible text (H1s, intros, product descriptions across all 14 pages) has NOT been reviewed for
-   keyword coverage or fact-extractability by AI answer engines. Real per-page task, needs a fresh
-   session (this one is context-exhausted).
-2. **Real order-system connection — the big gap.** Checkout sends a plain WhatsApp text message
+1. **Real order-system connection — the big gap.** Checkout sends a plain WhatsApp text message
    only. It does NOT write the hidden BM1 payload (`order-form.html`'s zero-width-unicode
    encoding), so new-site orders do NOT auto-import into the admin's order-import-review screen —
    Lin would have to retype every order by hand. Two paths were discussed with Moshe:
@@ -18,10 +14,19 @@
    (b) adopt TastyIgniter (real OSS restaurant ordering, PHP/MySQL) — rejected earlier as wrong
    stack (separate server, doesn't talk to the Node/Postgres ledger) unless there's an actual
    integration plan. Default to (a) unless Moshe says otherwise.
-3. Real food/venue photography for everything still tagged "תמונה זמנית".
-4. Resume `wip/auth-boundary` branch when picking that work back up.
+2. Real food/venue photography for everything still tagged "תמונה זמנית".
+3. Resume `wip/auth-boundary` branch when picking that work back up.
+4. SSR/prerendering for the customer site — see gap noted below, still open.
 
 ## Recently done (2026-08-13/14, newest first)
+- SEO/AEO copy + image pass: every hero photo and content image across all 14 pages now has
+  descriptive Hebrew alt text (was empty/missing on most — real image-search and accessibility
+  gap). Short keyword-rich intro copy added to Weekdays and Shabbat Order (previously thin pages).
+  Kashrut page got an FAQ block (Q&A reusing only already-approved facts — helps AI answer engines
+  extract facts, doesn't invent new claims). Canonical link, og:url, og/twitter title+description,
+  and robots meta now update on every route change (were frozen on the homepage before — told
+  crawlers all 13 other pages were duplicates of `/`, a real indexing bug). `/checkout` now sends
+  `noindex,nofollow` (transactional page, no search value).
 - SEO/AEO baseline: OG/Twitter tags + Restaurant JSON-LD in index.html, per-page title/meta on
   route change, sitemap.xml + llms.txt for the new site, robots.txt references the sitemap.
   Known gap: SPA client-rendering means crawlers that don't execute JS (most AEO/AI bots) still
