@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react'
-import { NavHeader } from '../components/nav'
+import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
 import { FloatingCartBar } from '../components/floating-cart-bar'
 import { Photo } from '../components/photo'
@@ -65,32 +65,14 @@ export function Weekdays() {
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
-      <section className="relative min-h-[70vh] flex flex-col overflow-hidden">
-        <div className="absolute inset-0">
-          <img
-            src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1zGIolEp4on.jpeg"
-            alt="Weekday Menu Dubai"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#3B151A]/90 via-[#3B151A]/50 to-[#F7ECE6]" />
-        </div>
-        <div className="relative z-10 flex flex-col min-h-[70vh]">
-          <NavHeader active="/weekdays" />
-          <div className="flex-grow flex flex-col items-center justify-center text-center px-6">
-            <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#F5A83A] text-white rounded-full text-xs font-black mb-8 shadow-xl tracking-widest uppercase">
-              <span>Fresh Every Single Day</span>
-            </div>
-            <h1 className="text-5xl md:text-9xl font-black text-white font-heading tracking-tight leading-none mb-8">
-              מטעמי <span className="text-[#F5A83A]">יום חול</span>
-            </h1>
-            <p className="text-white/90 text-lg md:text-3xl font-bold max-w-3xl leading-relaxed">
-              הטעם של הבית מחכה לכם בכל יום בשבוע.
-              <br className="hidden md:block" />
-              כשר, טרי ומבושל באהבה - במיוחד עבורכם בדובאי.
-            </p>
-          </div>
-        </div>
-      </section>
+      <PageHero
+        active="/weekdays"
+        size="tall"
+        badge="Fresh Every Single Day"
+        title={['מטעמי', 'יום חול']}
+        subtitle="הטעם של הבית מחכה לכם בכל יום בשבוע. כשר, טרי ומבושל באהבה - במיוחד עבורכם בדובאי."
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1zGIolEp4on.jpeg"
+      />
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-20 pb-56">
         <div className="text-center mb-16">

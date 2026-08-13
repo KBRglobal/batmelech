@@ -28,11 +28,14 @@ export function PageHero({
     <section className={`relative ${SIZE_CLASS[size]} flex flex-col overflow-hidden`}>
       <div className="absolute inset-0">
         <img src={image} alt="" className="w-full h-full object-cover" />
+        {/* Cream wordmark logo needs a guaranteed-dark upper half on ANY photo
+            (kashrut's certificate hero is nearly white) — hold ~35% brand-brown
+            through the logo zone before clearing to let the photo's color through. */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(to bottom, rgba(59,21,26,0.55) 0%, rgba(59,21,26,0.06) 45%, #F7ECE6 100%)',
+              'linear-gradient(to bottom, rgba(59,21,26,0.72) 0%, rgba(59,21,26,0.45) 40%, rgba(59,21,26,0.12) 65%, #F7ECE6 100%)',
           }}
         />
       </div>
@@ -43,7 +46,7 @@ export function PageHero({
             <img
               src="/site/assets/logo-cream.png"
               alt="מטעמי בת מלך"
-              className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]"
+              className="w-full h-full object-contain drop-shadow-[0_2px_18px_rgba(59,21,26,0.65)]"
             />
           </div>
           <div className="max-w-4xl backdrop-blur-md bg-black/10 p-10 rounded-[4rem] border border-white/10 shadow-2xl">

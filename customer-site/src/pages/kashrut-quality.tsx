@@ -10,7 +10,7 @@ export function KashrutQuality() {
         size="compact"
         badge="Kashrut & Premium Quality"
         title={['כשרות', 'ואיכות']}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7zzOf0cSMJb.jpeg"
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg"
       />
       <main className="pt-16 max-w-4xl mx-auto px-6">
         <section className="mb-20 text-center">
