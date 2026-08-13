@@ -162,7 +162,7 @@ export function ShabbatOrder() {
         active="/shabbat-order"
         size="tall"
         badge="The Shabbat Experience"
-        title={['הטעם של הבית', 'לשבת קודש']}
+        title={['מטעמי', 'שבת קודש']}
         subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
       >

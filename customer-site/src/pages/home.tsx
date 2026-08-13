@@ -170,8 +170,8 @@ export function Home() {
                   <span>The Shabbat Experience</span>
                 </div>
                 <h2 className="text-4xl md:text-7xl font-black font-heading text-white leading-tight">
-                  הטעם של הבית <br />
-                  <span className="text-[#F5A83A]">לשבת קודש</span>
+                  מטעמי <br />
+                  <span className="text-[#F5A83A]">שבת קודש</span>
                 </h2>
                 <p className="text-white/80 text-lg md:text-2xl font-bold leading-relaxed">
                   חבילות קידוש וסעודות שבת מפוארות שמגיעות עד אליכם. כל מה שצריך לשבת מושלמת, בטעם של בית ובכשרות
