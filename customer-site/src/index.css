@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-font-sans: var(--font-sans);
+  --font-font-heading: var(--font-heading);
+  --font-font-serif: var(--font-serif);
+}
+
+@theme {
+  --radius-xs: calc(var(--radius) - 8px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 16px);
+  --radius-4xl: calc(var(--radius) + 24px);
+}
+
+:root {
+  --background: #f7ece6;
+  --foreground: #3b151a;
+  --primary: #3b151a;
+  --primary-foreground: #ffffff;
+  --secondary: #edb2c1;
+  --secondary-foreground: #3b151a;
+  --muted: #f3ece7;
+  --muted-foreground: #8d182c;
+  --accent: #f5a83a;
+  --accent-foreground: #ffffff;
+  --destructive: #8d182c;
+  --card: #ffffff;
+  --card-foreground: #3b151a;
+  --popover: #ffffff;
+  --popover-foreground: #381f2a;
+  --border: #edb2c1;
+  --input: #ffffff;
+  --ring: #482638;
+
+  --font-sans: 'Assistant', sans-serif;
+  --font-heading: 'Assistant', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+
+  --radius: 1.5rem;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}

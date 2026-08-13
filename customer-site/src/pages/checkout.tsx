@@ -1,0 +1,185 @@
+import type { ReactNode } from 'react'
+import { Icon } from '@iconify/react'
+import { Link } from 'react-router'
+import { BackHeader } from '../components/nav'
+import { useCart } from '../cart-context'
+import { buildOrderMessage, waLink } from '../whatsapp'
+
+const DELIVERY_FEE = 15
+
+export function Checkout() {
+  const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
+  const total = lines.length ? subtotal + DELIVERY_FEE : 0
+
+  if (lines.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans flex flex-col items-center justify-center gap-8 px-6 text-center" dir="rtl">
+        <Icon icon="ph:basket-bold" className="text-6xl text-[#EDB2C1]" />
+        <h1 className="text-3xl font-black">הסל שלכם ריק</h1>
+        <Link to="/weekdays" className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg">
+          לתפריט יום חול
+        </Link>
+        <Link to="/shabbat-order" className="text-[#8D182C] font-black underline">
+          או להרכבת מארז שבת
+        </Link>
+      </div>
+    )
+  }
+
+  const canSubmit = customer.name.trim() && customer.phone.trim() && customer.address.trim()
+
+  return (
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
+      <BackHeader backTo="/weekdays" />
+      <div className="h-24" />
+
+      <main className="max-w-3xl mx-auto px-6 py-6 space-y-12">
+        <h1 className="text-3xl font-black font-heading text-center">סיכום הזמנה</h1>
+
+        <section className="bg-white rounded-[3rem] p-6 md:p-8 shadow-xl border border-[#EDB2C1]/20">
+          <h2 className="text-2xl font-black font-heading mb-6 border-b border-[#EDB2C1]/10 pb-4 flex items-center gap-3">
+            <Icon icon="ph:basket-fill" className="text-[#F5A83A]" />
+            פריטים בהזמנה
+          </h2>
+          <div className="space-y-6">
+            {lines.map((line) => (
+              <div key={line.id} className="flex items-start justify-between gap-4">
+                <div className="flex-grow">
+                  <h4 className="font-black">{line.name}</h4>
+                  {line.note && <p className="text-xs text-[#3B151A]/50 font-bold mt-1 leading-relaxed">{line.note}</p>}
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setQty(line.id, line.qty - 1)}
+                      className="w-8 h-8 rounded-lg bg-[#F7ECE6] font-black flex items-center justify-center"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center font-black">{line.qty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setQty(line.id, line.qty + 1)}
+                      className="w-8 h-8 rounded-lg bg-[#F7ECE6] font-black flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(line.id)}
+                      className="mr-2 text-[#8D182C] text-xs font-black underline"
+                    >
+                      הסר
+                    </button>
+                  </div>
+                </div>
+                <span className="font-black shrink-0">${(line.unitPrice * line.qty).toFixed(2).replace(/\.00$/, '')}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 pt-8 border-t-2 border-dotted border-[#EDB2C1]/20 space-y-4">
+            <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
+              <span>סיכום פריטים</span>
+              <span>${subtotal.toFixed(2).replace(/\.00$/, '')}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
+              <span>משלוח (דובאי)</span>
+              <span>${DELIVERY_FEE}</span>
+            </div>
+            <div className="flex justify-between text-2xl font-black pt-4">
+              <span>סה"כ לתשלום</span>
+              <span>${total.toFixed(2).replace(/\.00$/, '')}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-8">
+          <h2 className="text-2xl font-black font-heading flex items-center gap-3">
+            <Icon icon="ph:map-pin-fill" className="text-[#F5A83A]" />
+            פרטי משלוח
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Field label="שם מלא">
+              <input
+                type="text"
+                value={customer.name}
+                onChange={(e) => setCustomer({ name: e.target.value })}
+                placeholder="ישראל ישראלי"
+                className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+              />
+            </Field>
+            <Field label="מספר טלפון">
+              <input
+                type="tel"
+                value={customer.phone}
+                onChange={(e) => setCustomer({ phone: e.target.value })}
+                placeholder="+971 50 000 0000"
+                dir="ltr"
+                className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+              />
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="כתובת מלאה (מלון / דירה)">
+                <input
+                  type="text"
+                  value={customer.address}
+                  onChange={(e) => setCustomer({ address: e.target.value })}
+                  placeholder="שם המלון, מספר חדר, אזור..."
+                  className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+                />
+              </Field>
+            </div>
+            <div className="md:col-span-2">
+              <Field label="הערות למטבח">
+                <textarea
+                  value={customer.notes}
+                  onChange={(e) => setCustomer({ notes: e.target.value })}
+                  placeholder="בלי חריף, אקסטרה מטבוחה..."
+                  className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold h-32"
+                />
+              </Field>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-[#3B151A]/5 rounded-[3rem] p-8 border-2 border-dashed border-[#F5A83A]/30 text-center space-y-4">
+          <Icon icon="ph:info-fill" className="text-3xl text-[#F5A83A]" />
+          <p className="font-bold text-[#3B151A]/70">
+            לאחר לחיצה על "אישור ושליחה", ההזמנה תיפתח כהודעת וואטסאפ מוכנה אל בת מלך לאישור סופי.
+          </p>
+        </section>
+      </main>
+
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#F7ECE6]/90 backdrop-blur-xl border-t border-[#EDB2C1]/30 z-[100]">
+        <div className="max-w-3xl mx-auto">
+          <a
+            href={canSubmit ? waLink(buildOrderMessage(lines, customer, total)) : undefined}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => {
+              if (!canSubmit) {
+                e.preventDefault()
+                return
+              }
+              clear()
+            }}
+            className={`w-full py-6 rounded-[2.5rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 group ${
+              canSubmit ? 'bg-[#3B151A] text-white hover:bg-black' : 'bg-[#3B151A]/30 text-white/60 cursor-not-allowed'
+            }`}
+          >
+            אישור ושליחת הזמנה <Icon icon="ph:check-circle-fill" className="text-3xl group-hover:scale-125 transition-transform" />
+          </a>
+          {!canSubmit && <p className="text-center text-xs font-bold text-[#8D182C] mt-3">מלאו שם, טלפון וכתובת כדי לשלוח</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-black mr-2">{label}</label>
+      {children}
+    </div>
+  )
+}
