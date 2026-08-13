@@ -11,7 +11,7 @@ export function Story() {
         size="tall"
         badge="Our Story"
         title={['הסיפור', 'שלנו']}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hqJqmcg5k3O.jpeg"
       />
 
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-24 pb-32 -mt-24">

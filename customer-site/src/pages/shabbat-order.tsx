@@ -47,7 +47,7 @@ const MAIN_COURSES: Choice[] = [
   { id: 'main-meat-red', name: 'קציצות בשר ברוטב אדום עשיר', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-40-yVr6wFVvFkl.jpeg', allergy: 'gluten' },
   { id: 'main-meat-pea', name: 'קציצות בשר עם אפונה וארטישוק', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nQX6y7PSyNL.jpeg' },
   { id: 'main-meat-chestnut', name: 'קציצות בשר בריבת בצל וערמונים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/qVICFmHhkmz.jpeg' },
-  { id: 'main-chicken-red', name: 'טבחה עוף אדומה עם שעועית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg' },
+  { id: 'main-chicken-red', name: 'טבחה עוף אדומה עם שעועית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg' },
   { id: 'main-chicken-morocco', name: 'תבשיל עוף מרוקאי עם חומוסים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ZBzRBV0QnjT.jpeg' },
   { id: 'main-chicken-yellow', name: 'טבחה עוף צהובה עם תפו"א', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/00bCUcj59KN.jpeg' },
 ]
@@ -162,7 +162,7 @@ export function ShabbatOrder() {
         active="/shabbat-order"
         size="tall"
         badge="The Shabbat Experience"
-        title={['שבת קודש', 'בלב דובאי']}
+        title={['הטעם של הבית', 'לשבת קודש']}
         subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
       >

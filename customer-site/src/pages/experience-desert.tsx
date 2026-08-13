@@ -18,7 +18,7 @@ export function DesertSafariExperience() {
         gallery: [
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/3NjmofEbSU0.jpeg',
           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hQfhwTbpf9J.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg',
+          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg',
         ],
         ctaTitle: 'סעודה בלתי נשכחת',
         ctaBody: 'מוכנים למשהו אחר לגמרי? דברו איתנו לתיאום סעודת המדבר הבאה שלכם.',
