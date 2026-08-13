@@ -56,7 +56,15 @@ async function issueInvoice({ pool, resendApiKey, order, orderId, businessName, 
   };
 
   try {
-    await sendInvoiceEmail({ apiKey: resendApiKey, toEmail: email, invoiceNumber, pdfBytes, businessName, customerName: order.name });
+    await sendInvoiceEmail({
+      apiKey: resendApiKey,
+      toEmail: email,
+      invoiceNumber,
+      pdfBytes,
+      businessName,
+      customerName: order.name,
+      deliveryAddress: typeof order.address === 'string' ? order.address : undefined,
+    });
     await recordInvoice(pool, { ...base, status: 'sent' });
     logger.log(`invoice ${invoiceNumber} sent for order ${orderId}`);
   } catch (error) {
