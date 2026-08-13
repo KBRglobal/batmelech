@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useNavigate } from 'react-router'
 import { BackHeader } from '../components/nav'
+import { Photo } from '../components/photo'
 import { useCart } from '../cart-context'
 
 const BASE_PRICE = 230
@@ -12,7 +13,7 @@ const FIRST_EXTRA_PRICE = 25
 const INCLUDED_MAIN = 1
 const MAIN_EXTRA_PRICE = 45
 
-type Salad = { id: string; name: string; img: string; allergy?: 'gluten-free' | 'egg' | 'spicy' }
+type Salad = { id: string; name: string; img: string; allergy?: 'gluten-free' | 'egg' | 'spicy'; realPhoto?: boolean }
 type Choice = { id: string; name: string; img: string; allergy?: 'gluten' | 'gluten-free' | 'egg' }
 type Upsell = { id: string; name: string; price: number; note?: string; dark?: boolean }
 
@@ -23,7 +24,7 @@ const SALADS: Salad[] = [
   { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/cVEz0yFtGoP.jpeg', allergy: 'spicy' },
   { id: 'salad-chirshi', name: "צ'ירשי טריפוליטאי", img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/LkkkAnY1xCn.jpeg' },
   { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/suiaqbglZMf.jpeg', allergy: 'spicy' },
-  { id: 'salad-msir', name: 'מסייר (חמוצים)', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ktV7lQAiCxj.jpeg' },
+  { id: 'salad-msir', name: 'מסייר (חמוצים)', img: '/site/assets/pickles-real.jpg', realPhoto: true },
   { id: 'salad-tahini', name: 'טחינה', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7GjgJuaYjlq.jpeg' },
   { id: 'salad-beet', name: 'סלק מבושל', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/twpm8363MgJ.jpeg' },
   { id: 'salad-carrot', name: 'גזר מרוקאי מבושל', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ktV7lQAiCxj.jpeg', allergy: 'spicy' },
@@ -199,7 +200,7 @@ export function ShabbatOrder() {
               className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all hover:shadow-xl text-right"
             >
               <div className="aspect-square overflow-hidden relative">
-                <img src={s.img} className="w-full h-full object-cover" />
+                <Photo src={s.img} className="w-full h-full object-cover" real={s.realPhoto} />
                 {s.allergy && (
                   <span className="absolute top-2 left-2 bg-white/90 p-1.5 rounded-lg shadow-md">
                     <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
@@ -267,7 +268,7 @@ export function ShabbatOrder() {
               }`}
             >
               <div className="aspect-video overflow-hidden relative">
-                <img src={d.img} className="w-full h-full object-cover" />
+                <Photo src={d.img} className="w-full h-full object-cover" />
                 <div className="absolute bottom-4 right-4 px-8 py-3 rounded-2xl bg-white font-black shadow-2xl">{d.name}</div>
               </div>
             </button>
@@ -379,7 +380,7 @@ function QtyCard({
   return (
     <div className="group relative bg-white rounded-[3.5rem] overflow-hidden border-4 border-transparent transition-all hover:shadow-xl">
       <div className={compact ? 'aspect-video overflow-hidden relative' : 'aspect-video overflow-hidden relative'}>
-        <img src={choice.img} className="w-full h-full object-cover" />
+        <Photo src={choice.img} className="w-full h-full object-cover" />
         {choice.allergy && (
           <span className="absolute top-4 left-4 bg-white/90 p-2 rounded-xl shadow-lg">
             <Icon icon={ALLERGY_ICON[choice.allergy]} className="text-lg" />

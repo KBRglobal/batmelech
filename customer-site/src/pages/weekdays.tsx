@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { Nav, PhoneBadge } from '../components/nav'
 import { Footer } from '../components/footer'
 import { FloatingCartBar } from '../components/floating-cart-bar'
+import { Photo } from '../components/photo'
 import { useCart } from '../cart-context'
 
 type Variant = { id: string; label: string; price: number }
@@ -14,6 +15,7 @@ type MenuItem = {
   allergies: Array<'gluten' | 'egg' | 'spicy' | 'gluten-free'>
   price?: number
   variants?: Variant[]
+  realPhoto?: boolean
 }
 
 const ALLERGY_ICON: Record<MenuItem['allergies'][number], string> = {
@@ -50,9 +52,10 @@ const MENU: MenuItem[] = [
     name: 'קובה סלק ביתית',
     ingredients: 'רכיבים: סולת, בקר, בצל, סלק, לימון, מלח, סוכר, תבלינים.',
     desc: '5 יח׳ קובה עבודת יד במרק סלק עשיר וקטיפתי. מוגש לצד אורז לבן.',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/MM5i6oaJ3dm.jpeg',
+    img: '/site/assets/kubbe-selek-real.jpg',
     allergies: ['gluten-free'],
     price: 35,
+    realPhoto: true,
   },
 ]
 
@@ -118,7 +121,7 @@ export function Weekdays() {
               className="bg-white rounded-[4rem] p-8 shadow-2xl border-2 border-[#EDB2C1]/20 transition-all duration-500 hover:-translate-y-3 flex flex-col"
             >
               <div className="relative aspect-square rounded-[3.5rem] overflow-hidden mb-8 shadow-xl">
-                <img src={item.img} className="w-full h-full object-cover" alt={item.name} />
+                <Photo src={item.img} className="w-full h-full object-cover" alt={item.name} real={item.realPhoto} />
                 <div className="absolute top-6 left-6 flex flex-col gap-2">
                   {item.allergies.map((a) => (
                     <span key={a} className="bg-white/90 p-2 rounded-2xl shadow-xl flex items-center justify-center" title={a}>
