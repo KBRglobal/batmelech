@@ -35,15 +35,30 @@ export interface RestoreRequest {
 
 export type RestoreRequestHandler = (request: RestoreRequest) => Promise<void>
 
+export type InvoiceCurrency = 'AED' | 'USD'
+
 export interface SettingsDraft {
   readonly maxMeals: string
   readonly paymentLink: string
   readonly customerOrderFormUrl: string
   readonly outOfStock: readonly string[]
+  readonly businessName: string
+  readonly trn: string
+  readonly businessAddress: string
+  readonly invoiceCurrency: InvoiceCurrency
 }
 
 export type SettingsDraftValidation =
-  | { readonly valid: true; readonly maxMeals: number; readonly paymentLink: string; readonly customerOrderFormUrl: string }
+  | {
+      readonly valid: true
+      readonly maxMeals: number
+      readonly paymentLink: string
+      readonly customerOrderFormUrl: string
+      readonly businessName: string
+      readonly trn: string
+      readonly businessAddress: string
+      readonly invoiceCurrency: InvoiceCurrency
+    }
   | { readonly valid: false; readonly issues: readonly string[] }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -201,11 +216,16 @@ export function readSettingsDraft(
   const out = Array.isArray(settings.out)
     ? settings.out.filter((value): value is string => typeof value === 'string')
     : []
+  const currency = settings.invoiceCurrency
   return {
     maxMeals: nonNegativeIntegerText(settings.maxMeals),
     paymentLink: stringValue(settings.payLink),
     customerOrderFormUrl: stringValue(settings.orderFormUrl),
     outOfStock: out.filter((name) => validItems.has(name)),
+    businessName: stringValue(settings.businessName),
+    trn: stringValue(settings.trn),
+    businessAddress: stringValue(settings.businessAddress),
+    invoiceCurrency: currency === 'USD' ? 'USD' : 'AED',
   }
 }
 
@@ -232,9 +252,21 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
   if (!validOptionalUrl(customerOrderFormUrl)) {
     issues.push('הקישור לטופס הלקוחות חייב להיות כתובת HTTP או HTTPS תקינה.')
   }
+  const businessName = draft.businessName.trim()
+  const trn = draft.trn.trim()
+  const businessAddress = draft.businessAddress.trim()
   return issues.length > 0
     ? { valid: false, issues }
-    : { valid: true, maxMeals, paymentLink, customerOrderFormUrl }
+    : {
+        valid: true,
+        maxMeals,
+        paymentLink,
+        customerOrderFormUrl,
+        businessName,
+        trn,
+        businessAddress,
+        invoiceCurrency: draft.invoiceCurrency,
+      }
 }
 
 export function applySettingsToStore(
@@ -262,6 +294,10 @@ export function applySettingsToStore(
       payLink: result.paymentLink,
       orderFormUrl: result.customerOrderFormUrl,
       out: [...preservedOut, ...currentOut],
+      businessName: result.businessName,
+      trn: result.trn,
+      businessAddress: result.businessAddress,
+      invoiceCurrency: result.invoiceCurrency,
     },
   } as LegacyStore
 }

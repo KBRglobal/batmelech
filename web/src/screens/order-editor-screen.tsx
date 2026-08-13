@@ -856,6 +856,9 @@ function OrderEditorContent({
             <Field label="מספר טלפון">
               <input aria-label="מספר טלפון" inputMode="tel" value={draft.phone} onChange={(event) => patch({ phone: event.currentTarget.value })} className={inputClassName} />
             </Field>
+            <Field label="אימייל (לשליחת חשבונית)">
+              <input aria-label="אימייל" type="email" value={draft.email} onChange={(event) => patch({ email: event.currentTarget.value })} className={inputClassName} />
+            </Field>
           </div>
           <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-border px-4 text-sm font-black text-primary">
             <input type="checkbox" checked={draft.pickup} onChange={(event) => patch({ pickup: event.currentTarget.checked })} className="size-5 accent-primary" />

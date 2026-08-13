@@ -357,6 +357,7 @@ export interface OrderDraft extends Record<string, unknown> {
   readonly date: string
   readonly name: string
   readonly phone: string
+  readonly email: string
   readonly place: string
   readonly address: string
   readonly hotelName: string
@@ -739,6 +740,7 @@ export function createOrderDraft(menu: OrderEditorMenu, now: Date = new Date()):
     date: nextFridayIso(now),
     name: '',
     phone: '',
+    email: '',
     place: '',
     address: '',
     hotelName: '',
@@ -792,6 +794,7 @@ export function createOrderDraftFromLegacy(
     date: text(order.date) || defaults.date,
     name: text(order.name),
     phone: text(order.phone),
+    email: text(order.email),
     place: text(order.place),
     address: text(order.address),
     hotelName: text(raw.hotelName) || text(order.place),
@@ -1479,6 +1482,7 @@ export function serializeOrderDraft(draft: OrderDraft, orderId: string): LegacyO
     date: draft.date,
     name: draft.name,
     phone: draft.phone,
+    email: draft.email,
     place: draft.place,
     address: draft.address,
     hotelName: draft.hotelName,

@@ -8,6 +8,7 @@ export const LegacyOrderSchema = z
     date: z.string().optional(),
     name: z.string().optional(),
     phone: z.string().optional(),
+    email: z.string().optional(),
     place: z.string().optional(),
     address: z.string().optional(),
     time: z.string().optional(),
@@ -33,6 +34,9 @@ export const LegacyOrderSchema = z
     deposit: NumberLikeSchema.optional(),
     payMethod: z.string().optional(),
     paid: z.string().optional(),
+    source: z.string().optional(),
+    invoiceSentAt: z.number().optional(),
+    invoiceNumber: z.string().optional(),
   })
   .passthrough()
 
@@ -40,6 +44,10 @@ export const LegacySettingsSchema = z
   .object({
     maxMeals: NumberLikeSchema.optional(),
     out: z.array(z.unknown()).optional(),
+    businessName: z.string().optional(),
+    trn: z.string().optional(),
+    businessAddress: z.string().optional(),
+    invoiceCurrency: z.enum(['AED', 'USD']).optional(),
   })
   .passthrough()
 

@@ -77,6 +77,10 @@ describe('settings backup domain', () => {
       paymentLink: ' https://pay.example/path ',
       customerOrderFormUrl: 'https://order.example',
       outOfStock: ['פילה דג ברוטב מרוקאי', 'פילה דג ברוטב מרוקאי'],
+      businessName: '',
+      trn: '',
+      businessAddress: '',
+      invoiceCurrency: 'AED' as const,
     }
     expect(validateSettingsDraft(nextDraft)).toMatchObject({ valid: true, maxMeals: 20 })
     const saved = applySettingsToStore(store, nextDraft, DEFAULT_SETTINGS_CATALOG)
@@ -87,6 +91,10 @@ describe('settings backup domain', () => {
       orderFormUrl: 'https://order.example',
       out: ['מנה היסטורית שכבר לא בתפריט', 'פילה דג ברוטב מרוקאי'],
       privateSetting: { keep: true },
+      businessName: '',
+      trn: '',
+      businessAddress: '',
+      invoiceCurrency: 'AED',
     })
   })
 
@@ -113,6 +121,10 @@ describe('settings backup domain', () => {
         paymentLink: '',
         customerOrderFormUrl: '',
         outOfStock: ['פילה דג ברוטב מרוקאי'],
+        businessName: '',
+        trn: '',
+        businessAddress: '',
+        invoiceCurrency: 'AED' as const,
       },
       DEFAULT_SETTINGS_CATALOG,
     )
@@ -130,6 +142,10 @@ describe('settings backup domain', () => {
       paymentLink: 'javascript:alert(1)',
       customerOrderFormUrl: 'not a url',
       outOfStock: [],
+      businessName: '',
+      trn: '',
+      businessAddress: '',
+      invoiceCurrency: 'AED',
     })
 
     expect(result.valid).toBe(false)
@@ -137,7 +153,16 @@ describe('settings backup domain', () => {
     expect(() =>
       applySettingsToStore(
         { orders: [] },
-        { maxMeals: '1.5', paymentLink: '', customerOrderFormUrl: '', outOfStock: [] },
+        {
+          maxMeals: '1.5',
+          paymentLink: '',
+          customerOrderFormUrl: '',
+          outOfStock: [],
+          businessName: '',
+          trn: '',
+          businessAddress: '',
+          invoiceCurrency: 'AED',
+        },
         DEFAULT_SETTINGS_CATALOG,
       ),
     ).toThrow()

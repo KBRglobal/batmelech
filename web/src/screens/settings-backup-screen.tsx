@@ -261,6 +261,53 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
         </section>
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
+          <h2 className="text-xl font-black text-primary">פרטי חשבונית (מע"מ)</h2>
+          <p className="mt-2 text-xs font-bold text-muted-foreground">מוצג על כל חשבונית שנשלחת ללקוחות. באחריותך לוודא שהפרטים נכונים ולהגיש דיווח מע"מ בעצמך.</p>
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="text-xs font-black text-muted-foreground">
+              שם העסק הרשמי
+              <input
+                aria-label="שם העסק הרשמי"
+                value={currentDraft.businessName}
+                onChange={(event) => setDraft({ ...currentDraft, businessName: event.currentTarget.value })}
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-sm font-bold outline-none"
+              />
+            </label>
+            <label className="text-xs font-black text-muted-foreground">
+              מספר TRN (אם רשומים למע"מ)
+              <input
+                aria-label="מספר TRN"
+                dir="ltr"
+                value={currentDraft.trn}
+                onChange={(event) => setDraft({ ...currentDraft, trn: event.currentTarget.value })}
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-left text-sm font-bold outline-none"
+              />
+            </label>
+            <label className="text-xs font-black text-muted-foreground md:col-span-2">
+              כתובת לחשבונית
+              <input
+                aria-label="כתובת לחשבונית"
+                value={currentDraft.businessAddress}
+                onChange={(event) => setDraft({ ...currentDraft, businessAddress: event.currentTarget.value })}
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-sm font-bold outline-none"
+              />
+            </label>
+            <label className="text-xs font-black text-muted-foreground">
+              מטבע לחשבונית
+              <select
+                aria-label="מטבע לחשבונית"
+                value={currentDraft.invoiceCurrency}
+                onChange={(event) => setDraft({ ...currentDraft, invoiceCurrency: event.currentTarget.value === 'USD' ? 'USD' : 'AED' })}
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-sm font-bold outline-none"
+              >
+                <option value="AED">AED (דירהם)</option>
+                <option value="USD">USD (דולר)</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-xl font-black text-primary">תשלומים וקישורים</h2>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="text-xs font-black text-muted-foreground">
