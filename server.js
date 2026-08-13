@@ -77,6 +77,7 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /app',
     'Disallow: /api',
     'Disallow: /legacy',
+    'Sitemap: https://www.batmelech.ae/site/sitemap.xml',
   ].join('\n') + '\n');
 });
 
