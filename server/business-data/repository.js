@@ -15,6 +15,13 @@ const MIGRATION_SQL = Object.freeze([
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT payment_credentials_singleton_check CHECK (id = 1)
   )`,
+  `CREATE TABLE IF NOT EXISTS public.staff_credentials (
+    id SMALLINT PRIMARY KEY DEFAULT 1,
+    username_ciphertext TEXT NOT NULL,
+    password_ciphertext TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT staff_credentials_singleton_check CHECK (id = 1)
+  )`,
   `CREATE TABLE IF NOT EXISTS public.invoices (
     id BIGSERIAL PRIMARY KEY,
     invoice_number TEXT NOT NULL UNIQUE,
@@ -75,6 +82,24 @@ async function getZiinaApiKeyCiphertext(pool) {
   return result.rows[0]?.ziina_api_key_ciphertext ?? null;
 }
 
+async function setStaffCredentialCiphertexts(pool, { usernameCiphertext, passwordCiphertext }) {
+  await pool.query(
+    `INSERT INTO public.staff_credentials (id, username_ciphertext, password_ciphertext, updated_at)
+     VALUES (1, $1, $2, NOW())
+     ON CONFLICT (id) DO UPDATE SET username_ciphertext = $1, password_ciphertext = $2, updated_at = NOW()`,
+    [usernameCiphertext, passwordCiphertext]
+  );
+}
+
+async function getStaffCredentialCiphertexts(pool) {
+  const result = await pool.query(
+    'SELECT username_ciphertext, password_ciphertext FROM public.staff_credentials WHERE id = 1'
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return { usernameCiphertext: row.username_ciphertext, passwordCiphertext: row.password_ciphertext };
+}
+
 async function nextInvoiceNumber(pool, now = new Date()) {
   const year = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai', year: 'numeric' }).format(now);
   const result = await pool.query("SELECT nextval('public.invoice_number_seq') AS n");
@@ -132,6 +157,8 @@ module.exports = {
   initializeBusinessData,
   setZiinaApiKeyCiphertext,
   getZiinaApiKeyCiphertext,
+  setStaffCredentialCiphertexts,
+  getStaffCredentialCiphertexts,
   nextInvoiceNumber,
   recordInvoice,
   hasInvoiceForOrder,

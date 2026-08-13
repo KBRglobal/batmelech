@@ -76,6 +76,10 @@ function issueSessionCookie(response, sessionSecret) {
   });
 }
 
+function clearSessionCookie(response) {
+  response.clearCookie(SESSION_COOKIE, { path: '/' });
+}
+
 function createDecoyGate(sessionSecret) {
   return (request, response, next) => {
     if (hasValidSession(request, sessionSecret)) return next();
@@ -92,5 +96,6 @@ module.exports = {
   readToken,
   hasValidSession,
   issueSessionCookie,
+  clearSessionCookie,
   createDecoyGate,
 };

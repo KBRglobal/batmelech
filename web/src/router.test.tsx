@@ -104,8 +104,8 @@ describe('AppRoutes', () => {
     expect(screen.getAllByRole('navigation')).toHaveLength(2)
   })
 
-  it('mounts BrowserRouter below the /linaya basename', () => {
-    window.history.pushState({}, '', '/linaya/today')
+  it('mounts BrowserRouter below the /admin basename', () => {
+    window.history.pushState({}, '', '/admin/today')
 
     render(<AppRouter />)
 

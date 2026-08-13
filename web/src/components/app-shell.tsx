@@ -98,6 +98,11 @@ function mobileLinkClassName({ isActive }: NavLinkRenderProps) {
   return `flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[0.6875rem] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${stateClassName}`
 }
 
+async function handleLogout() {
+  await fetch('/api/auth/logout', { method: 'POST' })
+  window.location.href = '/'
+}
+
 function DesktopNavigation() {
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-l border-border bg-card/90 px-5 py-6 shadow-[0_0_40px_rgba(99,33,40,0.04)] backdrop-blur-xl md:flex">
@@ -128,6 +133,14 @@ function DesktopNavigation() {
           <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
           <span>המערכת הישנה</span>
         </a>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="group flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <LocalIcon name="ph:sign-out-bold" className="text-xl" />
+          <span>התנתקות</span>
+        </button>
       </nav>
     </aside>
   )
@@ -172,6 +185,14 @@ function MobileNavigation() {
           <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
           <span className="whitespace-nowrap">המערכת הישנה</span>
         </a>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <LocalIcon name="ph:sign-out-bold" className="text-xl" />
+          <span className="whitespace-nowrap">התנתקות</span>
+        </button>
       </div>
     </nav>
   )

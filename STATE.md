@@ -3,16 +3,16 @@
 ## Now (in progress) — disguised staff login, replacing Basic Auth
 Moshe's idea, fully built, tests passing, not yet deployed. The staff panel no longer shows
 Chrome's native Basic Auth popup at all — anyone hitting a protected route with no session
-(`/linaya`, `/app`, `/orders/admin`, `/api/state`, etc.) gets `server/auth/decoy-page.html`: a
+(`/admin`, `/app`, `/orders/admin`, `/api/state`, etc.) gets `server/auth/decoy-page.html`: a
 branded 404 ("משהו התפקשש במטבח...") with a "שלחו לנו הודעה" contact box that is actually the
-login form, disguised. Real path Lin uses day to day: **`/linaya`** (not indexed, not linked from
+login form, disguised. Real path Lin uses day to day: **`/admin`** (not indexed, not linked from
 anywhere, `/app` and `/orders/admin` still work as aliases for old bookmarks).
 
 - Two-step hidden flow, both steps use the SAME visible input box: first message = username
   (`BM_USER`), if correct the box silently resets for a second message = password (`BM_PASS`).
   Wrong at either step (or a fresh/expired session) → same fake "ההודעה נשלחה בהצלחה!" every
   real visitor would see from a normal 404 contact form. Right twice → real session cookie
-  (`bm_ref`, HMAC-signed, 30 days) → reload lands in `/linaya/today`.
+  (`bm_ref`, HMAC-signed, 30 days) → reload lands in `/admin/today`.
 - `POST /api/site/contact` (public, `server/auth/decoy-login-route.js`) is the actual check.
   Response body never differs in shape between "right, continue" and "wrong" in an obvious way —
   success carries a fake ticket ref (`{status:'received', ref:'RQ-12345'}`), failure omits it.
@@ -26,7 +26,7 @@ anywhere, `/app` and `/orders/admin` still work as aliases for old bookmarks).
 - `app.set('trust proxy', 1)` added — needed for real per-IP lockout behind Railway's edge; also
   fixes the existing `/api/site/orders` rate limiter, which was silently limiting by Railway's
   proxy IP for everyone before this.
-- `web/src/router.tsx` `AppRouter` now also recognizes a `/linaya` basename (alongside `/app` and
+- `web/src/router.tsx` `AppRouter` now also recognizes a `/admin` basename (alongside `/app` and
   `/orders/admin`), detected from `window.location.pathname` same as the existing two.
 - BM_USER/BM_PASS did NOT change in meaning, only in how they're checked — but the actual values
   changed at some point before this session (`lin`/`lin123` from the original 2026-08-06 deploy
@@ -81,9 +81,9 @@ received and reviewed real test emails/invoices via traviquackson@gmail.com.
 
 ## Next
 1. Deploy the decoy-login work (`railway up --service app --detach` — not the MCP deploy tool, see
-   Gotchas), then verify live: hit `/linaya/today` logged-out (must 404-decoy, not redirect to a
+   Gotchas), then verify live: hit `/admin/today` logged-out (must 404-decoy, not redirect to a
    real login), do the real two-step through the actual browser popup-free flow, confirm it lands
-   in the real panel. Tell Moshe the live `/linaya` URL once confirmed.
+   in the real panel. Tell Moshe the live `/admin` URL once confirmed.
 2. Wire the Settings screen's Ziina-key field (UI only — backend route already exists and works).
 3. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key,
    pasted into the field from step 2 — Claude/Moshe never see the raw value; Lin has the key and
@@ -124,7 +124,10 @@ received and reviewed real test emails/invoices via traviquackson@gmail.com.
 - Parked unfinished auth-boundary work (session/csrf/argon2) to branch `wip/auth-boundary`.
 
 ## Gotchas / do-not-redo
-- The staff login is DELIBERATELY not a login page — do not "fix" `/linaya` to show a real login
+- Never mount an alias path that overlaps with a real credential value — `/linaya` was tried and
+  scrapped the same session because Moshe is folding "linaya" into Lin's new real username. A path
+  segment matching part of a live username/password is a leak, not a bookmark.
+- The staff login is DELIBERATELY not a login page — do not "fix" `/admin` to show a real login
   form, a 401, or any hint that auth exists. The whole point is that it's indistinguishable from a
   broken link. If it ever looks suspicious to a real 404, that's a regression, not a UX bug.
 - Never put `BM_USER`/`BM_PASS`/`BM_SESSION_SECRET` values in a URL, in chat as a clickable link,

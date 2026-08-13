@@ -131,8 +131,8 @@ export function AppRouter() {
   const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
   const operatorBasePath = pathname.startsWith('/orders/admin')
     ? '/orders/admin'
-    : pathname.startsWith('/linaya')
-    ? '/linaya'
+    : pathname.startsWith('/admin')
+    ? '/admin'
     : '/app'
   return (
     <BrowserRouter basename={operatorBasePath}>

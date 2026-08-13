@@ -12,6 +12,8 @@ const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { z } = require('zod');
 const { readToken, makeToken, issueSessionCookie, parseCookies } = require('./decoy-auth');
+const { decryptSecret } = require('../business-data/secret-box');
+const { getStaffCredentialCiphertexts } = require('../business-data/repository');
 
 const CHALLENGE_COOKIE = 'bm_rq';
 const CHALLENGE_TTL_MS = 3 * 60 * 1_000;
@@ -43,7 +45,25 @@ function ticketRef() {
   return `RQ-${crypto.randomInt(10_000, 99_999)}`;
 }
 
-function createDecoyLoginRouter({ authUser, authPass, sessionSecret }) {
+// The env pair (BM_USER/BM_PASS on Railway) stays valid forever as Moshe's
+// recovery key, even after Lin sets her own encrypted pair from the panel —
+// changing the Railway vars must always be a working escape hatch. A decrypt
+// failure on the stored pair just means it's treated as absent, never a lock-out.
+async function loadStaffPair(pool, encryptionKey) {
+  if (!pool || !encryptionKey) return null;
+  try {
+    const stored = await getStaffCredentialCiphertexts(pool);
+    if (!stored) return null;
+    return {
+      user: decryptSecret(stored.usernameCiphertext, encryptionKey),
+      pass: decryptSecret(stored.passwordCiphertext, encryptionKey),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createDecoyLoginRouter({ authUser, authPass, sessionSecret, pool, encryptionKey }) {
   if (!authUser || !authPass || !sessionSecret) {
     throw new TypeError('authUser, authPass, and sessionSecret are required');
   }
@@ -64,7 +84,7 @@ function createDecoyLoginRouter({ authUser, authPass, sessionSecret }) {
     next();
   });
 
-  router.post('/', (request, response) => {
+  router.post('/', async (request, response) => {
     const parsed = MessageSchema.safeParse(request.body);
     if (!parsed.success) return response.status(200).json({ status: 'received' });
 
@@ -73,14 +93,22 @@ function createDecoyLoginRouter({ authUser, authPass, sessionSecret }) {
       return response.status(200).json({ status: 'received' });
     }
 
+    const staffPair = await loadStaffPair(pool, encryptionKey);
+
     const cookies = parseCookies(request.headers.cookie);
     const challenge = readToken(cookies[CHALLENGE_COOKIE], sessionSecret);
-    const awaitingPassword = Boolean(challenge && challenge.stage === 'password' && challenge.exp > Date.now());
+    const awaitingPassword = Boolean(
+      challenge && (challenge.source === 'env' || challenge.source === 'staff') && challenge.exp > Date.now()
+    );
     const message = parsed.data.message;
 
     if (!awaitingPassword) {
-      if (message === authUser) {
-        const token = makeToken({ stage: 'password', exp: Date.now() + CHALLENGE_TTL_MS }, sessionSecret);
+      let source = null;
+      if (message === authUser) source = 'env';
+      else if (staffPair && message === staffPair.user) source = 'staff';
+
+      if (source) {
+        const token = makeToken({ source, exp: Date.now() + CHALLENGE_TTL_MS }, sessionSecret);
         response.cookie(CHALLENGE_COOKIE, token, {
           httpOnly: true,
           secure: true,
@@ -95,7 +123,8 @@ function createDecoyLoginRouter({ authUser, authPass, sessionSecret }) {
     }
 
     response.clearCookie(CHALLENGE_COOKIE, { path: '/' });
-    if (message === authPass) {
+    const expectedPass = challenge.source === 'env' ? authPass : staffPair?.pass;
+    if (expectedPass && message === expectedPass) {
       issueSessionCookie(response, sessionSecret);
       return response.status(200).json({ status: 'received', ref: ticketRef() });
     }

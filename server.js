@@ -13,11 +13,12 @@ const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
-const { createDecoyGate, hasValidSession } = require('./server/auth/decoy-auth');
+const { createDecoyGate, hasValidSession, clearSessionCookie } = require('./server/auth/decoy-auth');
 const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
 const businessDataRepository = require('./server/business-data/repository');
 const { wrapRepositoryWithInvoiceTrigger } = require('./server/business-data/invoice-trigger');
 const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route');
+const { createStaffCredentialsRouter } = require('./server/auth/staff-credentials-route');
 const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-download-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
@@ -115,6 +116,8 @@ app.use('/api/site/contact', createDecoyLoginRouter({
   authUser: AUTH_USER,
   authPass: AUTH_PASS,
   sessionSecret: SESSION_SECRET,
+  pool,
+  encryptionKey: process.env.BM_SECRETS_KEY,
 }));
 // Public invoice-download link referenced from invoice emails — token-gated,
 // not just invoice number (numbers are sequential/guessable).
@@ -130,7 +133,7 @@ if (pool) {
 // land straight in the admin app instead.
 app.get(/^\/$/, (request, response) => {
   response.set('Cache-Control', 'no-store');
-  response.redirect(302, hasValidSession(request, SESSION_SECRET) ? '/linaya/today' : '/site/');
+  response.redirect(302, hasValidSession(request, SESSION_SECRET) ? '/admin/today' : '/site/');
 });
 
 app.get('/robots.txt', (_request, response) => {
@@ -150,6 +153,13 @@ app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => co
 // --- staff gate on everything else: no valid session -> looks like a 404 ---
 app.use(createDecoyGate(SESSION_SECRET));
 
+// Only reachable with a valid session already (the gate above ran first).
+app.post('/api/auth/logout', (_request, response) => {
+  clearSessionCookie(response);
+  response.set('Cache-Control', 'no-store');
+  response.status(204).end();
+});
+
 app.use(express.json({ limit: '15mb' }));
 
 // --- AI-assisted order interpretation (review-only; never persists state) ---
@@ -166,6 +176,17 @@ if (pool && process.env.BM_SECRETS_KEY) {
   app.use('/api/settings/ziina-key', createZiinaKeyRouter({ pool, encryptionKey: process.env.BM_SECRETS_KEY }));
 } else {
   app.use('/api/settings/ziina-key', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'not configured' });
+  });
+}
+
+// --- Admin-only, write-only staff login (username/password). Encrypted at
+// rest, never echoed back; decoy-login-route.js reads it on every attempt. ---
+if (pool && process.env.BM_SECRETS_KEY) {
+  app.use('/api/settings/staff-credentials', createStaffCredentialsRouter({ pool, encryptionKey: process.env.BM_SECRETS_KEY }));
+} else {
+  app.use('/api/settings/staff-credentials', (_request, response) => {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'not configured' });
   });
@@ -210,12 +231,12 @@ app.get(['/app/order-form.html', '/app/order.html'], (_request, response) => {
 app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
 app.use('/app', createReactAppRouter({ reactRoot: REACT_ROOT }));
 
-// /linaya is the real, non-obvious entry point Lin actually uses day to day.
-// /app and /orders/admin stay alive underneath the same decoy gate purely so
-// old bookmarks don't break — none of the three is easier to reach than the
-// others without a valid session, and search engines get told to ignore all.
-app.get(/^\/linaya$/, (req, res) => res.redirect(308, '/linaya/'));
-app.use('/linaya', (request, response, next) => {
+// /admin is the real entry point Lin actually uses day to day. /app and
+// /orders/admin stay alive underneath the same decoy gate purely so old
+// bookmarks don't break — neither is easier to reach than the other without
+// a valid session, and search engines get told to ignore both.
+app.get(/^\/admin$/, (req, res) => res.redirect(308, '/admin/'));
+app.use('/admin', (request, response, next) => {
   response.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
   response.set('Cache-Control', 'no-store');
   next();

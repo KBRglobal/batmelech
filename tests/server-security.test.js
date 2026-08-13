@@ -135,7 +135,7 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   // Root only enters the authenticated React manager when the request already
   // carries a valid session (checked explicitly, not by relying on route
   // order) — everyone else gets the public site, never admin data.
-  assert.match(source, /hasValidSession\(request, SESSION_SECRET\) \? '\/linaya\/today' : '\/site\/'/);
+  assert.match(source, /hasValidSession\(request, SESSION_SECRET\) \? '\/admin\/today' : '\/site\/'/);
   assert.match(source, /getContentRoot: \(\) => contentRoot/);
   assert.doesNotMatch(source, /app\.use\('\/'\s*,\s*createReactAppRouter/);
 });
@@ -209,7 +209,7 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
   try {
     await waitForHealth(port);
 
-    const before = await fetch(`http://127.0.0.1:${port}/linaya/today`);
+    const before = await fetch(`http://127.0.0.1:${port}/admin/today`);
     assert.equal(before.status, 404);
     const decoyBody = await before.text();
     assert.match(decoyBody, /שלחו לנו הודעה/);
@@ -262,7 +262,7 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
     const sessionCookie = cookieFrom(rightPass, 'bm_ref');
     assert.ok(sessionCookie, 'a session cookie should be set after both steps succeed');
 
-    const after = await fetch(`http://127.0.0.1:${port}/linaya/today`, {
+    const after = await fetch(`http://127.0.0.1:${port}/admin/today`, {
       headers: { Cookie: sessionCookie },
     });
     assert.equal(after.status, 200);

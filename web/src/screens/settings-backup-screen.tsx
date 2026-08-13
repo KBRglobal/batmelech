@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import { StaffLoginSection } from '../components/staff-login-section.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
@@ -334,6 +335,8 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
             </label>
           </div>
         </section>
+
+        <StaffLoginSection />
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-xl font-black text-primary">אזל מהמלאי</h2>
