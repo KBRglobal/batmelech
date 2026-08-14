@@ -29,9 +29,14 @@ function fakeRepository() {
   };
 }
 
-async function withServer(repository, run) {
+// Wednesday, 19 Aug 2026, noon in Dubai — an ordinary working day. Intake now
+// refuses orders on Shabbat and yom tov, so every test that expects an order to
+// go through has to stand on a fixed weekday rather than on whenever CI runs.
+const WEEKDAY = new Date(Date.UTC(2026, 7, 19, 8, 0));
+
+async function withServer(repository, run, clock = () => WEEKDAY) {
   const app = express();
-  app.use('/api/site/orders', createSiteOrderRouter({ repository, logger: { error() {} } }));
+  app.use('/api/site/orders', createSiteOrderRouter({ repository, logger: { error() {} }, clock }));
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
@@ -184,4 +189,74 @@ test('a hotel cannot be attached to a pickup order', async () => {
     assert.equal(response.status, 400);
     assert.equal(repository.saved.length, 0);
   });
+});
+
+// A page opened before candle lighting can still POST after it, so the server
+// is the gate that actually holds — not the closure screen.
+test('intake refuses an order posted during Shabbat', async () => {
+  const repository = fakeRepository();
+  const fridayNight = () => new Date(Date.UTC(2026, 7, 14, 15, 30)); // Fri 14 Aug 2026, 19:30 Dubai
+  await withServer(
+    repository,
+    async (origin) => {
+      const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+      assert.equal(response.status, 403);
+      const body = await response.json();
+      assert.equal(body.reason, 'shabbat');
+      assert.match(body.error, /שבת שלום/u);
+      assert.match(body.error, /במוצאי שבת/u);
+      assert.equal(repository.saved.length, 0);
+    },
+    fridayNight,
+  );
+});
+
+test('intake refuses an order posted on a chag, and says which one', async () => {
+  const repository = fakeRepository();
+  const pesach = () => new Date(Date.UTC(2027, 3, 22, 8, 0)); // Thu 22 Apr 2027, noon Dubai
+  await withServer(
+    repository,
+    async (origin) => {
+      const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+      assert.equal(response.status, 403);
+      const body = await response.json();
+      assert.equal(body.reason, 'shabbat');
+      assert.match(body.error, /חג שמח — פסח/u);
+      assert.match(body.error, /בצאת החג/u);
+      assert.equal(repository.saved.length, 0);
+    },
+    pesach,
+  );
+});
+
+test('intake accepts the same order once Shabbat is out', async () => {
+  const repository = fakeRepository();
+  const saturdayNight = () => new Date(Date.UTC(2026, 7, 15, 17, 0)); // Sat 15 Aug 2026, 21:00 Dubai
+  await withServer(
+    repository,
+    async (origin) => {
+      const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+      assert.equal(response.status, 201);
+      assert.equal(repository.saved.length, 1);
+    },
+    saturdayNight,
+  );
+});
+
+// Chanukah and chol hamoed are working days; only yom tov closes the kitchen.
+test('intake accepts orders on Chanukah and on chol hamoed Sukkot', async () => {
+  for (const [name, at] of [
+    ['Chanukah', Date.UTC(2026, 11, 7, 8, 0)],
+    ['chol hamoed Sukkot', Date.UTC(2026, 8, 28, 8, 0)],
+  ]) {
+    const repository = fakeRepository();
+    await withServer(
+      repository,
+      async (origin) => {
+        const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+        assert.equal(response.status, 201, `${name} should be a working day`);
+      },
+      () => new Date(at),
+    );
+  }
 });

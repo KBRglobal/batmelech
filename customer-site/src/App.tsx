@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router'
 import { FloatingCartBar } from './components/floating-cart-bar'
 import { SiteBanner } from './components/site-banner'
+import { ShabbatClosure } from './components/shabbat-closure'
+import { useSiteStatus } from './site-status-context'
 import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
 import { Story } from './pages/story'
@@ -39,6 +41,7 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
 
 export default function App() {
   const { pathname, hash } = useLocation()
+  const { shabbatClosed } = useSiteStatus()
 
   useEffect(() => {
     if (hash) {
@@ -67,6 +70,13 @@ export default function App() {
       .querySelector('meta[name="robots"]')
       ?.setAttribute('content', pathname === '/checkout' ? 'noindex,nofollow' : 'index,follow,max-image-preview:large')
   }, [pathname, hash])
+
+  // Every route at once, not a banner on top of a live menu: the site rests.
+  // The status fetch defaults to open, so a failed or slow call never hides
+  // the shop — only the server saying so does.
+  if (shabbatClosed) {
+    return <ShabbatClosure />
+  }
 
   return (
     <div key={pathname} className="page-transition">

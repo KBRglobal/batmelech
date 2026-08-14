@@ -152,12 +152,23 @@ async function hasInvoiceForOrder(pool, orderId) {
   return result.rows.length > 0;
 }
 
+// Any invoice at all, including one whose email failed. Manual issuing uses
+// this rather than hasInvoiceForOrder: a failed send is recovered by resending
+// the invoice that already exists, never by numbering a second one for the
+// same order. (The automatic trigger keeps the looser check so a genuinely
+// failed automatic attempt can still be retried.)
+async function hasAnyInvoiceForOrder(pool, orderId) {
+  const result = await pool.query(
+    'SELECT 1 FROM public.invoices WHERE order_id = $1 LIMIT 1',
+    [orderId]
+  );
+  return result.rows.length > 0;
+}
+
 // Which orders already carry an invoice — one query instead of asking per
 // order, so the staff panel can offer only the orders still missing one.
 async function listInvoicedOrderIds(pool) {
-  const result = await pool.query(
-    "SELECT DISTINCT order_id FROM public.invoices WHERE status = 'sent'"
-  );
+  const result = await pool.query('SELECT DISTINCT order_id FROM public.invoices');
   return result.rows.map((row) => row.order_id);
 }
 
@@ -227,6 +238,7 @@ module.exports = {
   nextInvoiceNumber,
   recordInvoice,
   hasInvoiceForOrder,
+  hasAnyInvoiceForOrder,
   listInvoicedOrderIds,
   getInvoiceByNumberAndToken,
   listInvoices,

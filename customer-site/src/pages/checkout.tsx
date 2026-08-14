@@ -29,7 +29,7 @@ function dubaiToday() {
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
-  const { orderingOpen } = useSiteStatus()
+  const { orderingOpen, shabbatClosed } = useSiteStatus()
   const isPickup = customer.fulfillment === 'pickup'
   const total = lines.length ? subtotal + (isPickup ? 0 : DELIVERY_FEE) : 0
 
@@ -54,8 +54,11 @@ export function Checkout() {
   const hotel = selectedHotel(customer)
   const isHotelMode = !isPickup && customer.addressMode === 'hotel'
 
+  // The closure screen normally replaces this page outright; this gate is what
+  // catches a cart that was already open when candle lighting arrived.
   const canSubmit =
     orderingOpen &&
+    !shabbatClosed &&
     customer.name.trim() &&
     customer.phone.trim() &&
     customer.date.trim() &&
@@ -349,7 +352,9 @@ export function Checkout() {
           </a>
           {!canSubmit && (
             <p className="text-center text-xs font-bold text-[#8D182C] mt-3">
-              {!orderingOpen
+              {shabbatClosed
+                ? 'המטבח שלנו שומר שבת — לא מקבלים הזמנות כרגע'
+                : !orderingOpen
                 ? 'האתר לא מקבל הזמנות כרגע'
                 : isPickup
                   ? 'מלאו שם, טלפון, תאריך ושעה כדי לשלוח'

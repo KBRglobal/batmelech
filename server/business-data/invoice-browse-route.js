@@ -15,7 +15,7 @@ const {
   listInvoices,
   getInvoiceByNumber,
   markInvoiceResent,
-  hasInvoiceForOrder,
+  hasAnyInvoiceForOrder,
   listInvoicedOrderIds,
 } = require('./repository');
 const { renderInvoicePdf } = require('./invoice-pdf');
@@ -237,7 +237,7 @@ function createInvoiceBrowseRouter({
         if (!order) return response.status(404).json({ error: 'order not found' });
 
         try {
-          if (await hasInvoiceForOrder(pool, orderId)) {
+          if (await hasAnyInvoiceForOrder(pool, orderId)) {
             return response.status(409).json({ error: 'this order already has an invoice' });
           }
         } catch (error) {

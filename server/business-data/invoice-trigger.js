@@ -12,7 +12,7 @@ const { invoiceSettings, orderInvoiceFields } = require('./invoice-inputs');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-async function handlePotentialInvoices(previousData, newData, { pool, resendApiKey, logger }) {
+async function handlePotentialInvoices(previousData, newData, { pool, resendApiKey, sendInvoiceEmail, logger }) {
   const settings = invoiceSettings(newData);
   if (!settings || !resendApiKey) return;
 
@@ -32,6 +32,9 @@ async function handlePotentialInvoices(previousData, newData, { pool, resendApiK
       await issueInvoice({
         pool,
         resendApiKey,
+        // Left undefined in production so issue-invoice.js uses the real
+        // sender; injected by tests so no invoice mail leaves the process.
+        ...(sendInvoiceEmail ? { sendInvoiceEmail } : {}),
         orderId,
         email,
         logger,
@@ -44,14 +47,16 @@ async function handlePotentialInvoices(previousData, newData, { pool, resendApiK
   }
 }
 
-function wrapRepositoryWithInvoiceTrigger(repository, { pool, resendApiKey, logger = console }) {
+function wrapRepositoryWithInvoiceTrigger(repository, { pool, resendApiKey, sendInvoiceEmail, logger = console }) {
   return Object.freeze({
     ...repository,
     async saveState(args) {
       const result = await repository.saveState(args);
       if (result.ok) {
         Promise.resolve()
-          .then(() => handlePotentialInvoices(args.baseState, result.data, { pool, resendApiKey, logger }))
+          .then(() =>
+            handlePotentialInvoices(args.baseState, result.data, { pool, resendApiKey, sendInvoiceEmail, logger })
+          )
           .catch((error) => logger.error('invoice trigger crashed', error));
       }
       return result;
