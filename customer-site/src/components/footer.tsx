@@ -2,8 +2,10 @@ import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
 
 const QUICK_LINKS = [
+  { to: '/', label: 'בית' },
   { to: '/weekdays', label: 'תפריט יום חול' },
   { to: '/shabbat-order', label: 'שבת קודש' },
+  { to: '/shabbat-extras', label: 'חיזוקים לסופ״ש' },
   { to: '/events', label: 'אירועים' },
   { to: '/gallery', label: 'גלריה' },
   { to: '/kashrut', label: 'כשרות' },

@@ -48,6 +48,8 @@ export const LegacySettingsSchema = z
     trn: z.string().optional(),
     businessAddress: z.string().optional(),
     invoiceCurrency: z.enum(['AED', 'USD']).optional(),
+    orderingOpen: z.boolean().optional(),
+    siteBanner: z.string().nullable().optional(),
   })
   .passthrough()
 

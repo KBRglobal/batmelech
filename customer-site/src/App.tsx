@@ -5,6 +5,7 @@ import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
 import { Story } from './pages/story'
 import { ShabbatOrder } from './pages/shabbat-order'
+import { ShabbatExtras } from './pages/shabbat-extras'
 import { Checkout } from './pages/checkout'
 import { Legal } from './pages/legal'
 import { KashrutQuality } from './pages/kashrut-quality'
@@ -20,6 +21,7 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
   '/': { title: 'מטעמי בת מלך | אוכל ביתי כשר בדובאי', description: 'מטבח ביתי כשר בדובאי. תפריט יום חול ומארזי שבת יוקרתיים, מבושל טרי ומגיע חם אליכם.' },
   '/weekdays': { title: 'מטעמי יום חול | מטעמי בת מלך', description: 'תפריט יום חול טרי - בגטים, קובה, סלטים ועוד. משלוח כשר בכל רחבי דובאי.' },
   '/shabbat-order': { title: 'מטעמי שבת קודש | מטעמי בת מלך', description: 'הרכיבו מארז שבת זוגי יוקרתי - סלטים, ראשונות, עיקריות ועוד. כשר וטרי, מגיע עד אליכם.' },
+  '/shabbat-extras': { title: 'חיזוקים לסופ״ש | מטעמי בת מלך', description: 'מנות שבת מלכותיות בהזמנה חופשית, בלי שום התחייבות למארז - כשר וטרי, מגיע עד אליכם.' },
   '/checkout': { title: 'סיכום הזמנה | מטעמי בת מלך', description: 'סיכום ההזמנה ופרטי המשלוח.' },
   '/story': { title: 'הסיפור שלנו | מטעמי בת מלך', description: 'הסיפור מאחורי מטעמי בת מלך - מטבח ביתי כשר בדובאי.' },
   '/legal': { title: 'תנאי שימוש ופרטיות | מטעמי בת מלך', description: 'תנאי שימוש, מדיניות פרטיות והצהרת אלרגיות.' },
@@ -71,6 +73,7 @@ export default function App() {
         <Route path="/weekdays" element={<Weekdays />} />
         <Route path="/story" element={<Story />} />
         <Route path="/shabbat-order" element={<ShabbatOrder />} />
+        <Route path="/shabbat-extras" element={<ShabbatExtras />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/kashrut" element={<KashrutQuality />} />
@@ -82,7 +85,7 @@ export default function App() {
         <Route path="/experiences/suite" element={<SuiteDiningExperience />} />
         <Route path="/experiences/desert" element={<DesertSafariExperience />} />
       </Routes>
-      {pathname !== '/checkout' && <FloatingCartBar />}
+      {pathname !== '/checkout' && pathname !== '/shabbat-extras' && <FloatingCartBar />}
     </div>
   )
 }

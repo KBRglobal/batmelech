@@ -13,6 +13,7 @@ const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
+const { createSiteStatusRouter } = require('./server/site-status-route');
 const { createDecoyGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
 const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
 const { createGenericContactRouter } = require('./server/auth/generic-contact-route');
@@ -105,10 +106,15 @@ app.use('/site', createReactAppRouter({ reactRoot: path.join(contentRoot, 'site'
 // into the same orders[] the admin app reads, no admin auth, no state sync.
 if (stateRepository) {
   app.use('/api/site/orders', createSiteOrderRouter({ repository: stateRepository }));
+  app.use('/api/site/status', createSiteStatusRouter({ repository: stateRepository }));
 } else {
   app.use('/api/site/orders', (_request, response) => {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'order intake unavailable' });
+  });
+  app.use('/api/site/status', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'status unavailable' });
   });
 }
 // Disguised staff login: only decoy-gate-page.html (served for /admin and

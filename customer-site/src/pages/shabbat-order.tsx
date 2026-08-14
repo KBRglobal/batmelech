@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { PageHero } from '../components/page-hero'
 import { Photo } from '../components/photo'
-import { Reveal } from '../components/reveal'
 import { useCart } from '../cart-context'
 
 const BASE_PRICE = 230
@@ -16,7 +15,6 @@ const MAIN_EXTRA_PRICE = 45
 
 type Salad = { id: string; name: string; img: string; allergy?: 'gluten-free' | 'egg' | 'spicy'; realPhoto?: boolean }
 type Choice = { id: string; name: string; img: string; allergy?: 'gluten' | 'gluten-free' | 'egg' }
-type Upsell = { id: string; name: string; price: number; note?: string; dark?: boolean }
 
 const SALADS: Salad[] = [
   { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
@@ -63,22 +61,6 @@ const DESSERTS: Choice[] = [
   { id: 'dessert-souffle', name: 'סופלה שוקולד', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/MmM6NDYjm66.jpeg' },
 ]
 
-const UPSELLS: Upsell[] = [
-  { id: 'up-roast-beef', name: 'צלי בקר פרוס ברוטב פטריות וערמונים', price: 150, note: '4 אנשים' },
-  { id: 'up-mafrum', name: 'מפרום ביתי של אמא (זוגי)', price: 40 },
-  { id: 'up-tabkha-red', name: 'טבחה בשר אדומה עם אפונה ותפו"א', price: 100, note: '2-3 אנשים' },
-  { id: 'up-roulade', name: 'רולדת בשר פריך לצד רוטב פטריות עשיר', price: 100 },
-  { id: 'up-schnitzel-tray', name: "מגש שניצלים (זוגי: כ-13-15 יח')", price: 100 },
-  { id: 'up-potato-tray', name: 'מגש תפו"א קריספיים', price: 30 },
-  { id: 'up-carb-tray', name: 'מגש אורז / קוסקוס / פסטה אדומה', price: 25 },
-  { id: 'up-olives', name: 'צלחת פתיחה (זיתים וחמוצים)', price: 15 },
-  { id: 'up-spicy-plate', name: 'צלחת חריפים', price: 15 },
-  { id: 'up-extra-salads', name: 'תוספת 4 סלטים לבחירה', price: 25 },
-  { id: 'up-hummus', name: 'תוספת חומוס ישראלי לניגוב', price: 15 },
-  { id: 'up-challah', name: 'תוספת חלה', price: 10 },
-  { id: 'up-havdala', name: 'מארז הבדלה', price: 20, dark: true },
-]
-
 const ALLERGY_ICON: Record<string, string> = {
   'gluten-free': 'ph:check-circle-bold',
   egg: 'ph:egg-bold',
@@ -87,7 +69,7 @@ const ALLERGY_ICON: Record<string, string> = {
 }
 
 export function ShabbatOrder() {
-  const { lines, addLine, setQty } = useCart()
+  const { addLine } = useCart()
   const navigate = useNavigate()
 
   const [salads, setSalads] = useState<Set<string>>(new Set())
@@ -161,7 +143,7 @@ export function ShabbatOrder() {
         active="/shabbat-order"
         size="tall"
         badge="The Shabbat Experience"
-        title={['מטעמי', 'שבת קודש']}
+        title={['מארז שבת', 'זוגי יוקרתי']}
         subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
         imageAlt="מארז שבת זוגי יוקרתי כשר בדובאי - מטעמי בת מלך"
@@ -171,6 +153,12 @@ export function ShabbatOrder() {
         <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
           ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
         </p>
+        <Link
+          to="/shabbat-extras"
+          className="block max-w-2xl mx-auto text-center text-[#8D182C] font-black underline text-sm"
+        >
+          לא רוצים חבילה שלמה? לחיזוקים לסופ״ש — מנות בודדות בלי התחייבות
+        </Link>
         <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">
           <Icon icon="ph:info-fill" className="text-amber-600 text-4xl shrink-0" />
           <div>
@@ -267,94 +255,6 @@ export function ShabbatOrder() {
             </button>
           ))}
         </div>
-
-        <Reveal>
-          <section id="free-items" className="space-y-10 scroll-mt-8">
-            <div className="flex items-center gap-4">
-              <Icon icon="ph:star-fill" className="text-4xl text-[#F5A83A]" />
-              <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">חיזוקים לסופ״ש</h2>
-            </div>
-            <p className="text-[#3B151A]/60 font-bold text-lg -mt-4">
-              לא רוצים מארז שבת שלם? כל פריט כאן נוסף לסל בנפרד, בלי שום התחייבות למארז.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {UPSELLS.map((u) => {
-                const inCartQty = lines.find((l) => l.id === u.id)?.qty ?? 0
-                return (
-                  <div
-                    key={u.id}
-                    className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all ${
-                      inCartQty > 0 ? 'border-[#F5A83A]' : u.dark ? 'border-[#F5A83A]/30' : 'border-[#EDB2C1]/20'
-                    } ${u.dark ? 'bg-[#3B151A] text-white' : 'bg-white'}`}
-                  >
-                    <div className="flex-grow">
-                      <h4 className={`text-lg font-black ${u.dark ? 'text-[#F5A83A]' : ''}`}>{u.name}</h4>
-                      {u.note && <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">{u.note}</p>}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className={`text-xl font-black ${u.dark ? 'text-[#F5A83A]' : 'text-[#8D182C]'}`}>${u.price}</span>
-                      {inCartQty === 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => addLine({ id: u.id, name: u.name, unitPrice: u.price })}
-                          className={`px-5 py-2.5 rounded-xl font-black text-sm transition-all ${
-                            u.dark ? 'bg-[#F5A83A] text-[#3B151A] hover:opacity-90' : 'bg-[#3B151A] text-white hover:bg-black'
-                          }`}
-                        >
-                          הוסף לסל
-                        </button>
-                      ) : (
-                        <div className={`flex items-center gap-2 rounded-xl p-1 ${u.dark ? 'bg-white/10' : 'bg-[#F7ECE6]'}`}>
-                          <button
-                            type="button"
-                            onClick={() => setQty(u.id, inCartQty - 1)}
-                            className={`w-8 h-8 rounded-lg font-black flex items-center justify-center ${
-                              u.dark ? 'bg-white/10 text-white' : 'bg-white text-[#3B151A]'
-                            }`}
-                          >
-                            −
-                          </button>
-                          <span className="w-6 text-center font-black flex items-center justify-center gap-1">
-                            <Icon icon="ph:check-bold" className="text-[#F5A83A] text-sm" />
-                            {inCartQty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setQty(u.id, inCartQty + 1)}
-                            className="w-8 h-8 rounded-lg bg-[#3B151A] text-white font-black flex items-center justify-center"
-                          >
-                            +
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        </Reveal>
-
-        <Reveal>
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
-            <SpecialCard
-              icon="ph:crown-fill"
-              title="ספיישל הבית"
-              desc="סיר קובה סלק בתוספת אורז (4 אנשים)"
-              price={125}
-              color="#8D182C"
-              onAdd={() => addLine({ id: 'special-kubbe-selek', name: 'ספיישל הבית — סיר קובה סלק (4 אנשים)', unitPrice: 125 })}
-            />
-            <SpecialCard
-              icon="ph:face-smile-fill"
-              title="מנת ילדים"
-              desc="מנת פסטה אדומה ושניצלונים"
-              price={35}
-              color="#3B151A"
-              onAdd={() => addLine({ id: 'special-kids', name: 'מנת ילדים — פסטה ושניצלונים', unitPrice: 35 })}
-            />
-          </section>
-        </Reveal>
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 p-6 md:p-10 bg-[#F7ECE6]/95 backdrop-blur-3xl border-t-4 border-[#EDB2C1]/20 z-[200] shadow-[0_-30px_60px_rgba(0,0,0,0.15)]">
@@ -429,45 +329,6 @@ function QtyCard({
       <div className={compact ? 'p-6' : 'p-8 text-center'}>
         <h4 className={compact ? 'text-lg font-black' : 'text-2xl font-black'}>{choice.name}</h4>
       </div>
-    </div>
-  )
-}
-
-function SpecialCard({
-  icon,
-  title,
-  desc,
-  price,
-  color,
-  onAdd,
-}: {
-  icon: string
-  title: string
-  desc: string
-  price: number
-  color: string
-  onAdd: () => void
-}) {
-  return (
-    <div className="bg-white p-8 rounded-[3.5rem] border-4 border-black/5 shadow-xl flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Icon icon={icon} className="text-3xl" style={{ color }} />
-          <h3 className="text-2xl font-black">{title}</h3>
-        </div>
-        <span className="text-3xl font-black" style={{ color }}>
-          ${price}
-        </span>
-      </div>
-      <h4 className="text-lg font-bold mb-6">{desc}</h4>
-      <button
-        type="button"
-        onClick={onAdd}
-        className="w-full text-white py-4 rounded-2xl font-black text-lg hover:opacity-90 transition-all mt-auto"
-        style={{ backgroundColor: color }}
-      >
-        הוסף לסל
-      </button>
     </div>
   )
 }
