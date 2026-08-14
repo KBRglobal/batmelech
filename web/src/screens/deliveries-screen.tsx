@@ -406,11 +406,11 @@ function ProgressStrip({
           <LocalIcon name="ph:truck-bold" className="text-xl" />
           <span>נמסרו {delivered} מתוך {total}</span>
         </p>
-        <p className="text-xs font-black text-muted-foreground">
-          עצירה נוכחית: <span className="text-primary">{currentStop === null ? 'אין עצירה בדרך' : currentStop.customerName}</span>
+        <p className="text-xs font-black text-primary">
+          {`עצירה נוכחית: ${currentStop === null ? 'אין עצירה בדרך' : currentStop.customerName}`}
         </p>
-        <p className="text-xs font-black text-muted-foreground">
-          העצירה הבאה: <span className="text-primary">{nextStop === undefined ? 'אין עצירה נוספת' : nextStop.customerName}</span>
+        <p className="text-xs font-black text-primary">
+          {`העצירה הבאה: ${nextStop === undefined ? 'אין עצירה נוספת' : nextStop.customerName}`}
         </p>
       </div>
       <CourierLocationLine store={store} />
