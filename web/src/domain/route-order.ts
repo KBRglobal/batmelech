@@ -151,7 +151,7 @@ function stopQuery(stop: RouteStop): string {
  * Google Maps refuses very long waypoint lists, so the stops are chunked at 9 per link and
  * one link per chunk is returned. Stops with no usable destination text are skipped.
  */
-export function buildMultiStopMapsUrl(orders: readonly RouteStop[]): string[] {
+export function buildMultiStopMapsUrl<T extends RouteStop>(orders: readonly T[]): string[] {
   const queries = orders.map(stopQuery).filter((query) => query !== '')
   const urls: string[] = []
   for (let start = 0; start < queries.length; start += MAX_STOPS_PER_MAPS_URL) {

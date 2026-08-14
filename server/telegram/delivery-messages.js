@@ -61,13 +61,20 @@ function timeLabel(order) {
   return `${hours}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
+// Half the hotels here are written in Latin letters ("Atlantis"), so a glued
+// Hebrew prefix reads as "בAtlantis". Hyphenate those the way people type.
+function attachPrefix(prefix, label) {
+  return /^[֐-׿]/u.test(label) ? `${prefix}${label}` : `${prefix}-${label}`;
+}
+
 function navigationLine(order) {
   const href = navigationHref(order);
   return href === null ? null : `ניווט: ${href}`;
 }
 
+// '' is a deliberate blank line; null is an absent line and disappears.
 function joinLines(lines) {
-  return lines.filter((line) => typeof line === 'string' && line !== '').join('\n');
+  return lines.filter((line) => typeof line === 'string').join('\n');
 }
 
 function humanDate(dateString) {
@@ -100,9 +107,9 @@ function digest(routeOrderedOrders, dateString, mapsUrls = []) {
       `בוקר טוב פליקס! ${dayText} יש ${countText}, לפי הסדר:`,
       '',
       ...numbered,
-      untimedLine === null ? '' : '',
+      untimedLine === null ? null : '',
       untimedLine,
-      routeLines.length === 0 ? '' : '',
+      routeLines.length === 0 ? null : '',
       ...routeLines,
       '',
       'יום קל! כל שינוי — תכתוב לי.',
@@ -123,7 +130,7 @@ function leadReminder(orders) {
     const timeText = time === '' ? '' : `, שעה ${time}`;
     return {
       text: joinLines([
-        `עוד שעה וחצי: ${orderName(first)} ב${destinationLabel(first)}${timeText}`,
+        `עוד שעה וחצי: ${orderName(first)} ${attachPrefix('ב', destinationLabel(first))}${timeText}`,
         navigation,
       ]),
     };
@@ -134,7 +141,7 @@ function leadReminder(orders) {
     return time === '' ? `• ${orderName(order)}` : `• ${orderName(order)}, שעה ${time}`;
   });
   return {
-    text: joinLines([`עוד שעה וחצי ב${destinationLabel(first)}:`, ...rows, navigation]),
+    text: joinLines([`עוד שעה וחצי ${attachPrefix('ב', destinationLabel(first))}:`, ...rows, navigation]),
   };
 }
 
@@ -143,7 +150,7 @@ function checkinPrompt(order) {
   const time = timeLabel(order);
   const timeText = time === '' ? '' : ` בשעה ${time}`;
   return {
-    text: `${orderName(order)} ב${destinationLabel(order)}${timeText} — בדרך?`,
+    text: `${orderName(order)} ${attachPrefix('ב', destinationLabel(order))}${timeText} — בדרך?`,
     reply_markup: keyboard([
       [
         button('🚗 בדרך', 'otw', token),
@@ -159,7 +166,7 @@ function lateEscalation(order, nowText) {
   const time = typeof nowText === 'string' && nowText.trim() !== '' ? nowText.trim() : timeLabel(order);
   const opening = time === '' ? 'עוד לא סומן שנמסר' : `כבר ${time} ועוד לא סומן שנמסר`;
   return {
-    text: `${opening} ל${orderName(order)}. הכל בסדר?`,
+    text: `${opening} ${attachPrefix('ל', orderName(order))}. הכל בסדר?`,
     reply_markup: keyboard([
       [button('✅ נמסר עכשיו', 'proof', token)],
       [button('⏳ מתעכב', 'late', token)],
@@ -174,7 +181,10 @@ function proofRecorded(order, nextOrder) {
   if (nextOrder) {
     const time = timeLabel(nextOrder);
     const timeText = time === '' ? '' : `, ${time}`;
-    lines.push('', `היעד הבא: ${orderName(nextOrder)} ב${destinationLabel(nextOrder)}${timeText}`);
+    lines.push(
+      '',
+      `היעד הבא: ${orderName(nextOrder)} ${attachPrefix('ב', destinationLabel(nextOrder))}${timeText}`,
+    );
     lines.push(navigationLine(nextOrder));
   }
   return {
@@ -206,7 +216,7 @@ function delayAdvice(order, etaMinutes) {
   const timeText =
     time === ''
       ? `אם זה מתארך — שווה לעדכן את ${orderName(order)}, זה חוסך טלפונים אחר כך.`
-      : `אם זה עובר את ${time} שביקש/ה ${orderName(order)} — שווה לעדכן, זה חוסך טלפונים אחר כך.`;
+      : `אם זה עובר את ${time} שסוכם עם ${orderName(order)} — שווה לעדכן, זה חוסך טלפונים אחר כך.`;
   return {
     text: joinLines([etaText, timeText, '', 'רוצה שאנסח לך הודעה להעתיק?']),
     reply_markup: keyboard([[button('📝 כן, נסחי', 'draft', token)]]),

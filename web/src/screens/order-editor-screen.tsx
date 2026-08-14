@@ -42,6 +42,8 @@ import {
   type OrderDraft,
   type OrderEditorMenu,
 } from '../domain/order-editor.ts'
+import { deliveryProofSummary } from '../domain/delivery-dashboard.ts'
+import type { LegacyOrder } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
@@ -61,6 +63,7 @@ const SECTIONS = [
   ['lunch', 'צהריים'],
   ['extras', 'אקסטרות'],
   ['payment', 'תשלום'],
+  ['proof', 'אישור מסירה'],
 ] as const
 
 const inputClassName =
@@ -424,6 +427,76 @@ function Section({
   )
 }
 
+const DELIVERY_TIMESTAMP_FORMAT = new Intl.DateTimeFormat('he-IL', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: 'Asia/Dubai',
+})
+
+function formatDeliveryTimestamp(value: number): string {
+  return DELIVERY_TIMESTAMP_FORMAT.format(new Date(value))
+}
+
+// Read-only. The courier flows on the server own every field shown here, and they are
+// deliberately absent from OrderDraft so that saving an admin edit preserves them.
+function DeliveryProofSection({ order }: { readonly order: LegacyOrder | null }) {
+  const proof = order === null ? null : deliveryProofSummary(order)
+  return (
+    <Section id="proof" title="אישור מסירה">
+      {proof === null || !proof.present ? (
+        <p className="text-sm font-bold text-muted-foreground">אין עדיין אישור מסירה</p>
+      ) : (
+        <div className="space-y-4">
+          {proof.photoHref && (
+            <a href={proof.photoHref} target="_blank" rel="noopener noreferrer" className="block w-fit">
+              <img
+                src={proof.photoHref}
+                alt="צילום מסירה"
+                className="max-h-[300px] w-auto rounded-2xl border border-border object-contain"
+              />
+            </a>
+          )}
+          <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {proof.deliveredAt !== null && (
+              <div>
+                <dt className="text-xs font-black text-muted-foreground">מועד המסירה</dt>
+                <dd className="mt-1 text-sm font-bold text-primary">{formatDeliveryTimestamp(proof.deliveredAt)}</dd>
+              </div>
+            )}
+            {proof.proofAt !== null && (
+              <div>
+                <dt className="text-xs font-black text-muted-foreground">מועד הצילום</dt>
+                <dd className="mt-1 text-sm font-bold text-primary">{formatDeliveryTimestamp(proof.proofAt)}</dd>
+              </div>
+            )}
+            {proof.proofBy !== '' && (
+              <div>
+                <dt className="text-xs font-black text-muted-foreground">נמסר על ידי</dt>
+                <dd className="mt-1 text-sm font-bold text-primary">{proof.proofBy}</dd>
+              </div>
+            )}
+            {proof.checkinLabel && (
+              <div>
+                <dt className="text-xs font-black text-muted-foreground">דיווח אחרון מהשליח</dt>
+                <dd className="mt-1 text-sm font-bold text-primary">
+                  {proof.checkinLabel}
+                  {proof.checkinAt !== null && ` · ${formatDeliveryTimestamp(proof.checkinAt)}`}
+                </dd>
+              </div>
+            )}
+            {proof.courierNote !== '' && (
+              <div className="md:col-span-2">
+                <dt className="text-xs font-black text-muted-foreground">הערת השליח</dt>
+                <dd className="mt-1 break-words text-sm font-bold text-primary [overflow-wrap:anywhere]">{proof.courierNote}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
+    </Section>
+  )
+}
+
 function Field({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
     <label className="block space-y-2">
@@ -572,6 +645,7 @@ function OrderEditorContent({
   autoConvertUntouchedDefaultMeal,
   managerReview,
   managerSourceMessage,
+  loadedOrder,
 }: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
@@ -586,6 +660,7 @@ function OrderEditorContent({
   readonly autoConvertUntouchedDefaultMeal: boolean
   readonly managerReview: AIReview | null
   readonly managerSourceMessage: string | null
+  readonly loadedOrder: LegacyOrder | null
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
@@ -1134,6 +1209,8 @@ function OrderEditorContent({
           </div>
           <Field label="הערות כלליות"><textarea aria-label="הערות כלליות" value={draft.notes} onChange={(event) => patch({ notes: event.currentTarget.value })} className={`${inputClassName} min-h-28 resize-y`} /></Field>
         </Section>
+
+        <DeliveryProofSection order={loadedOrder} />
       </div>
 
       <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
@@ -1485,6 +1562,9 @@ export function OrderEditorScreen() {
   const outOfStockNames = Array.isArray(store?.settings?.out)
     ? store.settings.out.filter((value): value is string => typeof value === 'string')
     : []
+  // The loaded order, not the draft: the delivery-confirmation fields never enter the draft.
+  const loadedMatches = mode === 'edit' ? (store?.orders ?? []).filter((order) => order.id === orderId) : []
+  const loadedOrder = loadedMatches.length === 1 ? loadedMatches[0]! : null
 
   return (
     <OrderEditorContent
@@ -1504,6 +1584,7 @@ export function OrderEditorScreen() {
       autoConvertUntouchedDefaultMeal={initialDraftKind.current === 'fresh'}
       managerReview={managerReview}
       managerSourceMessage={managerSourceMessage}
+      loadedOrder={loadedOrder}
     />
   )
 }

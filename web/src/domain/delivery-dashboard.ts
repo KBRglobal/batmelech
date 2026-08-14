@@ -353,6 +353,47 @@ function courierCheckin(
   }
 }
 
+export interface DeliveryProofSummary {
+  readonly photoHref: string | null
+  readonly proofAt: number | null
+  readonly proofBy: string
+  readonly deliveredAt: number | null
+  readonly checkinState: CourierCheckinState | null
+  readonly checkinLabel: string | null
+  readonly checkinAt: number | null
+  readonly courierNote: string
+  readonly present: boolean
+}
+
+/**
+ * Reads the delivery-confirmation fields an order may carry, applying the same validation
+ * the deliveries board applies. Every caller is read-only: these fields are written by the
+ * courier flows on the server and must survive an admin edit untouched.
+ */
+export function deliveryProofSummary(order: Readonly<LegacyOrder>): DeliveryProofSummary {
+  const checkin = courierCheckin(order)
+  const summary = {
+    photoHref: validatedProofHref(order.deliveryProofUrl),
+    proofAt: safeTimestamp(order.deliveryProofAt),
+    proofBy: boundedText(order.deliveryProofBy),
+    deliveredAt: safeTimestamp(order.deliveredAt),
+    checkinState: checkin.checkinState,
+    checkinLabel: checkin.checkinLabel,
+    checkinAt: safeTimestamp(order.courierCheckinAt),
+    courierNote: boundedText(order.courierNote),
+  }
+  return {
+    ...summary,
+    present:
+      summary.photoHref !== null ||
+      summary.proofAt !== null ||
+      summary.proofBy !== '' ||
+      summary.deliveredAt !== null ||
+      summary.checkinState !== null ||
+      summary.courierNote !== '',
+  }
+}
+
 function validOrderIds(orders: readonly LegacyOrder[]): ReadonlyMap<string, number> {
   const counts = new Map<string, number>()
   for (const order of orders) {
