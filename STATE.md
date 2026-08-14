@@ -58,9 +58,12 @@ Built and deployed tonight (2026-08-14), live on the Railway domain above.
 - Backend for the last two: `web/src/domain/store.ts` `LegacySettingsSchema` gained
   `orderingOpen`/`siteBanner`; `server/business-actions.js` has the load-mutate-save-with-retry
   helpers (same pattern as `site-order-route.js`); new public `GET /api/site/status` exposes
-  all three read-only. **Not yet consumed by customer-site** — no banner shown, no
-  ordering-closed gate, no sold-out badge on the storefront yet. That's the concrete next step
-  if this should actually affect what customers see, not just what Lin can ask about.
+  all three read-only. Customer-site now consumes it (`site-status-context.tsx`,
+  `components/site-banner.tsx`): a sitewide banner (custom message, or a default "not
+  accepting orders" notice when closed) and checkout refuses to submit while ordering is
+  closed. Confirmed live: Lin closed ordering via Mey, banner appeared on batmelech.ae
+  immediately. Sold-out badges on individual menu items using `outOfStockNames` still not
+  wired into weekdays/shabbat-extras — lower priority, add if it comes up.
 - Webhook: public route (Telegram must reach it), gated by a random path secret
   (`TELEGRAM_WEBHOOK_SECRET`, set on Railway + in `~/Documents/creds/batmelech-telegram.txt`)
   plus a hard chat_id check against the known "הזמנות" group — anything else is silently
@@ -90,9 +93,22 @@ a lightweight CRM (`customers`, `customerNotes`, `customerTags`, `activityLog`) 
 here, but a good future idea if Lin wants to track repeat customers/preferences through מיי.
 
 ## Next
-1. Wire `/api/site/status` into the customer-site (banner strip, ordering-closed gate on
-   checkout, sold-out badge on menu items using `outOfStockNames`) — the backend exists, the
-   frontend doesn't consume it yet.
+1. **Big scoped ask from Lin (via Mey), Moshe said "approve, but every action needs to verify
+   with me first" — needs its own real design session, not started tonight (context ran out):**
+   Panel features wanted: edit an existing order (change items/qty without cancel+recreate),
+   richer order status pipeline (בטיפול/בישול/ארוז/נשלח, not just today's binary), better
+   search/filter (date, status, repeat customer, payment method), a day/shift view sorted by
+   time, load alerts (too many orders in one time window), a daily digest (order count, meal
+   count, top items), a change-history/audit log, and basic inventory *quantities* (not just
+   in/out). Mey permissions wanted, ALL gated behind a new confirm-with-Moshe-first step (new
+   architecture — today's 3 tools execute immediately, no confirmation flow exists):
+   change order status, edit order details, add/remove menu items, update inventory quantities,
+   send an automatic customer message on status change/delay, export data to CSV. Priority
+   order if not all fits: (1) edit order (2) order status (3) search/filter (4) change history.
+   Start this as a proper brainstorm, not a quick add-on — it's a real expansion of Mey's
+   bounded-write boundary, which was a deliberate safety choice earlier tonight.
+2. Wire sold-out badges on individual menu items using `outOfStockNames` (banner + closed-gate
+   already wired, this piece wasn't).
 3. Decide with Moshe the exact trigger rule for delivery-timing reminders, then build that half
    of מיי's proactive nudges.
 4. Wire the Settings screen's Ziina-key field (UI only — backend route already exists).
