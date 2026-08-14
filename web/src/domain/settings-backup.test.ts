@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   applySettingsToStore,
   createBackupArtifact,
+  describeOrderingState,
   readSettingsDraft,
   reviewBackupText,
+  toggleOrderingOpen,
+  upcomingSundayDubai,
   validateSettingsDraft,
 } from './settings-backup.ts'
 import { DEFAULT_SETTINGS_CATALOG } from './settings-catalog.ts'
@@ -82,6 +85,7 @@ describe('settings backup domain', () => {
       businessAddress: '',
       invoiceCurrency: 'AED' as const,
       orderingOpen: true,
+      orderingClosedUntil: '',
       siteBanner: '',
     }
     expect(validateSettingsDraft(nextDraft)).toMatchObject({ valid: true, maxMeals: 20 })
@@ -130,6 +134,7 @@ describe('settings backup domain', () => {
         businessAddress: '',
         invoiceCurrency: 'AED' as const,
         orderingOpen: true,
+        orderingClosedUntil: '',
         siteBanner: '',
       },
       DEFAULT_SETTINGS_CATALOG,
@@ -153,6 +158,7 @@ describe('settings backup domain', () => {
       businessAddress: '',
       invoiceCurrency: 'AED',
       orderingOpen: true,
+      orderingClosedUntil: '',
       siteBanner: '',
     })
 
@@ -171,10 +177,73 @@ describe('settings backup domain', () => {
           businessAddress: '',
           invoiceCurrency: 'AED',
           orderingOpen: true,
+          orderingClosedUntil: '',
           siteBanner: '',
         },
         DEFAULT_SETTINGS_CATALOG,
       ),
     ).toThrow()
+  })
+})
+
+describe('date-aware ordering close', () => {
+  // 2026-08-09 is a Sunday; 08-14 is the Friday and 08-16 the Sunday after it.
+  const wednesday = new Date('2026-08-12T08:00:00Z')
+  const friday = new Date('2026-08-14T08:00:00Z')
+  const nextSunday = new Date('2026-08-16T08:00:00Z')
+
+  const draftOf = (store: LegacyStore, now: Date) =>
+    readSettingsDraft(store, DEFAULT_SETTINGS_CATALOG, now)
+
+  it('always closes to the next Sunday, including from Friday and from a Sunday', () => {
+    expect(upcomingSundayDubai(wednesday)).toBe('2026-08-16')
+    expect(upcomingSundayDubai(friday)).toBe('2026-08-16')
+    expect(upcomingSundayDubai(nextSunday)).toBe('2026-08-23')
+    // 21:00 UTC Saturday is already Sunday in Dubai.
+    expect(upcomingSundayDubai(new Date('2026-08-15T21:00:00Z'))).toBe('2026-08-23')
+  })
+
+  it('reads a closed store as open again once its reopen day arrives', () => {
+    const store = { orders: [], settings: { orderingOpen: false, orderingClosedUntil: '2026-08-16' } } as LegacyStore
+
+    const whileClosed = draftOf(store, friday)
+    expect(whileClosed.orderingOpen).toBe(false)
+    expect(whileClosed.orderingClosedUntil).toBe('2026-08-16')
+    expect(describeOrderingState(whileClosed)).toBe('האתר סגור להזמנות עד יום ראשון 16.08')
+
+    const afterReopen = draftOf(store, nextSunday)
+    expect(afterReopen.orderingOpen).toBe(true)
+    expect(afterReopen.orderingClosedUntil).toBe('')
+    expect(describeOrderingState(afterReopen)).toBe('האתר פתוח להזמנות')
+  })
+
+  it('closes for the coming Shabbat when the toggle flips, and clears the day when it opens', () => {
+    const open = draftOf({ orders: [], settings: {} } as LegacyStore, wednesday)
+    const closed = toggleOrderingOpen(open, wednesday)
+    expect(closed).toMatchObject({ orderingOpen: false, orderingClosedUntil: '2026-08-16' })
+    expect(toggleOrderingOpen(closed)).toMatchObject({ orderingOpen: true, orderingClosedUntil: '' })
+  })
+
+  it('saves the reopen day and preserves it across an unrelated settings edit', () => {
+    const store = { orders: [], settings: { orderingOpen: false, orderingClosedUntil: '2026-08-16' } } as LegacyStore
+    const draft = draftOf(store, friday)
+
+    const untouched = applySettingsToStore(store, { ...draft, businessName: 'בת מלך' }, DEFAULT_SETTINGS_CATALOG, friday)
+    expect(untouched.settings).toMatchObject({ orderingOpen: false, orderingClosedUntil: '2026-08-16' })
+
+    const reopened = applySettingsToStore(store, toggleOrderingOpen(draft), DEFAULT_SETTINGS_CATALOG, friday)
+    expect(reopened.settings).toMatchObject({ orderingOpen: true })
+    expect('orderingClosedUntil' in (reopened.settings as object)).toBe(false)
+  })
+
+  it('gives an old boolean-only close a reopen day when it is saved', () => {
+    const store = { orders: [], settings: { orderingOpen: false } } as LegacyStore
+    const draft = draftOf(store, wednesday)
+    expect(draft.orderingOpen).toBe(false)
+    expect(draft.orderingClosedUntil).toBe('')
+    expect(describeOrderingState(draft)).toBe('האתר סגור להזמנות')
+
+    const saved = applySettingsToStore(store, draft, DEFAULT_SETTINGS_CATALOG, wednesday)
+    expect(saved.settings).toMatchObject({ orderingOpen: false, orderingClosedUntil: '2026-08-16' })
   })
 })
