@@ -1,21 +1,95 @@
-# STATE — batmelech (updated: 2026-08-14 07:10)
+# STATE — batmelech (updated: 2026-08-14 15:50)
 
-## Now — full site gap audit for "what does Lin need to be perfect" (2026-08-14)
-Moshe said he'd asked Lin (via Mey) what's missing. Turns out that answer isn't retrievable:
-Mey/Telegram (`server/telegram/`) is fully stateless — `store: false` on every OpenAI call,
-no conversation log anywhere in the DB, filesystem, or code. If Lin answered, it only ever
-existed live inside Telegram, unlogged. Ran a live two-agent browser scan instead (customer
-site + admin panel, real login, both desktop-code-review and mobile viewport where possible)
-and folded every finding into **Next** below, priority-ordered.
-One flagged item was checked and ruled a false alarm: it looked like `/` might expose the
-admin order board to logged-out visitors, but that was session contamination (two scan agents
-shared one Chrome profile). Confirmed via a credentials-omitted fetch: logged-out `/` correctly
-redirects to `/site`, never to `/admin`. Real (lower-urgency) finding instead: real order PII
-(name/phone/hotel) sits unencrypted in `localStorage` under keys `batmelech-orders-v1` /
-`bm-sync-*`, written by the legacy `index.html`/`app.html` manager app. Since `localStorage` is
-origin-scoped, not path-scoped, that data is technically readable by any script running on any
-`/site/*` public page on the same origin — not a public leak today, but worth encrypting or
-moving server-side eventually.
+## Now — Felix delivery-coordination feature for מיי (queued next, not started)
+Felix is Lin's husband — he's the one actually doing Shabbat deliveries himself until real
+drivers exist. Moshe's framing: Felix should have מיי as a real always-on assistant for
+delivery logistics specifically, since on-time delivery is the highest-stakes part of the
+business. Scope, per Moshe (2026-08-14):
+- **Proactive reminders** — מיי currently only replies to incoming messages (`store: false`,
+  no scheduling, `server/telegram/mey-agent.js`). This needs new always-running infra: a
+  periodic check of upcoming orders that decides when to nudge Felix (ties to the new
+  checkout/order date+time fields just shipped below — finally gives a real timestamp to key
+  reminders off).
+- **Route/destination guidance** — hotel name + address already structured on orders (order
+  editor already has hotel search w/ map link), so this is mostly a matter of surfacing it
+  proactively, not new data modeling.
+- **"Are you on the way?" check-ins** — needs Felix's replies to resolve back to the right
+  order even though מיי has zero conversation memory per message. Needs a small piece of
+  state (e.g. "awaiting confirmation for order X" on the order itself), not a full chat log.
+- **Photo proof-of-delivery** — Felix photographs the bag at drop-off, מיי stores it against
+  the order. R2 bucket already provisioned (`~/Documents/creds/batmelech-r2.txt`,
+  `R2_ACCESS_KEY_ID` etc. already on Railway) but nothing uploads to it yet — this is the
+  first real use case. Needs the Telegram webhook to handle photo messages (currently
+  text-only) and an admin-side place to see the photo per order.
+Not yet decided: exact reminder trigger timing, and whether Felix talks to מיי in the existing
+"הזמנות" group or needs his own channel — default plan is the existing group (reuses working,
+tested infra) unless it gets noisy and Moshe asks to split it.
+
+## Recently done (2026-08-14) — full site gap audit + fix batch
+Moshe asked what Lin needs to be "perfect." He'd separately asked Lin the same question via
+מיי, but that answer isn't retrievable — מיי/Telegram (`server/telegram/`) is fully stateless
+(`store: false`, no conversation log anywhere). Ran a live two-agent browser scan instead
+(customer site + admin panel, real login, desktop + mobile viewport) and fixed everything
+buildable in one batch (5 parallel agents + main-thread integration), all merged to `main` and
+deployed same day. Verified before merge: `tsc` clean on both frontend apps, 220/221 server
+tests + 557/557 admin tests pass, both builds succeed, key fixes confirmed live in a real
+browser (cart persistence, unified nav, 404, checkout date/time+currency, scroll-reveal).
+
+**Shipped:**
+- Cart persists to `localStorage` (`customer-site/src/cart-context.tsx`) — survives refresh,
+  direct URL, new tab.
+- `/shabbat-extras` now uses the same standard nav/header as every other page — **Moshe
+  explicitly reversed the prior deliberate exception** ("top nav must be identical everywhere,
+  including the menu"); don't reintroduce a bespoke header here again without asking first.
+- Scroll-reveal (`components/reveal.tsx`) no longer gets stuck permanently invisible after a
+  jump-scroll — added a direct `getBoundingClientRect` check on mount as a fallback to the
+  IntersectionObserver.
+- Real 404 page for unknown `/site/*` URLs (`pages/not-found.tsx`), wired into the router.
+- Checkout has required delivery date + time fields (previously missing entirely), passed
+  through to the order and into the WhatsApp handoff message. `server/site-order-route.js`,
+  `pages/checkout.tsx`.
+- Checkout states payment method inline (cash on delivery / bank transfer / Bit / PayBox — the
+  real values already used in the admin's order editor, no online payment yet).
+- USD currency labeling site-wide (`components/currency-note.tsx`).
+- Admin Settings screen gained ordering-open/closed + site-banner controls (previously only
+  מיי could see/set `settings.orderingOpen`/`settings.siteBanner` — Lin can now see and
+  override them from the panel itself, same fields, same save path).
+- Admin Settings' demo-data load/delete buttons gated behind `?dev=1` — gone from Lin's normal
+  flow.
+- Preparation/deliveries/labels screens no longer default to the earliest date in the data
+  (which was pinned to a stale 07.08 demo order) — new `web/src/domain/service-dates.ts`
+  picks the soonest non-past date in Asia/Dubai instead.
+- Order editor heading shows the customer's name instead of the raw order UUID.
+- Shopping-list screen shows an honest empty state ("no recipes defined yet") instead of a
+  silent zero when 0 of 66 dishes have a recipe.
+- מיי persona fix (deployed same-day as a standalone hotfix ahead of the rest): she has full
+  live API access via `search_orders` but wasn't told to rely on it — asked Lin/Moshe for a
+  raw order number when told "פליקס בדרך לקטי סוזנה" instead of searching. Persona now
+  explicitly requires resolving the customer by name via `search_orders` first, and if truly
+  ambiguous, asking by date/hotel/amount — never by ID.
+
+**Investigated, deliberately not changed:**
+- The `localStorage` order-PII finding (`batmelech-orders-v1`/`bm-sync-*`, written by the
+  legacy `index.html`/`app.html` manager) — confirmed load-bearing: it's the ONLY channel
+  between `bm-sync.js` and the legacy app (see Gotchas), and its "never lose the local copy"
+  conflict-safety behavior is deliberately tested (`tests/bm-sync.test.js`). Dropping or
+  encrypting it would break real functionality for a threat model (same-origin JS reading it)
+  that encryption doesn't actually solve — the session cookie needed to decrypt would be sent
+  automatically by the same script anyway. **The real gap: `/site` has NO Content-Security-
+  Policy at all**, while the two smaller public routes do (`server/customer-order-route.js`,
+  `server/public-landing-route.js`). That, combined with the public site sharing an origin
+  with the admin's cache, is the actual amplifier. Next real fix, in order of leverage:
+  (1) serve the customer site on a separate hostname from admin — kills the whole class of
+  risk, needs a real infra/DNS decision from Moshe; (2) add a CSP to `/site` as defense in
+  depth (needs browser verification, can break fonts/icons/images — not done live during this
+  pass since other agents were actively editing that area).
+- 4 "demo" orders in live Postgres (`demo1`-`demo4`) — NOT fake/test data. Code comment in
+  `app.html` confirms: "real cases from the Word file" Moshe supplied as reference material,
+  loaded into the live DB at some point via the Settings "load demo data" button. Their dates
+  are NOT the real historical delivery dates — they're auto-computed as "next Friday from
+  whenever load was clicked" (`demo1`-`3` landed on 2026-08-07, already past; `demo4` landed
+  on 2026-08-28, artificially in the future). **Moshe confirmed: keep all 4, don't delete.**
+  Do not treat them as safe-to-purge seed data in a future pass.
 
 ## batmelech.ae DNS — false alarm, tools in this sandbox gave a wrong read
 Mid-session (earlier tonight), curl + DNS-over-HTTPS lookups run from this environment showed
@@ -112,46 +186,16 @@ here, but a good future idea if Lin wants to track repeat customers/preferences 
 
 ## Next
 
-### From the 2026-08-14 gap audit — revenue/trust blockers (do first)
-- 26/30 images on `/shabbat-order` (the flagship $230 builder) show a "תמונה זמנית" placeholder
-  badge — the page customers actually book from looks unfinished.
-- Cart is wiped on any page refresh, direct URL, or new tab (React state only, nothing
-  persisted) — customer loses their order silently.
-- Checkout has no delivery date/time field at all — a customer cannot say which Shabbat or
-  what time. No field is `required` either — worth confirming submit can't go out empty.
+### Blocked on real content from Moshe/Lin — do NOT fabricate, ask/wait instead
 - Kashrut page never names the certifying body, rabbi, or certificate — a hard dealbreaker for
-  an observant guest deciding whether to trust the kitchen.
-- `/shabbat-extras`'s only nav control (the back link in its bespoke sticky header) sits under
-  the site banner once scrolled — visitor has no way off the page.
-- Unknown `/site/*` URLs render a blank white page — no 404 text, no nav, no way out (unlike
-  `/admin`, which has a real 404).
-- `weekdays`/`shabbat-order`: scroll-reveal cards (`opacity-0` + IntersectionObserver) can get
-  stuck permanently invisible after a jump-scroll (hash link, back/forward restore) — confirmed
-  reproducible, not a one-off.
-- Payment method is never stated during ordering — flow ends as a WhatsApp message with no
-  in-flow mention of how/when to actually pay (ties into Ziina items below).
-
-### From the same audit — operational friction for Lin (admin panel)
-- No ordering-open/closed toggle or site-banner field anywhere in the admin Settings screen —
-  only Mey can set/see them (`/api/site/status` is read-only from the customer-site's side too).
-  Lin can't see or override site state from the panel itself.
-- Settings screen shows "load/delete demo data" buttons next to real backup/restore — confusing
-  for a non-technical operator, and the live DB may currently still hold demo seed orders
-  (an order bon showed `demo4` as its order ID — worth confirming the demo data was ever purged).
-- Preparation / deliveries / labels screens default to a fixed past date (07.08.2026) instead of
-  today or next Friday — Lin has to change it by hand every time.
-- Shopping-list feature computes 0 ingredients — 0 of 66 dishes have a recipe defined. Built but
-  dormant until someone enters recipes.
-- Order editor's page heading shows the raw order UUID instead of the customer's name.
-
-### From the same audit — trust/business polish (medium)
-- No real food photography anywhere (all placeholder or stock-feeling images).
-- Testimonials on the home page aren't linked to anything verifiable (no Google/Instagram).
-- Prices shown in `$` throughout a Dubai business — reads as ambiguous against AED.
-- The 5 experience pages + events page carry zero pricing signal (no "from $X/person", no
-  minimum guests) — dead-end into a quote request with no anchor.
-- `og:image` is a relative path and the logo, not food — WhatsApp link previews (the actual
-  order channel) will show no image, or the wrong one.
+  an observant guest. Waiting on the real certification info ("טרם קיבלנו את הכשרות" —
+  Moshe confirmed this isn't ready yet, not just unwritten).
+- No real food photography anywhere (all placeholder/"תמונה זמנית" or stock-feeling images) —
+  same category as kashrut, needs real assets, not invented ones.
+- Testimonials on the home page aren't linked to anything verifiable (no Google/Instagram) —
+  needs real review links from Lin.
+- The 5 experience pages + events page carry zero pricing signal — needs real price anchors
+  from Moshe, don't invent numbers.
 
 0. **"Ordering closed" needs to become date-aware, not a plain on/off.** Moshe's ask: closing
    should specifically mean "can't order for the upcoming Friday," with an automatic reopen
@@ -180,17 +224,17 @@ here, but a good future idea if Lin wants to track repeat customers/preferences 
    bounded-write boundary, which was a deliberate safety choice earlier tonight.
 2. Wire sold-out badges on individual menu items using `outOfStockNames` (banner + closed-gate
    already wired, this piece wasn't).
-3. Decide with Moshe the exact trigger rule for delivery-timing reminders, then build that half
-   of מיי's proactive nudges.
-4. Wire the Settings screen's Ziina-key field (UI only — backend route already exists).
-5. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key).
-6. Real food/venue photography — still needed everywhere tagged "תמונה זמנית", now also for
-   every royal-section item on `/shabbat-extras` if Moshe wants photos there eventually.
-7. R2 upload pipeline (bucket/creds provisioned, nothing built on top — see Gotchas).
-8. Admin screen to browse/search/resend past invoices (still only an automatic background email).
-9. SSR/prerendering for the customer site (AEO/crawler gap, noted below).
-10. Verify the decoy-login work from the prior session is actually deployed + working live —
-    last note said "third deploy about to go out," not independently re-verified tonight.
+3. Wire the Settings screen's Ziina-key field (UI only — backend route already exists).
+4. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key).
+5. R2 upload pipeline — bucket/creds provisioned, nothing built on top yet. The Felix
+   proof-of-delivery feature (see **Now**) will be the first real consumer of this.
+6. Admin screen to browse/search/resend past invoices (still only an automatic background email).
+7. SSR/prerendering for the customer site (AEO/crawler gap, noted below).
+8. Verify the decoy-login work from the prior session is actually deployed + working live —
+   last note said "third deploy about to go out," not independently re-verified tonight.
+9. Add a Content-Security-Policy to `/site` (defense in depth for the localStorage/PII finding
+   above — needs browser verification since it can break fonts/icons/images, not done live
+   during the 2026-08-14 audit-fix pass since other agents were actively in that area).
 
 ## Recently done (2026-08-13/14, newest first)
 - Checkout: split phone into a country-code dropdown (+971/+972/+1/+44) + digits, to stop
