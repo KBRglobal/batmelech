@@ -49,12 +49,15 @@ Built and deployed tonight (2026-08-14), live on the Railway domain above.
   (`gpt-5.4-mini`), key from `OPENAI_API_KEY` (Lin's own key, already on Railway, was
   provisioned but never wired to code until now).
 - **Full read** (orders/customers/menu-overrides/settings via `search_orders`,
-  `get_recent_orders`, `get_menu_and_settings`). **Bounded write, exactly 3 actions** —
-  deliberate safety boundary from Moshe, don't widen without his explicit sign-off:
-  `set_item_stock` (adds/removes a name from `settings.out`, the SAME list the admin's
-  existing out-of-stock UI already reads — did NOT invent a parallel field, see Gotchas),
-  `set_ordering_open`, `set_site_banner`. Everything else (price, menu structure, any message
-  that goes out to real customers) she can only suggest — Lin does it herself.
+  `get_recent_orders`, `get_menu_and_settings`). **Bounded write, 4 direct-execute actions,
+  no confirmation step** — widened once tonight (order status, explicitly approved by Moshe
+  to skip confirmation), still a deliberate boundary otherwise, don't widen further without
+  his sign-off: `set_item_stock` (adds/removes a name from `settings.out`, the SAME list the
+  admin's existing out-of-stock UI already reads — did NOT invent a parallel field, see
+  Gotchas), `set_ordering_open`, `set_site_banner`, `set_order_status` (only the 5 known
+  values the admin panel already uses: חדשה/אושרה/במשלוח/מוכנה/נמסרה,
+  `business-actions.js`). Everything else (price, menu structure, any message that goes out
+  to real customers, order item/qty edits) she can only suggest — Lin does it herself.
 - Backend for the last two: `web/src/domain/store.ts` `LegacySettingsSchema` gained
   `orderingOpen`/`siteBanner`; `server/business-actions.js` has the load-mutate-save-with-retry
   helpers (same pattern as `site-order-route.js`); new public `GET /api/site/status` exposes
