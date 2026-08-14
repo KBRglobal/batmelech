@@ -3,11 +3,25 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { setOrderingOpen, setSiteBanner, setItemStock, setOrderStatus } = require('../server/business-actions');
+const {
+  setOrderingOpen,
+  setSiteBanner,
+  setItemStock,
+  setOrderStatus,
+  markDeliveryNudge,
+  setDeliveryDigestSent,
+  setPromptMessageId,
+  setDeliveryCheckin,
+  setDeliveryProof,
+  revertDeliveryProof,
+  setPendingProof,
+  setCourierLocation,
+} = require('../server/business-actions');
 
 function fakeRepository(initialState) {
   let state = initialState;
   let revision = 1;
+  let saves = 0;
   return {
     async loadState() {
       return { data: state, revision, hash: 'h' };
@@ -15,10 +29,16 @@ function fakeRepository(initialState) {
     async saveState({ localState }) {
       state = localState;
       revision += 1;
+      saves += 1;
       return { ok: true };
     },
     _current: () => state,
+    _saves: () => saves,
   };
+}
+
+function orderById(repo, id) {
+  return repo._current().orders.find((order) => String(order.id) === String(id));
 }
 
 test('setOrderingOpen writes the flag under settings', async () => {
@@ -93,6 +113,258 @@ test('setOrderStatus fails cleanly when the order id does not exist', async () =
 test('setOrderStatus rejects an unknown status value', async () => {
   const repo = fakeRepository({ orders: [{ id: 'a', status: 'חדשה' }], settings: {} });
   await assert.rejects(() => setOrderStatus(repo, 'a', 'לא קיים'), RangeError);
+});
+
+test('setOrderStatus stamps deliveredAt and clears the awaiting-reply marker on נמסרה', async () => {
+  const repo = fakeRepository({
+    orders: [{ id: 'a', status: 'במשלוח', meyAwaitingReplySince: 111 }],
+    settings: {},
+  });
+  const result = await setOrderStatus(repo, 'a', 'נמסרה');
+  assert.equal(result.ok, true);
+  const order = orderById(repo, 'a');
+  assert.equal(order.status, 'נמסרה');
+  assert.equal(typeof order.deliveredAt, 'number');
+  assert.equal('meyAwaitingReplySince' in order, false);
+});
+
+test('setOrderStatus keeps an existing deliveredAt stamp', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'נמסרה', deliveredAt: 500 }], settings: {} });
+  await setOrderStatus(repo, 'a', 'נמסרה');
+  assert.equal(orderById(repo, 'a').deliveredAt, 500);
+});
+
+test('setOrderStatus does not stamp deliveredAt for other statuses', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'חדשה' }], settings: {} });
+  await setOrderStatus(repo, 'a', 'במשלוח');
+  assert.equal('deliveredAt' in orderById(repo, 'a'), false);
+});
+
+test('markDeliveryNudge claims the lead nudge and mints a token', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }, { id: 'b', status: 'חדשה' }], settings: {} });
+  const result = await markDeliveryNudge(repo, 'a', 'lead');
+  assert.equal(result.ok, true);
+  assert.equal(result.claimed, true);
+  assert.match(result.token, /^[0-9a-f]{8}$/);
+  const order = orderById(repo, 'a');
+  assert.equal(typeof order.meyLeadNudgeAt, 'number');
+  assert.equal(order.meyToken, result.token);
+  assert.deepEqual(orderById(repo, 'b'), { id: 'b', status: 'חדשה' });
+});
+
+test('markDeliveryNudge is a no-op on the second call and does not save again', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }], settings: {} });
+  const first = await markDeliveryNudge(repo, 'a', 'lead');
+  const savesAfterFirst = repo._saves();
+  const stampAfterFirst = orderById(repo, 'a').meyLeadNudgeAt;
+
+  const second = await markDeliveryNudge(repo, 'a', 'lead');
+  assert.equal(second.ok, true);
+  assert.equal(second.claimed, false);
+  assert.equal(second.token, first.token);
+  assert.equal(repo._saves(), savesAfterFirst);
+  assert.equal(orderById(repo, 'a').meyLeadNudgeAt, stampAfterFirst);
+});
+
+test('markDeliveryNudge keeps the three nudge kinds independent', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }], settings: {} });
+  const lead = await markDeliveryNudge(repo, 'a', 'lead');
+  const checkin = await markDeliveryNudge(repo, 'a', 'checkin');
+  const late = await markDeliveryNudge(repo, 'a', 'late');
+  assert.equal(checkin.claimed, true);
+  assert.equal(late.claimed, true);
+  assert.equal(checkin.token, lead.token);
+  const order = orderById(repo, 'a');
+  assert.equal(typeof order.meyLeadNudgeAt, 'number');
+  assert.equal(typeof order.meyCheckinAskedAt, 'number');
+  assert.equal(typeof order.meyLateNudgeAt, 'number');
+});
+
+test('markDeliveryNudge sets the awaiting-reply marker only for the checkin kind', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }], settings: {} });
+  await markDeliveryNudge(repo, 'a', 'lead');
+  assert.equal('meyAwaitingReplySince' in orderById(repo, 'a'), false);
+  await markDeliveryNudge(repo, 'a', 'checkin');
+  assert.equal(typeof orderById(repo, 'a').meyAwaitingReplySince, 'number');
+});
+
+test('markDeliveryNudge reuses an existing token instead of minting a new one', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה', meyToken: 'deadbeef' }], settings: {} });
+  const result = await markDeliveryNudge(repo, 'a', 'late');
+  assert.equal(result.token, 'deadbeef');
+  assert.equal(orderById(repo, 'a').meyToken, 'deadbeef');
+});
+
+test('markDeliveryNudge rejects an unknown kind and fails cleanly on a missing order', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }], settings: {} });
+  await assert.rejects(() => markDeliveryNudge(repo, 'a', 'whatever'), RangeError);
+  const missing = await markDeliveryNudge(repo, 'nope', 'lead');
+  assert.equal(missing.ok, false);
+});
+
+test('markDeliveryNudge yields the claim when another writer wins the save race', async () => {
+  // First save is rejected (someone else wrote in between) and the order comes
+  // back already nudged — the retry must re-check, not blindly overwrite.
+  let order = { id: 'a', status: 'מוכנה' };
+  let attempts = 0;
+  const repo = {
+    async loadState() {
+      return { data: { orders: [order], settings: {} }, revision: 1, hash: 'h' };
+    },
+    async saveState() {
+      attempts += 1;
+      if (attempts === 1) {
+        order = { ...order, meyLeadNudgeAt: 123, meyToken: 'aabbccdd' };
+        return { ok: false };
+      }
+      return { ok: true };
+    },
+  };
+  const result = await markDeliveryNudge(repo, 'a', 'lead');
+  assert.deepEqual(result, { ok: true, claimed: false, token: 'aabbccdd' });
+  assert.equal(attempts, 1);
+  assert.equal(order.meyLeadNudgeAt, 123);
+});
+
+test('setDeliveryDigestSent claims a date once', async () => {
+  const repo = fakeRepository({ orders: [], settings: { businessName: 'בת מלך' } });
+  const first = await setDeliveryDigestSent(repo, '2026-08-14');
+  assert.deepEqual(first, { ok: true, claimed: true });
+  assert.equal(repo._current().settings.meyDigestSentFor, '2026-08-14');
+  assert.equal(repo._current().settings.businessName, 'בת מלך');
+
+  const savesAfterFirst = repo._saves();
+  const second = await setDeliveryDigestSent(repo, '2026-08-14');
+  assert.deepEqual(second, { ok: true, claimed: false });
+  assert.equal(repo._saves(), savesAfterFirst);
+
+  const nextDay = await setDeliveryDigestSent(repo, '2026-08-15');
+  assert.equal(nextDay.claimed, true);
+  assert.equal(repo._current().settings.meyDigestSentFor, '2026-08-15');
+});
+
+test('setPromptMessageId stores the message id as a number', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }], settings: {} });
+  const result = await setPromptMessageId(repo, 'a', 4321);
+  assert.equal(result.ok, true);
+  assert.equal(orderById(repo, 'a').meyPromptMessageId, 4321);
+
+  const bad = await setPromptMessageId(repo, 'a', 'not a number');
+  assert.equal(bad.ok, false);
+});
+
+test('setDeliveryCheckin records state, eta and note', async () => {
+  const repo = fakeRepository({
+    orders: [{ id: 'a', status: 'במשלוח', meyAwaitingReplySince: 111 }, { id: 'b', status: 'חדשה' }],
+    settings: {},
+  });
+  const result = await setDeliveryCheckin(repo, 'a', { state: 'delayed', etaMinutes: 25, note: '  פקק  ' });
+  assert.equal(result.ok, true);
+  const order = orderById(repo, 'a');
+  assert.equal(order.courierCheckinState, 'delayed');
+  assert.equal(typeof order.courierCheckinAt, 'number');
+  assert.equal(order.courierEtaMinutes, 25);
+  assert.equal(typeof order.courierEtaAt, 'number');
+  assert.equal(order.courierNote, 'פקק');
+  assert.equal('meyAwaitingReplySince' in order, false);
+  assert.deepEqual(orderById(repo, 'b'), { id: 'b', status: 'חדשה' });
+});
+
+test('setDeliveryCheckin ignores an out-of-range eta and truncates a long note', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'במשלוח' }], settings: {} });
+  await setDeliveryCheckin(repo, 'a', { state: 'onTheWay', etaMinutes: 9000, note: 'x'.repeat(700) });
+  const order = orderById(repo, 'a');
+  assert.equal('courierEtaMinutes' in order, false);
+  assert.equal(order.courierNote.length, 500);
+});
+
+test('setDeliveryCheckin rejects an unknown state without touching the order', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'במשלוח' }], settings: {} });
+  const result = await setDeliveryCheckin(repo, 'a', { state: 'teleporting' });
+  assert.equal(result.ok, false);
+  assert.equal(typeof result.error, 'string');
+  assert.equal(repo._saves(), 0);
+  assert.deepEqual(orderById(repo, 'a'), { id: 'a', status: 'במשלוח' });
+});
+
+test('setDeliveryProof marks the order delivered and remembers the previous status', async () => {
+  const repo = fakeRepository({
+    orders: [{ id: 'a', status: 'במשלוח', meyAwaitingReplySince: 111 }],
+    settings: {},
+  });
+  const result = await setDeliveryProof(repo, 'a', { url: 'https://r2.example/proof.jpg', by: 'לין' });
+  assert.equal(result.ok, true);
+  assert.equal(result.previousStatus, 'במשלוח');
+  const order = orderById(repo, 'a');
+  assert.equal(order.deliveryProofUrl, 'https://r2.example/proof.jpg');
+  assert.equal(order.deliveryProofBy, 'לין');
+  assert.equal(typeof order.deliveryProofAt, 'number');
+  assert.equal(order.statusBeforeProof, 'במשלוח');
+  assert.equal(order.status, 'נמסרה');
+  assert.equal(typeof order.deliveredAt, 'number');
+  assert.equal('meyAwaitingReplySince' in order, false);
+});
+
+test('setDeliveryProof rejects a non-https url', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'במשלוח' }], settings: {} });
+  const httpResult = await setDeliveryProof(repo, 'a', { url: 'http://r2.example/proof.jpg' });
+  assert.equal(httpResult.ok, false);
+  const missingResult = await setDeliveryProof(repo, 'a', {});
+  assert.equal(missingResult.ok, false);
+  assert.equal(repo._saves(), 0);
+  assert.deepEqual(orderById(repo, 'a'), { id: 'a', status: 'במשלוח' });
+});
+
+test('setDeliveryProof honours an explicit timestamp', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'מוכנה' }], settings: {} });
+  await setDeliveryProof(repo, 'a', { url: 'https://r2.example/proof.jpg', at: 777 });
+  assert.equal(orderById(repo, 'a').deliveryProofAt, 777);
+});
+
+test('revertDeliveryProof restores the exact previous status and clears the proof fields', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'במשלוח' }], settings: {} });
+  await setDeliveryProof(repo, 'a', { url: 'https://r2.example/proof.jpg', by: 'לין' });
+  const result = await revertDeliveryProof(repo, 'a');
+  assert.equal(result.ok, true);
+  assert.deepEqual(orderById(repo, 'a'), { id: 'a', status: 'במשלוח' });
+});
+
+test('revertDeliveryProof falls back to מוכנה when no previous status was recorded', async () => {
+  const repo = fakeRepository({
+    orders: [{ id: 'a', status: 'נמסרה', deliveryProofUrl: 'https://r2.example/p.jpg', deliveredAt: 5 }],
+    settings: {},
+  });
+  await revertDeliveryProof(repo, 'a');
+  assert.deepEqual(orderById(repo, 'a'), { id: 'a', status: 'מוכנה' });
+});
+
+test('setPendingProof stores and clears the pending photo', async () => {
+  const repo = fakeRepository({ orders: [], settings: { businessName: 'בת מלך' } });
+  const stored = await setPendingProof(repo, { url: 'https://r2.example/p.jpg', at: 42, by: 'לין' });
+  assert.equal(stored.ok, true);
+  assert.deepEqual(repo._current().settings.meyPendingProof, { url: 'https://r2.example/p.jpg', at: 42, by: 'לין' });
+  assert.equal(repo._current().settings.businessName, 'בת מלך');
+
+  const cleared = await setPendingProof(repo, null);
+  assert.equal(cleared.ok, true);
+  assert.equal(repo._current().settings.meyPendingProof, null);
+});
+
+test('setPendingProof rejects a non-https url', async () => {
+  const repo = fakeRepository({ orders: [], settings: {} });
+  const result = await setPendingProof(repo, { url: 'ftp://r2.example/p.jpg' });
+  assert.equal(result.ok, false);
+  assert.equal(repo._saves(), 0);
+});
+
+test('setCourierLocation stores coordinates and rejects non-numbers', async () => {
+  const repo = fakeRepository({ orders: [], settings: {} });
+  const result = await setCourierLocation(repo, { lat: 31.77, lon: 35.21, at: 99 });
+  assert.equal(result.ok, true);
+  assert.deepEqual(repo._current().settings.meyCourierLocation, { lat: 31.77, lon: 35.21, at: 99 });
+
+  const bad = await setCourierLocation(repo, { lat: 'north', lon: 35.21 });
+  assert.equal(bad.ok, false);
 });
 
 test('setOrderingOpen reports failure when every save attempt is rejected', async () => {

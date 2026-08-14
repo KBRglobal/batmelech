@@ -19,6 +19,8 @@ const INACTIVE_STATUS_ALIASES = new Set([
 
 type LegacyOrderId = string | number | null
 
+export type CourierCheckinState = 'onTheWay' | 'onTime' | 'delayed'
+
 export type DeliveryWarningCode =
   | 'MISSING_ORDER_ID'
   | 'DUPLICATE_ORDER_ID'
@@ -53,6 +55,11 @@ export interface DeliveryOrderView {
   readonly groupName: string
   readonly collectionState: 'absent' | 'valid' | 'invalid'
   readonly collectionMinorUnits: number | null
+  readonly proofPhotoHref: string | null
+  readonly checkinState: CourierCheckinState | null
+  readonly checkinLabel: string | null
+  readonly etaMinutes: number | null
+  readonly deliveredAt: number | null
 }
 
 export interface DeliveryDestinationGroup {
@@ -290,6 +297,62 @@ function validatedNavigationHref(value: unknown): string | null {
   }
 }
 
+// Delivery proofs are uploaded to one R2 public bucket. The account hash is not hardcoded
+// here — the host only has to look like a public R2 bucket — but everything else is as
+// strict as validatedNavigationHref: https only, no credentials, no other host.
+const R2_PUBLIC_HOSTNAME = /^pub-[a-z0-9]+\.r2\.dev$/
+
+function validatedProofHref(value: unknown): string | null {
+  const raw = boundedText(value)
+  if (raw === '') return null
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'https:') return null
+    if (parsed.username !== '' || parsed.password !== '') return null
+    if (!R2_PUBLIC_HOSTNAME.test(parsed.hostname.toLocaleLowerCase('en-US'))) return null
+    return parsed.toString()
+  } catch {
+    return null
+  }
+}
+
+function courierCheckinState(value: unknown): CourierCheckinState | null {
+  if (value === 'onTheWay' || value === 'onTime' || value === 'delayed') return value
+  return null
+}
+
+function safeTimestamp(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
+}
+
+function courierEtaMinutes(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1440
+    ? value
+    : null
+}
+
+const CHECKIN_LABELS: Readonly<Record<CourierCheckinState, string>> = {
+  onTheWay: 'בדרך',
+  onTime: 'מגיע בזמן',
+  delayed: 'מתעכב',
+}
+
+function courierCheckin(
+  order: Readonly<LegacyOrder>,
+): Pick<DeliveryOrderView, 'checkinState' | 'checkinLabel' | 'etaMinutes'> {
+  const checkinState = courierCheckinState(order.courierCheckinState)
+  const etaMinutes = courierEtaMinutes(order.courierEtaMinutes)
+  if (checkinState === null) return { checkinState: null, checkinLabel: null, etaMinutes }
+  return {
+    checkinState,
+    checkinLabel:
+      etaMinutes === null
+        ? CHECKIN_LABELS[checkinState]
+        : `${CHECKIN_LABELS[checkinState]} · ${etaMinutes} דק׳`,
+    etaMinutes,
+  }
+}
+
 function validOrderIds(orders: readonly LegacyOrder[]): ReadonlyMap<string, number> {
   const counts = new Map<string, number>()
   for (const order of orders) {
@@ -436,6 +499,9 @@ export function buildDeliveryDashboard(
       status: boundedText(order.status) || 'חדשה',
       groupName: boundedText(order.group),
       ...collectionAmount(order, warnings),
+      proofPhotoHref: validatedProofHref(order.deliveryProofUrl),
+      ...courierCheckin(order),
+      deliveredAt: safeTimestamp(order.deliveredAt),
     }
 
     if (view.pickup) {

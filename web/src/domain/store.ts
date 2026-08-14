@@ -37,6 +37,28 @@ export const LegacyOrderSchema = z
     source: z.string().optional(),
     invoiceSentAt: z.number().optional(),
     invoiceNumber: z.string().optional(),
+    // Delivery-coordination fields. These are written only by the courier/customer
+    // Telegram flows on the server, never by the admin editor. They are deliberately
+    // absent from OrderDraft / createOrderDraftFromLegacy / serializeOrderDraft in
+    // order-editor.ts: the admin save merges `{...existingOrder, ...serializeOrderDraft(draft)}`,
+    // so keeping them out of the draft is what preserves them through an admin edit.
+    // Every admin-panel surface that shows them is read-only.
+    meyToken: z.string().optional(),
+    meyLeadNudgeAt: z.number().optional(),
+    meyCheckinAskedAt: z.number().optional(),
+    meyLateNudgeAt: z.number().optional(),
+    meyAwaitingReplySince: z.number().optional(),
+    meyPromptMessageId: z.number().optional(),
+    courierCheckinState: z.enum(['onTheWay', 'onTime', 'delayed']).optional(),
+    courierCheckinAt: z.number().optional(),
+    courierEtaMinutes: z.number().optional(),
+    courierEtaAt: z.number().optional(),
+    courierNote: z.string().optional(),
+    deliveryProofUrl: z.string().optional(),
+    deliveryProofAt: z.number().optional(),
+    deliveryProofBy: z.string().optional(),
+    deliveredAt: z.number().optional(),
+    statusBeforeProof: z.string().optional(),
   })
   .passthrough()
 
@@ -50,6 +72,15 @@ export const LegacySettingsSchema = z
     invoiceCurrency: z.enum(['AED', 'USD']).optional(),
     orderingOpen: z.boolean().optional(),
     siteBanner: z.string().nullable().optional(),
+    meyDigestSentFor: z.string().optional(),
+    meyPendingProof: z
+      .object({ url: z.string(), at: z.number(), by: z.string().optional() })
+      .nullable()
+      .optional(),
+    meyCourierLocation: z
+      .object({ lat: z.number(), lon: z.number(), at: z.number() })
+      .nullable()
+      .optional(),
   })
   .passthrough()
 
