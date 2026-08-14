@@ -342,6 +342,8 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
   const initializationRef = useRef<MenuInitialization | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveMessage, setSaveMessage] = useState('')
+  const [catalogOverride, setCatalogOverride] = useState<SettingsCatalog | null>(null)
+  const [editError, setEditError] = useState('')
 
   if (initializationRef.current === null && storeQuery.data?.data != null) {
     initializationRef.current = {
@@ -356,7 +358,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
   }
   const initialization = initializationRef.current
   const { baseEnvelope, baseStore, loaded } = initialization
-  const current = loaded.catalog
+  const current = catalogOverride ?? loaded.catalog
   const validation = validateSettingsCatalog(current)
   const blockingLoadWarnings = loaded.warnings.filter((warning) => warning.code !== 'SUPERSEDED_EXTRA_REMOVED')
   const visibleWarnings = [...loaded.warnings, ...validation].filter(
@@ -368,6 +370,16 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
           candidate.message === warning.message,
       ) === index,
   )
+
+  const onUpdate = (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => {
+    try {
+      setCatalogOverride(mutate(current))
+      setEditError('')
+      setSaveState('idle')
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'השינוי נדחה.')
+    }
+  }
 
   const commit = async () => {
     if (!onSave) {
@@ -406,7 +418,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-black text-primary sm:text-4xl">מחירון ותפריט</h1>
-          <p className="mt-2 text-sm font-bold text-muted-foreground">המנות ומחירי הצהריים מוצגים מתוך המחירון הקבוע.</p>
+          <p className="mt-2 text-sm font-bold text-muted-foreground">עריכת מחירים, שמות מנות והוספה/הסרה. שינויים נשמרים רק בלחיצה על "שמירת התפריט".</p>
         </div>
         <button type="button" onClick={() => void commit()} disabled={saveState === 'saving'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground disabled:opacity-50">
           <LocalIcon name="ph:check-circle-bold" />
@@ -414,6 +426,9 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
         </button>
       </header>
       <div className="mt-3"><SaveStatus state={saveState} message={saveMessage} /></div>
+      {editError !== '' && (
+        <p role="alert" className="mt-2 text-xs font-black text-destructive">{editError}</p>
+      )}
 
       {visibleWarnings.length > 0 && (
         <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5" role="alert">
@@ -427,11 +442,20 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       <section className="mt-8 rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className="text-xl font-black text-primary">כללי הארוחה הזוגית</h2>
         <p className="mt-2 text-xs font-bold text-muted-foreground">
-          מחיר הארוחה, החלה והאקסטרות מוצגים בלבד במהדורה הזו, כי טופס הלקוחות עדיין משתמש במחירים קבועים.
+          מחיר הארוחה והחלה הנוספת ניתנים לעריכה. הכללים (סלטים/דגים כלולים, מחיר פילה נוסף) קבועים
+          כרגע כי הם חלק מנוסחת התמחור האוטומטית.
         </p>
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <PriceField label="מחיר ארוחה זוגית" value={current.couplePriceMinorUnits} fixed onCommit={() => undefined} />
-          <PriceField label="מחיר חלה נוספת" value={current.extraChallahMinorUnits} fixed onCommit={() => undefined} />
+          <PriceField
+            label="מחיר ארוחה זוגית"
+            value={current.couplePriceMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'couplePriceMinorUnits', next))}
+          />
+          <PriceField
+            label="מחיר חלה נוספת"
+            value={current.extraChallahMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'extraChallahMinorUnits', next))}
+          />
           <FixedValue label="סלטים כלולים בזוגית" value={String(AUTHORITATIVE_ALLOWANCES.includedSaladsPerCouple)} />
           <FixedValue label="דגים כלולים בזוגית" value={String(AUTHORITATIVE_ALLOWANCES.includedFishUnitsPerCouple)} />
           <PriceField label="מחיר פילה דג נוסף" value={AUTHORITATIVE_ALLOWANCES.extraFishFilletMinorUnits} fixed onCommit={() => undefined} />
@@ -444,9 +468,11 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       </section>
 
       <section className="mt-8 space-y-3">
-        {MENU_CATEGORY_KEYS.map((category) => <CategoryEditor key={category} category={category} catalog={current} />)}
-        <ExtrasEditor catalog={current} />
-        <LunchEditor catalog={current} />
+        {MENU_CATEGORY_KEYS.map((category) => (
+          <CategoryEditor key={category} category={category} catalog={current} onUpdate={onUpdate} />
+        ))}
+        <ExtrasEditor catalog={current} onUpdate={onUpdate} />
+        <LunchEditor catalog={current} onUpdate={onUpdate} />
       </section>
     </div>
   )

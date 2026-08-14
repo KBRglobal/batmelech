@@ -50,76 +50,135 @@ describe('MenuEditorScreen', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
-  it('shows every authoritative fish, salad, dessert, extras, and lunch rule', () => {
+  it('shows editable prices for the couple meal, extras, and lunch, and a locked constant fillet price', () => {
     mockedUseStore.mockReturnValue(queryResult())
     render(<MenuEditorScreen />)
 
     expect((screen.getByLabelText('מחיר ארוחה זוגית') as HTMLInputElement).value).toBe('230')
-    expect((screen.getByLabelText('מחיר ארוחה זוגית') as HTMLInputElement).disabled).toBe(true)
-    expect((screen.getByLabelText('מחיר חלה נוספת') as HTMLInputElement).disabled).toBe(true)
-    expect(screen.getByText(/טופס הלקוחות עדיין משתמש במחירים קבועים/)).toBeTruthy()
+    expect((screen.getByLabelText('מחיר ארוחה זוגית') as HTMLInputElement).disabled).toBe(false)
+    expect((screen.getByLabelText('מחיר חלה נוספת') as HTMLInputElement).disabled).toBe(false)
     expect(screen.getByText('סלטים כלולים בזוגית').parentElement?.textContent).toContain('4')
     expect(screen.getByText('דגים כלולים בזוגית').parentElement?.textContent).toContain('2')
     expect((screen.getByLabelText('מחיר פילה דג נוסף') as HTMLInputElement).value).toBe('30')
-    expect(screen.getByText(/שני פילטים, בכל שילוב של מרוקאי וחריימה/)).toBeTruthy()
-    expect(screen.getByText(/מנת קציצות דגים אחת שווה למנת דג זוגית מלאה/)).toBeTruthy()
-    expect(screen.getByText(/כל בלוק נוסף של 4 עולה 25\$/)).toBeTruthy()
-    expect(screen.getByText(/2 סופלה או מנת סוכריות בקלוואה אחת/)).toBeTruthy()
+    expect((screen.getByLabelText('מחיר פילה דג נוסף') as HTMLInputElement).disabled).toBe(true)
     expect(screen.getByText('סלטים (17)')).toBeTruthy()
     expect(screen.getByText('ראשונות (3)')).toBeTruthy()
     expect(screen.getByText('עיקריות (8)')).toBeTruthy()
     expect(screen.getByText('תוספות (6)')).toBeTruthy()
     expect(screen.getByText('קינוחים (2)')).toBeTruthy()
-    expect((screen.getByLabelText('מחיר מרק ירקות לקוסקוס ללא עוף') as HTMLInputElement).disabled).toBe(true)
-    expect(screen.getByText('מרק ירקות לקוסקוס ללא עוף')).toBeTruthy()
-    expect(screen.getByText('אורז')).toBeTruthy()
-    expect(screen.getAllByText('פסטה אדומה').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('קוסקוס').length).toBeGreaterThan(0)
-    expect(screen.getByText('בגט טוניסאי אותנטי')).toBeTruthy()
-    expect(screen.getByText('מנת קובה סלק ביתית')).toBeTruthy()
+    expect((screen.getByLabelText('מחיר מרק ירקות לקוסקוס ללא עוף') as HTMLInputElement).disabled).toBe(false)
+    expect((screen.getByLabelText('מחיר בגט טוניסאי אותנטי') as HTMLInputElement).value).toBe('22')
     expect(screen.getAllByText(/משפחתית — כולל 2 תוספות/).length).toBeGreaterThan(0)
     expect(screen.getByText('זמין בסוף שבוע בלבד')).toBeTruthy()
-    expect(screen.getByText(/מחירי הצהריים מוצגים בלבד ונעולים למחירון שבטופס הלקוחות/)).toBeTruthy()
-    const lunchEditor = screen.getByText('תפריט צהריים (5)').closest('details')
-    expect(lunchEditor).not.toBeNull()
-    expect(lunchEditor?.querySelector('input, select, textarea, button')).toBeNull()
-    expect(within(lunchEditor as HTMLElement).getByText('מחיר בגט טוניסאי אותנטי').parentElement?.textContent).toContain('22$')
     expect(screen.queryByText('תוספת מנת דג')).toBeNull()
     expect(screen.queryByText('תוספת קציצות דגים')).toBeNull()
-    expect(screen.queryByText('משלוח')).toBeNull()
-    expect(screen.queryByLabelText('מנה חדשה בראשונות')).toBeNull()
-    expect(screen.queryByLabelText('מנה חדשה בעיקריות')).toBeNull()
-    expect(screen.queryByLabelText('אקסטרה חדשה')).toBeNull()
-    expect(screen.queryByRole('button', { name: /מחיקת/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'חזרה לתפריט המקורי' })).toBeNull()
+    expect(screen.queryByLabelText('הוספת מנה לראשונות')).toBeNull()
+    expect(screen.getByLabelText('הוספת מנה לעיקריות')).toBeTruthy()
+    expect(screen.getByLabelText('שם אקסטרה חדשה')).toBeTruthy()
   })
 
-  it('saves unrelated store data without exposing a callback that can change lunch pricing', async () => {
-    const store = { orders: [{ id: 'real-order' }], preserved: { exact: true } } as LegacyStore
+  it('locks the firsts category — no rename, no add, no remove', () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    render(<MenuEditorScreen />)
+
+    const firstsInput = screen.getByLabelText(/שם המנה — .*חריימה/) as HTMLInputElement
+    expect(firstsInput.disabled).toBe(true)
+    expect(screen.queryByLabelText('הוספת מנה לראשונות')).toBeNull()
+  })
+
+  it('renames a category dish and saves the new name', async () => {
+    const store = { orders: [] } as LegacyStore
     mockedUseStore.mockReturnValue(queryResult({ store }))
     const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
     const user = userEvent.setup()
     render(<MenuEditorScreen onSave={onSave} />)
 
-    expect(onSave).not.toHaveBeenCalled()
-    expect(screen.queryByRole('textbox', { name: 'מחיר בגט טוניסאי אותנטי' })).toBeNull()
-    const lunchEditor = screen.getByText('תפריט צהריים (5)').closest('details')
-    expect(lunchEditor?.querySelectorAll('input, select, textarea, button')).toHaveLength(0)
-    expect(onSave).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
+    const input = screen.getByLabelText('שם המנה — סלט ביצים') as HTMLInputElement
+    await user.clear(input)
+    await user.type(input, 'סלט ביצים חדש')
+    await user.tab()
+    expect(screen.getByLabelText('שם המנה — סלט ביצים חדש')).toBeTruthy()
 
+    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
     expect(onSave).toHaveBeenCalledTimes(1)
-    const request = onSave.mock.calls[0]![0]
-    expect(request.reason).toBe('menu')
-    expect(request.baseEnvelope).toMatchObject({ revision: 1, hash: HASH, data: store })
-    expect(request.baseStore).toBe(store)
-    expect(request.nextStore.orders).toEqual([{ id: 'real-order' }])
-    expect((request.nextStore as Record<string, unknown>).preserved).toEqual({ exact: true })
-    expect((request.nextStore as Record<string, unknown>).menu).toMatchObject({
-      couplePrice: 230,
-      lunch: expect.arrayContaining([{ key: 'baguette', price: 22 }]),
-    })
-    expect(await screen.findByText('נשמר')).toBeTruthy()
+    const nextMenu = onSave.mock.calls[0]![0].nextStore as unknown as { menu: { salads: string[] } }
+    expect(nextMenu.menu.salads).toContain('סלט ביצים חדש')
+  })
+
+  it('adds and removes a dish in an unlocked category', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    render(<MenuEditorScreen />)
+
+    const mainsSection = () => screen.getByText(/^עיקריות \(\d+\)$/).closest('details') as HTMLElement
+    await user.type(within(mainsSection()).getByLabelText('הוספת מנה לעיקריות'), 'מנה חדשה לגמרי')
+    await user.click(within(mainsSection()).getByRole('button', { name: 'הוספה' }))
+    expect(screen.getByText('עיקריות (9)')).toBeTruthy()
+    expect(screen.getByLabelText('שם המנה — מנה חדשה לגמרי')).toBeTruthy()
+
+    const removeButtons = within(mainsSection()).getAllByRole('button', { name: 'הסרה' })
+    await user.click(removeButtons[removeButtons.length - 1]!)
+    expect(screen.getByText('עיקריות (8)')).toBeTruthy()
+  })
+
+  it('edits an extra price and saves it', async () => {
+    const store = { orders: [] } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<MenuEditorScreen onSave={onSave} />)
+
+    const price = screen.getByLabelText('מחיר מארז הבדלה') as HTMLInputElement
+    await user.clear(price)
+    await user.type(price, '25')
+    await user.tab()
+    expect(price.value).toBe('25')
+
+    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const nextMenu = onSave.mock.calls[0]![0].nextStore as unknown as {
+      menu: { extras: Array<{ name: string; price: number }> }
+    }
+    expect(nextMenu.menu.extras).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'מארז הבדלה', price: 25 }),
+    ]))
+  })
+
+  it('edits a lunch variant price and saves it', async () => {
+    const store = { orders: [] } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<MenuEditorScreen onSave={onSave} />)
+
+    const price = screen.getByLabelText('מחיר בגט טוניסאי אותנטי') as HTMLInputElement
+    await user.clear(price)
+    await user.type(price, '24')
+    await user.tab()
+
+    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const nextMenu = onSave.mock.calls[0]![0].nextStore as unknown as {
+      menu: { lunch: Array<{ key: string; price?: number }> }
+    }
+    expect(nextMenu.menu.lunch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'baguette', price: 24 }),
+    ]))
+  })
+
+  it('shows a rejection message instead of applying an invalid rename, and never calls onSave for it', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<MenuEditorScreen onSave={onSave} />)
+
+    const input = screen.getByLabelText('שם המנה — סלט ביצים') as HTMLInputElement
+    await user.clear(input)
+    await user.type(input, 'סלט תפו"א')
+    await user.tab()
+
+    expect(screen.getByRole('alert').textContent).toContain('already exists')
+    expect(onSave).not.toHaveBeenCalled()
   })
 
   it('blocks loaded duplicate IDs without exposing lunch price mutation controls', async () => {
@@ -142,20 +201,6 @@ describe('MenuEditorScreen', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('keeps every Shabbat category and extra visible without add, delete, or reset mutations', () => {
-    mockedUseStore.mockReturnValue(queryResult())
-    render(<MenuEditorScreen />)
-
-    expect(screen.getByText('פילה דג ברוטב מרוקאי')).toBeTruthy()
-    expect(screen.getByText('קציצות בשר ברוטב אדום עשיר')).toBeTruthy()
-    expect(screen.getByText('מארז הבדלה')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /מחיקת/ })).toBeNull()
-    expect(screen.queryByLabelText(/מנה חדשה/)).toBeNull()
-    expect(screen.queryByLabelText('אקסטרה חדשה')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'חזרה לתפריט המקורי' })).toBeNull()
-    expect(screen.getAllByText(/טופס הלקוחות, המחיר/).length).toBeGreaterThan(0)
-  })
-
   it('keeps its exact initialization envelope and performs no stale callback', async () => {
     const initialStore = { orders: [{ id: 'initial' }], marker: 'initial' } as LegacyStore
     const refreshedStore = { orders: [{ id: 'initial' }], marker: 'refreshed' } as LegacyStore
@@ -166,7 +211,6 @@ describe('MenuEditorScreen', () => {
 
     mockedUseStore.mockReturnValue(queryResult({ store: refreshedStore, revision: 5 }))
     view.rerender(<MenuEditorScreen onSave={onSave} />)
-    expect(screen.queryByRole('textbox', { name: 'מחיר בגט טוניסאי אותנטי' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
 
     expect(onSave).not.toHaveBeenCalled()

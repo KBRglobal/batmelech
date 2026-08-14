@@ -14,6 +14,8 @@ import {
   loadSettingsCatalog,
   nextStableIngredientId,
   removeCatalogItem,
+  renameCatalogExtra,
+  renameCatalogItem,
   resolvePreparationCatalog,
   recipeTargets,
   updateLunchPrice,
@@ -195,6 +197,46 @@ describe('settings catalog', () => {
       expect.objectContaining({ code: 'UNSAFE_FIRST_COURSE_ITEM' }),
     ]))
     expect(() => applyCatalogToStore(EMPTY_STORE, renamed)).toThrow('must retain its authoritative name and ID')
+  })
+
+  it('rejects renaming the authoritative first-course rows but allows renaming elsewhere, keeping the same ID', () => {
+    for (const item of AUTHORITATIVE_FIRST_COURSE_ITEMS) {
+      expect(() => renameCatalogItem(DEFAULT_SETTINGS_CATALOG, 'firsts', item.id, 'שם אחר')).toThrow(
+        'cannot be renamed',
+      )
+    }
+
+    const target = DEFAULT_SETTINGS_CATALOG.categories.salads[0]!
+    const renamed = renameCatalogItem(DEFAULT_SETTINGS_CATALOG, 'salads', target.id, '  סלט חדש  ')
+    const renamedItem = renamed.categories.salads.find((item) => item.id === target.id)
+    expect(renamedItem?.name).toBe('סלט חדש')
+    expect(renamed.categories.salads).toHaveLength(DEFAULT_SETTINGS_CATALOG.categories.salads.length)
+
+    expect(() => renameCatalogItem(DEFAULT_SETTINGS_CATALOG, 'salads', target.id, '')).toThrow('nonblank')
+    const secondItem = DEFAULT_SETTINGS_CATALOG.categories.salads[1]!
+    expect(() => renameCatalogItem(DEFAULT_SETTINGS_CATALOG, 'salads', target.id, secondItem.name)).toThrow(
+      'already exists',
+    )
+
+    const saved = applyCatalogToStore({ orders: [] } as LegacyStore, renamed)
+    const reloaded = loadSettingsCatalog(saved)
+    expect(reloaded.catalog.categories.salads.find((item) => item.id === target.id)?.name).toBe('סלט חדש')
+  })
+
+  it('renames an extra in place, keeping its price and ID, and rejects reserved or duplicate names', () => {
+    const target = DEFAULT_SETTINGS_CATALOG.extras[0]!
+    const renamed = renameCatalogExtra(DEFAULT_SETTINGS_CATALOG, target.id, '  אקסטרה חדשה  ')
+    const renamedItem = renamed.extras.find((item) => item.id === target.id)
+    expect(renamedItem).toMatchObject({ id: target.id, name: 'אקסטרה חדשה', priceMinorUnits: target.priceMinorUnits })
+
+    expect(() => renameCatalogExtra(DEFAULT_SETTINGS_CATALOG, target.id, '')).toThrow('nonblank')
+    expect(() => renameCatalogExtra(DEFAULT_SETTINGS_CATALOG, target.id, 'משלוח')).toThrow(
+      'reserved for automatic pricing',
+    )
+    const secondExtra = DEFAULT_SETTINGS_CATALOG.extras[1]!
+    expect(() => renameCatalogExtra(DEFAULT_SETTINGS_CATALOG, target.id, secondExtra.name)).toThrow(
+      'already exists',
+    )
   })
 
   it('retains stable item IDs across an apply and reload cycle', () => {
