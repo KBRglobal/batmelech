@@ -168,7 +168,7 @@ export function ShabbatOrder() {
           <div>
             <h5 className="font-black text-amber-900 text-xl mb-2">שיטת הבחירה במארז</h5>
             <p className="text-amber-800 font-bold text-sm leading-relaxed">
-              המחיר הבסיסי ($230) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.
+              המחיר הבסיסי ($230 USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.
               <br />
               כל בחירה מעבר למכסה מתווספת אוטומטית למחיר למטה.
             </p>

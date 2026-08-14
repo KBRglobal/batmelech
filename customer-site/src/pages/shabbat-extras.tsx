@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { Link, useNavigate } from 'react-router'
 import { PageHero } from '../components/page-hero'
+import { CurrencyNote } from '../components/currency-note'
 import { useCart } from '../cart-context'
 
 const SALAD_PRICE = 6.25
@@ -257,7 +258,9 @@ export function ShabbatExtras() {
             <h4 className="text-2xl md:text-4xl font-black font-heading text-[#F5A83A] mb-4 md:mb-6 underline decoration-[#F5A83A]/30 underline-offset-8">
               תפריט זוגי לכבוד שבת קודש
             </h4>
-            <div className="text-4xl md:text-6xl font-black mb-6 md:mb-8">$230</div>
+            <div className="text-4xl md:text-6xl font-black mb-6 md:mb-8">
+              $230 <span className="text-lg md:text-2xl align-middle text-white/50">USD</span>
+            </div>
             <p className="text-sm md:text-lg font-bold text-white/60 mb-8 md:mb-12 italic">
               חבילה שלמה הכוללת 4 סוגי סלטים, מנה ראשונה, עיקרית, תוספת וקינוח.
             </p>
