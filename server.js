@@ -16,6 +16,12 @@ const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
 const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
 const { createMeyAgent } = require('./server/telegram/mey-agent');
+const { createR2Storage } = require('./server/telegram/r2-storage');
+const { createVoiceTranscriber } = require('./server/telegram/transcribe-voice');
+const { createProofHandler } = require('./server/telegram/proof-of-delivery');
+const { createCallbackHandler } = require('./server/telegram/callback-handler');
+const { createDeliveryScheduler } = require('./server/telegram/delivery-scheduler');
+const { getFilePath, downloadFile } = require('./server/telegram/telegram-files');
 const { createDecoyGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
 const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
 const { createGenericContactRouter } = require('./server/auth/generic-contact-route');
@@ -119,19 +125,52 @@ if (stateRepository) {
     response.status(503).json({ error: 'status unavailable' });
   });
 }
-// מיי — Lin's Telegram assistant. Publicly reachable (Telegram must be able
-// to POST to it) but only acts on messages from the known staff chat, and
-// only via the bounded tool set in server/business-actions.js.
+// מיי — Lin's Telegram assistant, now also Felix's delivery dispatcher.
+// Publicly reachable (Telegram must be able to POST to it) but only acts on
+// messages from the known staff chat, and only via the bounded tool set in
+// server/business-actions.js. Photo/voice/location/callback handlers degrade
+// to no-ops when their dependencies are unavailable.
 if (stateRepository && process.env.TELEGRAM_WEBHOOK_SECRET && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ORDERS_CHAT_ID) {
+  const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+  const telegramChatId = process.env.TELEGRAM_ORDERS_CHAT_ID;
+  const meyAgent = createMeyAgent({ repository: stateRepository });
+  const r2Storage = createR2Storage();
   app.use(
     '/api/telegram/webhook',
     createTelegramWebhookRouter({
       webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
-      botToken: process.env.TELEGRAM_BOT_TOKEN,
-      ordersChatId: process.env.TELEGRAM_ORDERS_CHAT_ID,
-      agent: createMeyAgent({ repository: stateRepository }),
+      botToken: telegramBotToken,
+      ordersChatId: telegramChatId,
+      agent: meyAgent,
+      repository: stateRepository,
+      proofHandler: r2Storage.enabled
+        ? createProofHandler({
+            repository: stateRepository,
+            storage: r2Storage,
+            botToken: telegramBotToken,
+            chatId: telegramChatId,
+          })
+        : null,
+      voiceTranscriber: createVoiceTranscriber(),
+      callbackHandler: createCallbackHandler({
+        repository: stateRepository,
+        botToken: telegramBotToken,
+        chatId: telegramChatId,
+        agent: meyAgent,
+      }),
+      telegramFiles: { getFilePath, downloadFile },
     })
   );
+  // Proactive delivery reminders (Friday digest, lead/check-in/late nudges).
+  // Kill switch: remove/blank MEY_DELIVERY_REMINDERS on Railway to disable.
+  if (process.env.MEY_DELIVERY_REMINDERS === 'on') {
+    const deliveryScheduler = createDeliveryScheduler({
+      repository: stateRepository,
+      botToken: telegramBotToken,
+      chatId: telegramChatId,
+    });
+    deliveryScheduler.start();
+  }
 }
 // Disguised staff login: only decoy-gate-page.html (served for /admin and
 // its aliases) ever posts here. No admin auth of its own — it IS the auth,
