@@ -87,7 +87,7 @@ const ALLERGY_ICON: Record<string, string> = {
 }
 
 export function ShabbatOrder() {
-  const { addLine } = useCart()
+  const { lines, addLine, setQty } = useCart()
   const navigate = useNavigate()
 
   const [salads, setSalads] = useState<Set<string>>(new Set())
@@ -269,7 +269,7 @@ export function ShabbatOrder() {
         </div>
 
         <Reveal>
-          <section className="space-y-10">
+          <section id="free-items" className="space-y-10 scroll-mt-8">
             <div className="flex items-center gap-4">
               <Icon icon="ph:star-fill" className="text-4xl text-[#F5A83A]" />
               <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">פריטים בודדים להזמנה חופשית</h2>
@@ -278,31 +278,59 @@ export function ShabbatOrder() {
               לא רוצים מארז שבת שלם? כל פריט כאן נוסף לסל בנפרד, בלי שום התחייבות למארז.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {UPSELLS.map((u) => (
-                <div
-                  key={u.id}
-                  className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all ${
-                    u.dark ? 'bg-[#3B151A] text-white border-[#F5A83A]/30' : 'bg-white border-[#EDB2C1]/20'
-                  }`}
-                >
-                  <div className="flex-grow">
-                    <h4 className={`text-lg font-black ${u.dark ? 'text-[#F5A83A]' : ''}`}>{u.name}</h4>
-                    {u.note && <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">{u.note}</p>}
+              {UPSELLS.map((u) => {
+                const inCartQty = lines.find((l) => l.id === u.id)?.qty ?? 0
+                return (
+                  <div
+                    key={u.id}
+                    className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all ${
+                      inCartQty > 0 ? 'border-[#F5A83A]' : u.dark ? 'border-[#F5A83A]/30' : 'border-[#EDB2C1]/20'
+                    } ${u.dark ? 'bg-[#3B151A] text-white' : 'bg-white'}`}
+                  >
+                    <div className="flex-grow">
+                      <h4 className={`text-lg font-black ${u.dark ? 'text-[#F5A83A]' : ''}`}>{u.name}</h4>
+                      {u.note && <p className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">{u.note}</p>}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className={`text-xl font-black ${u.dark ? 'text-[#F5A83A]' : 'text-[#8D182C]'}`}>${u.price}</span>
+                      {inCartQty === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => addLine({ id: u.id, name: u.name, unitPrice: u.price })}
+                          className={`px-5 py-2.5 rounded-xl font-black text-sm transition-all ${
+                            u.dark ? 'bg-[#F5A83A] text-[#3B151A] hover:opacity-90' : 'bg-[#3B151A] text-white hover:bg-black'
+                          }`}
+                        >
+                          הוסף לסל
+                        </button>
+                      ) : (
+                        <div className={`flex items-center gap-2 rounded-xl p-1 ${u.dark ? 'bg-white/10' : 'bg-[#F7ECE6]'}`}>
+                          <button
+                            type="button"
+                            onClick={() => setQty(u.id, inCartQty - 1)}
+                            className={`w-8 h-8 rounded-lg font-black flex items-center justify-center ${
+                              u.dark ? 'bg-white/10 text-white' : 'bg-white text-[#3B151A]'
+                            }`}
+                          >
+                            −
+                          </button>
+                          <span className="w-6 text-center font-black flex items-center justify-center gap-1">
+                            <Icon icon="ph:check-bold" className="text-[#F5A83A] text-sm" />
+                            {inCartQty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setQty(u.id, inCartQty + 1)}
+                            className="w-8 h-8 rounded-lg bg-[#3B151A] text-white font-black flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className={`text-xl font-black ${u.dark ? 'text-[#F5A83A]' : 'text-[#8D182C]'}`}>${u.price}</span>
-                    <button
-                      type="button"
-                      onClick={() => addLine({ id: u.id, name: u.name, unitPrice: u.price })}
-                      className={`px-5 py-2.5 rounded-xl font-black text-sm transition-all ${
-                        u.dark ? 'bg-[#F5A83A] text-[#3B151A] hover:opacity-90' : 'bg-[#3B151A] text-white hover:bg-black'
-                      }`}
-                    >
-                      הוסף לסל
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </section>
         </Reveal>

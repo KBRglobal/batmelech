@@ -6,6 +6,7 @@ const LINKS = [
   { to: '/', label: 'בית' },
   { to: '/weekdays', label: 'יום חול' },
   { to: '/shabbat-order', label: 'שבת קודש' },
+  { to: '/shabbat-order#free-items', label: 'הזמנה חופשית' },
   { to: '/story', label: 'עלינו' },
   { to: '/events', label: 'אירועים' },
   { to: '/gallery', label: 'גלריה' },
@@ -52,6 +53,14 @@ export function NavCartButton() {
   )
 }
 
+export function NavLogo() {
+  return (
+    <Link to="/" className="shrink-0 w-14 h-14 md:w-16 md:h-16">
+      <img src="/site/assets/logo-cream.png" alt="מטעמי בת מלך" className="w-full h-full object-contain drop-shadow-[0_2px_10px_rgba(59,21,26,0.5)]" />
+    </Link>
+  )
+}
+
 export function PhoneBadge() {
   return (
     <a
@@ -67,13 +76,16 @@ export function PhoneBadge() {
 
 export function NavHeader({ active }: { active: string }) {
   return (
-    <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="order-1 md:order-2 flex items-center gap-3">
-        <Nav active={active} />
-        <NavCartButton />
+    <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:grid md:grid-cols-3 items-center gap-6">
+      <div className="flex items-center justify-center md:justify-start order-1">
+        <NavLogo />
       </div>
-      <div className="order-2 md:order-1">
+      <div className="flex items-center justify-center order-3 md:order-2">
+        <Nav active={active} />
+      </div>
+      <div className="flex items-center justify-center md:justify-end gap-3 order-2 md:order-3">
         <PhoneBadge />
+        <NavCartButton />
       </div>
     </header>
   )

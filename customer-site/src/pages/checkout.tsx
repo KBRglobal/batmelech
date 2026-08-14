@@ -7,6 +7,12 @@ import { useCart } from '../cart-context'
 import { buildOrderMessage, waLink } from '../whatsapp'
 
 const DELIVERY_FEE = 15
+const PHONE_CODES = [
+  { code: '+971', label: 'איחוד האמירויות' },
+  { code: '+972', label: 'ישראל' },
+  { code: '+1', label: 'ארה"ב / קנדה' },
+  { code: '+44', label: 'בריטניה' },
+]
 const CHECKOUT_HERO_IMAGE =
   'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg'
 
@@ -40,7 +46,7 @@ export function Checkout() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customer,
+        customer: { ...customer, phone: `${customer.phoneCode}${customer.phone}` },
         lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
         total,
       }),
@@ -146,14 +152,26 @@ export function Checkout() {
               />
             </Field>
             <Field label="מספר טלפון">
-              <input
-                type="tel"
-                value={customer.phone}
-                onChange={(e) => setCustomer({ phone: e.target.value })}
-                placeholder="+971 50 000 0000"
-                dir="ltr"
-                className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
-              />
+              <div className="flex gap-2" dir="ltr">
+                <select
+                  value={customer.phoneCode}
+                  onChange={(e) => setCustomer({ phoneCode: e.target.value })}
+                  className="p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold shrink-0"
+                >
+                  {PHONE_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} {c.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  value={customer.phone}
+                  onChange={(e) => setCustomer({ phone: e.target.value })}
+                  placeholder="50 000 0000"
+                  className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+                />
+              </div>
             </Field>
             <div className="md:col-span-2">
               <Field label="אימייל (לקבלת חשבונית)">

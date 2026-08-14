@@ -34,10 +34,19 @@ const PAGE_META: Record<string, { title: string; description: string }> = {
 }
 
 export default function App() {
-  const { pathname } = useLocation()
+  const { pathname, hash } = useLocation()
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+    if (hash) {
+      const target = document.getElementById(hash.slice(1))
+      if (target) {
+        target.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' })
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+      }
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+    }
     const meta = PAGE_META[pathname]
     if (meta) {
       document.title = meta.title
@@ -53,7 +62,7 @@ export default function App() {
     document
       .querySelector('meta[name="robots"]')
       ?.setAttribute('content', pathname === '/checkout' ? 'noindex,nofollow' : 'index,follow,max-image-preview:large')
-  }, [pathname])
+  }, [pathname, hash])
 
   return (
     <div key={pathname} className="page-transition">
