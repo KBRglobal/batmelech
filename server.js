@@ -14,6 +14,8 @@ const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route'
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
+const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
+const { createMeyAgent } = require('./server/telegram/mey-agent');
 const { createDecoyGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
 const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
 const { createGenericContactRouter } = require('./server/auth/generic-contact-route');
@@ -116,6 +118,20 @@ if (stateRepository) {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'status unavailable' });
   });
+}
+// מיי — Lin's Telegram assistant. Publicly reachable (Telegram must be able
+// to POST to it) but only acts on messages from the known staff chat, and
+// only via the bounded tool set in server/business-actions.js.
+if (stateRepository && process.env.TELEGRAM_WEBHOOK_SECRET && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ORDERS_CHAT_ID) {
+  app.use(
+    '/api/telegram/webhook',
+    createTelegramWebhookRouter({
+      webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+      botToken: process.env.TELEGRAM_BOT_TOKEN,
+      ordersChatId: process.env.TELEGRAM_ORDERS_CHAT_ID,
+      agent: createMeyAgent({ repository: stateRepository }),
+    })
+  );
 }
 // Disguised staff login: only decoy-gate-page.html (served for /admin and
 // its aliases) ever posts here. No admin auth of its own — it IS the auth,
