@@ -95,7 +95,7 @@
   }
 }
 .page-transition {
-  animation: page-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: page-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

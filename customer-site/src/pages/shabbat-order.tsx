@@ -90,12 +90,11 @@ export function ShabbatOrder() {
   const { addLine } = useCart()
   const navigate = useNavigate()
 
-  const [salads, setSalads] = useState<Set<string>>(new Set(SALADS.slice(0, 4).map((s) => s.id)))
-  const [firstQty, setFirstQty] = useState<Record<string, number>>({ [FIRST_COURSES[0].id]: 1 })
-  const [mainQty, setMainQty] = useState<Record<string, number>>({ [MAIN_COURSES[0].id]: 1 })
-  const [side, setSide] = useState<string>(SIDES[0].id)
-  const [dessert, setDessert] = useState<string>(DESSERTS[0].id)
-  const [upsells, setUpsells] = useState<Set<string>>(new Set())
+  const [salads, setSalads] = useState<Set<string>>(new Set())
+  const [firstQty, setFirstQty] = useState<Record<string, number>>({})
+  const [mainQty, setMainQty] = useState<Record<string, number>>({})
+  const [side, setSide] = useState<string>('')
+  const [dessert, setDessert] = useState<string>('')
 
   const toggleSalad = (id: string) =>
     setSalads((prev) => {
@@ -108,31 +107,33 @@ export function ShabbatOrder() {
     setFirstQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }))
   const bumpMain = (id: string, delta: number) =>
     setMainQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }))
-  const toggleUpsell = (id: string) =>
-    setUpsells((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
 
   const firstCount = Object.values(firstQty).reduce((a, b) => a + b, 0)
   const mainCount = Object.values(mainQty).reduce((a, b) => a + b, 0)
 
-  const { total, saladExtra, firstExtra, mainExtra, upsellTotal } = useMemo(() => {
+  const { total, saladExtra, firstExtra, mainExtra } = useMemo(() => {
     const saladExtraN = Math.max(0, salads.size - INCLUDED_SALADS) * SALAD_EXTRA_PRICE
     const firstExtraN = Math.max(0, firstCount - INCLUDED_FIRST) * FIRST_EXTRA_PRICE
     const mainExtraN = Math.max(0, mainCount - INCLUDED_MAIN) * MAIN_EXTRA_PRICE
-    const upsellN = [...upsells].reduce((sum, id) => sum + (UPSELLS.find((u) => u.id === id)?.price ?? 0), 0)
     return {
       saladExtra: saladExtraN,
       firstExtra: firstExtraN,
       mainExtra: mainExtraN,
-      upsellTotal: upsellN,
-      total: BASE_PRICE + saladExtraN + firstExtraN + mainExtraN + upsellN,
+      total: BASE_PRICE + saladExtraN + firstExtraN + mainExtraN,
     }
-  }, [salads, firstCount, mainCount, upsells])
+  }, [salads, firstCount, mainCount])
 
-  const canContinue = firstCount >= 1 && mainCount >= 1 && side && dessert
+  const missing: string[] = []
+  if (salads.size < INCLUDED_SALADS) {
+    const left = INCLUDED_SALADS - salads.size
+    missing.push(left === 1 ? 'עוד סלט אחד' : `עוד ${left} סלטים`)
+  }
+  if (firstCount < INCLUDED_FIRST) missing.push('מנה ראשונה')
+  if (mainCount < INCLUDED_MAIN) missing.push('מנה עיקרית')
+  if (!side) missing.push('תוספת')
+  if (!dessert) missing.push('קינוח')
+
+  const canContinue = missing.length === 0
 
   const handleContinue = () => {
     if (!canContinue) return
@@ -141,14 +142,12 @@ export function ShabbatOrder() {
     const mainNames = MAIN_COURSES.filter((c) => (mainQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${mainQty[c.id]}`)
     const sideName = SIDES.find((s) => s.id === side)?.name
     const dessertName = DESSERTS.find((d) => d.id === dessert)?.name
-    const upsellNames = UPSELLS.filter((u) => upsells.has(u.id)).map((u) => u.name)
     const note = [
       `סלטים: ${saladNames.join(', ')}`,
       `ראשונה: ${firstNames.join(', ')}`,
       `עיקרית: ${mainNames.join(', ')}`,
       `תוספת: ${sideName}`,
       `קינוח: ${dessertName}`,
-      upsellNames.length ? `תוספות: ${upsellNames.join(', ')}` : undefined,
     ]
       .filter(Boolean)
       .join(' | ')
@@ -169,7 +168,7 @@ export function ShabbatOrder() {
       />
 
       <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
-        <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg -mb-4">
+        <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
           ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
         </p>
         <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">
@@ -240,7 +239,7 @@ export function ShabbatOrder() {
             <button
               key={s.id}
               type="button"
-              onClick={() => setSide(s.id)}
+              onClick={() => setSide((prev) => (prev === s.id ? '' : s.id))}
               className={`block p-6 rounded-3xl border-2 transition-all shadow-sm text-center font-black ${
                 side === s.id ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-transparent bg-white'
               }`}
@@ -256,7 +255,7 @@ export function ShabbatOrder() {
             <button
               key={d.id}
               type="button"
-              onClick={() => setDessert(d.id)}
+              onClick={() => setDessert((prev) => (prev === d.id ? '' : d.id))}
               className={`group relative rounded-[3.5rem] overflow-hidden border-4 transition-all shadow-lg text-right ${
                 dessert === d.id ? 'border-[#F5A83A]' : 'border-transparent'
               }`}
@@ -273,13 +272,16 @@ export function ShabbatOrder() {
           <section className="space-y-10">
             <div className="flex items-center gap-4">
               <Icon icon="ph:star-fill" className="text-4xl text-[#F5A83A]" />
-              <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">משדרגים את השולחן</h2>
+              <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">פריטים בודדים להזמנה חופשית</h2>
             </div>
+            <p className="text-[#3B151A]/60 font-bold text-lg -mt-4">
+              לא רוצים מארז שבת שלם? כל פריט כאן נוסף לסל בנפרד, בלי שום התחייבות למארז.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {UPSELLS.map((u) => (
-                <label
+                <div
                   key={u.id}
-                  className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                  className={`p-6 rounded-[2rem] border-2 flex items-center justify-between shadow-sm hover:shadow-md transition-all ${
                     u.dark ? 'bg-[#3B151A] text-white border-[#F5A83A]/30' : 'bg-white border-[#EDB2C1]/20'
                   }`}
                 >
@@ -289,17 +291,19 @@ export function ShabbatOrder() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className={`text-xl font-black ${u.dark ? 'text-[#F5A83A]' : 'text-[#8D182C]'}`}>${u.price}</span>
-                    <input
-                      type="checkbox"
-                      checked={upsells.has(u.id)}
-                      onChange={() => toggleUpsell(u.id)}
-                      className="w-8 h-8 accent-[#3B151A] cursor-pointer"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => addLine({ id: u.id, name: u.name, unitPrice: u.price })}
+                      className={`px-5 py-2.5 rounded-xl font-black text-sm transition-all ${
+                        u.dark ? 'bg-[#F5A83A] text-[#3B151A] hover:opacity-90' : 'bg-[#3B151A] text-white hover:bg-black'
+                      }`}
+                    >
+                      הוסף לסל
+                    </button>
                   </div>
-                </label>
+                </div>
               ))}
             </div>
-            {upsellTotal > 0 && <p className="text-[#8D182C] font-black text-center">+${upsellTotal} תוספות</p>}
           </section>
         </Reveal>
 
@@ -333,7 +337,7 @@ export function ShabbatOrder() {
             </div>
             <div className="flex flex-col">
               <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">מארז שבת זוגי יוקרתי</span>
-              <span className="text-xl md:text-3xl font-black leading-tight">{canContinue ? 'סיכום הזמנה' : 'השלימו בחירה ראשונה, עיקרית, תוספת וקינוח'}</span>
+              <span className="text-xl md:text-3xl font-black leading-tight">{canContinue ? 'סיכום הזמנה' : `חסר: ${missing.join(', ')}`}</span>
             </div>
           </div>
           <button

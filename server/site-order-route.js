@@ -21,13 +21,19 @@ const LineSchema = z.object({
 });
 
 const OrderSubmissionSchema = z.object({
-  customer: z.object({
-    name: z.string().trim().min(1).max(200),
-    phone: z.string().trim().min(1).max(60),
-    email: z.union([z.string().trim().email().max(200), z.literal('')]).optional(),
-    address: z.string().trim().min(1).max(1_000),
-    notes: z.string().trim().max(2_000).optional(),
-  }),
+  customer: z
+    .object({
+      name: z.string().trim().min(1).max(200),
+      phone: z.string().trim().min(1).max(60),
+      email: z.union([z.string().trim().email().max(200), z.literal('')]).optional(),
+      address: z.string().trim().max(1_000).optional().default(''),
+      notes: z.string().trim().max(2_000).optional(),
+      fulfillment: z.enum(['delivery', 'pickup']).optional().default('delivery'),
+    })
+    .refine((customer) => customer.fulfillment === 'pickup' || customer.address.length > 0, {
+      message: 'address is required for delivery orders',
+      path: ['address'],
+    }),
   lines: z.array(LineSchema).min(1).max(100),
   total: z.number().finite().nonnegative().max(1_000_000),
 });
@@ -47,7 +53,8 @@ function buildLegacyOrder(submission, now) {
       return `${line.name} x${line.qty}${noteText} — $${(line.unitPrice * line.qty).toFixed(2)}`;
     })
     .join('\n');
-  const notes = [itemsText, submission.customer.notes].filter(Boolean).join('\n\n');
+  const isPickup = submission.customer.fulfillment === 'pickup';
+  const notes = [itemsText, isPickup ? 'איסוף עצמי' : undefined, submission.customer.notes].filter(Boolean).join('\n\n');
   const id = orderId(now);
   if (!CANONICAL_ORDER_ID_PATTERN.test(id)) {
     throw new Error('generated order id is not canonical');
@@ -58,7 +65,7 @@ function buildLegacyOrder(submission, now) {
     name: submission.customer.name,
     phone: submission.customer.phone,
     email: submission.customer.email || undefined,
-    address: submission.customer.address,
+    address: isPickup ? 'איסוף עצמי' : submission.customer.address,
     status: 'חדשה',
     source: 'site',
     notes,

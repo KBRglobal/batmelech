@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router'
+import { FloatingCartBar } from './components/floating-cart-bar'
 import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
 import { Story } from './pages/story'
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/experiences/suite" element={<SuiteDiningExperience />} />
         <Route path="/experiences/desert" element={<DesertSafariExperience />} />
       </Routes>
+      {pathname !== '/checkout' && <FloatingCartBar />}
     </div>
   )
 }

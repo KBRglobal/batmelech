@@ -8,12 +8,15 @@ export type CartLine = {
   note?: string
 }
 
+export type Fulfillment = 'delivery' | 'pickup'
+
 export type CustomerDetails = {
   name: string
   phone: string
   email: string
   address: string
   notes: string
+  fulfillment: Fulfillment
 }
 
 type CartContextValue = {
@@ -29,7 +32,7 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-const EMPTY_CUSTOMER: CustomerDetails = { name: '', phone: '', email: '', address: '', notes: '' }
+const EMPTY_CUSTOMER: CustomerDetails = { name: '', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery' }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([])

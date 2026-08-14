@@ -12,7 +12,8 @@ const CHECKOUT_HERO_IMAGE =
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
-  const total = lines.length ? subtotal + DELIVERY_FEE : 0
+  const isPickup = customer.fulfillment === 'pickup'
+  const total = lines.length ? subtotal + (isPickup ? 0 : DELIVERY_FEE) : 0
 
   if (lines.length === 0) {
     return (
@@ -32,7 +33,7 @@ export function Checkout() {
     )
   }
 
-  const canSubmit = customer.name.trim() && customer.phone.trim() && customer.address.trim()
+  const canSubmit = customer.name.trim() && customer.phone.trim() && (isPickup || customer.address.trim())
 
   const submitOrderToKitchen = () => {
     fetch('/api/site/orders', {
@@ -99,8 +100,8 @@ export function Checkout() {
               <span>${subtotal.toFixed(2).replace(/\.00$/, '')}</span>
             </div>
             <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
-              <span>משלוח (דובאי)</span>
-              <span>${DELIVERY_FEE}</span>
+              <span>{isPickup ? 'איסוף עצמי' : 'משלוח (דובאי)'}</span>
+              <span>{isPickup ? 'ללא עלות' : `$${DELIVERY_FEE}`}</span>
             </div>
             <div className="flex justify-between text-2xl font-black pt-4">
               <span>סה"כ לתשלום</span>
@@ -112,8 +113,28 @@ export function Checkout() {
         <section className="space-y-8">
           <h2 className="text-2xl font-black font-heading flex items-center gap-3">
             <Icon icon="ph:map-pin-fill" className="text-[#F5A83A]" />
-            פרטי משלוח
+            איך תרצו לקבל את ההזמנה
           </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setCustomer({ fulfillment: 'delivery' })}
+              className={`p-6 rounded-3xl border-2 font-black text-center transition-all ${
+                !isPickup ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
+              }`}
+            >
+              משלוח (${DELIVERY_FEE})
+            </button>
+            <button
+              type="button"
+              onClick={() => setCustomer({ fulfillment: 'pickup' })}
+              className={`p-6 rounded-3xl border-2 font-black text-center transition-all ${
+                isPickup ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
+              }`}
+            >
+              איסוף עצמי (ללא עלות)
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field label="שם מלא">
               <input
@@ -146,17 +167,19 @@ export function Checkout() {
                 />
               </Field>
             </div>
-            <div className="md:col-span-2">
-              <Field label="כתובת מלאה (מלון / דירה)">
-                <input
-                  type="text"
-                  value={customer.address}
-                  onChange={(e) => setCustomer({ address: e.target.value })}
-                  placeholder="שם המלון, מספר חדר, אזור..."
-                  className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
-                />
-              </Field>
-            </div>
+            {!isPickup && (
+              <div className="md:col-span-2">
+                <Field label="כתובת מלאה (מלון / דירה)">
+                  <input
+                    type="text"
+                    value={customer.address}
+                    onChange={(e) => setCustomer({ address: e.target.value })}
+                    placeholder="שם המלון, מספר חדר, אזור..."
+                    className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+                  />
+                </Field>
+              </div>
+            )}
             <div className="md:col-span-2">
               <Field label="הערות למטבח">
                 <textarea
@@ -198,7 +221,11 @@ export function Checkout() {
           >
             אישור ושליחת הזמנה <Icon icon="ph:check-circle-fill" className="text-3xl group-hover:scale-125 transition-transform" />
           </a>
-          {!canSubmit && <p className="text-center text-xs font-bold text-[#8D182C] mt-3">מלאו שם, טלפון וכתובת כדי לשלוח</p>}
+          {!canSubmit && (
+            <p className="text-center text-xs font-bold text-[#8D182C] mt-3">
+              {isPickup ? 'מלאו שם וטלפון כדי לשלוח' : 'מלאו שם, טלפון וכתובת כדי לשלוח'}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
 import { Icon } from '@iconify/react'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
-import { FloatingCartBar } from '../components/floating-cart-bar'
 import { Photo } from '../components/photo'
 import { Reveal } from '../components/reveal'
 import { useCart } from '../cart-context'
@@ -148,7 +147,6 @@ export function Weekdays() {
       </main>
 
       <Footer className="mb-40" />
-      <FloatingCartBar />
     </div>
   )
 }
