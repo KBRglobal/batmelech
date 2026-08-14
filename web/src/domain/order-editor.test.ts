@@ -1112,9 +1112,8 @@ describe('delivery-confirmation fields through an admin edit', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
 
-    for (const key of Object.keys(draft)) expect(key.startsWith('plata')).toBe(false)
     const serialized: Record<string, unknown> = serializeOrderDraft(draft, 'order-1')
-    for (const key of Object.keys(serialized)) expect(key.startsWith('plata')).toBe(false)
+    expect(Object.keys(serialized).filter((key) => key.startsWith('plata'))).toEqual([])
   })
 
   it('preserves the proof URL even if the serialized draft carries no delivery fields at all', () => {
