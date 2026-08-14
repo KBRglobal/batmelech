@@ -8,6 +8,7 @@
 
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
+const { orderingStatus } = require('./business-actions');
 
 function createSiteStatusRouter({ repository, logger = console }) {
   if (!repository || typeof repository.loadState !== 'function') {
@@ -39,8 +40,12 @@ function createSiteStatusRouter({ repository, logger = console }) {
       const outOfStockNames = Array.isArray(settings.out)
         ? settings.out.filter((value) => typeof value === 'string')
         : [];
+      // Closed is closed only until the reopen day; the value is computed per
+      // request, so Sunday morning opens the site with nobody touching it.
+      const ordering = orderingStatus(settings);
       return response.status(200).json({
-        orderingOpen: settings.orderingOpen !== false,
+        orderingOpen: ordering.open,
+        reopensOn: ordering.reopensOn,
         siteBanner: typeof settings.siteBanner === 'string' && settings.siteBanner.trim() ? settings.siteBanner : null,
         outOfStockNames,
       });

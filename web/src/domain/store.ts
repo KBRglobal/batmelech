@@ -71,6 +71,7 @@ export const LegacySettingsSchema = z
     businessAddress: z.string().optional(),
     invoiceCurrency: z.enum(['AED', 'USD']).optional(),
     orderingOpen: z.boolean().optional(),
+    orderingClosedUntil: z.string().optional(),
     siteBanner: z.string().nullable().optional(),
     meyDigestSentFor: z.string().optional(),
     meyPendingProof: z

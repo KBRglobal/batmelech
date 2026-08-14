@@ -5,6 +5,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const { PUBLIC_SITE_SECURITY_HEADERS } = require('../server/react-app-route');
 
 const projectRoot = path.join(__dirname, '..');
 const serverPath = path.join(projectRoot, 'server.js');
@@ -43,6 +44,26 @@ function cookieFrom(response, name) {
     if (entry.startsWith(`${name}=`)) return entry.split(';')[0];
   }
   return null;
+}
+
+async function staffSessionCookie(port) {
+  const step = async (message, cookie) => {
+    const response = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+      body: JSON.stringify({ message }),
+    });
+    await response.json();
+    return response;
+  };
+
+  const username = await step('decoy-test-user');
+  const challengeCookie = cookieFrom(username, 'bm_rq');
+  assert.ok(challengeCookie, 'the username step must issue a challenge cookie');
+  const password = await step('decoy-test-password', challengeCookie);
+  const sessionCookie = cookieFrom(password, 'bm_ref');
+  assert.ok(sessionCookie, 'the password step must issue a session cookie');
+  return sessionCookie;
 }
 
 function startWithoutCredential(missingName) {
@@ -329,6 +350,35 @@ test('every other 404 site-wide shows the same decoy page, whose form has no log
     assert.equal(body.ref, undefined, 'the generic endpoint must never advance a login, even with the real username');
     assert.equal(cookieFrom(correctUsernameAsMessage, 'bm_rq'), null, 'the generic endpoint must never set a challenge cookie');
     assert.equal(cookieFrom(correctUsernameAsMessage, 'bm_ref'), null, 'the generic endpoint must never set a session cookie');
+  } finally {
+    server.kill();
+  }
+});
+
+test('the public site is served under a strict CSP that the admin build never inherits', async () => {
+  const port = 34875;
+  const server = startDecoyServer(port);
+  try {
+    await waitForHealth(port);
+
+    const site = await fetch(`http://127.0.0.1:${port}/site/`);
+    assert.equal(site.status, 200);
+    assert.equal(site.headers.get('content-security-policy'), PUBLIC_SITE_SECURITY_HEADERS['Content-Security-Policy']);
+    assert.equal(site.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(site.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+
+    // Deep links and hashed assets go through the same mount, so they must
+    // carry the policy too — a CSP only on the shell protects nothing.
+    const deepLink = await fetch(`http://127.0.0.1:${port}/site/weekdays`);
+    assert.equal(deepLink.headers.get('content-security-policy'), site.headers.get('content-security-policy'));
+
+    // The authenticated admin build shares the router factory but not the
+    // policy: its needs differ and tightening it here would break Lin's app.
+    const sessionCookie = await staffSessionCookie(port);
+    const admin = await fetch(`http://127.0.0.1:${port}/admin/today`, { headers: { Cookie: sessionCookie } });
+    assert.equal(admin.status, 200);
+    assert.equal(admin.headers.get('content-security-policy'), null);
+    assert.equal(admin.headers.get('referrer-policy'), null);
   } finally {
     server.kill();
   }

@@ -19,6 +19,7 @@ type PrimaryNavigationItem = {
     | typeof APP_ROUTES.shoppingList
     | typeof APP_ROUTES.deliveries
     | typeof APP_ROUTES.finance
+    | typeof APP_ROUTES.invoices
     | typeof APP_ROUTES.customers
     | typeof APP_ROUTES.settings
   icon: LocalIconName
@@ -66,6 +67,12 @@ const PRIMARY_NAVIGATION = [
     label: 'כספים',
     path: APP_ROUTES.finance,
     icon: 'ph:coins-bold',
+    end: true,
+  },
+  {
+    label: 'חשבוניות',
+    path: APP_ROUTES.invoices,
+    icon: 'ph:receipt-bold',
     end: true,
   },
   {

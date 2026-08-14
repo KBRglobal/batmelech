@@ -4,7 +4,9 @@ import { CurrencyNote } from '../components/currency-note'
 import { Footer } from '../components/footer'
 import { Photo } from '../components/photo'
 import { Reveal } from '../components/reveal'
+import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
+import { useSiteStatus } from '../site-status-context'
 
 type Variant = { id: string; label: string; price: number }
 type MenuItem = {
@@ -62,6 +64,7 @@ const MENU: MenuItem[] = [
 
 export function Weekdays() {
   const { addLine } = useCart()
+  const { isOutOfStock } = useSiteStatus()
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
@@ -96,14 +99,16 @@ export function Weekdays() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16">
-          {MENU.map((item, i) => (
+          {MENU.map((item, i) => {
+            const soldOut = isOutOfStock(item.name)
+            return (
             <Reveal
               key={item.id}
               delay={(i % 3) * 100}
               className="bg-white rounded-[4rem] p-8 shadow-2xl border-2 border-[#EDB2C1]/20 transition-all duration-500 hover:-translate-y-3 flex flex-col"
             >
               <div className="relative aspect-square rounded-[3.5rem] overflow-hidden mb-8 shadow-xl">
-                <Photo src={item.img} className="w-full h-full object-cover" alt={item.name} real={item.realPhoto} />
+                <Photo src={item.img} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} alt={item.name} real={item.realPhoto} />
                 <div className="absolute top-6 left-6 flex flex-col gap-2">
                   {item.allergies.map((a) => (
                     <span key={a} className="bg-white/90 p-2 rounded-2xl shadow-xl flex items-center justify-center" title={a}>
@@ -111,6 +116,7 @@ export function Weekdays() {
                     </span>
                   ))}
                 </div>
+                {soldOut && <OutOfStockBadge className="absolute bottom-6 right-6" />}
               </div>
               <div className="flex-grow">
                 <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight">{item.name}</h3>
@@ -123,8 +129,9 @@ export function Weekdays() {
                     <button
                       key={v.id}
                       type="button"
+                      disabled={soldOut}
                       onClick={() => addLine({ id: v.id, name: `${item.name} (${v.label})`, unitPrice: v.price })}
-                      className="flex items-center justify-between bg-[#F7ECE6] hover:bg-[#3B151A] hover:text-white rounded-2xl px-6 py-4 font-black transition-all"
+                      className="flex items-center justify-between bg-[#F7ECE6] rounded-2xl px-6 py-4 font-black transition-all enabled:hover:bg-[#3B151A] enabled:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <span>{v.label}</span>
                       <span>${v.price}</span>
@@ -136,15 +143,17 @@ export function Weekdays() {
                   <span className="text-3xl md:text-4xl font-black">${item.price}</span>
                   <button
                     type="button"
+                    disabled={soldOut}
                     onClick={() => addLine({ id: item.id, name: item.name, unitPrice: item.price! })}
-                    className="w-16 h-16 md:w-20 md:h-20 rounded-[2rem] md:rounded-[2.5rem] bg-[#3B151A] text-white flex items-center justify-center shadow-xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all duration-500 hover:rotate-90"
+                    className="w-16 h-16 md:w-20 md:h-20 rounded-[2rem] md:rounded-[2.5rem] bg-[#3B151A] text-white flex items-center justify-center shadow-xl transition-all duration-500 enabled:hover:bg-[#F5A83A] enabled:hover:text-[#3B151A] enabled:hover:rotate-90 disabled:bg-[#3B151A]/30 disabled:cursor-not-allowed"
                   >
                     <Icon icon="ph:plus-bold" className="text-3xl md:text-4xl" />
                   </button>
                 </div>
               )}
             </Reveal>
-          ))}
+            )
+          })}
         </div>
       </main>
 

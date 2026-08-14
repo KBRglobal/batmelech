@@ -11,7 +11,7 @@ const { createCustomerOrderRouter } = require('./server/customer-order-route');
 const { createPublicLandingRouter } = require('./server/public-landing-route');
 const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
-const { createReactAppRouter } = require('./server/react-app-route');
+const { PUBLIC_SITE_SECURITY_HEADERS, createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
 const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
@@ -30,6 +30,7 @@ const { wrapRepositoryWithInvoiceTrigger } = require('./server/business-data/inv
 const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route');
 const { createStaffCredentialsRouter } = require('./server/auth/staff-credentials-route');
 const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-download-route');
+const { createInvoiceBrowseRouter } = require('./server/business-data/invoice-browse-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
@@ -109,7 +110,10 @@ app.use('/assets', express.static(path.join(contentRoot, 'public', 'assets'), {
 // --- Public customer-facing site: no Basic Auth, no admin state. Same
 // static-plus-SPA-fallback shape as the authenticated React app so deep
 // links like /site/checkout resolve to the client router instead of 404. ---
-app.use('/site', createReactAppRouter({ reactRoot: path.join(contentRoot, 'site') }));
+app.use('/site', createReactAppRouter({
+  reactRoot: path.join(contentRoot, 'site'),
+  securityHeaders: PUBLIC_SITE_SECURITY_HEADERS,
+}));
 // Public order intake from the customer site's checkout — persists straight
 // into the same orders[] the admin app reads, no admin auth, no state sync.
 if (stateRepository) {
@@ -257,6 +261,16 @@ if (pool && process.env.BM_SECRETS_KEY) {
   app.use('/api/settings/staff-credentials', (_request, response) => {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'not configured' });
+  });
+}
+
+// --- Staff-only invoice history: browse issued invoices and re-send one ---
+if (pool) {
+  app.use('/api/invoices', createInvoiceBrowseRouter({ pool, resendApiKey: process.env.RESEND_API_KEY }));
+} else {
+  app.use('/api/invoices', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'invoices unavailable' });
   });
 }
 

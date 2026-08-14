@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
+  effectiveOrderingOpen,
+  orderingStatus,
+  upcomingSundayDubai,
   setOrderingOpen,
   setSiteBanner,
   setItemStock,
@@ -41,11 +44,56 @@ function orderById(repo, id) {
   return repo._current().orders.find((order) => String(order.id) === String(id));
 }
 
-test('setOrderingOpen writes the flag under settings', async () => {
+// 2026-08-09 is a Sunday, so 08-14 is the Friday and 08-16 the Sunday after it.
+const AUGUST_2026 = {
+  sunday: '2026-08-09',
+  monday: '2026-08-10',
+  thursday: '2026-08-13',
+  friday: '2026-08-14',
+  saturday: '2026-08-15',
+  nextSunday: '2026-08-16',
+};
+
+function dubaiNoon(dateString) {
+  return new Date(`${dateString}T08:00:00Z`); // 12:00 in Dubai
+}
+
+test('upcomingSundayDubai lands on the next Sunday from every weekday', () => {
+  for (const day of ['sunday', 'monday', 'thursday', 'friday', 'saturday']) {
+    const expected = day === 'sunday' ? '2026-08-16' : AUGUST_2026.nextSunday;
+    assert.equal(upcomingSundayDubai(dubaiNoon(AUGUST_2026[day])), expected, `from ${day}`);
+  }
+  // Closing on a Sunday closes the whole coming week, never zero days.
+  assert.equal(upcomingSundayDubai(dubaiNoon(AUGUST_2026.nextSunday)), '2026-08-23');
+});
+
+test('upcomingSundayDubai reads the weekday in Dubai, not in UTC', () => {
+  // 21:00 UTC Saturday is already 01:00 Sunday in Dubai.
+  assert.equal(upcomingSundayDubai(new Date('2026-08-15T21:00:00Z')), '2026-08-23');
+});
+
+test('setOrderingOpen closes only until the coming Sunday', async () => {
   const repo = fakeRepository({ orders: [], settings: {} });
-  const result = await setOrderingOpen(repo, false);
+  const result = await setOrderingOpen(repo, false, dubaiNoon(AUGUST_2026.monday));
   assert.equal(result.ok, true);
   assert.equal(repo._current().settings.orderingOpen, false);
+  assert.equal(repo._current().settings.orderingClosedUntil, AUGUST_2026.nextSunday);
+});
+
+test('setOrderingOpen closing on Friday reopens the Sunday right after', async () => {
+  const repo = fakeRepository({ orders: [], settings: {} });
+  await setOrderingOpen(repo, false, dubaiNoon(AUGUST_2026.friday));
+  assert.equal(repo._current().settings.orderingClosedUntil, AUGUST_2026.nextSunday);
+});
+
+test('setOrderingOpen opening clears the reopen day', async () => {
+  const repo = fakeRepository({
+    orders: [],
+    settings: { orderingOpen: false, orderingClosedUntil: AUGUST_2026.nextSunday },
+  });
+  await setOrderingOpen(repo, true);
+  assert.equal(repo._current().settings.orderingOpen, true);
+  assert.equal('orderingClosedUntil' in repo._current().settings, false);
 });
 
 test('setOrderingOpen preserves other settings fields', async () => {
@@ -53,6 +101,40 @@ test('setOrderingOpen preserves other settings fields', async () => {
   await setOrderingOpen(repo, true);
   assert.equal(repo._current().settings.businessName, 'בת מלך');
   assert.equal(repo._current().settings.orderingOpen, true);
+
+  await setOrderingOpen(repo, false, dubaiNoon(AUGUST_2026.thursday));
+  assert.equal(repo._current().settings.businessName, 'בת מלך');
+});
+
+test('effectiveOrderingOpen stays closed until the reopen day and opens on it', () => {
+  const closed = { orderingOpen: false, orderingClosedUntil: AUGUST_2026.nextSunday };
+  assert.equal(effectiveOrderingOpen(closed, AUGUST_2026.friday), false);
+  assert.equal(effectiveOrderingOpen(closed, AUGUST_2026.saturday), false);
+  assert.equal(effectiveOrderingOpen(closed, AUGUST_2026.nextSunday), true);
+  assert.equal(effectiveOrderingOpen(closed, '2026-08-20'), true);
+});
+
+test('effectiveOrderingOpen falls back to the legacy boolean without a reopen day', () => {
+  assert.equal(effectiveOrderingOpen({}, AUGUST_2026.friday), true);
+  assert.equal(effectiveOrderingOpen({ orderingOpen: true }, AUGUST_2026.friday), true);
+  assert.equal(effectiveOrderingOpen({ orderingOpen: false }, AUGUST_2026.friday), false);
+  assert.equal(effectiveOrderingOpen(null, AUGUST_2026.friday), true);
+  // A junk date is not a licence to open a store its owner closed.
+  assert.equal(effectiveOrderingOpen({ orderingOpen: false, orderingClosedUntil: 'soon' }, AUGUST_2026.friday), false);
+});
+
+test('orderingStatus reports the reopen day only while ordering is closed', () => {
+  const closed = { orderingOpen: false, orderingClosedUntil: AUGUST_2026.nextSunday };
+  assert.deepEqual(orderingStatus(closed, AUGUST_2026.friday), {
+    open: false,
+    reopensOn: AUGUST_2026.nextSunday,
+  });
+  assert.deepEqual(orderingStatus(closed, AUGUST_2026.nextSunday), { open: true, reopensOn: null });
+  assert.deepEqual(orderingStatus({}, AUGUST_2026.friday), { open: true, reopensOn: null });
+  assert.deepEqual(orderingStatus({ orderingOpen: false }, AUGUST_2026.friday), {
+    open: false,
+    reopensOn: null,
+  });
 });
 
 test('setSiteBanner trims and stores a message', async () => {

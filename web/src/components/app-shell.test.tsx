@@ -31,6 +31,7 @@ describe('AppShell', () => {
       ['רשימת קניות', APP_ROUTES.shoppingList],
       ['משלוחים', APP_ROUTES.deliveries],
       ['כספים', APP_ROUTES.finance],
+      ['חשבוניות', APP_ROUTES.invoices],
       ['לקוחות', APP_ROUTES.customers],
       ['הגדרות', APP_ROUTES.settings],
     ] as const

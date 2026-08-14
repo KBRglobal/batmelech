@@ -123,6 +123,44 @@ describe('SettingsBackupScreen', () => {
     expect(saved.siteBanner).toBe('חוזרים ביום ראשון')
   })
 
+  it('closes ordering for the coming Shabbat only and shows when it returns', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-12T08:00:00Z')) // Wednesday, midday in Dubai
+    try {
+      const onSave = vi.fn().mockResolvedValue(undefined)
+      mockedUseStore.mockReturnValue(queryResult({ store: { orders: [], settings: {} } as LegacyStore }))
+      renderSettings({ onSave })
+
+      fireEvent.click(screen.getByRole('switch', { name: 'האתר פתוח להזמנות' }))
+      expect(screen.getByText('האתר סגור להזמנות עד יום ראשון 16.08')).toBeTruthy()
+
+      fireEvent.click(screen.getByRole('button', { name: 'שמירת ההגדרות' }))
+      expect(onSave).toHaveBeenCalledTimes(1)
+      expect(onSave.mock.calls[0]![0].nextStore.settings).toMatchObject({
+        orderingOpen: false,
+        orderingClosedUntil: '2026-08-16',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows a dated close as open again once its reopen day has arrived', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-16T08:00:00Z')) // the reopen Sunday itself
+    try {
+      mockedUseStore.mockReturnValue(queryResult({
+        store: { orders: [], settings: { orderingOpen: false, orderingClosedUntil: '2026-08-16' } } as LegacyStore,
+      }))
+      renderSettings()
+
+      expect(screen.getByText('האתר פתוח להזמנות')).toBeTruthy()
+      expect(screen.getByRole('switch', { name: 'האתר פתוח להזמנות' }).getAttribute('aria-checked')).toBe('true')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('copies an exact complete JSON export without mutating the store', async () => {
     const store = {
       orders: [{ id: 'actual', unknownOrderField: { exact: true } }],

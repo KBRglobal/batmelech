@@ -2,7 +2,9 @@ import { Icon } from '@iconify/react'
 import { Link, useNavigate } from 'react-router'
 import { PageHero } from '../components/page-hero'
 import { CurrencyNote } from '../components/currency-note'
+import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
+import { useSiteStatus } from '../site-status-context'
 
 const SALAD_PRICE = 6.25
 const FIRST_PRICE = 25
@@ -61,6 +63,7 @@ const LOGO_URL = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/pub
 
 export function ShabbatExtras() {
   const { lines, addLine, setQty, subtotal } = useCart()
+  const { isOutOfStock } = useSiteStatus()
   const navigate = useNavigate()
   const count = lines.reduce((n, l) => n + l.qty, 0)
 
@@ -107,14 +110,16 @@ export function ShabbatExtras() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
             {SALADS.map((s) => {
               const qty = qtyOf(s.id)
+              const soldOut = isOutOfStock(s.name)
               return (
                 <div key={s.id} className="flex flex-col items-center group">
                   <button
                     type="button"
+                    disabled={soldOut}
                     onClick={() => addLine({ id: s.id, name: s.name, unitPrice: SALAD_PRICE })}
-                    className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden mb-3 md:mb-4 ring-4 ring-[#F7ECE6] group-hover:ring-[#F5A83A] transition-all duration-500 relative"
+                    className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden mb-3 md:mb-4 ring-4 ring-[#F7ECE6] transition-all duration-500 relative enabled:group-hover:ring-[#F5A83A] disabled:cursor-not-allowed"
                   >
-                    <img src={s.img} alt={s.name} className="w-full h-full object-cover" />
+                    <img src={s.img} alt={s.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-50' : ''}`} />
                     {qty > 0 && (
                       <span className="absolute inset-0 bg-[#3B151A]/50 flex items-center justify-center text-white font-black text-xl">
                         {qty}
@@ -122,12 +127,17 @@ export function ShabbatExtras() {
                     )}
                   </button>
                   <span className="font-black text-xs md:text-sm text-center">{s.name}</span>
-                  <span className="text-[#F5A83A] font-bold text-xs mt-1">${SALAD_PRICE}</span>
+                  {soldOut ? (
+                    <OutOfStockBadge className="mt-2" />
+                  ) : (
+                    <span className="text-[#F5A83A] font-bold text-xs mt-1">${SALAD_PRICE}</span>
+                  )}
                   {qty === 0 ? (
                     <button
                       type="button"
+                      disabled={soldOut}
                       onClick={() => addLine({ id: s.id, name: s.name, unitPrice: SALAD_PRICE })}
-                      className="mt-3 w-8 h-8 rounded-full border border-[#3B151A]/10 flex items-center justify-center hover:bg-[#3B151A] hover:text-white transition-colors"
+                      className="mt-3 w-8 h-8 rounded-full border border-[#3B151A]/10 flex items-center justify-center transition-colors enabled:hover:bg-[#3B151A] enabled:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Icon icon="ph:plus" />
                     </button>
@@ -142,8 +152,9 @@ export function ShabbatExtras() {
                       </button>
                       <button
                         type="button"
+                        disabled={soldOut}
                         onClick={() => setQty(s.id, qty + 1)}
-                        className="w-8 h-8 rounded-full bg-[#3B151A] text-white flex items-center justify-center"
+                        className="w-8 h-8 rounded-full bg-[#3B151A] text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         <Icon icon="ph:plus" className="text-xs" />
                       </button>
@@ -159,10 +170,16 @@ export function ShabbatExtras() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 -mt-16 md:-mt-28">
           {FIRST_COURSES.map((c) => {
             const qty = qtyOf(c.id)
+            const soldOut = isOutOfStock(c.name)
             return (
               <div key={c.id} className="bg-white rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-xl border border-[#3B151A]/5 group">
-                <div className="h-48 md:h-64 overflow-hidden">
-                  <img src={c.img} alt={c.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="h-48 md:h-64 overflow-hidden relative">
+                  <img
+                    src={c.img}
+                    alt={c.name}
+                    className={`w-full h-full object-cover transition-transform duration-700 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
+                  />
+                  {soldOut && <OutOfStockBadge className="absolute bottom-4 right-4" />}
                 </div>
                 <div className="p-6 md:p-8 space-y-3 md:space-y-4 text-center">
                   <h4 className="text-xl md:text-2xl font-black font-heading">{c.name}</h4>
@@ -171,10 +188,11 @@ export function ShabbatExtras() {
                     {qty === 0 ? (
                       <button
                         type="button"
+                        disabled={soldOut}
                         onClick={() => addLine({ id: c.id, name: c.name, unitPrice: c.price })}
-                        className="bg-[#3B151A] text-white px-6 md:px-8 py-2.5 md:py-3 rounded-full font-black text-xs hover:bg-[#F5A83A] transition-all"
+                        className="bg-[#3B151A] text-white px-6 md:px-8 py-2.5 md:py-3 rounded-full font-black text-xs transition-all enabled:hover:bg-[#F5A83A] disabled:opacity-30 disabled:cursor-not-allowed"
                       >
-                        הוספה להזמנה
+                        {soldOut ? 'אזל מהמלאי' : 'הוספה להזמנה'}
                       </button>
                     ) : (
                       <div className="flex items-center gap-3 bg-[#F7ECE6] rounded-full px-4 py-2">
@@ -182,7 +200,14 @@ export function ShabbatExtras() {
                         <span className="font-black flex items-center gap-1">
                           <Icon icon="ph:check-bold" className="text-[#F5A83A]" /> {qty}
                         </span>
-                        <button type="button" onClick={() => setQty(c.id, qty + 1)} className="font-black">+</button>
+                        <button
+                          type="button"
+                          disabled={soldOut}
+                          onClick={() => setQty(c.id, qty + 1)}
+                          className="font-black disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          +
+                        </button>
                       </div>
                     )}
                   </div>
@@ -225,18 +250,23 @@ export function ShabbatExtras() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 md:gap-x-32 gap-y-10 md:gap-y-20 relative z-10">
             {ROYAL.map((r) => {
               const qty = qtyOf(r.id)
+              const soldOut = isOutOfStock(r.name)
               return (
                 <div key={r.id} className="space-y-4 md:space-y-6 group">
                   <div className="flex items-baseline justify-between gap-4 md:gap-6 border-b border-white/10 pb-4 md:pb-6">
-                    <h4 className="text-xl md:text-4xl font-black font-heading group-hover:text-[#F5A83A] transition-colors">{r.name}</h4>
+                    <h4 className={`text-xl md:text-4xl font-black font-heading transition-colors ${soldOut ? 'text-white/40' : 'group-hover:text-[#F5A83A]'}`}>
+                      {r.name}
+                    </h4>
                     <span className="text-xl md:text-3xl font-black text-[#F5A83A] shrink-0">${r.price}</span>
                   </div>
+                  {soldOut && <OutOfStockBadge />}
                   {r.note && <p className="text-sm md:text-xl font-bold text-white/40 italic leading-relaxed">{r.note}</p>}
                   {qty === 0 ? (
                     <button
                       type="button"
+                      disabled={soldOut}
                       onClick={() => addLine({ id: r.id, name: r.name, unitPrice: r.price })}
-                      className="bg-[#F5A83A] text-white px-8 md:px-16 py-3 md:py-5 rounded-full font-black text-xs md:text-sm tracking-widest uppercase hover:scale-105 active:scale-95 transition-all shadow-2xl"
+                      className="bg-[#F5A83A] text-white px-8 md:px-16 py-3 md:py-5 rounded-full font-black text-xs md:text-sm tracking-widest uppercase transition-all shadow-2xl enabled:hover:scale-105 enabled:active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       הוסף למלכות שלך
                     </button>
@@ -246,7 +276,14 @@ export function ShabbatExtras() {
                       <span className="font-black flex items-center gap-2 text-[#F5A83A]">
                         <Icon icon="ph:check-bold" /> {qty}
                       </span>
-                      <button type="button" onClick={() => setQty(r.id, qty + 1)} className="font-black text-lg">+</button>
+                      <button
+                        type="button"
+                        disabled={soldOut}
+                        onClick={() => setQty(r.id, qty + 1)}
+                        className="font-black text-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        +
+                      </button>
                     </div>
                   )}
                 </div>
@@ -284,17 +321,24 @@ export function ShabbatExtras() {
               />
             </div>
             <div className="p-8 md:p-16 flex flex-col justify-center space-y-6 md:space-y-10">
-              {DESSERTS.map((d, i) => (
-                <div key={d.id} className={`space-y-2 md:space-y-4 group ${i === 0 ? 'border-b border-[#3B151A]/5 pb-6 md:pb-8' : ''}`}>
-                  <div className="flex items-center gap-4">
-                    <img src={d.img} alt={d.name} className="w-16 h-16 rounded-2xl object-cover shrink-0" />
-                    <h4 className="text-lg md:text-3xl font-black font-heading group-hover:text-[#F5A83A] transition-colors">{d.name}</h4>
+              {DESSERTS.map((d, i) => {
+                const soldOut = isOutOfStock(d.name)
+                return (
+                  <div key={d.id} className={`space-y-2 md:space-y-4 group ${i === 0 ? 'border-b border-[#3B151A]/5 pb-6 md:pb-8' : ''}`}>
+                    <div className="flex items-center gap-4">
+                      <img src={d.img} alt={d.name} className={`w-16 h-16 rounded-2xl object-cover shrink-0 ${soldOut ? 'grayscale opacity-60' : ''}`} />
+                      <h4 className="text-lg md:text-3xl font-black font-heading group-hover:text-[#F5A83A] transition-colors">{d.name}</h4>
+                    </div>
+                    {soldOut ? (
+                      <OutOfStockBadge />
+                    ) : (
+                      <span className="inline-block text-xs font-black uppercase tracking-widest text-[#F5A83A] bg-[#F5A83A]/10 px-3 py-1 rounded-full">
+                        כלול במארז השבת
+                      </span>
+                    )}
                   </div>
-                  <span className="inline-block text-xs font-black uppercase tracking-widest text-[#F5A83A] bg-[#F5A83A]/10 px-3 py-1 rounded-full">
-                    כלול במארז השבת
-                  </span>
-                </div>
-              ))}
+                )
+              })}
               <Link
                 to="/shabbat-order"
                 className="text-xs font-black uppercase tracking-widest text-[#3B151A] hover:text-[#F5A83A] transition-colors flex items-center gap-2 w-fit"
