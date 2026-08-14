@@ -266,6 +266,7 @@ export function ShabbatOrder() {
           <div className="flex items-center gap-6 md:gap-10 w-full sm:w-auto justify-center sm:justify-start">
             <div className="w-20 h-20 md:w-28 md:h-28 rounded-[2rem] md:rounded-[3rem] bg-[#3B151A] text-white flex flex-col items-center justify-center shadow-2xl border-4 border-[#F5A83A]/30 shrink-0">
               <span className="text-2xl md:text-4xl font-black">${total.toFixed(2).replace(/\.00$/, '')}</span>
+              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest opacity-40">USD</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">מארז שבת זוגי יוקרתי</span>

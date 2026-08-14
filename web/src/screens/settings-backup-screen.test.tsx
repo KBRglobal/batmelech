@@ -37,10 +37,12 @@ function queryResult(options: {
 function renderSettings(props: {
   readonly onSave?: StoreSaveHandler
   readonly onRestore?: RestoreRequestHandler
+  readonly search?: string
 } = {}) {
+  const { search = '', ...screenProps } = props
   return render(
-    <MemoryRouter initialEntries={[APP_ROUTES.settings]}>
-      <SettingsBackupScreen {...props} />
+    <MemoryRouter initialEntries={[`${APP_ROUTES.settings}${search}`]}>
+      <SettingsBackupScreen {...screenProps} />
     </MemoryRouter>,
   )
 }
