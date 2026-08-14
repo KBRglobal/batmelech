@@ -96,6 +96,17 @@ a lightweight CRM (`customers`, `customerNotes`, `customerTags`, `activityLog`) 
 here, but a good future idea if Lin wants to track repeat customers/preferences through מיי.
 
 ## Next
+0. **"Ordering closed" needs to become date-aware, not a plain on/off.** Moshe's ask: closing
+   should specifically mean "can't order for the upcoming Friday," with an automatic reopen
+   every Sunday for the next cycle — not an indefinite closed state someone has to remember to
+   flip back. Today `orderingOpen`/`set_ordering_open` (Mey + `business-actions.js` +
+   `/api/site/status` + the customer-site banner/checkout-gate) is a plain boolean with no date
+   logic at all. Needs real design: what "Friday" means exactly (this Friday vs. next?), what
+   happens to the boolean at Sunday, whether it's a stored reopen-date vs. a recurring rule
+   computed from `Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai'})` (already used
+   elsewhere in this repo for Dubai-local dates, e.g. `site-order-route.js`
+   `dubaiDateString`). Don't just bolt a date check onto the existing boolean without thinking
+   this through with Moshe first.
 1. **Big scoped ask from Lin (via Mey), Moshe said "approve, but every action needs to verify
    with me first" — needs its own real design session, not started tonight (context ran out):**
    Panel features wanted: edit an existing order (change items/qty without cancel+recreate),
