@@ -303,7 +303,8 @@ describe('ShoppingListScreen', () => {
 
     expect(screen.getByText('לא נשמרו מתכונים, ולכן לא הומצאו מצרכים או כמויות חסרות.')).toBeTruthy()
     expect(screen.getByText('למנה מנה ללא מתכון אין מתכון שמור, ולכן המצרכים שלה לא חושבו.')).toBeTruthy()
-    expect(screen.getByText('לא חושבו מצרכים בבטחה')).toBeTruthy()
+    expect(screen.getByText('אין עדיין מתכונים מוגדרים לתפריט')).toBeTruthy()
+    expect(screen.getByText('רשימת הקניות תתמלא אוטומטית לאחר הזנת מתכונים למנות.')).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'מצרכים לקנייה' })).toBeNull()
   })
 

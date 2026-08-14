@@ -17,6 +17,7 @@ import { YachtPartyExperience } from './pages/experience-yacht'
 import { VillaPartyExperience } from './pages/experience-villa'
 import { SuiteDiningExperience } from './pages/experience-suite'
 import { DesertSafariExperience } from './pages/experience-desert'
+import { NotFound } from './pages/not-found'
 
 const PAGE_META: Record<string, { title: string; description: string }> = {
   '/': { title: 'מטעמי בת מלך | אוכל ביתי כשר בדובאי', description: 'מטבח ביתי כשר בדובאי. תפריט יום חול ומארזי שבת יוקרתיים, מבושל טרי ומגיע חם אליכם.' },
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/experiences/villa" element={<VillaPartyExperience />} />
         <Route path="/experiences/suite" element={<SuiteDiningExperience />} />
         <Route path="/experiences/desert" element={<DesertSafariExperience />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       {pathname !== '/checkout' && pathname !== '/shabbat-extras' && <FloatingCartBar />}
     </div>

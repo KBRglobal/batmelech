@@ -1,5 +1,7 @@
 import { Icon } from '@iconify/react'
 import { Link, useNavigate } from 'react-router'
+import { PageHero } from '../components/page-hero'
+import { CurrencyNote } from '../components/currency-note'
 import { useCart } from '../cart-context'
 
 const SALAD_PRICE = 6.25
@@ -65,68 +67,42 @@ export function ShabbatExtras() {
   const qtyOf = (id: string) => lines.find((l) => l.id === id)?.qty ?? 0
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#FDFCFB] text-[#3B151A] font-sans selection:bg-[#F5A83A]/20 pb-48">
-      <header className="sticky top-0 z-[100] bg-white/90 backdrop-blur-xl border-b border-[#3B151A]/5 px-4 md:px-8 py-4 md:py-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link
-            to="/"
-            className="flex items-center gap-2 md:gap-3 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] hover:text-[#F5A83A] transition-all shrink-0"
-          >
-            <Icon icon="ph:arrow-right-bold" className="text-base md:text-lg" /> חזרה
-          </Link>
-          <div className="text-center flex flex-col items-center">
-            <img src={LOGO_URL} alt="מטעמי בת מלך" className="h-9 md:h-16 mb-1" />
-            <div className="flex items-center justify-center gap-2 md:gap-3">
-              <div className="h-[1px] w-4 md:w-6 bg-[#F5A83A]" />
-              <span className="text-[7px] md:text-[9px] text-[#F5A83A] font-black uppercase tracking-[0.4em] md:tracking-[0.6em] whitespace-nowrap">
-                Holy Shabbat Menu
-              </span>
-              <div className="h-[1px] w-4 md:w-6 bg-[#F5A83A]" />
-            </div>
+    <div dir="rtl" className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#F5A83A]/20 pb-48">
+      <PageHero
+        active="/shabbat-extras"
+        size="tall"
+        badge="Royal Catering Dubai"
+        title={['חיזוקים', 'לסופ״ש']}
+        subtitle="שולחן השבת הוא הלב הפועם של הבית היהודי. אצלנו בבת מלך, כל מנה היא תפילה וכל טעם הוא חיבור לשורשים."
+        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nnwx4pzCGTT.jpeg"
+        imageAlt="שולחן שבת מלכותי"
+      >
+        <h2 className="text-2xl md:text-4xl font-black font-heading italic text-white/90 leading-tight tracking-tight mb-6">
+          "כבודה בת מלך פנימה"
+        </h2>
+        <div className="flex items-center justify-center gap-4 md:gap-8 pt-4 md:pt-6 border-t border-white/10 text-white">
+          <div className="text-center">
+            <div className="text-[#F5A83A] font-black text-lg md:text-2xl">100%</div>
+            <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">Kosher Glatt</div>
           </div>
-          <span className="hidden md:block text-[10px] font-black opacity-30 shrink-0">BS"D • בס"ד</span>
+          <div className="w-px h-8 md:h-10 bg-white/10" />
+          <div className="text-center">
+            <div className="text-[#F5A83A] font-black text-lg md:text-2xl">Chef</div>
+            <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">Traditional</div>
+          </div>
+          <div className="w-px h-8 md:h-10 bg-white/10" />
+          <div className="text-center">
+            <div className="text-[#F5A83A] font-black text-lg md:text-2xl">Royal</div>
+            <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">Presentation</div>
+          </div>
         </div>
-      </header>
+      </PageHero>
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-12 space-y-24 md:space-y-40">
-        <section className="relative rounded-[2.5rem] md:rounded-[4rem] overflow-hidden aspect-[4/5] md:aspect-[21/9] flex items-center justify-center text-center p-6 md:p-8 group shadow-2xl border-4 border-white">
-          <img
-            src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nnwx4pzCGTT.jpeg"
-            alt="שולחן שבת מלכותי"
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#3B151A]/60 to-[#3B151A]/90 backdrop-blur-[1px]" />
-          <div className="relative z-10 space-y-4 md:space-y-6 text-white max-w-4xl">
-            <div className="inline-flex items-center gap-2 md:gap-3 bg-[#F5A83A] px-4 md:px-6 py-1.5 md:py-2 rounded-full mb-2 md:mb-4">
-              <Icon icon="ph:crown-simple-fill" className="text-base md:text-xl" />
-              <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">Royal Catering Dubai</span>
-            </div>
-            <h2 className="text-3xl md:text-8xl font-black font-heading leading-tight tracking-tighter italic">
-              "כבודה בת מלך פנימה"
-            </h2>
-            <p className="text-base md:text-2xl font-bold italic text-white/70 leading-relaxed max-w-2xl mx-auto">
-              שולחן השבת הוא הלב הפועם של הבית היהודי. אצלנו בבת מלך, כל מנה היא תפילה וכל טעם הוא חיבור לשורשים.
-            </p>
-            <div className="flex items-center justify-center gap-4 md:gap-8 pt-4 md:pt-6 border-t border-white/10">
-              <div className="text-center">
-                <div className="text-[#F5A83A] font-black text-lg md:text-2xl">100%</div>
-                <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">Kosher Glatt</div>
-              </div>
-              <div className="w-px h-8 md:h-10 bg-white/10" />
-              <div className="text-center">
-                <div className="text-[#F5A83A] font-black text-lg md:text-2xl">Chef</div>
-                <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">Traditional</div>
-              </div>
-              <div className="w-px h-8 md:h-10 bg-white/10" />
-              <div className="text-center">
-                <div className="text-[#F5A83A] font-black text-lg md:text-2xl">Royal</div>
-                <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">Presentation</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <SectionIntro icon="ph:leaf-fill" iconBg="light" n={1} title="סלטי הבית הטריים" quote={`"וברכת את ה' אלוהיך על הארץ הטובה" - פתיחה רעננה שמעוררת את החושים`} />
+        <div>
+          <CurrencyNote className="mb-12 md:mb-16" />
+          <SectionIntro icon="ph:leaf-fill" iconBg="light" n={1} title="סלטי הבית הטריים" quote={`"וברכת את ה' אלוהיך על הארץ הטובה" - פתיחה רעננה שמעוררת את החושים`} />
+        </div>
         <div className="bg-white rounded-[2.5rem] md:rounded-[4rem] p-6 md:p-12 shadow-xl border border-[#3B151A]/5 -mt-16 md:-mt-28">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
             {SALADS.map((s) => {
@@ -282,7 +258,9 @@ export function ShabbatExtras() {
             <h4 className="text-2xl md:text-4xl font-black font-heading text-[#F5A83A] mb-4 md:mb-6 underline decoration-[#F5A83A]/30 underline-offset-8">
               תפריט זוגי לכבוד שבת קודש
             </h4>
-            <div className="text-4xl md:text-6xl font-black mb-6 md:mb-8">$230</div>
+            <div className="text-4xl md:text-6xl font-black mb-6 md:mb-8">
+              $230 <span className="text-lg md:text-2xl align-middle text-white/50">USD</span>
+            </div>
             <p className="text-sm md:text-lg font-bold text-white/60 mb-8 md:mb-12 italic">
               חבילה שלמה הכוללת 4 סוגי סלטים, מנה ראשונה, עיקרית, תוספת וקינוח.
             </p>

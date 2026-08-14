@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react'
 import { PageHero } from '../components/page-hero'
+import { CurrencyNote } from '../components/currency-note'
 import { Footer } from '../components/footer'
 import { Photo } from '../components/photo'
 import { Reveal } from '../components/reveal'
@@ -91,6 +92,7 @@ export function Weekdays() {
               <Icon icon="ph:pepper-bold" className="text-red-600" /> חריף
             </span>
           </div>
+          <CurrencyNote className="mt-6" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16">

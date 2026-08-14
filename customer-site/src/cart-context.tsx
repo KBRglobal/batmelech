@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export type CartLine = {
   id: string
@@ -18,6 +18,8 @@ export type CustomerDetails = {
   address: string
   notes: string
   fulfillment: Fulfillment
+  date: string
+  time: string
 }
 
 type CartContextValue = {
@@ -33,11 +35,42 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-const EMPTY_CUSTOMER: CustomerDetails = { name: '', phoneCode: '+971', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery' }
+const EMPTY_CUSTOMER: CustomerDetails = { name: '', phoneCode: '+971', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery', date: '', time: '' }
+
+const STORAGE_KEY = 'bm-cart-v1'
+
+function readStoredLines(): CartLine[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (l): l is CartLine =>
+        !!l &&
+        typeof l === 'object' &&
+        typeof (l as CartLine).id === 'string' &&
+        typeof (l as CartLine).name === 'string' &&
+        Number.isFinite((l as CartLine).unitPrice) &&
+        Number.isFinite((l as CartLine).qty) &&
+        (l as CartLine).qty > 0,
+    )
+  } catch {
+    return []
+  }
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>([])
+  const [lines, setLines] = useState<CartLine[]>(readStoredLines)
   const [customer, setCustomerState] = useState<CustomerDetails>(EMPTY_CUSTOMER)
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(lines))
+    } catch {
+      // storage full or blocked (private mode) — cart still works in-memory
+    }
+  }, [lines])
 
   const addLine: CartContextValue['addLine'] = (line) => {
     setLines((prev) => {

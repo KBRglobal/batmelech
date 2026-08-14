@@ -23,6 +23,7 @@ import {
   type PreparationPlan,
   type PreparationWarning,
 } from '../domain/preparation.ts'
+import { upcomingServiceDate } from '../domain/service-dates.ts'
 import { resolvePreparationCatalog } from '../domain/settings-catalog.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
@@ -30,6 +31,10 @@ import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../servic
 
 const linkClassName =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-5 py-3 text-sm font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+
+// Sentinel so "all dates" stays an explicit choice in the URL; an absent
+// `date` param means "not chosen yet" and lands on the upcoming service date.
+const ALL_DATES = 'all'
 
 type CatalogState = 'configured' | 'missing' | 'invalid'
 
@@ -479,10 +484,16 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
   const store = initialization.baseStore
   const { plan, catalogState } = safePreparationPlan(store)
   const requestedDate = searchParams.get('date')?.trim() ?? ''
-  const visibleDates = requestedDate === ''
+  const showAllDates = requestedDate === ALL_DATES
+  const selectedDate = showAllDates
+    ? ''
+    : requestedDate !== ''
+      ? requestedDate
+      : upcomingServiceDate(plan.dates.map(({ serviceDate }) => serviceDate)) ?? ''
+  const visibleDates = showAllDates
     ? plan.dates
-    : plan.dates.filter(({ serviceDate }) => serviceDate === requestedDate)
-  const operationsReview = buildPreparationOperationsReview(plan, requestedDate)
+    : plan.dates.filter(({ serviceDate }) => serviceDate === selectedDate)
+  const operationsReview = buildPreparationOperationsReview(plan, selectedDate)
 
   const toggleCompletion = onSave === undefined
     ? undefined
@@ -596,16 +607,15 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
             תאריך הכנה
             <select
               aria-label="תאריך הכנה"
-              value={requestedDate}
+              value={showAllDates ? ALL_DATES : selectedDate}
               onChange={(event) => {
                 const next = new URLSearchParams(searchParams)
-                if (event.currentTarget.value === '') next.delete('date')
-                else next.set('date', event.currentTarget.value)
+                next.set('date', event.currentTarget.value)
                 setSearchParams(next)
               }}
               className="min-h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value="">כל התאריכים</option>
+              <option value={ALL_DATES}>כל התאריכים</option>
               {plan.dates.map(({ serviceDate }) => (
                 <option key={serviceDate} value={serviceDate}>{formatServiceDate(serviceDate)}</option>
               ))}

@@ -20,7 +20,7 @@ export function FloatingCartBar() {
         {count}
       </span>
       <span className="absolute top-full mt-2 left-0 whitespace-nowrap text-xs font-black bg-white text-[#3B151A] px-2 py-1 rounded-lg shadow-md">
-        ${subtotal}
+        ${subtotal} USD
       </span>
     </button>
   )

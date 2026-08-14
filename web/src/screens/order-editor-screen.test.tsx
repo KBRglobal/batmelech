@@ -145,9 +145,14 @@ describe('OrderEditorScreen', () => {
     mockedUseStore.mockReturnValue(queryResult({ store }))
     renderEditor('/orders/live-1/edit')
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'עריכת הזמנה live-1' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'עריכת הזמנה לקוחה אמיתית' })).toBeTruthy())
     expect((screen.getByLabelText('שם מלא') as HTMLInputElement).value).toBe('לקוחה אמיתית')
     expect(store).toEqual(original)
+    cleanup()
+
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [{ id: 'nameless-1', date: '2099-08-20' }] } }))
+    renderEditor('/orders/nameless-1/edit')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'עריכת הזמנה nameless-1' })).toBeTruthy())
     cleanup()
 
     mockedUseStore.mockReturnValue(queryResult({ store: { orders: [{ id: 7 }, { id: '7' }] } }))

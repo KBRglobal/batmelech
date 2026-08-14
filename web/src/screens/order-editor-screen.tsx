@@ -754,7 +754,9 @@ function OrderEditorContent({
         <header>
           <p className="text-xs font-black text-accent-foreground">השינויים נשמרים רק אחרי אישור מהשרת</p>
           <h1 className="mt-2 font-heading text-3xl font-black text-primary">
-            {mode === 'edit' ? `עריכת הזמנה ${String(draft.id ?? '')}` : 'הזמנה חדשה'}
+            {mode === 'edit'
+              ? `עריכת הזמנה ${draft.name.trim() === '' ? String(draft.id ?? '') : draft.name.trim()}`
+              : 'הזמנה חדשה'}
           </h1>
         </header>
 

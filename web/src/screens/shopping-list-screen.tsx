@@ -142,6 +142,30 @@ function ConfigurationWarnings({ catalogState, recipeState }: {
   )
 }
 
+// An empty list has three very different meanings for the operator, and only
+// one of them is a problem she can act on right now.
+function emptyListState(
+  demands: readonly PreparationItemDemand[],
+  result: ShoppingListResult,
+): { readonly title: string; readonly description: string } {
+  if (demands.length === 0) {
+    return {
+      title: 'אין דרישות קנייה לתאריך שנבחר',
+      description: 'אפשר לבחור תאריך אחר או לבדוק את ההזמנות הפעילות.',
+    }
+  }
+  if (result.warnings.length > 0 && result.warnings.every(({ code }) => code === 'MISSING_RECIPE')) {
+    return {
+      title: 'אין עדיין מתכונים מוגדרים לתפריט',
+      description: 'רשימת הקניות תתמלא אוטומטית לאחר הזנת מתכונים למנות.',
+    }
+  }
+  return {
+    title: 'לא חושבו מצרכים בבטחה',
+    description: 'מוסיפים את המתכונים החסרים ורק אז המערכת תציג כמויות לקנייה.',
+  }
+}
+
 function ShoppingWarnings({ result, demands }: { result: ShoppingListResult; demands: readonly PreparationItemDemand[] }) {
   if (result.warnings.length === 0) return null
   return (
@@ -303,6 +327,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
   const mealCount = safeCountSum(preparationGroups.map(({ meals }) => meals))
   const completionDate = requestedDate === '' ? null : requestedDate
   const operationsReview = buildShoppingOperationsReview(demands, result, requestedDate)
+  const emptyState = emptyListState(demands, result)
 
   const toggleShopping = onSave === undefined
     ? undefined
@@ -462,12 +487,8 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
         {result.items.length === 0 ? (
           <ScreenState
             kind="empty"
-            title={demands.length === 0 ? 'אין דרישות קנייה לתאריך שנבחר' : 'לא חושבו מצרכים בבטחה'}
-            description={
-              demands.length === 0
-                ? 'אפשר לבחור תאריך אחר או לבדוק את ההזמנות הפעילות.'
-                : 'מוסיפים את המתכונים החסרים ורק אז המערכת תציג כמויות לקנייה.'
-            }
+            title={emptyState.title}
+            description={emptyState.description}
             action={{ label: 'להגדרת מתכונים', icon: 'ph:cooking-pot-bold', to: APP_ROUTES.recipeSettings }}
             className="px-0"
           />

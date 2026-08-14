@@ -19,6 +19,7 @@ import {
   applyNextDeliveryStatus,
   nextDeliveryStatus,
 } from '../domain/operational-state.ts'
+import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
@@ -372,7 +373,14 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
     )
   }
 
-  const selectedGroup = dashboard.groups.find(({ key }) => key === selectedGroupKey) ?? dashboard.groups[0]!
+  const datedGroups = dashboard.groups.filter(
+    (group): group is DeliveryDateGroup & { serviceDate: string } => group.serviceDate !== null,
+  )
+  const defaultServiceDate = upcomingServiceDate(datedGroups.map(({ serviceDate }) => serviceDate))
+  const selectedGroup =
+    dashboard.groups.find(({ key }) => key === selectedGroupKey)
+    ?? datedGroups.find(({ serviceDate }) => serviceDate === defaultServiceDate)
+    ?? dashboard.groups[0]!
 
   const advanceStatus = onSave === undefined
     ? undefined

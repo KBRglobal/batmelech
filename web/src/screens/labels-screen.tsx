@@ -4,6 +4,7 @@ import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
+import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder } from '../domain/store.ts'
 
 const QL800_PRINT_CSS = `
@@ -305,7 +306,7 @@ export function LabelsScreen() {
   const orders = storeQuery.data?.data?.orders ?? EMPTY_ORDERS
   const dates = useMemo(() => [...new Set(orders.filter(active).map((order) => order.date).filter(realDate))].sort(), [orders])
   const requestedDate = searchParams.get('date') ?? ''
-  const selectedDate = realDate(requestedDate) ? requestedDate : (dates[0] ?? '')
+  const selectedDate = realDate(requestedDate) ? requestedDate : (upcomingServiceDate(dates) ?? '')
   const scopedOrders = useMemo(
     () => orders.filter((order) => active(order) && order.date === selectedDate).sort(orderSort),
     [orders, selectedDate],

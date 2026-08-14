@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
@@ -69,6 +69,8 @@ export interface SettingsBackupScreenProps {
 
 export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreenProps) {
   const storeQuery = useStore()
+  const [searchParams] = useSearchParams()
+  const developerTools = searchParams.get('dev') === '1'
   const initializationRef = useRef<SettingsInitialization | null>(null)
   const [draft, setDraft] = useState<SettingsDraft | null>(null)
   const [backupText, setBackupText] = useState('')
@@ -339,7 +341,47 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
         <StaffLoginSection />
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
-          <h2 className="text-xl font-black text-primary">אזל מהמלאי</h2>
+          <h2 className="text-xl font-black text-primary">מצב האתר</h2>
+          <p className="mt-2 text-xs font-bold text-muted-foreground">מה שהלקוחות רואים באתר ההזמנות ברגע זה.</p>
+          <div className="mt-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-secondary/30 p-5">
+              <div>
+                <p className="text-sm font-black text-primary">
+                  {currentDraft.orderingOpen ? 'האתר פתוח להזמנות' : 'האתר סגור להזמנות'}
+                </p>
+                <p className="mt-1 text-xs font-bold text-muted-foreground">
+                  כשסוגרים, לקוחות עדיין רואים את התפריט אבל לא יכולים לשלוח הזמנה חדשה.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={currentDraft.orderingOpen}
+                aria-label="האתר פתוח להזמנות"
+                onClick={() => setDraft({ ...currentDraft, orderingOpen: !currentDraft.orderingOpen })}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-black ${
+                  currentDraft.orderingOpen
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-rose-200 bg-rose-50 text-destructive'
+                }`}
+              >
+                <LocalIcon name={currentDraft.orderingOpen ? 'ph:check-circle-bold' : 'ph:warning-circle-bold'} className="text-lg" />
+                <span>{currentDraft.orderingOpen ? 'פתוח' : 'סגור'}</span>
+              </button>
+            </div>
+            <label className="block text-xs font-black text-muted-foreground">
+              הודעה לראש האתר (ריק = בלי הודעה)
+              <input
+                aria-label="הודעה לראש האתר"
+                value={currentDraft.siteBanner}
+                onChange={(event) => setDraft({ ...currentDraft, siteBanner: event.currentTarget.value })}
+                placeholder="לדוגמה: חוזרים לקבל הזמנות ביום ראשון"
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-sm font-bold outline-none"
+              />
+            </label>
+          </div>
+
+          <h3 className="mt-8 text-xl font-black text-primary">אזל מהמלאי</h3>
           <p className="mt-2 text-xs font-bold text-muted-foreground">לוחצים על מנה שנגמרה; אקסטרות וצהריים אינן חלק ממלאי זה.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             {stockItems.map((item) => {
@@ -431,11 +473,13 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
           </div>
         </section>
 
-        <section className="rounded-[2.5rem] border border-border bg-muted/40 p-6 sm:p-8">
-          <div className="flex items-center gap-3"><h2 className="text-xl font-black text-primary">נתוני דוגמה</h2><span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-primary">סביבת בדיקה בלבד</span></div>
-          <p className="mt-3 text-sm font-bold text-muted-foreground">נתוני דוגמה אינם זמינים בסביבת הייצור.</p>
-          <div className="mt-4 flex gap-3"><button type="button" disabled className={actionClassName}>טעינת נתוני הדוגמה</button><button type="button" disabled className={actionClassName}>מחיקת נתוני הדוגמה</button></div>
-        </section>
+        {developerTools && (
+          <section className="rounded-[2.5rem] border border-border bg-muted/40 p-6 sm:p-8">
+            <div className="flex items-center gap-3"><h2 className="text-xl font-black text-primary">נתוני דוגמה</h2><span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-primary">פיתוח בלבד</span></div>
+            <p className="mt-3 text-sm font-bold text-muted-foreground">נתוני דוגמה אינם זמינים בסביבת הייצור.</p>
+            <div className="mt-4 flex gap-3"><button type="button" disabled className={actionClassName}>טעינת נתוני הדוגמה</button><button type="button" disabled className={actionClassName}>מחיקת נתוני הדוגמה</button></div>
+          </section>
+        )}
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-xl font-black text-primary">מצב נוכחי</h2>

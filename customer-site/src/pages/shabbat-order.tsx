@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { Link, useNavigate } from 'react-router'
 import { PageHero } from '../components/page-hero'
+import { CurrencyNote } from '../components/currency-note'
 import { Photo } from '../components/photo'
 import { useCart } from '../cart-context'
 
@@ -150,9 +151,12 @@ export function ShabbatOrder() {
       />
 
       <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
-        <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
-          ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
-        </p>
+        <div>
+          <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
+            ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
+          </p>
+          <CurrencyNote className="mt-6" />
+        </div>
         <Link
           to="/shabbat-extras"
           className="block max-w-2xl mx-auto text-center text-[#8D182C] font-black underline text-sm"
@@ -164,7 +168,7 @@ export function ShabbatOrder() {
           <div>
             <h5 className="font-black text-amber-900 text-xl mb-2">שיטת הבחירה במארז</h5>
             <p className="text-amber-800 font-bold text-sm leading-relaxed">
-              המחיר הבסיסי ($230) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.
+              המחיר הבסיסי ($230 USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.
               <br />
               כל בחירה מעבר למכסה מתווספת אוטומטית למחיר למטה.
             </p>
@@ -262,6 +266,7 @@ export function ShabbatOrder() {
           <div className="flex items-center gap-6 md:gap-10 w-full sm:w-auto justify-center sm:justify-start">
             <div className="w-20 h-20 md:w-28 md:h-28 rounded-[2rem] md:rounded-[3rem] bg-[#3B151A] text-white flex flex-col items-center justify-center shadow-2xl border-4 border-[#F5A83A]/30 shrink-0">
               <span className="text-2xl md:text-4xl font-black">${total.toFixed(2).replace(/\.00$/, '')}</span>
+              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest opacity-40">USD</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">מארז שבת זוגי יוקרתי</span>

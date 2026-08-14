@@ -5,6 +5,7 @@ const MAX_BACKUP_BYTES = 10_000_000
 const MAX_BACKUP_DEPTH = 64
 const MAX_BACKUP_NODES = 500_000
 const MAX_LINK_LENGTH = 2_048
+const MAX_SITE_BANNER_LENGTH = 200
 
 export interface BackupArtifact {
   readonly filename: string
@@ -46,6 +47,8 @@ export interface SettingsDraft {
   readonly trn: string
   readonly businessAddress: string
   readonly invoiceCurrency: InvoiceCurrency
+  readonly orderingOpen: boolean
+  readonly siteBanner: string
 }
 
 export type SettingsDraftValidation =
@@ -58,6 +61,8 @@ export type SettingsDraftValidation =
       readonly trn: string
       readonly businessAddress: string
       readonly invoiceCurrency: InvoiceCurrency
+      readonly orderingOpen: boolean
+      readonly siteBanner: string
     }
   | { readonly valid: false; readonly issues: readonly string[] }
 
@@ -226,6 +231,8 @@ export function readSettingsDraft(
     trn: stringValue(settings.trn),
     businessAddress: stringValue(settings.businessAddress),
     invoiceCurrency: currency === 'USD' ? 'USD' : 'AED',
+    orderingOpen: settings.orderingOpen !== false,
+    siteBanner: stringValue(settings.siteBanner),
   }
 }
 
@@ -255,6 +262,10 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
   const businessName = draft.businessName.trim()
   const trn = draft.trn.trim()
   const businessAddress = draft.businessAddress.trim()
+  const siteBanner = draft.siteBanner.trim()
+  if (siteBanner.length > MAX_SITE_BANNER_LENGTH) {
+    issues.push(`הודעת האתר ארוכה מדי (עד ${MAX_SITE_BANNER_LENGTH} תווים).`)
+  }
   return issues.length > 0
     ? { valid: false, issues }
     : {
@@ -266,6 +277,8 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
         trn,
         businessAddress,
         invoiceCurrency: draft.invoiceCurrency,
+        orderingOpen: draft.orderingOpen,
+        siteBanner,
       }
 }
 
@@ -298,6 +311,8 @@ export function applySettingsToStore(
       trn: result.trn,
       businessAddress: result.businessAddress,
       invoiceCurrency: result.invoiceCurrency,
+      orderingOpen: result.orderingOpen,
+      siteBanner: result.siteBanner === '' ? null : result.siteBanner,
     },
   } as LegacyStore
 }

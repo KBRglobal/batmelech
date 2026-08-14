@@ -232,9 +232,12 @@ here, but a good future idea if Lin wants to track repeat customers/preferences 
 - customer-site's package builder (`shabbat-order.tsx`) and weekdays menu still have their OWN
   hardcoded copy of dish names/prices, disconnected from the admin catalog — known, accepted,
   deliberately deferred gap (site wasn't live before tonight; still not fully synced now).
-- `PageHero` is the standard hero every page should use — **except** `/shabbat-extras`, which
-  intentionally has its own bespoke sticky header per Moshe's explicit ask that it "stand alone,
-  dignified," not feel like a generic sub-page. Don't "fix" it to use PageHero.
+- `PageHero` is the standard hero **every** page uses — no exceptions. The old `/shabbat-extras`
+  carve-out (its own bespoke sticky header, "stand alone, dignified") was **removed on
+  2026-08-14** on Moshe's explicit instruction that the top nav must be identical on every page,
+  menu links included. `/shabbat-extras` now renders `PageHero` like the rest of the site; its
+  old hero copy (the "כבודה בת מלך פנימה" quote + the Kosher/Chef/Royal stat row) lives on as
+  `PageHero` children. Don't reintroduce a page-specific header anywhere.
 - Before touching `DEFAULT_EXTRA_ROWS`: several entries that look like stale duplicates (two
   vegetable-soup rows, `סט עריכה`, `תוספת יין`, the standalone weekend-challah-schnitzel row)
   are locked in by explicit assertions in `settings-catalog.test.ts` (~line 53) — deliberate,
