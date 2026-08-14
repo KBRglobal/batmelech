@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router'
 import { FloatingCartBar } from './components/floating-cart-bar'
+import { SiteBanner } from './components/site-banner'
 import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
 import { Story } from './pages/story'
@@ -68,6 +69,7 @@ export default function App() {
 
   return (
     <div key={pathname} className="page-transition">
+      <SiteBanner />
       <Routes location={pathname}>
         <Route path="/" element={<Home />} />
         <Route path="/weekdays" element={<Weekdays />} />

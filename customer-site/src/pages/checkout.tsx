@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
 import { useCart } from '../cart-context'
+import { useSiteStatus } from '../site-status-context'
 import { buildOrderMessage, waLink } from '../whatsapp'
 
 const DELIVERY_FEE = 15
@@ -18,6 +19,7 @@ const CHECKOUT_HERO_IMAGE =
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
+  const { orderingOpen } = useSiteStatus()
   const isPickup = customer.fulfillment === 'pickup'
   const total = lines.length ? subtotal + (isPickup ? 0 : DELIVERY_FEE) : 0
 
@@ -39,7 +41,7 @@ export function Checkout() {
     )
   }
 
-  const canSubmit = customer.name.trim() && customer.phone.trim() && (isPickup || customer.address.trim())
+  const canSubmit = orderingOpen && customer.name.trim() && customer.phone.trim() && (isPickup || customer.address.trim())
 
   const submitOrderToKitchen = () => {
     fetch('/api/site/orders', {
@@ -241,7 +243,11 @@ export function Checkout() {
           </a>
           {!canSubmit && (
             <p className="text-center text-xs font-bold text-[#8D182C] mt-3">
-              {isPickup ? 'מלאו שם וטלפון כדי לשלוח' : 'מלאו שם, טלפון וכתובת כדי לשלוח'}
+              {!orderingOpen
+                ? 'האתר לא מקבל הזמנות כרגע'
+                : isPickup
+                  ? 'מלאו שם וטלפון כדי לשלוח'
+                  : 'מלאו שם, טלפון וכתובת כדי לשלוח'}
             </p>
           )}
         </div>
