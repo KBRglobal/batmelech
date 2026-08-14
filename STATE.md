@@ -1,4 +1,28 @@
-# STATE — batmelech (updated: 2026-08-14 16:45)
+# STATE — batmelech (updated: 2026-08-14 17:20)
+
+## Batch 3 SHIPPED (2026-08-14 evening, deployed + live-verified)
+Four approved items, built by 4 parallel agents, merged + deployed, verified live (curl:
+computed status + reopensOn in /api/site/status, CSP headers present on /site, page renders
+clean under CSP in a real browser screenshot — fonts/images/banner all load):
+- **Date-aware ordering close**: `settings.orderingClosedUntil` (YYYY-MM-DD Dubai, exclusive)
+  — closing via מיי or the panel now means "closed until the upcoming Sunday", reopen is pure
+  computation (`effectiveOrderingOpen` in `business-actions.js`), no cron. Legacy
+  `orderingOpen` boolean still honored as fallback. Customer banner + מיי both state the
+  reopen day. NOTE live state at ship time: `orderingOpen:false, reopensOn:null` — that's the
+  LEGACY manual close from before this feature (site not launched yet, intentional); first
+  time someone closes via the new path it gets a real date.
+- **חשבוניות admin screen**: browse/search all invoices, download PDF, resend by email
+  (rate-limited). `web/src/screens/invoices-screen.tsx`, `server/business-data/
+  invoice-browse-route.js`.
+- **Sold-out badges** on weekdays/shabbat-order/shabbat-extras from live `outOfStockNames`
+  (tolerant name matching — site's hardcoded names vs admin catalog names; fails OPEN on
+  status-fetch failure, never blocks purchases). `customer-site/src/components/
+  out-of-stock-badge.tsx`.
+- **CSP on `/site`** (`server/react-app-route.js`, opt-in `securityHeaders` param — ONLY the
+  public /site mount, admin untouched): script-src 'self', fonts.googleapis/gstatic,
+  supabase + randomuser images, iconify API connect-src, frame-ancestors 'none' + nosniff +
+  referrer-policy. Hosts verified against the actual built bundle.
+Verified: 390 server + 596 web tests, both builds, deploy SUCCESS.
 
 ## Now — Felix delivery coordination SHIPPED (2026-08-14, deployed + live-verified)
 Felix (Lin's husband, does all Friday deliveries himself) now has מיי as his delivery
@@ -219,44 +243,24 @@ here, but a good future idea if Lin wants to track repeat customers/preferences 
 - The 5 experience pages + events page carry zero pricing signal — needs real price anchors
   from Moshe, don't invent numbers.
 
-0. **"Ordering closed" needs to become date-aware, not a plain on/off.** Moshe's ask: closing
-   should specifically mean "can't order for the upcoming Friday," with an automatic reopen
-   every Sunday for the next cycle — not an indefinite closed state someone has to remember to
-   flip back. Today `orderingOpen`/`set_ordering_open` (Mey + `business-actions.js` +
-   `/api/site/status` + the customer-site banner/checkout-gate) is a plain boolean with no date
-   logic at all. Needs real design: what "Friday" means exactly (this Friday vs. next?), what
-   happens to the boolean at Sunday, whether it's a stored reopen-date vs. a recurring rule
-   computed from `Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Dubai'})` (already used
-   elsewhere in this repo for Dubai-local dates, e.g. `site-order-route.js`
-   `dubaiDateString`). Don't just bolt a date check onto the existing boolean without thinking
-   this through with Moshe first.
-1. **Big scoped ask from Lin (via Mey), Moshe said "approve, but every action needs to verify
-   with me first" — needs its own real design session, not started tonight (context ran out):**
-   Panel features wanted: edit an existing order (change items/qty without cancel+recreate),
-   richer order status pipeline (בטיפול/בישול/ארוז/נשלח, not just today's binary), better
+1. **Big scoped ask from Lin (via Mey) — Moshe said "עוד לא" on 2026-08-14, deferred, do NOT
+   start without his go-ahead. When approved: every action gated behind confirm-with-Moshe
+   first:** Panel features wanted: edit an existing order (change items/qty without
+   cancel+recreate), richer order status pipeline (בטיפול/בישול/ארוז/נשלח), better
    search/filter (date, status, repeat customer, payment method), a day/shift view sorted by
-   time, load alerts (too many orders in one time window), a daily digest (order count, meal
-   count, top items), a change-history/audit log, and basic inventory *quantities* (not just
-   in/out). Mey permissions wanted, ALL gated behind a new confirm-with-Moshe-first step (new
-   architecture — today's 3 tools execute immediately, no confirmation flow exists):
-   change order status, edit order details, add/remove menu items, update inventory quantities,
-   send an automatic customer message on status change/delay, export data to CSV. Priority
-   order if not all fits: (1) edit order (2) order status (3) search/filter (4) change history.
-   Start this as a proper brainstorm, not a quick add-on — it's a real expansion of Mey's
-   bounded-write boundary, which was a deliberate safety choice earlier tonight.
-2. Wire sold-out badges on individual menu items using `outOfStockNames` (banner + closed-gate
-   already wired, this piece wasn't).
-3. Wire the Settings screen's Ziina-key field (UI only — backend route already exists).
-4. Ziina Payment Intent creation + checkout button on customer-site (needs Lin's own Ziina key).
-5. R2 upload pipeline — bucket/creds provisioned, nothing built on top yet. The Felix
-   proof-of-delivery feature (see **Now**) will be the first real consumer of this.
-6. Admin screen to browse/search/resend past invoices (still only an automatic background email).
-7. SSR/prerendering for the customer site (AEO/crawler gap, noted below).
-8. Verify the decoy-login work from the prior session is actually deployed + working live —
-   last note said "third deploy about to go out," not independently re-verified tonight.
-9. Add a Content-Security-Policy to `/site` (defense in depth for the localStorage/PII finding
-   above — needs browser verification since it can break fonts/icons/images, not done live
-   during the 2026-08-14 audit-fix pass since other agents were actively in that area).
+   time, load alerts, a daily digest, a change-history/audit log, and basic inventory
+   *quantities*. Mey permissions wanted, ALL behind a new confirmation flow (today's tools
+   execute immediately): change order status, edit order details, add/remove menu items,
+   update inventory quantities, send an automatic customer message on status change/delay,
+   CSV export. Priority: (1) edit order (2) order status (3) search/filter (4) change history.
+   Real brainstorm session, not a quick add-on — expands Mey's bounded-write boundary.
+2. Ziina: Settings-screen key field (UI only, backend exists) + Payment Intent/checkout button
+   — Moshe said "לא" on 2026-08-14 (needs Lin's own Ziina key anyway). Deferred until he asks.
+3. SSR/prerendering for the customer site (AEO/crawler gap, noted below).
+4. Verify the decoy-login work from the prior session is actually deployed + working live —
+   last note said "third deploy about to go out," never independently re-verified.
+5. R2 proof-photo polish (custom domain instead of rate-limited pub-*.r2.dev, thumbnails) —
+   only if Friday usage shows the need.
 
 ## Recently done (2026-08-13/14, newest first)
 - Checkout: split phone into a country-code dropdown (+971/+972/+1/+44) + digits, to stop
