@@ -6,10 +6,20 @@ import { useStore } from '../data/use-store.ts'
 import {
   AUTHORITATIVE_ALLOWANCES,
   MENU_CATEGORY_KEYS,
+  addCatalogExtra,
+  addCatalogItem,
   applyCatalogToStore,
   loadSettingsCatalog,
+  removeCatalogExtra,
+  removeCatalogItem,
+  renameCatalogExtra,
+  renameCatalogItem,
+  updateCatalogCorePrice,
+  updateCatalogExtraPrice,
+  updateLunchPrice,
   validateSettingsCatalog,
   type CatalogResult,
+  type LunchPricePath,
   type MenuCategoryKey,
   type SettingsCatalog,
   type StoreSaveHandler,
@@ -119,11 +129,15 @@ function FixedValue({ label, value }: { label: string; value: string }) {
 function CategoryEditor({
   category,
   catalog,
+  onUpdate,
 }: {
   category: MenuCategoryKey
   catalog: SettingsCatalog
+  onUpdate: (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => void
 }) {
   const items = catalog.categories[category]
+  const locked = category === 'firsts'
+  const [newName, setNewName] = useState('')
   return (
     <details className="rounded-2xl border border-border bg-card p-4">
       <summary className="cursor-pointer text-sm font-black text-primary">
@@ -131,52 +145,156 @@ function CategoryEditor({
       </summary>
       <div className="mt-4 space-y-2">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-secondary/40 p-3">
-            <span className="min-w-0 flex-1 text-sm font-bold text-primary">{item.name}</span>
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
+          <div key={item.id} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3">
+            <input
+              aria-label={`שם המנה — ${item.name}`}
+              defaultValue={item.name}
+              disabled={locked}
+              onBlur={(event) => {
+                const next = event.currentTarget.value
+                if (next.trim() !== '' && next !== item.name) {
+                  onUpdate((current) => renameCatalogItem(current, category, item.id, next))
+                }
+              }}
+              className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-border focus:bg-card disabled:cursor-not-allowed"
+            />
+            {locked ? (
+              <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onUpdate((current) => removeCatalogItem(current, category, item.id))}
+                className="shrink-0 rounded-full px-3 py-1 text-xs font-black text-destructive hover:bg-rose-50"
+              >
+                הסרה
+              </button>
+            )}
           </div>
         ))}
-        <p className="rounded-xl bg-secondary/60 p-3 text-xs font-bold text-muted-foreground">
-          מנות השבת קבועות כרגע כדי שטופס הלקוחות, המחיר, ההכנות ורשימת הקניות יישארו זהים.
-        </p>
+        {locked ? (
+          <p className="rounded-xl bg-secondary/60 p-3 text-xs font-bold text-muted-foreground">
+            מנה ראשונה קבועה במבנה שלה (זוג פילה דג עם רוטב לבחירה, או קציצות דגים) — לא ניתן להוסיף
+            או להסיר כאן.
+          </p>
+        ) : (
+          <form
+            className="flex gap-2 pt-1"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (newName.trim() === '') return
+              onUpdate((current) => addCatalogItem(current, category, newName))
+              setNewName('')
+            }}
+          >
+            <input
+              aria-label={`הוספת מנה ל${CATEGORY_LABELS[category]}`}
+              value={newName}
+              onChange={(event) => setNewName(event.currentTarget.value)}
+              placeholder="הוספת מנה..."
+              className="min-h-10 flex-1 rounded-xl border border-border px-3 text-sm font-bold outline-none"
+            />
+            <button type="submit" className="rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground">
+              הוספה
+            </button>
+          </form>
+        )}
       </div>
     </details>
   )
 }
 
-function ExtrasEditor({ catalog }: { catalog: SettingsCatalog }) {
+function ExtrasEditor({
+  catalog,
+  onUpdate,
+}: {
+  catalog: SettingsCatalog
+  onUpdate: (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => void
+}) {
+  const [newName, setNewName] = useState('')
+  const [newPrice, setNewPrice] = useState('')
   return (
     <details className="rounded-2xl border border-border bg-card p-4">
       <summary className="cursor-pointer text-sm font-black text-primary">
         אקסטרות ומחירים ({catalog.extras.length})
       </summary>
-      <p className="mt-3 text-xs font-bold text-muted-foreground">
-        האקסטרות מוצגות בלבד כרגע, כדי שטופס הלקוחות, המחיר וההכנות יישארו זהים.
-      </p>
       <div className="mt-4 space-y-2">
         {catalog.extras.map((item) => (
           <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-secondary/40 p-3">
-            <span className="min-w-48 flex-1 text-sm font-bold text-primary">{item.name}</span>
+            <input
+              aria-label={`שם האקסטרה — ${item.name}`}
+              defaultValue={item.name}
+              onBlur={(event) => {
+                const next = event.currentTarget.value
+                if (next.trim() !== '' && next !== item.name) {
+                  onUpdate((current) => renameCatalogExtra(current, item.id, next))
+                }
+              }}
+              className="min-w-48 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-border focus:bg-card"
+            />
             <PriceField
               label={`מחיר ${item.name}`}
               value={item.priceMinorUnits}
-              fixed
-              onCommit={() => undefined}
+              onCommit={(next) => onUpdate((current) => updateCatalogExtraPrice(current, item.id, next))}
             />
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
+            <button
+              type="button"
+              onClick={() => onUpdate((current) => removeCatalogExtra(current, item.id))}
+              className="shrink-0 rounded-full px-3 py-1 text-xs font-black text-destructive hover:bg-rose-50"
+            >
+              הסרה
+            </button>
           </div>
         ))}
+        <form
+          className="flex flex-wrap gap-2 pt-1"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const priceMinorUnits = priceInput(newPrice)
+            if (newName.trim() === '' || priceMinorUnits === null) return
+            onUpdate((current) => addCatalogExtra(current, newName, priceMinorUnits))
+            setNewName('')
+            setNewPrice('')
+          }}
+        >
+          <input
+            aria-label="שם אקסטרה חדשה"
+            value={newName}
+            onChange={(event) => setNewName(event.currentTarget.value)}
+            placeholder="הוספת אקסטרה..."
+            className="min-h-10 min-w-48 flex-1 rounded-xl border border-border px-3 text-sm font-bold outline-none"
+          />
+          <input
+            aria-label="מחיר האקסטרה החדשה"
+            dir="ltr"
+            inputMode="decimal"
+            value={newPrice}
+            onChange={(event) => setNewPrice(event.currentTarget.value)}
+            placeholder="$"
+            className="min-h-10 w-24 rounded-xl border border-border px-3 text-sm font-bold outline-none"
+          />
+          <button type="submit" className="rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground">
+            הוספה
+          </button>
+        </form>
       </div>
     </details>
   )
 }
 
-function LunchEditor({ catalog }: { catalog: SettingsCatalog }) {
+function LunchEditor({
+  catalog,
+  onUpdate,
+}: {
+  catalog: SettingsCatalog
+  onUpdate: (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => void
+}) {
+  const commitPrice = (path: LunchPricePath) => (next: number) =>
+    onUpdate((current) => updateLunchPrice(current, path, next))
   return (
     <details className="rounded-2xl border border-border bg-card p-4">
       <summary className="cursor-pointer text-sm font-black text-primary">תפריט צהריים ({catalog.lunch.length})</summary>
       <p className="mt-3 rounded-xl bg-secondary/60 p-3 text-xs font-bold leading-6 text-muted-foreground">
-        מחירי הצהריים מוצגים בלבד ונעולים למחירון שבטופס הלקוחות. שינוי מחיר יתאפשר רק אחרי חיבור שני המסכים לאותו קטלוג ציבורי.
+        שמות המנות ומבנה הבחירות (גדלים, ימי זמינות) קבועים כרגע — רק המחירים ניתנים לעריכה.
       </p>
       <div className="mt-4 space-y-4">
         {catalog.lunch.map((item) => (
@@ -184,20 +302,32 @@ function LunchEditor({ catalog }: { catalog: SettingsCatalog }) {
             <h3 className="font-black text-primary">{item.name}</h3>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {item.priceMinorUnits !== null && (
-                <FixedValue label={`מחיר ${item.name}`} value={`${displayDollarInput(item.priceMinorUnits)}$`} />
+                <PriceField label={`מחיר ${item.name}`} value={item.priceMinorUnits} onCommit={commitPrice({ kind: 'base', itemKey: item.key })} />
               )}
               {item.variants.map((variant) => (
                 <div key={variant.key} className="space-y-2">
-                  <FixedValue label={`${item.name} — ${variant.name}`} value={`${displayDollarInput(variant.priceMinorUnits)}$`} />
+                  <PriceField
+                    label={`${item.name} — ${variant.name}`}
+                    value={variant.priceMinorUnits}
+                    onCommit={commitPrice({ kind: 'variant', itemKey: item.key, variantKey: variant.key })}
+                  />
                   {variant.weekendOnly && <p className="text-xs font-black text-amber-800">זמין בסוף שבוע בלבד</p>}
                   {variant.includedSides > 0 && <p className="text-xs font-bold text-muted-foreground">כולל {variant.includedSides} תוספות</p>}
                   {variant.extraSideMinorUnits !== null && (
-                    <FixedValue label={`תוספת בחירה — ${variant.name}`} value={`${displayDollarInput(variant.extraSideMinorUnits)}$`} />
+                    <PriceField
+                      label={`תוספת בחירה — ${variant.name}`}
+                      value={variant.extraSideMinorUnits}
+                      onCommit={commitPrice({ kind: 'side', itemKey: item.key, variantKey: variant.key })}
+                    />
                   )}
                 </div>
               ))}
               {item.addon !== null && (
-                <FixedValue label={`${item.name} — ${item.addon.name}`} value={`${displayDollarInput(item.addon.priceMinorUnits)}$`} />
+                <PriceField
+                  label={`${item.name} — ${item.addon.name}`}
+                  value={item.addon.priceMinorUnits}
+                  onCommit={commitPrice({ kind: 'addon', itemKey: item.key })}
+                />
               )}
             </div>
           </section>

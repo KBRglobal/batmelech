@@ -1747,6 +1747,29 @@ export function addCatalogItem(
   return withCatalogUpdate(catalog, { categories })
 }
 
+export function renameCatalogItem(
+  catalog: SettingsCatalog,
+  category: MenuCategoryKey,
+  itemId: string,
+  rawName: string,
+): SettingsCatalog {
+  const item = catalog.categories[category].find((candidate) => candidate.id === itemId)
+  if (category === 'firsts' && item !== undefined && isAuthoritativeFirstCourseItem(item)) {
+    throw new RangeError('authoritative first-course fish rows cannot be renamed')
+  }
+  const name = text(rawName)
+  if (name === '') throw new RangeError('name must be nonblank')
+  const items = catalog.categories[category]
+  if (items.some((candidate) => candidate.id !== itemId && canonicalCatalogName(candidate.name) === canonicalCatalogName(name))) {
+    throw new RangeError('item name already exists in this category')
+  }
+  const categories = {
+    ...catalog.categories,
+    [category]: items.map((candidate) => (candidate.id === itemId ? { ...candidate, name } : candidate)),
+  }
+  return withCatalogUpdate(catalog, { categories })
+}
+
 export function removeCatalogItem(
   catalog: SettingsCatalog,
   category: MenuCategoryKey,
@@ -1781,6 +1804,24 @@ export function addCatalogExtra(
   }
   return withCatalogUpdate(catalog, {
     extras: [...catalog.extras, { id: nextStableItemId('extra', name, catalog), name, priceMinorUnits }],
+  })
+}
+
+export function renameCatalogExtra(
+  catalog: SettingsCatalog,
+  itemId: string,
+  rawName: string,
+): SettingsCatalog {
+  const name = canonicalizeChargeName(text(rawName))
+  if (name === '') throw new RangeError('name must be nonblank')
+  if (isAutomaticChargeName(name)) {
+    throw new RangeError('extra name is reserved for automatic pricing')
+  }
+  if (catalog.extras.some((item) => item.id !== itemId && canonicalCatalogName(item.name) === canonicalCatalogName(name))) {
+    throw new RangeError('extra name already exists')
+  }
+  return withCatalogUpdate(catalog, {
+    extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, name } : item)),
   })
 }
 
