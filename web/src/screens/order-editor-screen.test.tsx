@@ -1451,7 +1451,7 @@ describe('OrderEditorScreen delivery proof section', () => {
     expect((screen.getByLabelText('פיקדון פלטה') as HTMLInputElement).value).toBe('80.00')
     expect((screen.getByLabelText('מצב הפלטה') as HTMLSelectElement).value).toBe('collected')
     expect((screen.getByLabelText('איפה הפלטה מחכה') as HTMLInputElement).value).toBe('בקבלה')
-    expect(screen.getByText('נאספה')).toBeTruthy()
+    expect(screen.getByText('מועד האיסוף')).toBeTruthy()
 
     await user.clear(screen.getByLabelText('פיקדון פלטה'))
     await user.type(screen.getByLabelText('פיקדון פלטה'), 'שמונים')

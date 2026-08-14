@@ -539,6 +539,9 @@ function PlataSection({
     readonly signature: string
     readonly values: PlataFormValues
   } | null>(null)
+  // What the last save was for, so the confirmation belongs to the values on screen and
+  // disappears the moment they are edited again.
+  const [submitted, setSubmitted] = useState<string | null>(null)
   const values = edited !== null && edited.signature === storedSignature ? edited.values : stored
   const patch = (next: Partial<PlataFormValues>) => {
     setEdited({ signature: storedSignature, values: { ...values, ...next } })
@@ -605,13 +608,13 @@ function PlataSection({
             <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {stamps.collectedAt !== null && (
                 <div>
-                  <dt className="text-xs font-black text-muted-foreground">נאספה</dt>
+                  <dt className="text-xs font-black text-muted-foreground">מועד האיסוף</dt>
                   <dd className="mt-1 text-sm font-bold text-primary">{formatDeliveryTimestamp(stamps.collectedAt)}</dd>
                 </div>
               )}
               {stamps.depositReturnedAt !== null && (
                 <div>
-                  <dt className="text-xs font-black text-muted-foreground">הפיקדון הוחזר</dt>
+                  <dt className="text-xs font-black text-muted-foreground">מועד החזרת הפיקדון</dt>
                   <dd className="mt-1 text-sm font-bold text-primary">{formatDeliveryTimestamp(stamps.depositReturnedAt)}</dd>
                 </div>
               )}
@@ -621,7 +624,10 @@ function PlataSection({
             <button
               type="button"
               disabled={!dirty || !valid || saveState.kind === 'saving'}
-              onClick={() => onSave(values)}
+              onClick={() => {
+                setSubmitted(JSON.stringify(values))
+                onSave(values)
+              }}
               className="min-h-11 rounded-full border border-primary bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
             >
               {saveState.kind === 'saving' ? 'שומרת פלטה' : 'שמירת הפלטה'}
@@ -631,7 +637,7 @@ function PlataSection({
                 הפיקדון חייב להיות סכום תקין. לא נשמר שינוי.
               </p>
             )}
-            {valid && saveState.kind === 'saved' && !dirty && (
+            {saveState.kind === 'saved' && submitted === JSON.stringify(values) && (
               <p role="status" className="text-xs font-black text-emerald-700">פרטי הפלטה נשמרו.</p>
             )}
             {saveState.kind === 'error' && (
