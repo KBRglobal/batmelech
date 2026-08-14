@@ -1,4 +1,13 @@
-# STATE — batmelech (updated: 2026-08-14 17:20)
+# STATE — batmelech (updated: 2026-08-14 17:25)
+
+## מיי identity awareness SHIPPED (2026-08-14 evening)
+Every message to מיי now carries a sender line ([השולח: name @username], injected by
+webhook-route/mey-agent — system data, not user text). Persona register per person:
+Lin (direct boss, no username → default) warmest — endearments/flowers/hearts;
+@balmin55 (Felix) delivery-manager mode, concise; @ogind2858 (Moshe) technical boss —
+internals/tools talk allowed; "Mr Quackson" in a message = admin code word → full
+robotic/technical mode until another speaker. Boundaries explicitly unchanged by
+identity — no speaker unlocks out-of-toolset actions. Deployed + verified up.
 
 ## Batch 3 SHIPPED (2026-08-14 evening, deployed + live-verified)
 Four approved items, built by 4 parallel agents, merged + deployed, verified live (curl:
