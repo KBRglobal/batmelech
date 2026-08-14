@@ -9,9 +9,11 @@ import { useStore } from '../data/use-store.ts'
 import {
   applySettingsToStore,
   createBackupArtifact,
+  describeOrderingState,
   formatLastBackup,
   readSettingsDraft,
   reviewBackupText,
+  toggleOrderingOpen,
   validateSettingsDraft,
   type BackupReview,
   type RestoreRequestHandler,
@@ -346,11 +348,9 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
           <div className="mt-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-secondary/30 p-5">
               <div>
-                <p className="text-sm font-black text-primary">
-                  {currentDraft.orderingOpen ? 'האתר פתוח להזמנות' : 'האתר סגור להזמנות'}
-                </p>
+                <p className="text-sm font-black text-primary">{describeOrderingState(currentDraft)}</p>
                 <p className="mt-1 text-xs font-bold text-muted-foreground">
-                  כשסוגרים, לקוחות עדיין רואים את התפריט אבל לא יכולים לשלוח הזמנה חדשה.
+                  סגירה היא לשבת הקרובה בלבד: לקוחות עדיין רואים את התפריט, וההזמנות נפתחות שוב לבד ביום ראשון.
                 </p>
               </div>
               <button
@@ -358,7 +358,7 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
                 role="switch"
                 aria-checked={currentDraft.orderingOpen}
                 aria-label="האתר פתוח להזמנות"
-                onClick={() => setDraft({ ...currentDraft, orderingOpen: !currentDraft.orderingOpen })}
+                onClick={() => setDraft(toggleOrderingOpen(currentDraft))}
                 className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-black ${
                   currentDraft.orderingOpen
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-800'

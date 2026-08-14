@@ -46,6 +46,7 @@ const MIGRATION_SQL = Object.freeze([
   )`,
   `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS access_token TEXT`,
+  `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS resent_at TIMESTAMPTZ`,
   `CREATE INDEX IF NOT EXISTS invoices_order_id_idx ON public.invoices (order_id)`,
   // Partial unique index (not a plain UNIQUE column) so this stays idempotent
   // regardless of any pre-existing rows with a null token.
@@ -153,6 +154,52 @@ async function getInvoiceByNumberAndToken(pool, invoiceNumber, accessToken) {
   return result.rows[0] ?? null;
 }
 
+function likePattern(term) {
+  return `%${term.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+// Staff-facing listing: the access token comes along so the panel can build
+// the same token-gated download link the customer received.
+async function listInvoices(pool, { query = '', limit = 50 } = {}) {
+  const term = typeof query === 'string' ? query.trim() : '';
+  const result = await pool.query(
+    `SELECT invoice_number, order_id, customer_name, customer_email, currency,
+       total_minor, status, access_token, created_at, resent_at
+     FROM public.invoices
+     WHERE $1::text IS NULL
+        OR invoice_number ILIKE $1 ESCAPE '\\'
+        OR customer_name ILIKE $1 ESCAPE '\\'
+     ORDER BY created_at DESC, id DESC
+     LIMIT $2`,
+    [term ? likePattern(term) : null, limit]
+  );
+  return result.rows;
+}
+
+async function getInvoiceByNumber(pool, invoiceNumber) {
+  const result = await pool.query(
+    `SELECT invoice_number, order_id, business_name, trn, business_address, currency,
+       customer_name, customer_email, description, subtotal_minor, vat_minor, total_minor,
+       status, access_token, created_at
+     FROM public.invoices
+     WHERE invoice_number = $1`,
+    [invoiceNumber]
+  );
+  return result.rows[0] ?? null;
+}
+
+// A resend is also the recovery path for a row stuck at status 'failed', so it
+// clears the stored error and keeps the original access token when there is one.
+async function markInvoiceResent(pool, invoiceNumber, accessToken) {
+  await pool.query(
+    `UPDATE public.invoices
+     SET status = 'sent', error_message = NULL, resent_at = NOW(),
+         access_token = COALESCE(access_token, $2)
+     WHERE invoice_number = $1`,
+    [invoiceNumber, accessToken ?? null]
+  );
+}
+
 module.exports = {
   initializeBusinessData,
   setZiinaApiKeyCiphertext,
@@ -163,4 +210,7 @@ module.exports = {
   recordInvoice,
   hasInvoiceForOrder,
   getInvoiceByNumberAndToken,
+  listInvoices,
+  getInvoiceByNumber,
+  markInvoiceResent,
 };

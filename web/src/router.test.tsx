@@ -41,6 +41,9 @@ vi.mock('./screens/finance-screen.tsx', () => ({
     <h1 data-save-bound={typeof onSave === 'function'}>מסך הכספים המחובר</h1>
   ),
 }))
+vi.mock('./screens/invoices-screen.tsx', () => ({
+  InvoicesScreen: () => <h1>מסך החשבוניות המחובר</h1>,
+}))
 vi.mock('./screens/order-editor-screen.tsx', () => ({
   OrderEditorScreen: () => <h1>מסך עריכת ההזמנה המחובר</h1>,
 }))
@@ -138,6 +141,7 @@ describe('AppRoutes', () => {
     [APP_ROUTES.deliveries, 'מסך המשלוחים המחובר'],
     [APP_ROUTES.customers, 'מסך הלקוחות המחובר'],
     [APP_ROUTES.finance, 'מסך הכספים המחובר'],
+    [APP_ROUTES.invoices, 'מסך החשבוניות המחובר'],
     [APP_ROUTES.newOrder, 'מסך עריכת ההזמנה המחובר'],
     ['/orders/order%201/edit', 'מסך עריכת ההזמנה המחובר'],
     [APP_ROUTES.orderImportReview, 'מסך בדיקת הוואטסאפ המחובר'],

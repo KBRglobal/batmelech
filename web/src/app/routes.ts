@@ -12,6 +12,7 @@ export const APP_ROUTES = {
   preparationLabels: '/preparation/labels',
   deliveries: '/deliveries',
   finance: '/finance',
+  invoices: '/invoices',
   customers: '/customers',
   settings: '/settings',
   menuSettings: '/settings/menu',

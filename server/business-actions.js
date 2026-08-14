@@ -8,8 +8,47 @@
 // fields under settings.
 
 const crypto = require('node:crypto');
+const { dubaiDateString } = require('./telegram/delivery-day');
 
 const MAX_ATTEMPTS = 5;
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MILLISECONDS_PER_DAY = 86_400_000;
+
+function normalizedDay(value) {
+  const day = typeof value === 'string' ? value.trim() : '';
+  return DATE_PATTERN.test(day) ? day : '';
+}
+
+// Closing ordering always means "not for the upcoming Shabbat", never "until
+// somebody remembers to open it again": settings.orderingClosedUntil names the
+// day ordering comes back — the next Sunday, exclusive of nothing before it —
+// and every read compares it to today. The reopen therefore needs no scheduler.
+function upcomingSundayDubai(now = new Date()) {
+  const today = dubaiDateString(now);
+  const midnightUtc = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(midnightUtc)) throw new RangeError('now must be a valid Date');
+  const weekday = new Date(midnightUtc).getUTCDay(); // 0 = Sunday
+  const daysAhead = 7 - weekday; // Sunday closes for a full week, never for zero days
+  return new Date(midnightUtc + daysAhead * MILLISECONDS_PER_DAY).toISOString().slice(0, 10);
+}
+
+// The one place that answers "can a customer order right now". State blobs
+// written before orderingClosedUntil existed only carry the boolean, so an
+// absent (or unparsable) date falls back to it.
+function effectiveOrderingOpen(settings, todayDubaiString = dubaiDateString()) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const closedUntil = normalizedDay(source.orderingClosedUntil);
+  const today = normalizedDay(todayDubaiString);
+  if (closedUntil === '' || today === '') return source.orderingOpen !== false;
+  return today >= closedUntil; // open again ON the reopen day
+}
+
+function orderingStatus(settings, todayDubaiString = dubaiDateString()) {
+  const open = effectiveOrderingOpen(settings, todayDubaiString);
+  const closedUntil = normalizedDay(settings && settings.orderingClosedUntil);
+  return { open, reopensOn: open ? null : closedUntil || null };
+}
 
 // A mutate() that returns null means "nothing to do" — the caller already sees
 // the value it wanted, so we skip the save entirely. Used by the claim-style
@@ -63,8 +102,16 @@ async function withOrderUpdate(repository, orderId, mutate) {
   return { ok: false, error: 'save failed after retries' };
 }
 
-async function setOrderingOpen(repository, open) {
-  return withSettingsUpdate(repository, (settings) => ({ ...settings, orderingOpen: Boolean(open) }));
+async function setOrderingOpen(repository, open, now = new Date()) {
+  if (open) {
+    return withSettingsUpdate(repository, (settings) => {
+      const next = { ...settings, orderingOpen: true };
+      delete next.orderingClosedUntil;
+      return next;
+    });
+  }
+  const orderingClosedUntil = upcomingSundayDubai(now);
+  return withSettingsUpdate(repository, (settings) => ({ ...settings, orderingOpen: false, orderingClosedUntil }));
 }
 
 async function setSiteBanner(repository, message) {
@@ -251,6 +298,9 @@ async function setCourierLocation(repository, { lat, lon, at } = {}) {
 }
 
 module.exports = {
+  effectiveOrderingOpen,
+  orderingStatus,
+  upcomingSundayDubai,
   setOrderingOpen,
   setSiteBanner,
   setItemStock,

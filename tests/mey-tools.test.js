@@ -210,6 +210,41 @@ test('the tool surface exposes nine well-formed definitions', async () => {
   assert.ok(names.includes('set_delivery_checkin'));
 });
 
+test('get_menu_and_settings answers with the ordering state as it is right now', async () => {
+  const stillClosed = toolsFor({
+    orders: [],
+    settings: { orderingOpen: false, orderingClosedUntil: '2099-01-04', siteBanner: 'שבת שלום' },
+  });
+  const closed = await stillClosed.execute('get_menu_and_settings', {});
+  assert.equal(closed.orderingOpen, false);
+  assert.equal(closed.reopensOn, '2099-01-04');
+  assert.equal(closed.siteBanner, 'שבת שלום');
+
+  // Mey must not tell a customer the site is closed after its reopen day.
+  const reopened = toolsFor({
+    orders: [],
+    settings: { orderingOpen: false, orderingClosedUntil: '2020-01-05' },
+  });
+  const open = await reopened.execute('get_menu_and_settings', {});
+  assert.equal(open.orderingOpen, true);
+  assert.equal(open.reopensOn, null);
+});
+
+test('set_ordering_open closes for the coming Shabbat and opens immediately', async () => {
+  const repository = fakeRepository({ orders: [], settings: {} });
+  const tools = createMeyTools({ repository, logger: silentLogger });
+
+  await tools.execute('set_ordering_open', { open: false });
+  const closedUntil = repository._current().settings.orderingClosedUntil;
+  assert.match(closedUntil, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(new Date(`${closedUntil}T00:00:00Z`).getUTCDay(), 0, 'reopens on a Sunday');
+  assert.ok(closedUntil > dubaiDateString(), 'reopens in the future');
+
+  await tools.execute('set_ordering_open', { open: true });
+  assert.equal(repository._current().settings.orderingOpen, true);
+  assert.equal('orderingClosedUntil' in repository._current().settings, false);
+});
+
 test('unknown tools are reported rather than thrown', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
   const result = await tools.execute('set_price', { amount: 10 });

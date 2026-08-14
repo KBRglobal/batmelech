@@ -47,7 +47,10 @@ export interface SettingsDraft {
   readonly trn: string
   readonly businessAddress: string
   readonly invoiceCurrency: InvoiceCurrency
+  /** Effective openness right now, not the raw stored boolean. */
   readonly orderingOpen: boolean
+  /** YYYY-MM-DD (Dubai) ordering reopens on; '' while open. */
+  readonly orderingClosedUntil: string
   readonly siteBanner: string
 }
 
@@ -62,6 +65,7 @@ export type SettingsDraftValidation =
       readonly businessAddress: string
       readonly invoiceCurrency: InvoiceCurrency
       readonly orderingOpen: boolean
+      readonly orderingClosedUntil: string
       readonly siteBanner: string
     }
   | { readonly valid: false; readonly issues: readonly string[] }
@@ -84,6 +88,55 @@ function dubaiDate(now: Date): string {
     return part
   }
   return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+// Ordering never closes indefinitely: settings.orderingClosedUntil names the
+// day it comes back (always a Sunday, exclusive of nothing before it) and every
+// read compares it to today, so the site reopens itself.
+//
+// The rules here intentionally mirror effectiveOrderingOpen /
+// upcomingSundayDubai in server/business-actions.js. That file is CommonJS and
+// cannot be imported here, so the logic is duplicated: change one, change the
+// other, or the panel and the customer site disagree about whether Lin is open.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const MILLISECONDS_PER_DAY = 86_400_000
+
+function isoDate(value: unknown): string {
+  return typeof value === 'string' && ISO_DATE.test(value.trim()) ? value.trim() : ''
+}
+
+export function upcomingSundayDubai(now = new Date()): string {
+  const midnightUtc = Date.parse(`${dubaiDate(now)}T00:00:00Z`)
+  if (!Number.isFinite(midnightUtc)) throw new RangeError('now must be a valid Date')
+  const daysAhead = 7 - new Date(midnightUtc).getUTCDay() // Sunday closes for a full week
+  return new Date(midnightUtc + daysAhead * MILLISECONDS_PER_DAY).toISOString().slice(0, 10)
+}
+
+function orderingOpenOn(settings: Readonly<Record<string, unknown>>, today: string): boolean {
+  const closedUntil = isoDate(settings.orderingClosedUntil)
+  if (closedUntil === '') return settings.orderingOpen !== false // pre-date state blobs
+  return today >= closedUntil
+}
+
+function reopenDayLabel(closedUntil: string, locale = 'he-IL'): string {
+  const day = new Date(`${closedUntil}T00:00:00Z`)
+  if (!Number.isFinite(day.getTime())) return ''
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(day)
+  return `${weekday} ${closedUntil.slice(8, 10)}.${closedUntil.slice(5, 7)}`
+}
+
+/** The sentence shown above the toggle: open, or closed with the day it returns. */
+export function describeOrderingState(draft: SettingsDraft, locale = 'he-IL'): string {
+  if (draft.orderingOpen) return 'האתר פתוח להזמנות'
+  const label = reopenDayLabel(isoDate(draft.orderingClosedUntil), locale)
+  return label === '' ? 'האתר סגור להזמנות' : `האתר סגור להזמנות עד ${label}`
+}
+
+/** Closing always closes for the coming Shabbat only; opening returns at once. */
+export function toggleOrderingOpen(draft: SettingsDraft, now = new Date()): SettingsDraft {
+  return draft.orderingOpen
+    ? { ...draft, orderingOpen: false, orderingClosedUntil: upcomingSundayDubai(now) }
+    : { ...draft, orderingOpen: true, orderingClosedUntil: '' }
 }
 
 export function createBackupArtifact(
@@ -213,8 +266,10 @@ function nonNegativeIntegerText(value: unknown): string {
 export function readSettingsDraft(
   store: Readonly<LegacyStore>,
   catalog: SettingsCatalog,
+  now = new Date(),
 ): SettingsDraft {
   const settings = settingsRecord(store)
+  const orderingOpen = orderingOpenOn(settings, dubaiDate(now))
   const validItems = new Set(
     Object.values(catalog.categories).flatMap((items) => items.map((item) => item.name)),
   )
@@ -231,7 +286,9 @@ export function readSettingsDraft(
     trn: stringValue(settings.trn),
     businessAddress: stringValue(settings.businessAddress),
     invoiceCurrency: currency === 'USD' ? 'USD' : 'AED',
-    orderingOpen: settings.orderingOpen !== false,
+    orderingOpen,
+    // A reopen day already behind us is spent; the draft shows an open site.
+    orderingClosedUntil: orderingOpen ? '' : isoDate(settings.orderingClosedUntil),
     siteBanner: stringValue(settings.siteBanner),
   }
 }
@@ -278,6 +335,7 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
         businessAddress,
         invoiceCurrency: draft.invoiceCurrency,
         orderingOpen: draft.orderingOpen,
+        orderingClosedUntil: draft.orderingOpen ? '' : isoDate(draft.orderingClosedUntil),
         siteBanner,
       }
 }
@@ -286,6 +344,7 @@ export function applySettingsToStore(
   store: Readonly<LegacyStore>,
   draft: SettingsDraft,
   catalog: SettingsCatalog,
+  now = new Date(),
 ): LegacyStore {
   const result = validateSettingsDraft(draft)
   if (!result.valid) throw new Error(result.issues.join('; '))
@@ -299,22 +358,28 @@ export function applySettingsToStore(
       )
     : []
   const currentOut = [...new Set(draft.outOfStock.map((name) => name.trim()).filter(Boolean))]
-  return {
-    ...store,
-    settings: {
-      ...previous,
-      maxMeals: result.maxMeals,
-      payLink: result.paymentLink,
-      orderFormUrl: result.customerOrderFormUrl,
-      out: [...preservedOut, ...currentOut],
-      businessName: result.businessName,
-      trn: result.trn,
-      businessAddress: result.businessAddress,
-      invoiceCurrency: result.invoiceCurrency,
-      orderingOpen: result.orderingOpen,
-      siteBanner: result.siteBanner === '' ? null : result.siteBanner,
-    },
-  } as LegacyStore
+  const settings: Record<string, unknown> = {
+    ...previous,
+    maxMeals: result.maxMeals,
+    payLink: result.paymentLink,
+    orderFormUrl: result.customerOrderFormUrl,
+    out: [...preservedOut, ...currentOut],
+    businessName: result.businessName,
+    trn: result.trn,
+    businessAddress: result.businessAddress,
+    invoiceCurrency: result.invoiceCurrency,
+    orderingOpen: result.orderingOpen,
+    siteBanner: result.siteBanner === '' ? null : result.siteBanner,
+  }
+  if (result.orderingOpen) {
+    delete settings.orderingClosedUntil
+  } else {
+    // A draft closed but carrying no reopen day is either a fresh close or an
+    // old boolean-only close; either way it closes for the coming Shabbat.
+    settings.orderingClosedUntil =
+      result.orderingClosedUntil === '' ? upcomingSundayDubai(now) : result.orderingClosedUntil
+  }
+  return { ...store, settings } as LegacyStore
 }
 
 export function formatLastBackup(value: unknown, locale = 'he-IL'): string {

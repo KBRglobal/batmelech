@@ -4,7 +4,9 @@ import { Link, useNavigate } from 'react-router'
 import { PageHero } from '../components/page-hero'
 import { CurrencyNote } from '../components/currency-note'
 import { Photo } from '../components/photo'
+import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
+import { useSiteStatus } from '../site-status-context'
 
 const BASE_PRICE = 230
 const INCLUDED_SALADS = 4
@@ -71,6 +73,7 @@ const ALLERGY_ICON: Record<string, string> = {
 
 export function ShabbatOrder() {
   const { addLine } = useCart()
+  const { isOutOfStock } = useSiteStatus()
   const navigate = useNavigate()
 
   const [salads, setSalads] = useState<Set<string>>(new Set())
@@ -116,7 +119,18 @@ export function ShabbatOrder() {
   if (!side) missing.push('תוספת')
   if (!dessert) missing.push('קינוח')
 
-  const canContinue = missing.length === 0
+  // An item can sell out after it was picked (the status call lands late, or a
+  // second tab marks it). The picks stay put — the builder just refuses to
+  // continue until they are swapped out.
+  const soldOutPicks = [
+    ...SALADS.filter((s) => salads.has(s.id)),
+    ...FIRST_COURSES.filter((c) => (firstQty[c.id] ?? 0) > 0),
+    ...MAIN_COURSES.filter((c) => (mainQty[c.id] ?? 0) > 0),
+    ...SIDES.filter((s) => s.id === side),
+    ...DESSERTS.filter((d) => d.id === dessert),
+  ].filter((item) => isOutOfStock(item.name))
+
+  const canContinue = missing.length === 0 && soldOutPicks.length === 0
 
   const handleContinue = () => {
     if (!canContinue) return
@@ -177,33 +191,46 @@ export function ShabbatOrder() {
 
         <SectionHeader n={1} title="סלטים טריים" hint={`יש לבחור לפחות 4 (סלט חמישי ומעלה: $${SALAD_EXTRA_PRICE} ליחידה)`} />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 -mt-12">
-          {SALADS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => toggleSalad(s.id)}
-              className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all hover:shadow-xl text-right"
-            >
-              <div className="aspect-square overflow-hidden relative">
-                <Photo src={s.img} alt={s.name} className="w-full h-full object-cover" real={s.realPhoto} />
-                {s.allergy && (
-                  <span className="absolute top-2 left-2 bg-white/90 p-1.5 rounded-lg shadow-md">
-                    <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
+          {SALADS.map((s) => {
+            const picked = salads.has(s.id)
+            const soldOut = isOutOfStock(s.name)
+            return (
+              <button
+                key={s.id}
+                type="button"
+                // A sold-out salad that is already picked stays clickable so it
+                // can be removed — it just cannot be picked again.
+                disabled={soldOut && !picked}
+                onClick={() => toggleSalad(s.id)}
+                className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all text-right enabled:hover:shadow-xl disabled:cursor-not-allowed"
+              >
+                <div className="aspect-square overflow-hidden relative">
+                  <Photo
+                    src={s.img}
+                    alt={s.name}
+                    className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`}
+                    real={s.realPhoto}
+                  />
+                  {s.allergy && (
+                    <span className="absolute top-2 left-2 bg-white/90 p-1.5 rounded-lg shadow-md">
+                      <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
+                    </span>
+                  )}
+                  {soldOut && <OutOfStockBadge className="absolute bottom-3 left-3" />}
+                  <span
+                    className={`absolute bottom-3 right-3 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${
+                      picked ? 'bg-[#3B151A] text-white' : 'bg-white text-[#3B151A]'
+                    }`}
+                  >
+                    <Icon icon={picked ? 'ph:check-bold' : 'ph:plus-bold'} className="text-xl" />
                   </span>
-                )}
-                <span
-                  className={`absolute bottom-3 right-3 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${
-                    salads.has(s.id) ? 'bg-[#3B151A] text-white' : 'bg-white text-[#3B151A]'
-                  }`}
-                >
-                  <Icon icon={salads.has(s.id) ? 'ph:check-bold' : 'ph:plus-bold'} className="text-xl" />
-                </span>
-              </div>
-              <div className="p-4">
-                <h4 className="text-sm font-black">{s.name}</h4>
-              </div>
-            </button>
-          ))}
+                </div>
+                <div className="p-4">
+                  <h4 className="text-sm font-black">{s.name}</h4>
+                </div>
+              </button>
+            )
+          })}
         </div>
         {saladExtra > 0 && (
           <p className="text-[#8D182C] font-black text-center -mt-12">+${saladExtra.toFixed(2)} עבור {salads.size - INCLUDED_SALADS} סלטים נוספים</p>
@@ -212,7 +239,7 @@ export function ShabbatOrder() {
         <SectionHeader n={2} title="מנות ראשונות" hint={`מנה שניה ומעלה: $${FIRST_EXTRA_PRICE} ליחידה`} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">
           {FIRST_COURSES.map((c) => (
-            <QtyCard key={c.id} choice={c} qty={firstQty[c.id] ?? 0} onBump={(d) => bumpFirst(c.id, d)} />
+            <QtyCard key={c.id} choice={c} qty={firstQty[c.id] ?? 0} onBump={(d) => bumpFirst(c.id, d)} soldOut={isOutOfStock(c.name)} />
           ))}
         </div>
         {firstExtra > 0 && <p className="text-[#8D182C] font-black text-center -mt-12">+${firstExtra} עבור {firstCount - INCLUDED_FIRST} מנות נוספות</p>}
@@ -220,44 +247,54 @@ export function ShabbatOrder() {
         <SectionHeader n={3} title="עיקריות לשבת" hint={`מנה שניה ומעלה: $${MAIN_EXTRA_PRICE} ליחידה`} />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 -mt-12">
           {MAIN_COURSES.map((c) => (
-            <QtyCard key={c.id} choice={c} qty={mainQty[c.id] ?? 0} onBump={(d) => bumpMain(c.id, d)} compact />
+            <QtyCard key={c.id} choice={c} qty={mainQty[c.id] ?? 0} onBump={(d) => bumpMain(c.id, d)} soldOut={isOutOfStock(c.name)} compact />
           ))}
         </div>
         {mainExtra > 0 && <p className="text-[#8D182C] font-black text-center -mt-12">+${mainExtra} עבור {mainCount - INCLUDED_MAIN} מנות נוספות</p>}
 
         <SectionHeader n={4} title="תוספות לעיקריות" hint="יש לבחור תוספת אחת" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 -mt-12">
-          {SIDES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSide((prev) => (prev === s.id ? '' : s.id))}
-              className={`block p-6 rounded-3xl border-2 transition-all shadow-sm text-center font-black ${
-                side === s.id ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-transparent bg-white'
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
+          {SIDES.map((s) => {
+            const soldOut = isOutOfStock(s.name)
+            return (
+              <button
+                key={s.id}
+                type="button"
+                disabled={soldOut && side !== s.id}
+                onClick={() => setSide((prev) => (prev === s.id ? '' : s.id))}
+                className={`flex flex-col items-center gap-2 p-6 rounded-3xl border-2 transition-all shadow-sm text-center font-black disabled:opacity-40 disabled:cursor-not-allowed ${
+                  side === s.id ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-transparent bg-white'
+                }`}
+              >
+                {s.name}
+                {soldOut && <OutOfStockBadge />}
+              </button>
+            )
+          })}
         </div>
 
         <SectionHeader n={5} title="סיום מתוק (פרווה)" hint="יש לבחור מנה אחת" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">
-          {DESSERTS.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setDessert((prev) => (prev === d.id ? '' : d.id))}
-              className={`group relative rounded-[3.5rem] overflow-hidden border-4 transition-all shadow-lg text-right ${
-                dessert === d.id ? 'border-[#F5A83A]' : 'border-transparent'
-              }`}
-            >
-              <div className="aspect-video overflow-hidden relative">
-                <Photo src={d.img} alt={d.name} className="w-full h-full object-cover" />
-                <div className="absolute bottom-4 right-4 px-8 py-3 rounded-2xl bg-white font-black shadow-2xl">{d.name}</div>
-              </div>
-            </button>
-          ))}
+          {DESSERTS.map((d) => {
+            const soldOut = isOutOfStock(d.name)
+            return (
+              <button
+                key={d.id}
+                type="button"
+                disabled={soldOut && dessert !== d.id}
+                onClick={() => setDessert((prev) => (prev === d.id ? '' : d.id))}
+                className={`group relative rounded-[3.5rem] overflow-hidden border-4 transition-all shadow-lg text-right disabled:cursor-not-allowed ${
+                  dessert === d.id ? 'border-[#F5A83A]' : 'border-transparent'
+                }`}
+              >
+                <div className="aspect-video overflow-hidden relative">
+                  <Photo src={d.img} alt={d.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} />
+                  {soldOut && <OutOfStockBadge className="absolute top-4 left-4" />}
+                  <div className="absolute bottom-4 right-4 px-8 py-3 rounded-2xl bg-white font-black shadow-2xl">{d.name}</div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </main>
 
@@ -270,7 +307,13 @@ export function ShabbatOrder() {
             </div>
             <div className="flex flex-col">
               <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">מארז שבת זוגי יוקרתי</span>
-              <span className="text-xl md:text-3xl font-black leading-tight">{canContinue ? 'סיכום הזמנה' : `חסר: ${missing.join(', ')}`}</span>
+              <span className="text-xl md:text-3xl font-black leading-tight">
+                {soldOutPicks.length > 0
+                  ? `אזל מהמלאי: ${soldOutPicks.map((item) => item.name).join(', ')}`
+                  : canContinue
+                    ? 'סיכום הזמנה'
+                    : `חסר: ${missing.join(', ')}`}
+              </span>
             </div>
           </div>
           <button
@@ -305,24 +348,32 @@ function QtyCard({
   choice,
   qty,
   onBump,
+  soldOut = false,
   compact = false,
 }: {
   choice: Choice
   qty: number
   onBump: (delta: number) => void
+  soldOut?: boolean
   compact?: boolean
 }) {
   return (
     <div className="group relative bg-white rounded-[3.5rem] overflow-hidden border-4 border-transparent transition-all hover:shadow-xl">
       <div className={compact ? 'aspect-video overflow-hidden relative' : 'aspect-video overflow-hidden relative'}>
-        <Photo src={choice.img} alt={choice.name} className="w-full h-full object-cover" />
+        <Photo src={choice.img} alt={choice.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} />
         {choice.allergy && (
           <span className="absolute top-4 left-4 bg-white/90 p-2 rounded-xl shadow-lg">
             <Icon icon={ALLERGY_ICON[choice.allergy]} className="text-lg" />
           </span>
         )}
+        {soldOut && <OutOfStockBadge className="absolute bottom-4 left-4" />}
         <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-white rounded-2xl shadow-2xl p-1">
-          <button type="button" onClick={() => onBump(1)} className="w-10 h-10 rounded-xl bg-[#3B151A] text-white flex items-center justify-center font-black">
+          <button
+            type="button"
+            disabled={soldOut}
+            onClick={() => onBump(1)}
+            className="w-10 h-10 rounded-xl bg-[#3B151A] text-white flex items-center justify-center font-black disabled:opacity-30 disabled:cursor-not-allowed"
+          >
             +
           </button>
           <span className="w-8 text-center font-black">{qty}</span>

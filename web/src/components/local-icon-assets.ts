@@ -17,6 +17,7 @@ export const LOCAL_ICON_PATHS = {
   'ph:pencil-simple-bold': `${PUBLIC_BASE}icons/ph-pencil-simple-bold.svg`,
   'ph:plus-bold': `${PUBLIC_BASE}icons/ph-plus-bold.svg`,
   'ph:plus-circle-bold': `${PUBLIC_BASE}icons/ph-plus-circle-bold.svg`,
+  'ph:receipt-bold': `${PUBLIC_BASE}icons/ph-receipt-bold.svg`,
   'ph:shopping-cart-bold': `${PUBLIC_BASE}icons/ph-shopping-cart-bold.svg`,
   'ph:sign-out-bold': `${PUBLIC_BASE}icons/ph-sign-out-bold.svg`,
   'ph:storefront-bold': `${PUBLIC_BASE}icons/ph-storefront-bold.svg`,

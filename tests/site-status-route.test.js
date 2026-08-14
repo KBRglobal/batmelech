@@ -32,8 +32,34 @@ test('site status defaults ordering open and no banner when settings is missing'
     const body = await response.json();
     assert.equal(response.status, 200);
     assert.equal(body.orderingOpen, true);
+    assert.equal(body.reopensOn, null);
     assert.equal(body.siteBanner, null);
     assert.deepEqual(body.outOfStockNames, []);
+  });
+});
+
+test('site status keeps a dated close shut and names the day ordering returns', async () => {
+  const repo = fakeRepository({
+    orders: [],
+    settings: { orderingOpen: false, orderingClosedUntil: '2099-01-04' },
+  });
+  await withServer(repo, async (base) => {
+    const body = await (await fetch(`${base}/api/site/status`)).json();
+    assert.equal(body.orderingOpen, false);
+    assert.equal(body.reopensOn, '2099-01-04');
+  });
+});
+
+// The whole point of the date: nobody has to remember to flip the flag back.
+test('site status reopens on its own once the reopen day has passed', async () => {
+  const repo = fakeRepository({
+    orders: [],
+    settings: { orderingOpen: false, orderingClosedUntil: '2020-01-05' },
+  });
+  await withServer(repo, async (base) => {
+    const body = await (await fetch(`${base}/api/site/status`)).json();
+    assert.equal(body.orderingOpen, true);
+    assert.equal(body.reopensOn, null);
   });
 });
 
@@ -46,6 +72,7 @@ test('site status reflects a closed store, a banner, and out-of-stock names', as
     const response = await fetch(`${base}/api/site/status`);
     const body = await response.json();
     assert.equal(body.orderingOpen, false);
+    assert.equal(body.reopensOn, null); // legacy boolean-only close
     assert.equal(body.siteBanner, '  חוזרים ביום ראשון  ');
     assert.deepEqual(body.outOfStockNames, ['מטבוחה']);
   });

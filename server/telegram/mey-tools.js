@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  orderingStatus,
   setOrderingOpen,
   setSiteBanner,
   setItemStock,
@@ -53,7 +54,9 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     name: 'get_menu_and_settings',
-    description: 'מחזיר את מבנה התפריט הנוכחי, אילו מנות מסומנות כאזל מהמלאי, האם ההזמנות פתוחות, והודעת הבאנר הנוכחית באתר.',
+    description:
+      'מחזיר את מבנה התפריט הנוכחי, אילו מנות מסומנות כאזל מהמלאי, האם ההזמנות פתוחות עכשיו, ' +
+      'ואם הן סגורות - באיזה תאריך הן נפתחות מחדש (reopensOn), והודעת הבאנר הנוכחית באתר.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
     strict: true,
   },
@@ -90,11 +93,13 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     name: 'set_ordering_open',
-    description: 'סוגרת או פותחת הזמנות חדשות באתר הלקוחות.',
+    description:
+      'סוגרת או פותחת הזמנות חדשות באתר הלקוחות. סגירה היא תמיד סגירה לשבת הקרובה בלבד - ' +
+      'ההזמנות נפתחות שוב לבד ביום ראשון, בלי שצריך לזכור לפתוח. פתיחה מחזירה את ההזמנות מיד.',
     parameters: {
       type: 'object',
       properties: {
-        open: { type: 'boolean', description: 'true = הזמנות פתוחות, false = סגורות' },
+        open: { type: 'boolean', description: 'false = לסגור לשבת הקרובה, true = לפתוח מיד' },
       },
       required: ['open'],
       additionalProperties: false,
@@ -243,8 +248,10 @@ function createMeyTools({ repository, logger = console }) {
       const settings = current.data.settings && typeof current.data.settings === 'object' ? current.data.settings : {};
       const menu = current.data.menu && typeof current.data.menu === 'object' ? current.data.menu : {};
       const outOfStock = Array.isArray(settings.out) ? settings.out.filter((v) => typeof v === 'string') : [];
+      const ordering = orderingStatus(settings);
       return {
-        orderingOpen: settings.orderingOpen !== false,
+        orderingOpen: ordering.open,
+        reopensOn: ordering.reopensOn,
         siteBanner: typeof settings.siteBanner === 'string' ? settings.siteBanner : null,
         outOfStock,
         menuOverrides: menu,
