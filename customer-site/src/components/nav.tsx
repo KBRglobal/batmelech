@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
+import { useCart } from '../cart-context'
 
 const LINKS = [
   { to: '/', label: 'בית' },
@@ -32,6 +33,25 @@ export function Nav({ active }: { active: string }) {
   )
 }
 
+export function NavCartButton() {
+  const { lines } = useCart()
+  const count = lines.reduce((n, l) => n + l.qty, 0)
+
+  return (
+    <Link
+      to="/checkout"
+      className="relative flex items-center justify-center w-11 h-11 rounded-full bg-white text-[#3B151A] shadow-xl shrink-0"
+    >
+      <Icon icon="ph:basket-fill" className="text-lg" />
+      {count > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-[#8D182C] text-white text-[10px] font-black flex items-center justify-center shadow-md">
+          {count}
+        </span>
+      )}
+    </Link>
+  )
+}
+
 export function PhoneBadge() {
   return (
     <a
@@ -48,8 +68,9 @@ export function PhoneBadge() {
 export function NavHeader({ active }: { active: string }) {
   return (
     <header className="w-full pt-8 px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="order-1 md:order-2">
+      <div className="order-1 md:order-2 flex items-center gap-3">
         <Nav active={active} />
+        <NavCartButton />
       </div>
       <div className="order-2 md:order-1">
         <PhoneBadge />
