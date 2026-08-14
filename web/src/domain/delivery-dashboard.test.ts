@@ -224,7 +224,7 @@ describe('delivery dashboard', () => {
   })
 
   it('accepts only an https public-R2 delivery proof URL', () => {
-    const proofHrefs = (deliveryProofUrl: unknown) =>
+    const proofHrefs = (deliveryProofUrl: string | undefined) =>
       buildDeliveryDashboard({
         orders: [{ id: 'proof', date: '2026-08-14', place: 'מלון', deliveryProofUrl }],
       }).groups[0]?.destinations[0]?.orders[0]?.proofPhotoHref

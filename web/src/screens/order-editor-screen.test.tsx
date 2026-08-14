@@ -1323,7 +1323,7 @@ describe('OrderEditorScreen delivery proof section', () => {
       deliveryProofAt: 1_760_000_000_000,
       deliveryProofBy: 'שליח ראשי',
       deliveredAt: 1_760_000_100_000,
-      courierCheckinState: 'delayed',
+      courierCheckinState: 'delayed' as const,
       courierCheckinAt: 1_759_999_000_000,
       courierEtaMinutes: 20,
       courierNote: 'תנועה כבדה',
