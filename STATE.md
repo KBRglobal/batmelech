@@ -12,12 +12,27 @@ cross-checked against `DEFAULT_SETTINGS_CATALOG`, which already matched almost e
 (the customer-site's hardcoded numbers were what was wrong, not the admin defaults — see
 Gotchas, customer-site isn't live yet so that rewrite is lower priority).
 
-**Queued, not started:** move all images to Cloudflare R2 as a CDN (Moshe has Cloudflare
-browser + token access, expects this to "work perfectly"), show R2 storage usage vs the 25GB
-tier on some screen. AI allergy-detection layer reading the real menu, low-frequency Lin
-usage (she has her own OpenAI key already, ~$100/yr, doesn't log in daily). Telegram
-notification to Lin on new order. None of these started yet — surfaced mid-session, not
-acted on to avoid fragmenting the menu-editing work.
+**R2 infra done, upload pipeline NOT built yet:**
+- Bucket `batmelech` created on Cloudflare (account `3151f4ff0858523911e2840f214b123c`),
+  public managed domain `https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev`. No custom
+  domain (`cdn.batmelech.ae`) — batmelech.ae isn't on Cloudflare DNS at all (zone lookup
+  empty), moving nameservers needs explicit approval first, didn't touch it.
+- Scoped API token `batmelech-r2` (Object Read & Write, bucket-scoped only, not the shared
+  global key) — creds in `~/Documents/creds/batmelech-r2.txt`, also documented in
+  `cloudflare.json`. Verified PUT/GET/DELETE working via `@aws-sdk/client-s3`.
+- Mirrored as Railway env vars on the `app` service: `R2_ACCOUNT_ID`, `R2_ENDPOINT`,
+  `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`.
+  `skip_deploys` was used — nothing in the app reads these yet, they're just staged.
+- **Next actual work, not done:** no upload route, no image field on catalog items, no
+  admin UI to pick/replace a dish photo, no R2-usage-vs-25GB display anywhere. This was
+  infra provisioning only.
+
+**Also queued, fully unstarted:** full per-dish CMS fields (description, ingredient
+tags/allergens, on-sale flag, hot/cold, in-stock toggle — the image field belongs here too,
+same schema change). AI allergy-detection layer reading the real menu (Lin has her own
+OpenAI key already, ~$100/yr, logs in rarely). Telegram notification to Lin on new order. An
+admin screen to browse/search/resend past invoices (currently zero invoice UI anywhere in
+the panel — invoices only exist as an automatic background email).
 
 ## Now (in progress) — disguised staff login, replacing Basic Auth
 Moshe's idea, built across one session, third deploy about to go out. The staff panel no longer
