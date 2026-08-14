@@ -1116,6 +1116,32 @@ describe('delivery-confirmation fields through an admin edit', () => {
     expect(Object.keys(serialized).filter((key) => key.startsWith('plata'))).toEqual([])
   })
 
+  it('lets a hotplate update that landed mid-edit survive the admin save', () => {
+    // Lin opens the order, מיי (or the plata section) then marks the plate collected. Saving
+    // the order afterwards must not write the draft's stale 'awaitingPickup' back over it.
+    const menu = buildOrderEditorMenu(emptyStore)
+    const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
+    const movedOn: LegacyOrder = {
+      ...deliveryOwnedOrder,
+      plataStatus: 'collected',
+      plataPickupNote: 'נאספה מהקבלה',
+      plataCollectedAt: 1_760_000_900_000,
+    }
+
+    const nextState = applyOrderDraftToStore(
+      { orders: [movedOn] },
+      { ...draft, notes: 'הערה חדשה' },
+      { mode: 'edit', orderId: 'order-1' },
+    )
+
+    expect(nextState.orders[0]).toMatchObject({
+      notes: 'הערה חדשה',
+      plataStatus: 'collected',
+      plataPickupNote: 'נאספה מהקבלה',
+      plataCollectedAt: 1_760_000_900_000,
+    })
+  })
+
   it('preserves the proof URL even if the serialized draft carries no delivery fields at all', () => {
     // The editor must never own these fields: the merge in applyOrderDraftToStore is what
     // keeps them, so the round trip has to survive a draft that dropped them entirely.
