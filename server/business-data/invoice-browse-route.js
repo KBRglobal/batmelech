@@ -21,7 +21,7 @@ const {
 const { renderInvoicePdf } = require('./invoice-pdf');
 const { sendInvoiceEmail: defaultSendInvoiceEmail } = require('./send-invoice-email');
 const { issueInvoice, dubaiDateString, DOWNLOAD_BASE_URL } = require('./issue-invoice');
-const { orderInvoiceFields } = require('./order-invoice-fields');
+const { invoiceSettings, orderInvoiceFields } = require('./invoice-inputs');
 
 const INVOICE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 const MAX_QUERY_LENGTH = 120;
