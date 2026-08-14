@@ -17,6 +17,10 @@ const PHONE_CODES = [
 const CHECKOUT_HERO_IMAGE =
   'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg'
 
+function dubaiToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date())
+}
+
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
   const { orderingOpen } = useSiteStatus()
@@ -41,7 +45,13 @@ export function Checkout() {
     )
   }
 
-  const canSubmit = orderingOpen && customer.name.trim() && customer.phone.trim() && (isPickup || customer.address.trim())
+  const canSubmit =
+    orderingOpen &&
+    customer.name.trim() &&
+    customer.phone.trim() &&
+    customer.date.trim() &&
+    customer.time.trim() &&
+    (isPickup || customer.address.trim())
 
   const submitOrderToKitchen = () => {
     fetch('/api/site/orders', {
@@ -175,6 +185,23 @@ export function Checkout() {
                 />
               </div>
             </Field>
+            <Field label={isPickup ? 'תאריך איסוף' : 'תאריך משלוח'}>
+              <input
+                type="date"
+                value={customer.date}
+                min={dubaiToday()}
+                onChange={(e) => setCustomer({ date: e.target.value })}
+                className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+              />
+            </Field>
+            <Field label={isPickup ? 'שעת איסוף' : 'שעת משלוח'}>
+              <input
+                type="time"
+                value={customer.time}
+                onChange={(e) => setCustomer({ time: e.target.value })}
+                className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+              />
+            </Field>
             <div className="md:col-span-2">
               <Field label="אימייל (לקבלת חשבונית)">
                 <input
@@ -218,6 +245,9 @@ export function Checkout() {
           <p className="font-bold text-[#3B151A]/70">
             לאחר לחיצה על "אישור ושליחה", ההזמנה תיפתח כהודעת וואטסאפ מוכנה אל בת מלך לאישור סופי.
           </p>
+          <p className="font-bold text-[#3B151A]/70">
+            אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.
+          </p>
         </section>
       </main>
 
@@ -246,8 +276,8 @@ export function Checkout() {
               {!orderingOpen
                 ? 'האתר לא מקבל הזמנות כרגע'
                 : isPickup
-                  ? 'מלאו שם וטלפון כדי לשלוח'
-                  : 'מלאו שם, טלפון וכתובת כדי לשלוח'}
+                  ? 'מלאו שם, טלפון, תאריך ושעה כדי לשלוח'
+                  : 'מלאו שם, טלפון, תאריך, שעה וכתובת כדי לשלוח'}
             </p>
           )}
         </div>

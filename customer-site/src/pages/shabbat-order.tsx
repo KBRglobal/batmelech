@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { Link, useNavigate } from 'react-router'
 import { PageHero } from '../components/page-hero'
+import { CurrencyNote } from '../components/currency-note'
 import { Photo } from '../components/photo'
 import { useCart } from '../cart-context'
 
@@ -150,9 +151,12 @@ export function ShabbatOrder() {
       />
 
       <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
-        <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
-          ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
-        </p>
+        <div>
+          <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
+            ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
+          </p>
+          <CurrencyNote className="mt-6" />
+        </div>
         <Link
           to="/shabbat-extras"
           className="block max-w-2xl mx-auto text-center text-[#8D182C] font-black underline text-sm"

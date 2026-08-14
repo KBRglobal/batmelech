@@ -29,6 +29,8 @@ const OrderSubmissionSchema = z.object({
       address: z.string().trim().max(1_000).optional().default(''),
       notes: z.string().trim().max(2_000).optional(),
       fulfillment: z.enum(['delivery', 'pickup']).optional().default('delivery'),
+      date: z.union([z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/u), z.literal('')]).optional().default(''),
+      time: z.union([z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/u), z.literal('')]).optional().default(''),
     })
     .refine((customer) => customer.fulfillment === 'pickup' || customer.address.length > 0, {
       message: 'address is required for delivery orders',
@@ -61,7 +63,8 @@ function buildLegacyOrder(submission, now) {
   }
   return {
     id,
-    date: dubaiDateString(now),
+    date: submission.customer.date || dubaiDateString(now),
+    time: submission.customer.time,
     name: submission.customer.name,
     phone: submission.customer.phone,
     email: submission.customer.email || undefined,
