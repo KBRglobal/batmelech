@@ -43,8 +43,14 @@ function createTelegramWebhookRouter({
   const fromOrdersChat = (chatId) => String(chatId) === String(ordersChatId);
   const say = (text) => sendTelegramMessage({ botToken, chatId: ordersChatId, text, logger });
 
-  async function answerText(text) {
-    const replyText = await agent.reply(text);
+  const senderOf = (message) => {
+    const from = message && message.from;
+    if (!from || typeof from !== 'object') return undefined;
+    return { username: from.username, firstName: from.first_name };
+  };
+
+  async function answerText(text, sender) {
+    const replyText = await agent.reply(text, sender);
     await say(replyText);
   }
 
@@ -65,7 +71,7 @@ function createTelegramWebhookRouter({
       return;
     }
     // Echoing what was heard is the only way Felix can catch a misheard word.
-    const replyText = await agent.reply(transcript.trim());
+    const replyText = await agent.reply(transcript.trim(), senderOf(message));
     await say(`🎤 "${transcript.trim()}"\n\n${replyText}`);
   }
 
@@ -110,7 +116,7 @@ function createTelegramWebhookRouter({
 
     const text = typeof message.text === 'string' ? message.text : '';
     if (!text.trim()) return;
-    await answerText(text);
+    await answerText(text, senderOf(message));
   }
 
   const router = express.Router();

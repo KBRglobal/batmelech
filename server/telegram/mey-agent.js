@@ -37,7 +37,7 @@ function createMeyAgent({
   const tools = createMeyTools({ repository, logger });
 
   return {
-    async reply(userMessage) {
+    async reply(userMessage, sender) {
       const model = resolveModel();
       const selectedClient = resolveClient();
       if (!model || !selectedClient) {
@@ -48,9 +48,17 @@ function createMeyAgent({
         return FALLBACK_REPLY;
       }
 
+      // The sender line lets the persona apply its per-person register
+      // (Lin / Felix / the technical boss). Absent sender -> generic.
+      const senderUsername = sender && typeof sender.username === 'string' ? sender.username.trim() : '';
+      const senderName = sender && typeof sender.firstName === 'string' ? sender.firstName.trim() : '';
+      const senderLine = senderUsername || senderName
+        ? `[השולח: ${senderName || 'ללא שם'}${senderUsername ? ` @${senderUsername}` : ''}]\n`
+        : '';
+
       const input = [
         { role: 'system', content: MEY_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage.trim() },
+        { role: 'user', content: `${senderLine}${userMessage.trim()}` },
       ];
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
