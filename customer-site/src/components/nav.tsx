@@ -6,7 +6,7 @@ const LINKS = [
   { to: '/', label: 'בית' },
   { to: '/weekdays', label: 'יום חול' },
   { to: '/shabbat-order', label: 'שבת קודש' },
-  { to: '/shabbat-order#free-items', label: 'הזמנה חופשית' },
+  { to: '/shabbat-order#free-items', label: 'חיזוקים לסופ״ש' },
   { to: '/story', label: 'עלינו' },
   { to: '/events', label: 'אירועים' },
   { to: '/gallery', label: 'גלריה' },

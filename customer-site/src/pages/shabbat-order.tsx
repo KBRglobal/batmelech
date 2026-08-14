@@ -272,7 +272,7 @@ export function ShabbatOrder() {
           <section id="free-items" className="space-y-10 scroll-mt-8">
             <div className="flex items-center gap-4">
               <Icon icon="ph:star-fill" className="text-4xl text-[#F5A83A]" />
-              <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">פריטים בודדים להזמנה חופשית</h2>
+              <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">חיזוקים לסופ״ש</h2>
             </div>
             <p className="text-[#3B151A]/60 font-bold text-lg -mt-4">
               לא רוצים מארז שבת שלם? כל פריט כאן נוסף לסל בנפרד, בלי שום התחייבות למארז.
