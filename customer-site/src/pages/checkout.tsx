@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
+import { CurrencyNote } from '../components/currency-note'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
 import { useCart } from '../cart-context'
@@ -126,6 +127,7 @@ export function Checkout() {
               <span>${total.toFixed(2).replace(/\.00$/, '')}</span>
             </div>
           </div>
+          <CurrencyNote className="mt-6" />
         </section>
 
         <section className="space-y-8">

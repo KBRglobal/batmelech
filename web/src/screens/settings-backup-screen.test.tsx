@@ -70,7 +70,7 @@ describe('SettingsBackupScreen', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
-  it('shows all seven safe sections, real status, and no destructive whole-store reset', () => {
+  it('shows all safe sections, real status, and no destructive whole-store reset', () => {
     mockedUseStore.mockReturnValue(queryResult({
       store: { orders: [{ id: 'real-1' }, { id: 'real-2' }], lastBackup: Date.UTC(2026, 7, 11) },
     }))
@@ -80,16 +80,47 @@ describe('SettingsBackupScreen', () => {
       'תקרת עומס',
       'מחירון ותפריט',
       'תשלומים וקישורים',
+      'מצב האתר',
       'אזל מהמלאי',
       'גיבוי ושחזור',
-      'נתוני דוגמה',
       'מצב נוכחי',
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy()
     expect(screen.getByText(/2 הזמנות שמורות/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'עריכת תפריט ומחירים' }).getAttribute('href')).toBe(APP_ROUTES.menuSettings)
     expect(screen.getByRole('link', { name: 'מתכונים ומצרכים' }).getAttribute('href')).toBe(APP_ROUTES.recipeSettings)
     expect(screen.queryByRole('button', { name: /איפוס כל הנתונים/ })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'נתוני דוגמה' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'מחיקת נתוני הדוגמה' })).toBeNull()
+  })
+
+  it('keeps the demo-data block reachable only behind the dev flag, still disabled', () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [] } }))
+    renderSettings({ search: '?dev=1' })
+
+    expect(screen.getByRole('heading', { name: 'נתוני דוגמה' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'מחיקת נתוני הדוגמה' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'טעינת נתוני הדוגמה' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('edits ordering-open and the site banner through the same settings save', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [], settings: { orderingOpen: false, siteBanner: 'ישן' } } as LegacyStore,
+    }))
+    renderSettings({ onSave })
+
+    const toggle = screen.getByRole('switch', { name: 'האתר פתוח להזמנות' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    await user.click(toggle)
+    await user.clear(screen.getByLabelText('הודעה לראש האתר'))
+    await user.type(screen.getByLabelText('הודעה לראש האתר'), 'חוזרים ביום ראשון')
+    await user.click(screen.getByRole('button', { name: 'שמירת ההגדרות' }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    const saved = onSave.mock.calls[0]![0].nextStore.settings
+    expect(saved.orderingOpen).toBe(true)
+    expect(saved.siteBanner).toBe('חוזרים ביום ראשון')
   })
 
   it('copies an exact complete JSON export without mutating the store', async () => {
