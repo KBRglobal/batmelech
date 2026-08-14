@@ -27,6 +27,18 @@ Gotchas, customer-site isn't live yet so that rewrite is lower priority).
   admin UI to pick/replace a dish photo, no R2-usage-vs-25GB display anywhere. This was
   infra provisioning only.
 
+**Telegram bot created, notification code NOT written yet:**
+- Bot `@batmelech_orders_bot` created via BotFather (Moshe's real Telegram account, in
+  browser). Token in `~/Documents/creds/batmelech-telegram.txt`, mirrored as Railway env
+  var `TELEGRAM_BOT_TOKEN`.
+- **Blocked on a real human step, same shape as BotFather itself:** a bot can't message a
+  user who hasn't messaged it first. Lin needs to open t.me/batmelech_orders_bot and send
+  it anything — Moshe has that link to forward, hasn't yet as of this checkpoint. Once she
+  has, fetch her chat_id via `GET https://api.telegram.org/bot<TOKEN>/getUpdates`.
+- No code sends anything yet — need to wire a Telegram send call into wherever a new order
+  actually lands (`server/site-order-route.js` for site orders; check whether admin-created
+  orders need the same hook).
+
 **Also queued, fully unstarted:** full per-dish CMS fields (description, ingredient
 tags/allergens, on-sale flag, hot/cold, in-stock toggle — the image field belongs here too,
 same schema change). AI allergy-detection layer reading the real menu (Lin has her own
