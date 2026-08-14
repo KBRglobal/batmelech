@@ -267,6 +267,103 @@ describe('OrdersScreen', () => {
     expect(screen.getByRole('button', { name: 'וואטסאפ לא זמין' })).toBeTruthy()
   })
 
+  it('offers a payment request only for unpaid orders and a review request only for delivered ones', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            {
+              id: 'unpaid',
+              date: '2099-08-14',
+              name: 'שרה',
+              phone: '0501234567',
+              total: '120.50',
+              deposit: '40',
+            },
+            { id: 'paid', date: '2099-08-14', name: 'רות', phone: '0501111111', total: '80', paid: 'כן' },
+            {
+              id: 'delivered',
+              date: '2099-08-15',
+              name: 'רחל',
+              phone: '0502222222',
+              total: '90',
+              paid: 'כן',
+              status: 'נמסרה',
+            },
+          ],
+          settings: {
+            paymentRequestDetails: 'ביט 050-1234567',
+            googleReviewUrl: 'https://g.page/r/batmelech',
+          },
+        },
+      }),
+    )
+
+    renderOrders()
+
+    const depositLinks = screen.getAllByRole('link', { name: 'בקשת תשלום' })
+    expect(depositLinks).toHaveLength(1)
+    const depositUrl = new URL(depositLinks[0]!.getAttribute('href')!)
+    expect(depositUrl.origin + depositUrl.pathname).toBe('https://wa.me/972501234567')
+    expect(depositUrl.searchParams.get('text')).toContain('נשאר להסדיר תשלום של $40.00.')
+    expect(depositUrl.searchParams.get('text')).toContain('אפשר להעביר כך: ביט 050-1234567')
+
+    const reviewLinks = screen.getAllByRole('link', { name: 'בקשת ביקורת' })
+    expect(reviewLinks).toHaveLength(1)
+    expect(reviewLinks[0]!.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/972502222222\?text=/)
+    expect(
+      new URL(reviewLinks[0]!.getAttribute('href')!).searchParams.get('text'),
+    ).toContain('https://g.page/r/batmelech')
+  })
+
+  it('hides the review request without a saved link and flags missing payment details', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'unpaid', date: '2099-08-14', name: 'שרה', phone: '0501234567', total: '120.50' },
+            {
+              id: 'delivered',
+              date: '2099-08-15',
+              name: 'רחל',
+              phone: '0502222222',
+              paid: 'כן',
+              status: 'נמסרה',
+            },
+          ],
+        },
+      }),
+    )
+
+    renderOrders()
+
+    expect(screen.queryByRole('link', { name: 'בקשת ביקורת' })).toBeNull()
+    const depositLink = screen.getByRole('link', { name: 'בקשת תשלום' })
+    expect(depositLink.getAttribute('title')).toContain('כדאי למלא אותם בהגדרות')
+    expect(new URL(depositLink.getAttribute('href')!).searchParams.get('text')).toContain(
+      'אפשר להעביר כך: [פרטי תשלום]',
+    )
+  })
+
+  it('never drafts outbound messages for an order the dashboard already refuses to send', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'bad-money', date: '2099-08-14', name: 'סכום שבור', phone: '0501234567', total: '1,2,3' },
+            { id: 'no-phone', date: '2099-08-14', name: 'בלי טלפון', total: '50' },
+          ],
+          settings: { googleReviewUrl: 'https://g.page/r/batmelech' },
+        },
+      }),
+    )
+
+    renderOrders()
+
+    expect(screen.queryByRole('link', { name: 'בקשת תשלום' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'בקשת ביקורת' })).toBeNull()
+  })
+
   it('blocks every ambiguous edit and bon route when legacy IDs collide', () => {
     mockedUseStore.mockReturnValue(
       queryResult({

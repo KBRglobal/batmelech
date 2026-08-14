@@ -19,6 +19,9 @@ const {
   revertDeliveryProof,
   setPendingProof,
   setCourierLocation,
+  setPlataOnOrder,
+  setPlataStatus,
+  setPlataDigestSent,
 } = require('../server/business-actions');
 
 function fakeRepository(initialState) {
@@ -460,4 +463,136 @@ test('setOrderingOpen reports failure when every save attempt is rejected', asyn
   };
   const result = await setOrderingOpen(repo, false);
   assert.equal(result.ok, false);
+});
+
+// --- plata (hotplate) rental ---------------------------------------------------
+
+function plataRepository(order = {}) {
+  return fakeRepository({
+    orders: [{ id: 'p1', name: 'רותי', hotelName: 'Atlantis', date: '2026-08-14', ...order }],
+    settings: {},
+  });
+}
+
+test('setPlataOnOrder marks hotplates out with an order and stores a canonical deposit', async () => {
+  const repo = plataRepository();
+  const result = await setPlataOnOrder(repo, 'p1', { count: 2, deposit: '50' });
+  assert.equal(result.ok, true);
+
+  const order = orderById(repo, 'p1');
+  assert.equal(order.plataCount, 2);
+  assert.equal(order.plataStatus, 'withCustomer');
+  assert.equal(order.plataDeposit, '50.00');
+  assert.equal(order.name, 'רותי', 'the rest of the order is untouched');
+});
+
+test('setPlataOnOrder accepts a numeric deposit and rejects a nonsense one', async () => {
+  const repo = plataRepository();
+  assert.equal((await setPlataOnOrder(repo, 'p1', { count: 1, deposit: 37.5 })).ok, true);
+  assert.equal(orderById(repo, 'p1').plataDeposit, '37.50');
+
+  const bad = await setPlataOnOrder(repo, 'p1', { count: 1, deposit: 'חמישים' });
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /deposit/);
+  assert.equal(orderById(repo, 'p1').plataDeposit, '37.50', 'the stored deposit survives a rejected write');
+});
+
+test('setPlataOnOrder rejects a count that is not a whole number in range', async () => {
+  const repo = plataRepository();
+  for (const count of [-1, 2.5, 21, 'two', undefined]) {
+    const result = await setPlataOnOrder(repo, 'p1', { count });
+    assert.equal(result.ok, false, `count ${String(count)} must be rejected`);
+  }
+  assert.equal(repo._saves(), 0);
+});
+
+test('setPlataOnOrder with count 0 clears every plata field', async () => {
+  const repo = plataRepository({
+    plataCount: 2,
+    plataDeposit: '50.00',
+    plataStatus: 'collected',
+    plataPickupNote: 'בקבלה',
+    plataCollectedAt: 1_760_000_000_000,
+    plataDepositReturnedAt: 1_760_000_100_000,
+  });
+  const result = await setPlataOnOrder(repo, 'p1', { count: 0 });
+  assert.equal(result.ok, true);
+
+  const order = orderById(repo, 'p1');
+  for (const field of [
+    'plataCount', 'plataDeposit', 'plataStatus', 'plataPickupNote',
+    'plataCollectedAt', 'plataDepositReturnedAt',
+  ]) {
+    assert.equal(field in order, false, `${field} must be gone`);
+  }
+  assert.equal(order.name, 'רותי');
+});
+
+test('setPlataOnOrder keeps a status that already moved past withCustomer', async () => {
+  const repo = plataRepository({ plataCount: 1, plataStatus: 'awaitingPickup', plataPickupNote: 'בקבלה' });
+  const result = await setPlataOnOrder(repo, 'p1', { count: 2, deposit: '80' });
+  assert.equal(result.ok, true);
+
+  const order = orderById(repo, 'p1');
+  assert.equal(order.plataCount, 2);
+  assert.equal(order.plataStatus, 'awaitingPickup');
+  assert.equal(order.plataPickupNote, 'בקבלה');
+});
+
+test('setPlataStatus walks the lifecycle and stamps each step once', async () => {
+  const repo = plataRepository({ plataCount: 1, plataStatus: 'withCustomer' });
+
+  const waiting = await setPlataStatus(repo, 'p1', 'awaitingPickup', { note: '  בקבלה  ' });
+  assert.equal(waiting.ok, true);
+  assert.equal(orderById(repo, 'p1').plataStatus, 'awaitingPickup');
+  assert.equal(orderById(repo, 'p1').plataPickupNote, 'בקבלה');
+  assert.equal('plataCollectedAt' in orderById(repo, 'p1'), false);
+
+  assert.equal((await setPlataStatus(repo, 'p1', 'collected')).ok, true);
+  const collectedAt = orderById(repo, 'p1').plataCollectedAt;
+  assert.equal(typeof collectedAt, 'number');
+  assert.equal('plataDepositReturnedAt' in orderById(repo, 'p1'), false);
+
+  assert.equal((await setPlataStatus(repo, 'p1', 'collected')).ok, true);
+  assert.equal(orderById(repo, 'p1').plataCollectedAt, collectedAt, 'the first collection time stands');
+
+  assert.equal((await setPlataStatus(repo, 'p1', 'depositReturned')).ok, true);
+  const order = orderById(repo, 'p1');
+  assert.equal(order.plataStatus, 'depositReturned');
+  assert.equal(typeof order.plataDepositReturnedAt, 'number');
+  assert.equal(order.plataCollectedAt, collectedAt);
+});
+
+test('setPlataStatus rejects an unknown status and truncates a long note', async () => {
+  const repo = plataRepository({ plataCount: 1, plataStatus: 'withCustomer' });
+
+  const bad = await setPlataStatus(repo, 'p1', 'returnedMaybe');
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /status must be one of/);
+  assert.equal(repo._saves(), 0);
+
+  await setPlataStatus(repo, 'p1', 'awaitingPickup', { note: 'א'.repeat(400) });
+  assert.equal(orderById(repo, 'p1').plataPickupNote.length, 300);
+});
+
+test('setPlataStatus reports an order that is not there', async () => {
+  const repo = plataRepository();
+  const result = await setPlataStatus(repo, 'nope', 'collected');
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'order not found');
+});
+
+test('setPlataDigestSent claims one motzei-Shabbat digest per day', async () => {
+  const repo = fakeRepository({ orders: [], settings: {} });
+
+  const first = await setPlataDigestSent(repo, '2026-08-15');
+  assert.deepEqual(first, { ok: true, claimed: true });
+  assert.equal(repo._current().settings.meyPlataDigestSentFor, '2026-08-15');
+
+  const second = await setPlataDigestSent(repo, '2026-08-15');
+  assert.deepEqual(second, { ok: true, claimed: false });
+  assert.equal(repo._saves(), 1, 'a lost claim writes nothing');
+
+  const nextWeek = await setPlataDigestSent(repo, '2026-08-22');
+  assert.deepEqual(nextWeek, { ok: true, claimed: true });
 });

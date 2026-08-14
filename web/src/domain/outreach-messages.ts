@@ -148,7 +148,6 @@ export function summarizeOrderItems(
   pushItem(items, 'עריכת שולחן', quantity(order.aricha))
 
   return items
-    .slice()
     .sort((left, right) => right.quantity - left.quantity)
     .slice(0, Math.max(0, limit))
 }

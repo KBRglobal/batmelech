@@ -219,8 +219,10 @@ export function summarizeOutstandingPlata(store: Readonly<LegacyStore>): PlataOu
     if (status === 'awaitingPickup') awaitingPickup += view.count
     if (status === 'collected') collected += view.count
 
-    if (view.deposit === '') continue
-    const minorUnits = plataDepositMinorUnits(view.deposit)
+    // The raw field, not the sanitised view: a deposit stored as something we cannot read is
+    // money nobody can account for, and it has to say so rather than count as zero.
+    if (order.plataDeposit === undefined || order.plataDeposit === null || order.plataDeposit === '') continue
+    const minorUnits = plataDepositMinorUnits(order.plataDeposit)
     if (minorUnits === null) {
       depositComplete = false
       continue
