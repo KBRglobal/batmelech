@@ -1,29 +1,51 @@
-# STATE — batmelech (updated: 2026-08-14 15:50)
+# STATE — batmelech (updated: 2026-08-14 16:45)
 
-## Now — Felix delivery-coordination feature for מיי (queued next, not started)
-Felix is Lin's husband — he's the one actually doing Shabbat deliveries himself until real
-drivers exist. Moshe's framing: Felix should have מיי as a real always-on assistant for
-delivery logistics specifically, since on-time delivery is the highest-stakes part of the
-business. Scope, per Moshe (2026-08-14):
-- **Proactive reminders** — מיי currently only replies to incoming messages (`store: false`,
-  no scheduling, `server/telegram/mey-agent.js`). This needs new always-running infra: a
-  periodic check of upcoming orders that decides when to nudge Felix (ties to the new
-  checkout/order date+time fields just shipped below — finally gives a real timestamp to key
-  reminders off).
-- **Route/destination guidance** — hotel name + address already structured on orders (order
-  editor already has hotel search w/ map link), so this is mostly a matter of surfacing it
-  proactively, not new data modeling.
-- **"Are you on the way?" check-ins** — needs Felix's replies to resolve back to the right
-  order even though מיי has zero conversation memory per message. Needs a small piece of
-  state (e.g. "awaiting confirmation for order X" on the order itself), not a full chat log.
-- **Photo proof-of-delivery** — Felix photographs the bag at drop-off, מיי stores it against
-  the order. R2 bucket already provisioned (`~/Documents/creds/batmelech-r2.txt`,
-  `R2_ACCESS_KEY_ID` etc. already on Railway) but nothing uploads to it yet — this is the
-  first real use case. Needs the Telegram webhook to handle photo messages (currently
-  text-only) and an admin-side place to see the photo per order.
-Not yet decided: exact reminder trigger timing, and whether Felix talks to מיי in the existing
-"הזמנות" group or needs his own channel — default plan is the existing group (reuses working,
-tested infra) unless it gets noisy and Moshe asks to split it.
+## Now — Felix delivery coordination SHIPPED (2026-08-14, deployed + live-verified)
+Felix (Lin's husband, does all Friday deliveries himself) now has מיי as his delivery
+dispatcher. Designed with Opus, built by 6 parallel agents + main-thread integration, merged
+`f6ec5d0`, deployed, webhook live-verified (synthetic update → 200, clean logs). What shipped:
+- **Proactive scheduler** (`server/telegram/delivery-scheduler.js`, in-process setInterval,
+  60s tick, Dubai-timezone): morning digest at 08:00 (deliveries in suggested ROUTE order +
+  multi-stop Google Maps link), lead reminder 90min before each delivery (grouped by
+  destination), check-in prompt 40min before (inline keyboard: בדרך/מגיע בזמן/מתעכב), late
+  escalation 15min past. Idempotency: claim-before-send timestamp markers ON the order
+  (meyLeadNudgeAt etc.) via the optimistic-concurrency save — restart-safe, never
+  double-sends (a crash between claim and send DROPS one message by design, never doubles).
+  Kill switch: Railway env `MEY_DELIVERY_REMINDERS` (currently `on`). Scheduler messages are
+  deterministic Hebrew templates (`delivery-messages.js`), never through agent.reply().
+- **Inline-keyboard callbacks** (`callback-handler.js`): callback_data `d|<action>|<token>`
+  (8-hex meyToken per order — order IDs exceed Telegram's 64-byte cap). מתעכב triggers caring
+  delay-advice + offer to DRAFT a customer message (draft-only — the never-message-customers
+  boundary is unchanged and restated in the persona).
+- **Voice**: Whisper transcription (he), transcript echoed back (`🎤 "..."` + reply) so
+  drive-time mis-transcriptions are visible. `transcribe-voice.js`.
+- **Photo proof-of-delivery**: upload to R2 first (`r2-storage.js`, @aws-sdk/client-s3, key
+  `proof/<date>/<orderId>-<ts>-<rand>.jpg` — random suffix because the bucket is public),
+  then 6-rule order resolution (reply-to > caption-name > sole-במשלוח > sole-awaiting-reply >
+  sole-remaining > ask-with-buttons via settings.meyPendingProof). Auto-advances to נמסרה
+  with one-tap undo restoring exact prior status (`statusBeforeProof`).
+- **Live/one-shot location** captured to `settings.meyCourierLocation` (display only).
+- **מיי tools**: +get_delivery_day (read), +set_delivery_checkin (narrow write: checkin
+  state/ETA/note only) — total 9 tools. Persona: Felix is "המלך שלה" for deliveries; always
+  concrete (name+hotel+time+nav link); extracts ETA from Waze phrases; search-first rules.
+- **Admin delivery command center** (`deliveries-screen.tsx`): numbered suggested route order
+  (`route-order.ts` — time-first, nearest-neighbor tie-break via hotel coords, NO external
+  API; researched VROOM/OR-Tools, rejected as fleet-scale overkill), progress strip
+  (delivered X/Y, current, next), full-route nav button (plain Google Maps /dir/ URL, no
+  key), check-in badges, proof-photo links; read-only proof Section in order editor.
+- **Customer checkout hotel search**: existing UAE-bounded Nominatim route
+  (`server/hotels/hotel-search-route.js`) now mounted PUBLICLY (before decoy gate, has own
+  rate limit) — checkout offers מלון (live search) / כתובת אחרת toggle; site orders now carry
+  hotelName/hotelAddress/hotelLatitude/hotelLongitude/hotelProviderId (UAE-bounds validated)
+  — feeds route ordering automatically.
+- All new state = optional fields in the bm_state JSON blob, zero migration. **HARD RULE
+  (enforced by test): the mey*/courier*/deliveryProof* fields must never be added to
+  OrderDraft/serializeOrderDraft** — their absence from the draft is what preserves them
+  through admin edits.
+Verified: 367 server + 581 web tests green, both builds, deploy SUCCESS, webhook 200.
+**Not yet real-world-tested: an actual Friday.** First live Friday will reveal noise level —
+if the group gets too chatty for Lin, split Felix into his own chat (chatId is a constructor
+arg everywhere, config-only change).
 
 ## Recently done (2026-08-14) — full site gap audit + fix batch
 Moshe asked what Lin needs to be "perfect." He'd separately asked Lin the same question via
