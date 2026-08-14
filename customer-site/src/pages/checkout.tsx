@@ -1,14 +1,19 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
 import { CurrencyNote } from '../components/currency-note'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
-import { useCart } from '../cart-context'
+import { useCart, type SelectedHotel } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
-import { buildOrderMessage, waLink } from '../whatsapp'
+import { buildOrderMessage, selectedHotel, waLink } from '../whatsapp'
 
 const DELIVERY_FEE = 15
+const HOTEL_SEARCH_DEBOUNCE_MS = 300
+const HOTEL_QUERY_MIN_LENGTH = 2
+const HOTEL_QUERY_MAX_LENGTH = 100
+const INPUT_CLASS =
+  'w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold'
 const PHONE_CODES = [
   { code: '+971', label: 'איחוד האמירויות' },
   { code: '+972', label: 'ישראל' },
@@ -46,26 +51,50 @@ export function Checkout() {
     )
   }
 
+  const hotel = selectedHotel(customer)
+  const isHotelMode = !isPickup && customer.addressMode === 'hotel'
+
   const canSubmit =
     orderingOpen &&
     customer.name.trim() &&
     customer.phone.trim() &&
     customer.date.trim() &&
     customer.time.trim() &&
-    (isPickup || customer.address.trim())
+    (isPickup || (isHotelMode ? hotel !== null : customer.address.trim()))
 
   const submitOrderToKitchen = () => {
     fetch('/api/site/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customer: { ...customer, phone: `${customer.phoneCode}${customer.phone}` },
+        customer: {
+          ...customer,
+          phone: `${customer.phoneCode}${customer.phone}`,
+          // Flat fields, all five together or none — that is what the order
+          // route accepts, and what the kitchen's delivery routing reads.
+          ...(hotel
+            ? {
+                hotelName: hotel.name,
+                hotelAddress: hotel.fullAddress,
+                hotelLatitude: hotel.latitude,
+                hotelLongitude: hotel.longitude,
+                hotelProviderId: hotel.id,
+              }
+            : {}),
+        },
         lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
         total,
       }),
     }).catch(() => {
       // Best-effort — the WhatsApp message is the order of record either way.
     })
+  }
+
+  // Address means different things per mode (free address vs room number), so
+  // switching starts that field clean.
+  const chooseAddressMode = (addressMode: 'hotel' | 'free') => {
+    if (customer.addressMode === addressMode) return
+    setCustomer({ addressMode, address: '', hotel: null })
   }
 
   return (
@@ -217,16 +246,61 @@ export function Checkout() {
               </Field>
             </div>
             {!isPickup && (
-              <div className="md:col-span-2">
-                <Field label="כתובת מלאה (מלון / דירה)">
-                  <input
-                    type="text"
-                    value={customer.address}
-                    onChange={(e) => setCustomer({ address: e.target.value })}
-                    placeholder="שם המלון, מספר חדר, אזור..."
-                    className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
-                  />
+              <div className="md:col-span-2 space-y-6">
+                <Field label="לאן מגיע המשלוח">
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => chooseAddressMode('hotel')}
+                      className={`p-4 rounded-2xl border-2 font-black text-center transition-all ${
+                        isHotelMode ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
+                      }`}
+                    >
+                      מלון
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => chooseAddressMode('free')}
+                      className={`p-4 rounded-2xl border-2 font-black text-center transition-all ${
+                        !isHotelMode ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
+                      }`}
+                    >
+                      כתובת אחרת
+                    </button>
+                  </div>
                 </Field>
+                {isHotelMode ? (
+                  <>
+                    <Field label="שם המלון">
+                      <HotelPicker
+                        hotel={hotel}
+                        onSelect={(selection) => setCustomer({ hotel: selection })}
+                        onClear={() => setCustomer({ hotel: null })}
+                      />
+                    </Field>
+                    {hotel && (
+                      <Field label="מספר חדר, הערות לכתובת">
+                        <input
+                          type="text"
+                          value={customer.address}
+                          onChange={(e) => setCustomer({ address: e.target.value })}
+                          placeholder="חדר 402, לובי, קומה 12..."
+                          className={INPUT_CLASS}
+                        />
+                      </Field>
+                    )}
+                  </>
+                ) : (
+                  <Field label="כתובת מלאה">
+                    <input
+                      type="text"
+                      value={customer.address}
+                      onChange={(e) => setCustomer({ address: e.target.value })}
+                      placeholder="רחוב, בניין, מספר דירה, אזור..."
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                )}
               </div>
             )}
             <div className="md:col-span-2">
@@ -279,7 +353,9 @@ export function Checkout() {
                 ? 'האתר לא מקבל הזמנות כרגע'
                 : isPickup
                   ? 'מלאו שם, טלפון, תאריך ושעה כדי לשלוח'
-                  : 'מלאו שם, טלפון, תאריך, שעה וכתובת כדי לשלוח'}
+                  : isHotelMode
+                    ? 'מלאו שם, טלפון, תאריך ושעה, ובחרו מלון כדי לשלוח'
+                    : 'מלאו שם, טלפון, תאריך, שעה וכתובת כדי לשלוח'}
             </p>
           )}
         </div>
@@ -293,6 +369,163 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     <div className="space-y-2">
       <label className="text-sm font-black mr-2">{label}</label>
       {children}
+    </div>
+  )
+}
+
+const HOTEL_PROVIDER_ID_PATTERN = /^[NWR][1-9]\d{0,18}$/u
+const HOTEL_MINIMUM_LATITUDE = 22.5
+const HOTEL_MAXIMUM_LATITUDE = 26.5
+const HOTEL_MINIMUM_LONGITUDE = 51
+const HOTEL_MAXIMUM_LONGITUDE = 56.6
+
+/** Same bounds the search route enforces — a malformed page never becomes an order. */
+function parseHotelResults(value: unknown): SelectedHotel[] | null {
+  if (!value || typeof value !== 'object') return null
+  const results = (value as { results?: unknown }).results
+  if (!Array.isArray(results) || results.length > 10) return null
+  const hotels: SelectedHotel[] = []
+  for (const row of results) {
+    if (!row || typeof row !== 'object') return null
+    const { id, name, fullAddress, latitude, longitude } = row as Record<string, unknown>
+    if (typeof id !== 'string' || !HOTEL_PROVIDER_ID_PATTERN.test(id)) return null
+    if (typeof name !== 'string' || name.length === 0 || name.length > 200) return null
+    if (typeof fullAddress !== 'string' || fullAddress.length === 0 || fullAddress.length > 500) return null
+    if (
+      typeof latitude !== 'number' ||
+      !Number.isFinite(latitude) ||
+      latitude < HOTEL_MINIMUM_LATITUDE ||
+      latitude > HOTEL_MAXIMUM_LATITUDE
+    ) return null
+    if (
+      typeof longitude !== 'number' ||
+      !Number.isFinite(longitude) ||
+      longitude < HOTEL_MINIMUM_LONGITUDE ||
+      longitude > HOTEL_MAXIMUM_LONGITUDE
+    ) return null
+    hotels.push({ id, name, fullAddress, latitude, longitude })
+  }
+  return hotels
+}
+
+type HotelSearchState = 'idle' | 'loading' | 'empty' | 'error'
+
+function HotelPicker({
+  hotel,
+  onSelect,
+  onClear,
+}: {
+  hotel: SelectedHotel | null
+  onSelect: (hotel: SelectedHotel) => void
+  onClear: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SelectedHotel[]>([])
+  const [searchState, setSearchState] = useState<HotelSearchState>('idle')
+
+  useEffect(() => {
+    if (hotel) return
+    const trimmed = query.normalize('NFKC').trim().replace(/\s+/gu, ' ')
+    if (trimmed.length < HOTEL_QUERY_MIN_LENGTH || trimmed.length > HOTEL_QUERY_MAX_LENGTH) {
+      setResults([])
+      setSearchState('idle')
+      return
+    }
+    // Aborting on cleanup is what drops stale answers: a reply that arrives
+    // after the next keystroke belongs to a controller nobody reads anymore.
+    const controller = new AbortController()
+    setSearchState('loading')
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(`/api/hotels/search?${new URLSearchParams({ q: trimmed }).toString()}`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+          })
+          if (!response.ok) throw new Error('hotel search failed')
+          const parsed = parseHotelResults(await response.json())
+          if (!parsed) throw new Error('hotel search response was invalid')
+          if (controller.signal.aborted) return
+          setResults(parsed)
+          setSearchState(parsed.length > 0 ? 'idle' : 'empty')
+        } catch {
+          if (controller.signal.aborted) return
+          setResults([])
+          setSearchState('error')
+        }
+      })()
+    }, HOTEL_SEARCH_DEBOUNCE_MS)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [query, hotel])
+
+  if (hotel) {
+    return (
+      <div className="w-full p-5 rounded-2xl bg-white border-2 border-[#F5A83A] flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-black">{hotel.name}</p>
+          <p className="text-xs font-bold text-[#3B151A]/50 mt-1 leading-relaxed">{hotel.fullAddress}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setQuery('')
+            setResults([])
+            setSearchState('idle')
+            onClear()
+          }}
+          aria-label="ביטול בחירת המלון"
+          className="shrink-0 w-8 h-8 rounded-lg bg-[#F7ECE6] flex items-center justify-center"
+        >
+          <Icon icon="ph:x-bold" className="text-[#8D182C]" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="התחילו להקליד שם מלון..."
+        autoComplete="off"
+        className={INPUT_CLASS}
+      />
+      {searchState === 'loading' && (
+        <p className="text-xs font-bold text-[#3B151A]/50 mr-2">מחפשים מלונות...</p>
+      )}
+      {searchState === 'empty' && (
+        <p className="text-xs font-bold text-[#3B151A]/50 mr-2">
+          לא מצאנו מלון בשם הזה. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.
+        </p>
+      )}
+      {searchState === 'error' && (
+        <p className="text-xs font-bold text-[#8D182C] mr-2">
+          חיפוש המלונות לא זמין כרגע. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.
+        </p>
+      )}
+      {results.length > 0 && (
+        <ul className="bg-white rounded-2xl border border-[#EDB2C1]/30 divide-y divide-[#EDB2C1]/20 max-h-72 overflow-y-auto">
+          {results.map((result) => (
+            <li key={result.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(result)}
+                className="w-full text-right p-4 hover:bg-[#F7ECE6] transition-colors"
+              >
+                <span className="block font-black">{result.name}</span>
+                <span className="block text-xs font-bold text-[#3B151A]/50 mt-1 leading-relaxed">
+                  {result.fullAddress}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

@@ -177,6 +177,11 @@ app.get('/robots.txt', (_request, response) => {
 // --- Public customer form: no manager sync, state API, or admin authentication ---
 app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));
 
+// --- Hotel search for both the admin panel and the public checkout: read-only
+// place lookup, no customer or order state. Rate limited per IP inside the
+// router because it is reachable without a staff session. ---
+app.use('/api/hotels/search', createHotelSearchRouter());
+
 // --- staff gate on everything else: no valid session -> looks like a 404 ---
 app.use(createDecoyGate(SESSION_SECRET));
 
@@ -194,9 +199,6 @@ app.use('/api/ai/order-intake', createOrderIntakeRouter());
 
 // --- AI-assisted operations analysis (sanitized advisory; never persists state) ---
 app.use('/api/ai/operations-review', createOperationsReviewRouter());
-
-// --- Explicit staff-triggered hotel search; no customer or order state ---
-app.use('/api/hotels/search', createHotelSearchRouter());
 
 // --- Admin-only, write-only payment provider key. Never echoed back. ---
 if (pool && process.env.BM_SECRETS_KEY) {

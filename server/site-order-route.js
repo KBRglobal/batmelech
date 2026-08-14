@@ -12,6 +12,19 @@ const { z } = require('zod');
 const MAX_ATTEMPTS = 5;
 const CANONICAL_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
+// Mirrors server/hotels/hotel-search-route.js: a checkout may only hand back a
+// hotel that route could have produced.
+const HOTEL_PROVIDER_ID_PATTERN = /^[NWR][1-9]\d{0,18}$/u;
+const HOTEL_MINIMUM_LATITUDE = 22.5;
+const HOTEL_MAXIMUM_LATITUDE = 26.5;
+const HOTEL_MINIMUM_LONGITUDE = 51;
+const HOTEL_MAXIMUM_LONGITUDE = 56.6;
+const HOTEL_FIELDS = ['hotelName', 'hotelAddress', 'hotelLatitude', 'hotelLongitude', 'hotelProviderId'];
+
+function coordinateNavigationUrl(latitude, longitude) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`;
+}
+
 const LineSchema = z.object({
   id: z.string().trim().min(1).max(200),
   name: z.string().trim().min(1).max(500),
@@ -31,11 +44,27 @@ const OrderSubmissionSchema = z.object({
       fulfillment: z.enum(['delivery', 'pickup']).optional().default('delivery'),
       date: z.union([z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/u), z.literal('')]).optional().default(''),
       time: z.union([z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/u), z.literal('')]).optional().default(''),
+      hotelName: z.string().trim().min(1).max(200).optional(),
+      hotelAddress: z.string().trim().min(1).max(500).optional(),
+      hotelLatitude: z.number().finite().min(HOTEL_MINIMUM_LATITUDE).max(HOTEL_MAXIMUM_LATITUDE).optional(),
+      hotelLongitude: z.number().finite().min(HOTEL_MINIMUM_LONGITUDE).max(HOTEL_MAXIMUM_LONGITUDE).optional(),
+      hotelProviderId: z.string().trim().max(32).regex(HOTEL_PROVIDER_ID_PATTERN).optional(),
     })
-    .refine((customer) => customer.fulfillment === 'pickup' || customer.address.length > 0, {
-      message: 'address is required for delivery orders',
-      path: ['address'],
-    }),
+    // A hotel is one identity, never a half-filled one: the admin order editor
+    // stores coordinates only alongside a provider ID, and so must a site order.
+    .refine((customer) => {
+      const present = HOTEL_FIELDS.filter((field) => customer[field] !== undefined);
+      return present.length === 0 || present.length === HOTEL_FIELDS.length;
+    }, { message: 'a hotel selection needs every hotel field', path: ['hotelName'] })
+    .refine((customer) => customer.fulfillment === 'delivery' || customer.hotelName === undefined, {
+      message: 'a hotel cannot be attached to a pickup order',
+      path: ['hotelName'],
+    })
+    .refine(
+      (customer) =>
+        customer.fulfillment === 'pickup' || customer.address.length > 0 || customer.hotelName !== undefined,
+      { message: 'address or hotel is required for delivery orders', path: ['address'] },
+    ),
   lines: z.array(LineSchema).min(1).max(100),
   total: z.number().finite().nonnegative().max(1_000_000),
 });
@@ -61,6 +90,12 @@ function buildLegacyOrder(submission, now) {
   if (!CANONICAL_ORDER_ID_PATTERN.test(id)) {
     throw new Error('generated order id is not canonical');
   }
+  const hotelName = isPickup ? undefined : submission.customer.hotelName;
+  // The customer's own address line is the room/notes detail once a hotel is
+  // picked, so every screen that only reads `address` still shows where to go.
+  const deliveryAddress = hotelName
+    ? [hotelName, submission.customer.address].filter(Boolean).join(' — ')
+    : submission.customer.address;
   return {
     id,
     date: submission.customer.date || dubaiDateString(now),
@@ -68,7 +103,23 @@ function buildLegacyOrder(submission, now) {
     name: submission.customer.name,
     phone: submission.customer.phone,
     email: submission.customer.email || undefined,
-    address: isPickup ? 'איסוף עצמי' : submission.customer.address,
+    address: isPickup ? 'איסוף עצמי' : deliveryAddress,
+    // Same field names the admin order editor writes (serializeOrderDraft), so
+    // delivery routing reads a site hotel exactly like a staff-entered one.
+    ...(hotelName
+      ? {
+          place: hotelName,
+          hotelName,
+          hotelAddress: submission.customer.hotelAddress,
+          hotelProviderId: submission.customer.hotelProviderId,
+          hotelLatitude: submission.customer.hotelLatitude,
+          hotelLongitude: submission.customer.hotelLongitude,
+          navigationUrl: coordinateNavigationUrl(
+            submission.customer.hotelLatitude,
+            submission.customer.hotelLongitude,
+          ),
+        }
+      : {}),
     status: 'חדשה',
     source: 'site',
     notes,

@@ -20,11 +20,11 @@ const {
   DELIVERED_STATUS,
   dubaiDateString,
   findByToken,
-  nextStop,
   orderName,
   selectDeliveryDay,
 } = require('./delivery-day');
-const { delayAdvice, proofRecorded } = require('./delivery-messages');
+const { delayAdvice } = require('./delivery-messages');
+const { proofConfirmation } = require('./proof-of-delivery');
 const { answerCallbackQuery, sendTelegramMessage } = require('./send-message');
 
 const CHECKIN_STATES = { otw: 'onTheWay', ontime: 'onTime', late: 'delayed' };
@@ -131,11 +131,7 @@ function createCallbackHandler({ repository, botToken, chatId, agent, logger = c
           return;
         }
         await setPendingProof(repository, null);
-        const next = nextStop(
-          day.map((entry) => (String(entry.id) === String(order.id) ? { ...entry, status: DELIVERED_STATUS } : entry)),
-          order.id,
-        );
-        const done = proofRecorded({ ...result.order, meyToken: token }, next);
+        const done = proofConfirmation(day, result.order, token);
         await say(done.text, done.reply_markup);
         return;
       }

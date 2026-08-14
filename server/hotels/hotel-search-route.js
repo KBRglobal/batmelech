@@ -302,10 +302,13 @@ function createHotelSearchRouter(options = {}) {
     response.set('Pragma', 'no-cache');
     next();
   });
+  // Per IP, not one shared bucket: the public checkout searches from this same
+  // route, so a single global budget would let any visitor lock out staff.
+  // Provider load stays bounded regardless by the serialized request queue and
+  // the 24h cache in createHotelSearcher.
   router.use(rateLimit({
     windowMs: 15 * 60 * 1_000,
-    limit: 20,
-    keyGenerator: () => 'authenticated-batmelech-staff',
+    limit: 60,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
   }));

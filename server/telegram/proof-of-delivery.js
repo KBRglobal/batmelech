@@ -66,6 +66,21 @@ async function ensureToken(repository, orderId) {
   return null;
 }
 
+// Both ways a proof gets attached — Felix's photo landing on an obvious order,
+// and Felix tapping a name on the disambiguation keyboard — end in the same
+// confirmation. `dayOrders` is deliberately the pre-write view of the day: the
+// delivered order still holds its route position, so nextStop walks forward
+// from there rather than restarting at the top.
+function proofConfirmation(dayOrders, order, token) {
+  const next = nextStop(
+    dayOrders.map((entry) => (
+      String(entry.id) === String(order.id) ? { ...entry, status: DELIVERED_STATUS } : entry
+    )),
+    order.id,
+  );
+  return proofRecorded({ ...order, meyToken: token }, next);
+}
+
 function rawName(order) {
   return order && typeof order.name === 'string' ? order.name.trim() : '';
 }
@@ -199,22 +214,22 @@ function createProofHandler({
         return;
       }
 
-      // `active` is the pre-write view, so the delivered order still sits in it
-      // at its route position and nextStop walks forward from there.
-      const next = nextStop(
-        active.map((order) => (String(order.id) === String(target.id) ? { ...order, status: DELIVERED_STATUS } : order)),
-        target.id,
-      );
       // No token means no undo button — say it plainly rather than let the
       // message builder throw and leave Felix with silence.
       if (token === null) {
         await say(`נשמר ✅ צילום המסירה של ${orderName(result.order)}. סימנתי כנמסר.`);
         return;
       }
-      const done = proofRecorded({ ...result.order, meyToken: token }, next);
+      const done = proofConfirmation(active, result.order, token);
       await say(done.text, done.reply_markup);
     },
   };
 }
 
-module.exports = { AWAITING_REPLY_WINDOW_MS, SAVE_FAILED_TEXT, NO_CANDIDATES_TEXT, createProofHandler };
+module.exports = {
+  AWAITING_REPLY_WINDOW_MS,
+  SAVE_FAILED_TEXT,
+  NO_CANDIDATES_TEXT,
+  createProofHandler,
+  proofConfirmation,
+};
