@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { setOrderingOpen, setSiteBanner, setItemStock } = require('../server/business-actions');
+const { setOrderingOpen, setSiteBanner, setItemStock, setOrderStatus } = require('../server/business-actions');
 
 function fakeRepository(initialState) {
   let state = initialState;
@@ -72,6 +72,27 @@ test('setItemStock does not duplicate an already-out item', async () => {
 test('setItemStock rejects a blank item name', async () => {
   const repo = fakeRepository({ orders: [], settings: {} });
   await assert.rejects(() => setItemStock(repo, '  ', false), RangeError);
+});
+
+test('setOrderStatus updates the matching order and leaves others untouched', async () => {
+  const repo = fakeRepository({
+    orders: [{ id: 'a', status: 'חדשה' }, { id: 'b', status: 'חדשה' }],
+    settings: {},
+  });
+  const result = await setOrderStatus(repo, 'a', 'אושרה');
+  assert.equal(result.ok, true);
+  assert.deepEqual(repo._current().orders, [{ id: 'a', status: 'אושרה' }, { id: 'b', status: 'חדשה' }]);
+});
+
+test('setOrderStatus fails cleanly when the order id does not exist', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'חדשה' }], settings: {} });
+  const result = await setOrderStatus(repo, 'missing', 'אושרה');
+  assert.equal(result.ok, false);
+});
+
+test('setOrderStatus rejects an unknown status value', async () => {
+  const repo = fakeRepository({ orders: [{ id: 'a', status: 'חדשה' }], settings: {} });
+  await assert.rejects(() => setOrderStatus(repo, 'a', 'לא קיים'), RangeError);
 });
 
 test('setOrderingOpen reports failure when every save attempt is rejected', async () => {

@@ -1,6 +1,6 @@
 'use strict';
 
-const { setOrderingOpen, setSiteBanner, setItemStock } = require('../business-actions');
+const { setOrderingOpen, setSiteBanner, setItemStock, setOrderStatus, KNOWN_ORDER_STATUSES } = require('../business-actions');
 
 const MAX_SEARCH_RESULTS = 15;
 const MAX_ORDERS_IN_CONTEXT = 200;
@@ -52,6 +52,21 @@ const TOOL_DEFINITIONS = [
         inStock: { type: 'boolean', description: 'true = יש במלאי, false = אזל' },
       },
       required: ['itemName', 'inStock'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'set_order_status',
+    description: `מעדכנת את הסטטוס של הזמנה קיימת. סטטוסים אפשריים: ${KNOWN_ORDER_STATUSES.join(', ')}. חפשי קודם עם search_orders כדי לוודא את מזהה ההזמנה הנכון.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'מזהה ההזמנה (id)' },
+        status: { type: 'string', enum: KNOWN_ORDER_STATUSES, description: 'הסטטוס החדש' },
+      },
+      required: ['orderId', 'status'],
       additionalProperties: false,
     },
     strict: true,
@@ -161,6 +176,10 @@ function createMeyTools({ repository, logger = console }) {
     async set_item_stock({ itemName, inStock }) {
       const result = await setItemStock(repository, itemName, inStock);
       return result;
+    },
+
+    async set_order_status({ orderId, status }) {
+      return setOrderStatus(repository, orderId, status);
     },
 
     async set_ordering_open({ open }) {

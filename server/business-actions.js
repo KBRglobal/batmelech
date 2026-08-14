@@ -49,4 +49,33 @@ async function setItemStock(repository, itemName, inStock) {
   });
 }
 
-module.exports = { setOrderingOpen, setSiteBanner, setItemStock };
+const KNOWN_ORDER_STATUSES = ['חדשה', 'אושרה', 'במשלוח', 'מוכנה', 'נמסרה'];
+
+async function setOrderStatus(repository, orderId, status) {
+  const id = typeof orderId === 'string' ? orderId.trim() : '';
+  if (id === '') throw new RangeError('order id required');
+  if (!KNOWN_ORDER_STATUSES.includes(status)) {
+    throw new RangeError(`status must be one of: ${KNOWN_ORDER_STATUSES.join(', ')}`);
+  }
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const current = await repository.loadState();
+    const orders = Array.isArray(current.data.orders) ? current.data.orders : [];
+    const found = orders.some((order) => String(order.id) === id);
+    if (!found) return { ok: false, error: 'order not found' };
+    const localState = {
+      ...current.data,
+      orders: orders.map((order) => (String(order.id) === id ? { ...order, status } : order)),
+    };
+    const saved = await repository.saveState({
+      baseState: current.data,
+      localState,
+      baseRevision: current.revision,
+      baseHash: current.hash,
+      requestId: crypto.randomUUID(),
+    });
+    if (saved.ok) return { ok: true };
+  }
+  return { ok: false, error: 'save failed after retries' };
+}
+
+module.exports = { setOrderingOpen, setSiteBanner, setItemStock, setOrderStatus, KNOWN_ORDER_STATUSES };
