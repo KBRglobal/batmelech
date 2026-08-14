@@ -43,6 +43,17 @@ import {
   type OrderEditorMenu,
 } from '../domain/order-editor.ts'
 import { deliveryProofSummary } from '../domain/delivery-dashboard.ts'
+import {
+  MAX_PLATA_NOTE_LENGTH,
+  PLATA_STATUSES,
+  PLATA_STATUS_LABELS,
+  PLATA_STEPPER_MAX,
+  applyPlataToStore,
+  isPlataFormValid,
+  plataFormValues,
+  type PlataFormValues,
+  type PlataStatus,
+} from '../domain/plata.ts'
 import type { LegacyOrder } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
@@ -64,6 +75,7 @@ const SECTIONS = [
   ['extras', 'אקסטרות'],
   ['payment', 'תשלום'],
   ['proof', 'אישור מסירה'],
+  ['plata', 'פלטה'],
 ] as const
 
 const inputClassName =
@@ -497,6 +509,144 @@ function DeliveryProofSection({ order }: { readonly order: LegacyOrder | null })
   )
 }
 
+type PlataSaveState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'saving' }
+  | { readonly kind: 'saved' }
+  | { readonly kind: 'error'; readonly message: string }
+
+/**
+ * The one place a hotplate is edited. It saves itself, straight to the versioned state, and
+ * never through OrderDraft: the draft save merges over the stored order, so a plata that
+ * lived in the draft would silently overwrite whatever מיי wrote while the editor was open
+ * (and vice versa). Its own save keeps the two writers apart.
+ */
+function PlataSection({
+  order,
+  saveState,
+  onSave,
+}: {
+  readonly order: LegacyOrder | null
+  readonly saveState: PlataSaveState
+  readonly onSave: ((values: PlataFormValues) => void) | null
+}) {
+  const stored = plataFormValues(order)
+  const storedSignature = JSON.stringify(stored)
+  // Edits are tagged with the stored values they started from, so a confirmed save — or a
+  // Telegram update landing under the open editor — drops the local copy instead of
+  // re-showing a value the server already replaced.
+  const [edited, setEdited] = useState<{
+    readonly signature: string
+    readonly values: PlataFormValues
+  } | null>(null)
+  const values = edited !== null && edited.signature === storedSignature ? edited.values : stored
+  const patch = (next: Partial<PlataFormValues>) => {
+    setEdited({ signature: storedSignature, values: { ...values, ...next } })
+  }
+
+  const dirty = JSON.stringify(values) !== storedSignature
+  const valid = isPlataFormValid(values)
+  const stamps = order === null ? null : {
+    collectedAt: typeof order.plataCollectedAt === 'number' ? order.plataCollectedAt : null,
+    depositReturnedAt: typeof order.plataDepositReturnedAt === 'number' ? order.plataDepositReturnedAt : null,
+  }
+
+  return (
+    <Section id="plata" title="פלטה ופיקדון">
+      {onSave === null ? (
+        <p className="text-sm font-bold text-muted-foreground">אפשר לרשום פלטה אחרי ששומרים את ההזמנה.</p>
+      ) : (
+        <div className="space-y-5">
+          <QuantityStepper
+            label="פלטות"
+            value={values.count}
+            onChange={(count) => patch({ count: Math.min(Math.max(count, 0), Math.max(PLATA_STEPPER_MAX, values.count)) })}
+          />
+          {values.count === 0 ? (
+            <p className="text-sm font-bold text-muted-foreground">אין פלטה בהזמנה הזאת.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <Field label="פיקדון ($)">
+                <input
+                  aria-label="פיקדון פלטה"
+                  inputMode="decimal"
+                  value={values.deposit}
+                  onChange={(event) => patch({ deposit: event.currentTarget.value })}
+                  className={inputClassName}
+                />
+              </Field>
+              <Field label="מצב הפלטה">
+                <select
+                  aria-label="מצב הפלטה"
+                  value={values.status}
+                  onChange={(event) => patch({ status: event.currentTarget.value as PlataStatus })}
+                  className={inputClassName}
+                >
+                  {PLATA_STATUSES.map((status) => (
+                    <option key={status} value={status}>{PLATA_STATUS_LABELS[status]}</option>
+                  ))}
+                </select>
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="איפה הפלטה מחכה">
+                  <input
+                    aria-label="איפה הפלטה מחכה"
+                    maxLength={MAX_PLATA_NOTE_LENGTH}
+                    placeholder="בקבלה, חדר 812..."
+                    value={values.note}
+                    onChange={(event) => patch({ note: event.currentTarget.value })}
+                    className={inputClassName}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+          {stamps !== null && (stamps.collectedAt !== null || stamps.depositReturnedAt !== null) && (
+            <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {stamps.collectedAt !== null && (
+                <div>
+                  <dt className="text-xs font-black text-muted-foreground">נאספה</dt>
+                  <dd className="mt-1 text-sm font-bold text-primary">{formatDeliveryTimestamp(stamps.collectedAt)}</dd>
+                </div>
+              )}
+              {stamps.depositReturnedAt !== null && (
+                <div>
+                  <dt className="text-xs font-black text-muted-foreground">הפיקדון הוחזר</dt>
+                  <dd className="mt-1 text-sm font-bold text-primary">{formatDeliveryTimestamp(stamps.depositReturnedAt)}</dd>
+                </div>
+              )}
+            </dl>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={!dirty || !valid || saveState.kind === 'saving'}
+              onClick={() => onSave(values)}
+              className="min-h-11 rounded-full border border-primary bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+            >
+              {saveState.kind === 'saving' ? 'שומרת פלטה' : 'שמירת הפלטה'}
+            </button>
+            {!valid && (
+              <p role="alert" className="text-xs font-black text-destructive">
+                הפיקדון חייב להיות סכום תקין. לא נשמר שינוי.
+              </p>
+            )}
+            {valid && saveState.kind === 'saved' && !dirty && (
+              <p role="status" className="text-xs font-black text-emerald-700">פרטי הפלטה נשמרו.</p>
+            )}
+            {saveState.kind === 'error' && (
+              <p role="alert" className="text-xs font-black text-destructive">{saveState.message}</p>
+            )}
+          </div>
+          <p className="text-xs font-bold text-muted-foreground">
+            הפלטה נשמרת בנפרד משאר ההזמנה, כדי שעדכון של מיי בטלגרם ועריכה כאן לא ידרסו זה את זה.
+          </p>
+        </div>
+      )}
+    </Section>
+  )
+}
+
 function Field({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
     <label className="block space-y-2">
@@ -646,6 +796,8 @@ function OrderEditorContent({
   managerReview,
   managerSourceMessage,
   loadedOrder,
+  plataSaveState,
+  onSavePlata,
 }: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
@@ -661,6 +813,8 @@ function OrderEditorContent({
   readonly managerReview: AIReview | null
   readonly managerSourceMessage: string | null
   readonly loadedOrder: LegacyOrder | null
+  readonly plataSaveState: PlataSaveState
+  readonly onSavePlata: ((values: PlataFormValues) => void) | null
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
@@ -1211,6 +1365,8 @@ function OrderEditorContent({
         </Section>
 
         <DeliveryProofSection order={loadedOrder} />
+
+        <PlataSection order={loadedOrder} saveState={plataSaveState} onSave={onSavePlata} />
       </div>
 
       <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
@@ -1252,6 +1408,10 @@ export function OrderEditorScreen() {
   const { orderId } = useParams<{ orderId?: string }>()
   const storeQuery = useStore()
   const saveMutation = useVersionedStateMutation()
+  // The plata section's own writer. Same mutation scope as the draft save, so the two can
+  // never be in flight at once, but its own pending state — saving a hotplate must not look
+  // like saving the order.
+  const plataMutation = useVersionedStateMutation()
   const location = useLocation()
   const navigate = useNavigate()
   const [draft, setDraft] = useState<OrderDraft | null>(null)
@@ -1261,6 +1421,7 @@ export function OrderEditorScreen() {
   const [duplicateLoadIssue, setDuplicateLoadIssue] = useState<string | null>(null)
   const [reviewLoadIssue, setReviewLoadIssue] = useState<{ readonly sourceMessage: string | null } | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>({ kind: 'idle' })
+  const [plataSaveState, setPlataSaveState] = useState<PlataSaveState>({ kind: 'idle' })
   const initializedFor = useRef('')
   const baseEnvelope = useRef<VersionedStateEnvelope | null>(null)
   const retryAttempt = useRef<SaveAttempt | null>(null)
@@ -1504,6 +1665,79 @@ export function OrderEditorScreen() {
     }
   }
 
+  // Deliberately not part of saveDraft: it writes only the plata fields of one order, straight
+  // onto the loaded base, and then adopts the confirmed envelope as the new base so the open
+  // draft can still be saved afterwards without looking stale.
+  const savePlata = async (values: PlataFormValues) => {
+    if (mode !== 'edit' || typeof orderId !== 'string') return
+    if (submissionLocked.current || saveMutation.isPending || plataMutation.isPending) return
+    const loadedBase = baseEnvelope.current
+    if (!loadedBase) {
+      setPlataSaveState({
+        kind: 'error',
+        message: 'אי אפשר לשמור בלי גרסת בסיס מאומתת. שום נתון לא שונה.',
+      })
+      return
+    }
+
+    setPlataSaveState({ kind: 'saving' })
+    let refreshedEnvelope: VersionedStateEnvelope | null = null
+    try {
+      const refreshed = await storeQuery.refetch()
+      const refreshedData = refreshed.data
+      refreshedEnvelope = refreshedData !== undefined && isVersionedStateEnvelope(refreshedData)
+        ? refreshedData
+        : null
+    } catch {
+      refreshedEnvelope = null
+    }
+    if (!refreshedEnvelope || !isExactEnvelopeSnapshot(refreshedEnvelope, loadedBase)) {
+      setPlataSaveState({
+        kind: 'error',
+        message: 'הנתונים השתנו מאז פתיחת ההזמנה. שום שינוי לא נשמר; צריך לפתוח את ההזמנה מחדש.',
+      })
+      return
+    }
+
+    let change: PreparedVersionedStateChange
+    try {
+      change = prepareVersionedStateChange(
+        loadedBase,
+        createVersionedRequestId('order-plata'),
+        (baseStateCopy) => applyPlataToStore(baseStateCopy, orderId, values),
+      )
+    } catch {
+      setPlataSaveState({
+        kind: 'error',
+        message: 'פרטי הפלטה אינם בטוחים לשמירה. שום נתון לא שונה.',
+      })
+      return
+    }
+
+    try {
+      const result = await plataMutation.mutateAsync(change)
+      if (!result.ok) {
+        setPlataSaveState({
+          kind: 'error',
+          message: 'נמצאה התנגשות עם שינוי אחר. פרטי הפלטה לא נשמרו.',
+        })
+        return
+      }
+      baseEnvelope.current = {
+        revision: result.revision,
+        ts: result.ts,
+        hash: result.hash,
+        data: result.data,
+      }
+      setPlataSaveState({ kind: 'saved' })
+    } catch {
+      setPlataSaveState({
+        kind: 'error',
+        message: 'לא התקבל אישור שמירה מהשרת. פרטי הפלטה לא נשמרו.',
+      })
+    }
+  }
+
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את טופס ההזמנה" />
   if (storeQuery.isError) return <ScreenState kind="error" title="לא הצלחנו לטעון את ההזמנה" retry={() => { void storeQuery.refetch() }} />
   if (storedOrderIdStatus !== 'safe') {
@@ -1585,6 +1819,8 @@ export function OrderEditorScreen() {
       managerReview={managerReview}
       managerSourceMessage={managerSourceMessage}
       loadedOrder={loadedOrder}
+      plataSaveState={plataSaveState}
+      onSavePlata={loadedOrder === null ? null : (values) => { void savePlata(values) }}
     />
   )
 }

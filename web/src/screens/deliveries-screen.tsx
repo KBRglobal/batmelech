@@ -19,6 +19,11 @@ import {
   applyNextDeliveryStatus,
   nextDeliveryStatus,
 } from '../domain/operational-state.ts'
+import {
+  PLATA_STATUS_LABELS,
+  summarizeOutstandingPlata,
+  type PlataStatus,
+} from '../domain/plata.ts'
 import { buildMultiStopMapsUrl, suggestRouteOrder } from '../domain/route-order.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
@@ -53,6 +58,28 @@ function statusClassName(status: string): string {
   if (status === 'מוכנה') return 'border-emerald-100 bg-emerald-50 text-emerald-700'
   if (status === IN_TRANSIT_STATUS || status === 'אושרה') return 'border-amber-100 bg-amber-50 text-amber-800'
   return 'border-rose-100 bg-rose-50 text-rose-700'
+}
+
+// A plate still with a customer is the normal state on delivery day; amber is the one that
+// needs Felix to do something, and a returned deposit is closed business.
+function plataClassName(status: PlataStatus): string {
+  if (status === 'awaitingPickup') return 'border-amber-100 bg-amber-50 text-amber-800'
+  if (status === 'collected') return 'border-emerald-100 bg-emerald-50 text-emerald-700'
+  if (status === 'depositReturned') return 'border-border bg-muted text-muted-foreground'
+  return 'border-border bg-secondary text-primary'
+}
+
+function PlataBadge({ order }: { order: DeliveryOrderView }) {
+  if (order.plataCount === 0 || order.plataStatus === null) return null
+  const countText = order.plataCount > 1 ? ` ×${order.plataCount}` : ''
+  return (
+    <span
+      className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${plataClassName(order.plataStatus)}`}
+      title={PLATA_STATUS_LABELS[order.plataStatus]}
+    >
+      {`פלטה${countText} · ${PLATA_STATUS_LABELS[order.plataStatus]}`}
+    </span>
+  )
 }
 
 function checkinClassName(state: NonNullable<DeliveryOrderView['checkinState']>): string {
@@ -245,6 +272,7 @@ function DeliveryOrder({
               {order.checkinState && order.checkinLabel && (
                 <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${checkinClassName(order.checkinState)}`}>{order.checkinLabel}</span>
               )}
+              <PlataBadge order={order} />
               {order.groupName && <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.6875rem] font-black text-primary">{order.groupName}</span>}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -384,6 +412,32 @@ function CourierLocationLine({ store }: { store: Readonly<LegacyStore> }) {
   )
 }
 
+// Counted across every order, not the selected date: a plate nobody collected two weeks ago
+// is exactly the one worth showing, and its deposit is money Lin still owes back.
+function OutstandingPlataLine({ store }: { store: Readonly<LegacyStore> }) {
+  const outstanding = summarizeOutstandingPlata(store)
+  const out = outstanding.withCustomer + outstanding.awaitingPickup + outstanding.collected
+  if (out === 0) return null
+  return (
+    <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-black text-muted-foreground">
+      <span className="flex items-center gap-2 text-primary">
+        <LocalIcon name="ph:cooking-pot-bold" className="text-base" />
+        <span>פלטות בחוץ: {out}</span>
+      </span>
+      <span>{outstanding.withCustomer} אצל לקוחות</span>
+      <span className={outstanding.awaitingPickup > 0 ? 'text-amber-800' : undefined}>
+        {outstanding.awaitingPickup} ממתינות לאיסוף
+      </span>
+      {outstanding.collected > 0 && <span>{outstanding.collected} נאספו, הפיקדון עוד לא הוחזר</span>}
+      <span>
+        {outstanding.depositComplete
+          ? <>פיקדונות פתוחים: <span dir="ltr">{formatUsdMinorUnits(outstanding.openDepositMinorUnits)}</span></>
+          : 'פיקדונות פתוחים: לא מלא'}
+      </span>
+    </p>
+  )
+}
+
 function ProgressStrip({
   store,
   group,
@@ -414,6 +468,7 @@ function ProgressStrip({
         </p>
       </div>
       <CourierLocationLine store={store} />
+      <OutstandingPlataLine store={store} />
     </div>
   )
 }

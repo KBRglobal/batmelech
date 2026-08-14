@@ -1,4 +1,5 @@
 import { checkedAdd } from './money.ts'
+import { readPlata, type PlataStatus } from './plata.ts'
 import type { LegacyOrder, LegacyStore } from './store.ts'
 
 const DEFAULT_LOCALE = 'he-IL'
@@ -60,6 +61,8 @@ export interface DeliveryOrderView {
   readonly checkinLabel: string | null
   readonly etaMinutes: number | null
   readonly deliveredAt: number | null
+  readonly plataCount: number
+  readonly plataStatus: PlataStatus | null
 }
 
 export interface DeliveryDestinationGroup {
@@ -525,6 +528,7 @@ export function buildDeliveryDashboard(
       routeIdCandidate !== null && (idCounts.get(routeIdCandidate) ?? 0) === 1
         ? routeIdCandidate
         : null
+    const plata = readPlata(order)
     const view: DeliveryOrderView = {
       sourceIndex,
       orderId: routeId,
@@ -543,6 +547,8 @@ export function buildDeliveryDashboard(
       proofPhotoHref: validatedProofHref(order.deliveryProofUrl),
       ...courierCheckin(order),
       deliveredAt: safeTimestamp(order.deliveredAt),
+      plataCount: plata.count,
+      plataStatus: plata.count === 0 ? null : plata.status ?? 'withCustomer',
     }
 
     if (view.pickup) {

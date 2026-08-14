@@ -340,6 +340,40 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
           </div>
         </section>
 
+        <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
+          <h2 className="text-xl font-black text-primary">פרטי תשלום וביקורות</h2>
+          <p className="mt-2 text-xs font-bold text-muted-foreground">
+            נכנס להודעות המוכנות שאת שולחת מהוואטסאפ שלך. שום הודעה לא נשלחת ללקוח לבד.
+          </p>
+          <div className="mt-5 grid grid-cols-1 gap-4">
+            <label className="text-xs font-black text-muted-foreground">
+              איך משלמים לך (נכנס להודעת בקשת התשלום)
+              <textarea
+                aria-label="איך משלמים לך"
+                value={currentDraft.paymentRequestDetails}
+                onChange={(event) =>
+                  setDraft({ ...currentDraft, paymentRequestDetails: event.currentTarget.value })
+                }
+                placeholder="לדוגמה: ביט למספר 050-1234567, או העברה לחשבון..."
+                className="mt-2 min-h-20 w-full resize-y rounded-xl border border-border px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <label className="text-xs font-black text-muted-foreground">
+              קישור לביקורות בגוגל (בלי זה כפתור בקשת הביקורת לא מופיע)
+              <input
+                aria-label="קישור לביקורות בגוגל"
+                dir="ltr"
+                value={currentDraft.googleReviewUrl}
+                onChange={(event) =>
+                  setDraft({ ...currentDraft, googleReviewUrl: event.currentTarget.value })
+                }
+                placeholder="https://..."
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-left text-sm font-bold outline-none"
+              />
+            </label>
+          </div>
+        </section>
+
         <StaffLoginSection />
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">

@@ -223,6 +223,108 @@ function delayAdvice(order, etaMinutes) {
   };
 }
 
+// --- weekly business digest + Friday prep forecast ---------------------------
+// The only two messages in this file aimed at the business rather than at the
+// drive: what last week earned, and what Friday needs cooked. Both take an
+// already-computed summary from business-insights.js — no arithmetic here.
+
+// '4180' reads as a phone number in a chat; '4,180$' reads as money. Cents only
+// appear when there are cents, because Lin's totals are almost always round.
+function money(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return '0$';
+  const rounded = Math.round(value * 100) / 100;
+  const whole = Math.floor(rounded);
+  const cents = Math.round((rounded - whole) * 100);
+  const grouped = String(whole).replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
+  return cents === 0 ? `${grouped}$` : `${grouped}.${String(cents).padStart(2, '0')}$`;
+}
+
+function dishLine(dish) {
+  return `• ${dish.name} — ${dish.quantity}`;
+}
+
+function weeklyBusinessDigest(stats) {
+  if (!stats || typeof stats !== 'object') return { text: '' };
+  const span = `${humanDate(stats.from)}–${humanDate(stats.to)}`;
+  const orderCount = Number(stats.orderCount) || 0;
+  const ordersText = orderCount === 1 ? 'הזמנה אחת' : `${orderCount} הזמנות`;
+
+  // Every count below is a real number from the week, so a zero is shown as a
+  // zero — a line that quietly disappears is a line Lin would go looking for.
+  const customerLine =
+    stats.newCustomers === 0 && stats.returningCustomers === 0
+      ? null
+      : `לקוחות: ${stats.newCustomers} חדשים, ${stats.returningCustomers} חוזרים`;
+  const unpricedLine =
+    stats.unpricedOrders > 0
+      ? `(${stats.unpricedOrders} ${stats.unpricedOrders === 1 ? 'הזמנה' : 'הזמנות'} בלי סכום קריא — לא חושבו)`
+      : null;
+  const dishes = Array.isArray(stats.topDishes) ? stats.topDishes : [];
+
+  return {
+    text: joinLines([
+      `סיכום השבוע (${span}):`,
+      '',
+      `הכנסות: ${money(stats.revenue)}`,
+      unpricedLine,
+      `${ordersText}, מהן ${stats.deliveredCount} נמסרו`,
+      customerLine,
+      dishes.length === 0 ? null : '',
+      dishes.length === 0 ? null : 'הכי מבוקש השבוע:',
+      ...dishes.map(dishLine),
+      '',
+      'שבוע טוב!',
+    ]),
+  };
+}
+
+function prepForecast(forecast) {
+  if (!forecast || typeof forecast !== 'object') return { text: '' };
+  const courses = Array.isArray(forecast.courses) ? forecast.courses : [];
+  if (courses.length === 0) return { text: '' };
+
+  const day = humanDate(forecast.date);
+  const dayText = day === '' ? 'לשישי' : `לשישי (${day})`;
+  const orderCount = Number(forecast.orderCount) || 0;
+  const ordersText = orderCount === 1 ? 'הזמנה אחת' : `${orderCount} הזמנות`;
+  const meals = Number(forecast.meals) || 0;
+  const mealsText = meals === 1 ? 'ארוחה זוגית אחת' : `${meals} ארוחות זוגיות`;
+
+  const blocks = [];
+  for (const course of courses) {
+    blocks.push('', `${course.label}:`, ...course.dishes.map(dishLine));
+  }
+
+  return {
+    text: joinLines([
+      `לפי מה שהוזמן עד עכשיו ${dayText} — ההכנות:`,
+      ...blocks,
+      '',
+      `סה"כ ${ordersText} · ${mealsText}.`,
+      'עוד יכולות להיכנס הזמנות עד שישי.',
+    ]),
+  };
+}
+// --- end weekly business digest + Friday prep forecast -----------------------
+
+// Motzei Shabbat: the plates are business equipment sitting in hotels, and every
+// one still out is a deposit Lin cannot return. One list, no buttons — Felix
+// reads it in the car and reports back in words.
+function plataPickupDigest(orders) {
+  const list = (Array.isArray(orders) ? orders : []).filter(Boolean);
+  if (list.length === 0) return { text: '' };
+  const rows = list.map((order) => {
+    const count = Number(order.plataCount);
+    const countText = Number.isFinite(count) && count > 1 ? `${count} פלטות` : 'פלטה אחת';
+    const note = typeof order.plataPickupNote === 'string' ? order.plataPickupNote.trim() : '';
+    const parts = [orderName(order), destinationLabel(order), countText];
+    if (note !== '') parts.push(note);
+    return `• ${parts.join(' · ')}`;
+  });
+  return { text: joinLines(['פלטות לאיסוף:', '', ...rows]) };
+}
+
 module.exports = {
   MAX_CALLBACK_BYTES,
   callbackData,
@@ -231,6 +333,9 @@ module.exports = {
   digest,
   lateEscalation,
   leadReminder,
+  plataPickupDigest,
+  prepForecast,
   proofAmbiguous,
   proofRecorded,
+  weeklyBusinessDigest,
 };

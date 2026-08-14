@@ -199,6 +199,33 @@ async function setDeliveryDigestSent(repository, dateString) {
   return { ok: true, claimed: !result.skipped };
 }
 
+// --- weekly business digest + Friday prep forecast (business-insights) -------
+// Same settings-level claim as setDeliveryDigestSent, one marker per message.
+// The stored day is the thing the message is ABOUT — the window's closing
+// Saturday, the Friday being cooked for — not the day it was sent, so a
+// restart, a redeploy or a clock that ticks twice can never produce a second
+// copy of the same week.
+async function setWeeklyDigestSent(repository, dateString) {
+  const day = typeof dateString === 'string' ? dateString.trim() : '';
+  if (day === '') throw new RangeError('date string required');
+  const result = await withSettingsUpdate(repository, (settings) => (
+    settings.meyWeeklyDigestSentFor === day ? null : { ...settings, meyWeeklyDigestSentFor: day }
+  ));
+  if (!result.ok) return { ok: false, error: 'save failed after retries' };
+  return { ok: true, claimed: !result.skipped };
+}
+
+async function setPrepForecastSent(repository, dateString) {
+  const day = typeof dateString === 'string' ? dateString.trim() : '';
+  if (day === '') throw new RangeError('date string required');
+  const result = await withSettingsUpdate(repository, (settings) => (
+    settings.meyPrepForecastSentFor === day ? null : { ...settings, meyPrepForecastSentFor: day }
+  ));
+  if (!result.ok) return { ok: false, error: 'save failed after retries' };
+  return { ok: true, claimed: !result.skipped };
+}
+// --- end weekly business digest + Friday prep forecast -----------------------
+
 async function setPromptMessageId(repository, orderId, messageId) {
   const id = Number(messageId);
   if (!Number.isFinite(id)) return { ok: false, error: 'message id must be a number' };
@@ -297,6 +324,94 @@ async function setCourierLocation(repository, { lat, lon, at } = {}) {
   return { ok: true };
 }
 
+// --- plata (hotplate) rental --------------------------------------------------
+
+// A rented hotplate is business equipment held against a deposit, so the money
+// only closes when the plate is physically back: it goes out withCustomer, the
+// customer says where they left it (awaitingPickup), Felix collects it
+// (collected), and Lin returns the deposit (depositReturned).
+const KNOWN_PLATA_STATUSES = ['withCustomer', 'awaitingPickup', 'collected', 'depositReturned'];
+const MAX_PLATA_COUNT = 20;
+const MAX_PLATA_NOTE_LENGTH = 300;
+const PLATA_FIELDS = [
+  'plataCount',
+  'plataDeposit',
+  'plataStatus',
+  'plataPickupNote',
+  'plataCollectedAt',
+  'plataDepositReturnedAt',
+];
+
+// Stored the way order.deposit is stored — a canonical 'D.CC' string — so the
+// two amounts stay comparable. Mirrors canonicalOptionalUsd /
+// parsePlataDepositMinorUnits in web/src/domain/plata.ts: change one, change
+// the other, or the admin editor and מיי start writing different shapes.
+const PLATA_DEPOSIT_PATTERN = /^\$?(\d{1,9})(?:\.(\d{1,2}))?$/u;
+
+function canonicalPlataDeposit(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const raw = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : '';
+  const match = PLATA_DEPOSIT_PATTERN.exec(raw.replaceAll(',', ''));
+  if (match === null) return null;
+  return `${match[1]}.${(match[2] || '').padEnd(2, '0')}`;
+}
+
+// count 0 means "no hotplate on this order" and clears the whole lifecycle, so a
+// plate booked by mistake leaves nothing behind to chase after Shabbat.
+async function setPlataOnOrder(repository, orderId, { count, deposit } = {}) {
+  const requested = Number(count);
+  if (!Number.isInteger(requested) || requested < 0 || requested > MAX_PLATA_COUNT) {
+    return { ok: false, error: `count must be a whole number between 0 and ${MAX_PLATA_COUNT}` };
+  }
+  const hasDeposit = deposit !== undefined && deposit !== null && deposit !== '';
+  const canonicalDeposit = hasDeposit ? canonicalPlataDeposit(deposit) : null;
+  if (hasDeposit && canonicalDeposit === null) {
+    return { ok: false, error: 'deposit must be a non-negative amount with at most two decimals' };
+  }
+  return withOrderUpdate(repository, orderId, (order) => {
+    const next = { ...order };
+    if (requested === 0) {
+      for (const field of PLATA_FIELDS) delete next[field];
+      return next;
+    }
+    next.plataCount = requested;
+    // Correcting the count of a plate already reported as left at reception must
+    // not drag it back to withCustomer, so an existing status stands.
+    next.plataStatus = KNOWN_PLATA_STATUSES.includes(order.plataStatus) ? order.plataStatus : 'withCustomer';
+    if (canonicalDeposit === null) delete next.plataDeposit;
+    else next.plataDeposit = canonicalDeposit;
+    return next;
+  });
+}
+
+async function setPlataStatus(repository, orderId, status, { note } = {}) {
+  if (!KNOWN_PLATA_STATUSES.includes(status)) {
+    return { ok: false, error: `status must be one of: ${KNOWN_PLATA_STATUSES.join(', ')}` };
+  }
+  const trimmedNote = typeof note === 'string' ? note.trim() : '';
+  return withOrderUpdate(repository, orderId, (order) => {
+    const next = { ...order, plataStatus: status };
+    if (trimmedNote !== '') next.plataPickupNote = trimmedNote.slice(0, MAX_PLATA_NOTE_LENGTH);
+    // The stamps record when it actually happened, so the first report wins and a
+    // repeated update does not move the clock.
+    if (status === 'collected' && !next.plataCollectedAt) next.plataCollectedAt = Date.now();
+    if (status === 'depositReturned' && !next.plataDepositReturnedAt) next.plataDepositReturnedAt = Date.now();
+    return next;
+  });
+}
+
+// Same claim shape as setDeliveryDigestSent: one motzei-Shabbat pickup digest
+// per day, whatever restarts the scheduler.
+async function setPlataDigestSent(repository, dateString) {
+  const day = typeof dateString === 'string' ? dateString.trim() : '';
+  if (day === '') throw new RangeError('date string required');
+  const result = await withSettingsUpdate(repository, (settings) => (
+    settings.meyPlataDigestSentFor === day ? null : { ...settings, meyPlataDigestSentFor: day }
+  ));
+  if (!result.ok) return { ok: false, error: 'save failed after retries' };
+  return { ok: true, claimed: !result.skipped };
+}
+
 module.exports = {
   effectiveOrderingOpen,
   orderingStatus,
@@ -313,6 +428,12 @@ module.exports = {
   revertDeliveryProof,
   setPendingProof,
   setCourierLocation,
+  setPlataOnOrder,
+  setPlataStatus,
+  setPlataDigestSent,
+  setWeeklyDigestSent,
+  setPrepForecastSent,
   KNOWN_ORDER_STATUSES,
   KNOWN_CHECKIN_STATES,
+  KNOWN_PLATA_STATUSES,
 };

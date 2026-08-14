@@ -6,6 +6,7 @@ const MAX_BACKUP_DEPTH = 64
 const MAX_BACKUP_NODES = 500_000
 const MAX_LINK_LENGTH = 2_048
 const MAX_SITE_BANNER_LENGTH = 200
+const MAX_PAYMENT_DETAILS_LENGTH = 500
 
 export interface BackupArtifact {
   readonly filename: string
@@ -52,6 +53,10 @@ export interface SettingsDraft {
   /** YYYY-MM-DD (Dubai) ordering reopens on; '' while open. */
   readonly orderingClosedUntil: string
   readonly siteBanner: string
+  /** Free text Lin writes once: how a customer actually pays her. */
+  readonly paymentRequestDetails: string
+  /** The business's Google review link, pasted into the thank-you message. */
+  readonly googleReviewUrl: string
 }
 
 export type SettingsDraftValidation =
@@ -67,6 +72,8 @@ export type SettingsDraftValidation =
       readonly orderingOpen: boolean
       readonly orderingClosedUntil: string
       readonly siteBanner: string
+      readonly paymentRequestDetails: string
+      readonly googleReviewUrl: string
     }
   | { readonly valid: false; readonly issues: readonly string[] }
 
@@ -290,6 +297,8 @@ export function readSettingsDraft(
     // A reopen day already behind us is spent; the draft shows an open site.
     orderingClosedUntil: orderingOpen ? '' : isoDate(settings.orderingClosedUntil),
     siteBanner: stringValue(settings.siteBanner),
+    paymentRequestDetails: stringValue(settings.paymentRequestDetails),
+    googleReviewUrl: stringValue(settings.googleReviewUrl),
   }
 }
 
@@ -323,6 +332,14 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
   if (siteBanner.length > MAX_SITE_BANNER_LENGTH) {
     issues.push(`הודעת האתר ארוכה מדי (עד ${MAX_SITE_BANNER_LENGTH} תווים).`)
   }
+  const paymentRequestDetails = draft.paymentRequestDetails.trim()
+  if (paymentRequestDetails.length > MAX_PAYMENT_DETAILS_LENGTH) {
+    issues.push(`פרטי התשלום ארוכים מדי (עד ${MAX_PAYMENT_DETAILS_LENGTH} תווים).`)
+  }
+  const googleReviewUrl = draft.googleReviewUrl.trim()
+  if (!validOptionalUrl(googleReviewUrl)) {
+    issues.push('קישור הביקורות בגוגל חייב להיות כתובת HTTP או HTTPS תקינה.')
+  }
   return issues.length > 0
     ? { valid: false, issues }
     : {
@@ -337,6 +354,8 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
         orderingOpen: draft.orderingOpen,
         orderingClosedUntil: draft.orderingOpen ? '' : isoDate(draft.orderingClosedUntil),
         siteBanner,
+        paymentRequestDetails,
+        googleReviewUrl,
       }
 }
 
@@ -370,6 +389,8 @@ export function applySettingsToStore(
     invoiceCurrency: result.invoiceCurrency,
     orderingOpen: result.orderingOpen,
     siteBanner: result.siteBanner === '' ? null : result.siteBanner,
+    paymentRequestDetails: result.paymentRequestDetails,
+    googleReviewUrl: result.googleReviewUrl,
   }
   if (result.orderingOpen) {
     delete settings.orderingClosedUntil
