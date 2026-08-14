@@ -1,18 +1,33 @@
-# STATE — batmelech (updated: 2026-08-14 02:45)
+# STATE — batmelech (updated: 2026-08-14 07:10)
+
+## Now — full site gap audit for "what does Lin need to be perfect" (2026-08-14)
+Moshe said he'd asked Lin (via Mey) what's missing. Turns out that answer isn't retrievable:
+Mey/Telegram (`server/telegram/`) is fully stateless — `store: false` on every OpenAI call,
+no conversation log anywhere in the DB, filesystem, or code. If Lin answered, it only ever
+existed live inside Telegram, unlogged. Ran a live two-agent browser scan instead (customer
+site + admin panel, real login, both desktop-code-review and mobile viewport where possible)
+and folded every finding into **Next** below, priority-ordered.
+One flagged item was checked and ruled a false alarm: it looked like `/` might expose the
+admin order board to logged-out visitors, but that was session contamination (two scan agents
+shared one Chrome profile). Confirmed via a credentials-omitted fetch: logged-out `/` correctly
+redirects to `/site`, never to `/admin`. Real (lower-urgency) finding instead: real order PII
+(name/phone/hotel) sits unencrypted in `localStorage` under keys `batmelech-orders-v1` /
+`bm-sync-*`, written by the legacy `index.html`/`app.html` manager app. Since `localStorage` is
+origin-scoped, not path-scoped, that data is technically readable by any script running on any
+`/site/*` public page on the same origin — not a public leak today, but worth encrypting or
+moving server-side eventually.
 
 ## batmelech.ae DNS — false alarm, tools in this sandbox gave a wrong read
-Mid-session, curl + DNS-over-HTTPS lookups run from this environment showed `batmelech.ae`
-resolving to an AEserver parking-page IP with HTTPS closed, and Railway's `domain_status` API
-showed the custom domain `Verified: no`. Read that as the domain never having worked. Moshe
-checked live in a fresh private tab and confirmed the real site loads fine — so that reading
-was wrong, likely a network/DNS quirk specific to this sandboxed environment, not a real
-production issue. Don't trust this environment's raw `curl`/DNS lookups against batmelech.ae
-as ground truth again; verify through Moshe or the Chrome browser tool instead. Railway's
-dashboard still shows the custom domain as unverified, which is odd given it works — worth a
-glance sometime, but not an active emergency.
+Mid-session (earlier tonight), curl + DNS-over-HTTPS lookups run from this environment showed
+`batmelech.ae` resolving to an AEserver parking-page IP with HTTPS closed, and Railway's
+`domain_status` API showed the custom domain `Verified: no`. Moshe checked live in a fresh
+private tab and confirmed the real site loads fine — sandbox DNS quirk, not real. Don't trust
+this environment's raw `curl`/DNS lookups against batmelech.ae again; verify through Moshe or
+the Chrome browser tool instead. Railway dashboard still shows the custom domain unverified —
+cosmetic, not an active emergency.
 
-## Now (in progress) — Shabbat menu split + מיי (Mey), Lin's Telegram AI assistant
-Built and deployed tonight (2026-08-14), live on the Railway domain above.
+## Recently done (2026-08-14, Shabbat menu split + מיי)
+Built and deployed same day, live on the Railway domain above.
 
 **Shabbat is now two distinct pages, not one page wearing two hats:**
 - `/shabbat-order` — unchanged $230 package builder (salads/first/main/side/dessert, quota +
@@ -96,6 +111,48 @@ a lightweight CRM (`customers`, `customerNotes`, `customerTags`, `activityLog`) 
 here, but a good future idea if Lin wants to track repeat customers/preferences through מיי.
 
 ## Next
+
+### From the 2026-08-14 gap audit — revenue/trust blockers (do first)
+- 26/30 images on `/shabbat-order` (the flagship $230 builder) show a "תמונה זמנית" placeholder
+  badge — the page customers actually book from looks unfinished.
+- Cart is wiped on any page refresh, direct URL, or new tab (React state only, nothing
+  persisted) — customer loses their order silently.
+- Checkout has no delivery date/time field at all — a customer cannot say which Shabbat or
+  what time. No field is `required` either — worth confirming submit can't go out empty.
+- Kashrut page never names the certifying body, rabbi, or certificate — a hard dealbreaker for
+  an observant guest deciding whether to trust the kitchen.
+- `/shabbat-extras`'s only nav control (the back link in its bespoke sticky header) sits under
+  the site banner once scrolled — visitor has no way off the page.
+- Unknown `/site/*` URLs render a blank white page — no 404 text, no nav, no way out (unlike
+  `/admin`, which has a real 404).
+- `weekdays`/`shabbat-order`: scroll-reveal cards (`opacity-0` + IntersectionObserver) can get
+  stuck permanently invisible after a jump-scroll (hash link, back/forward restore) — confirmed
+  reproducible, not a one-off.
+- Payment method is never stated during ordering — flow ends as a WhatsApp message with no
+  in-flow mention of how/when to actually pay (ties into Ziina items below).
+
+### From the same audit — operational friction for Lin (admin panel)
+- No ordering-open/closed toggle or site-banner field anywhere in the admin Settings screen —
+  only Mey can set/see them (`/api/site/status` is read-only from the customer-site's side too).
+  Lin can't see or override site state from the panel itself.
+- Settings screen shows "load/delete demo data" buttons next to real backup/restore — confusing
+  for a non-technical operator, and the live DB may currently still hold demo seed orders
+  (an order bon showed `demo4` as its order ID — worth confirming the demo data was ever purged).
+- Preparation / deliveries / labels screens default to a fixed past date (07.08.2026) instead of
+  today or next Friday — Lin has to change it by hand every time.
+- Shopping-list feature computes 0 ingredients — 0 of 66 dishes have a recipe defined. Built but
+  dormant until someone enters recipes.
+- Order editor's page heading shows the raw order UUID instead of the customer's name.
+
+### From the same audit — trust/business polish (medium)
+- No real food photography anywhere (all placeholder or stock-feeling images).
+- Testimonials on the home page aren't linked to anything verifiable (no Google/Instagram).
+- Prices shown in `$` throughout a Dubai business — reads as ambiguous against AED.
+- The 5 experience pages + events page carry zero pricing signal (no "from $X/person", no
+  minimum guests) — dead-end into a quote request with no anchor.
+- `og:image` is a relative path and the logo, not food — WhatsApp link previews (the actual
+  order channel) will show no image, or the wrong one.
+
 0. **"Ordering closed" needs to become date-aware, not a plain on/off.** Moshe's ask: closing
    should specifically mean "can't order for the upcoming Friday," with an automatic reopen
    every Sunday for the next cycle — not an indefinite closed state someone has to remember to
