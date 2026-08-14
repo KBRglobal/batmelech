@@ -307,6 +307,100 @@ describe('DeliveriesScreen', () => {
     expect(screen.queryByText('במשלוח')).toBeNull()
   })
 
+  it('shows delivery progress, the suggested route sequence, and one full-route navigation link', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          {
+            id: 'far-stop', date: '2099-08-14', name: 'עצירה רחוקה', place: 'מלון רחוק',
+            hotelAddress: 'Far Road, Dubai', hotelLatitude: 25.8, hotelLongitude: 55.9,
+            time: '10:00', status: 'מוכנה',
+          },
+          {
+            id: 'near-stop', date: '2099-08-14', name: 'עצירה קרובה', place: 'מלון קרוב',
+            hotelAddress: 'Near Road, Dubai', hotelLatitude: 25.21, hotelLongitude: 55.28,
+            time: '10:15', status: 'במשלוח',
+          },
+          { id: 'was-delivered', date: '2099-08-14', name: 'כבר נמסרה', place: 'מלון', status: 'נמסרה' },
+        ],
+      },
+    }))
+    renderDeliveries()
+
+    expect(screen.getByText('נמסרו 1 מתוך 3')).toBeTruthy()
+    expect(screen.getByText('עצירה נוכחית: עצירה קרובה')).toBeTruthy()
+    expect(screen.getByText('העצירה הבאה: עצירה רחוקה')).toBeTruthy()
+
+    const route = screen.getByRole('link', { name: 'פתח מסלול מלא בניווט' })
+    expect(route.getAttribute('href')).toBe(
+      'https://www.google.com/maps/dir/Near%20Road%2C%20Dubai/Far%20Road%2C%20Dubai',
+    )
+    expect(route.getAttribute('target')).toBe('_blank')
+    expect(route.getAttribute('rel')).toBe('noopener noreferrer')
+
+    // The nearer stop is 15 minutes later but sits inside the same cluster, so the
+    // suggested sequence puts it first and the numbering follows the driving order.
+    expect([...document.querySelectorAll('article h2')].map((heading) => heading.textContent))
+      .toEqual(['מלון קרוב', 'מלון רחוק'])
+    expect(
+      [...document.querySelectorAll('article ol > li')].map((stop) => stop.querySelector('span')?.textContent),
+    ).toEqual(['1', '2'])
+  })
+
+  it('shows the courier check-in badge and a validated delivery proof link', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          {
+            id: 'checked-in', date: '2099-08-14', name: 'לקוחה מדווחת', place: 'מלון א',
+            courierCheckinState: 'delayed', courierEtaMinutes: 20,
+            deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+          },
+          {
+            id: 'unsafe-proof', date: '2099-08-14', name: 'לקוחה לא בטוחה', place: 'מלון ב',
+            courierCheckinState: 'onTheWay',
+            deliveryProofUrl: 'http://pub-abc123.r2.dev/proof.jpg',
+          },
+        ],
+      },
+    }))
+    renderDeliveries()
+
+    expect(screen.getByText('מתעכב · 20 דק׳')).toBeTruthy()
+    expect(screen.getByText('בדרך')).toBeTruthy()
+
+    const proofLinks = screen.getAllByRole('link', { name: 'צילום מסירה' })
+    expect(proofLinks).toHaveLength(1)
+    expect(proofLinks[0]!.getAttribute('href')).toBe('https://pub-abc123.r2.dev/proof.jpg')
+    expect(proofLinks[0]!.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
+  it('shows a recent courier location and hides one older than three hours', () => {
+    const store = (at: number): LegacyStore => ({
+      orders: [{ id: 'located', date: '2099-08-14', name: 'לקוחה', place: 'מלון' }],
+      settings: { meyCourierLocation: { lat: 25.2, lon: 55.27, at } },
+    })
+
+    mockedUseStore.mockReturnValue(queryResult({ store: store(Date.now() - 12 * 60_000) }))
+    const recent = renderDeliveries()
+    expect(screen.getByText('עדכון מיקום אחרון לפני 12 דק׳')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'מיקום השליח' }).getAttribute('href')).toBe(
+      'https://www.google.com/maps/search/?api=1&query=25.2,55.27',
+    )
+    recent.unmount()
+
+    mockedUseStore.mockReturnValue(queryResult({ store: store(Date.now() - 4 * 60 * 60_000) }))
+    const stale = renderDeliveries()
+    expect(screen.queryByText(/עדכון מיקום אחרון/)).toBeNull()
+    stale.unmount()
+
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'located', date: '2099-08-14', name: 'לקוחה', place: 'מלון' }] },
+    }))
+    renderDeliveries()
+    expect(screen.queryByText(/עדכון מיקום אחרון/)).toBeNull()
+  })
+
   it('rejects background envelope drift before calling the save callback', async () => {
     const store = {
       orders: [{ id: 'drift', date: '2099-08-14', name: 'לקוחה דריפט', place: 'מלון', status: 'אושרה' }],

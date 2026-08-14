@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { LegacyStore } from './store.ts'
-import { buildDeliveryDashboard, buildGoogleMapsSearchHref } from './delivery-dashboard.ts'
+import {
+  buildDeliveryDashboard,
+  buildGoogleMapsSearchHref,
+  deliveryProofSummary,
+} from './delivery-dashboard.ts'
 
 function deepFreeze(value: unknown): void {
   if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return
@@ -217,6 +221,86 @@ describe('delivery dashboard', () => {
       orderId: null,
     })
     expect(dashboard.warnings.map(({ code }) => code)).toContain('MISSING_ORDER_ID')
+  })
+
+  it('accepts only an https public-R2 delivery proof URL', () => {
+    const proofHrefs = (deliveryProofUrl: string | undefined) =>
+      buildDeliveryDashboard({
+        orders: [{ id: 'proof', date: '2026-08-14', place: 'מלון', deliveryProofUrl }],
+      }).groups[0]?.destinations[0]?.orders[0]?.proofPhotoHref
+
+    expect(proofHrefs('https://pub-abc123.r2.dev/x.jpg')).toBe('https://pub-abc123.r2.dev/x.jpg')
+    expect(proofHrefs('http://pub-abc123.r2.dev/x.jpg')).toBeNull()
+    expect(proofHrefs('https://evil.example.com/x.jpg')).toBeNull()
+    expect(proofHrefs('https://pub-abc123.r2.dev.evil.example.com/x.jpg')).toBeNull()
+    expect(proofHrefs('https://r2.dev/x.jpg')).toBeNull()
+    expect(proofHrefs('https://user:pass@pub-abc123.r2.dev/x.jpg')).toBeNull()
+    expect(proofHrefs('javascript:alert(1)')).toBeNull()
+    expect(proofHrefs('')).toBeNull()
+    expect(proofHrefs(undefined)).toBeNull()
+  })
+
+  it('labels the courier check-in state and appends the ETA only when it is present', () => {
+    const checkin = (order: Record<string, unknown>) =>
+      buildDeliveryDashboard({
+        orders: [{ id: 'checkin', date: '2026-08-14', place: 'מלון', ...order }],
+      }).groups[0]?.destinations[0]?.orders[0]
+
+    expect(checkin({ courierCheckinState: 'onTheWay' })).toMatchObject({
+      checkinState: 'onTheWay',
+      checkinLabel: 'בדרך',
+      etaMinutes: null,
+    })
+    expect(checkin({ courierCheckinState: 'onTime', courierEtaMinutes: 15 })).toMatchObject({
+      checkinState: 'onTime',
+      checkinLabel: 'מגיע בזמן · 15 דק׳',
+      etaMinutes: 15,
+    })
+    expect(checkin({ courierCheckinState: 'delayed', courierEtaMinutes: 40 })?.checkinLabel)
+      .toBe('מתעכב · 40 דק׳')
+    expect(checkin({ courierCheckinState: 'delayed', courierEtaMinutes: -5 })?.checkinLabel)
+      .toBe('מתעכב')
+    expect(checkin({ courierCheckinState: 'exploded' })).toMatchObject({
+      checkinState: null,
+      checkinLabel: null,
+    })
+    expect(checkin({})).toMatchObject({ checkinState: null, checkinLabel: null, deliveredAt: null })
+    expect(checkin({ deliveredAt: 1_760_000_000_000 })?.deliveredAt).toBe(1_760_000_000_000)
+    expect(checkin({ deliveredAt: 'yesterday' })?.deliveredAt).toBeNull()
+  })
+
+  it('reads a delivery proof summary without reporting anything for a bare order', () => {
+    expect(deliveryProofSummary({ id: 'bare' })).toMatchObject({
+      present: false,
+      photoHref: null,
+      proofAt: null,
+      proofBy: '',
+      deliveredAt: null,
+      checkinState: null,
+      checkinAt: null,
+      courierNote: '',
+    })
+    expect(deliveryProofSummary({
+      id: 'full',
+      deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+      deliveryProofAt: 1_760_000_000_000,
+      deliveryProofBy: 'שליח',
+      deliveredAt: 1_760_000_100_000,
+      courierCheckinState: 'delayed',
+      courierCheckinAt: 1_759_999_000_000,
+      courierEtaMinutes: 20,
+      courierNote: 'תנועה כבדה',
+    })).toMatchObject({
+      present: true,
+      photoHref: 'https://pub-abc123.r2.dev/proof.jpg',
+      proofAt: 1_760_000_000_000,
+      proofBy: 'שליח',
+      deliveredAt: 1_760_000_100_000,
+      checkinState: 'delayed',
+      checkinLabel: 'מתעכב · 20 דק׳',
+      checkinAt: 1_759_999_000_000,
+      courierNote: 'תנועה כבדה',
+    })
   })
 
   it('does not mutate the persisted state while deriving deterministic groups', () => {

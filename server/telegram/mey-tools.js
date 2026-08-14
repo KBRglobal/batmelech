@@ -1,6 +1,22 @@
 'use strict';
 
-const { setOrderingOpen, setSiteBanner, setItemStock, setOrderStatus, KNOWN_ORDER_STATUSES } = require('../business-actions');
+const {
+  setOrderingOpen,
+  setSiteBanner,
+  setItemStock,
+  setOrderStatus,
+  setDeliveryCheckin,
+  KNOWN_ORDER_STATUSES,
+  KNOWN_CHECKIN_STATES,
+} = require('../business-actions');
+const {
+  destinationLabel,
+  dubaiDateString,
+  navigationHref,
+  orderName,
+  orderStatus,
+  selectDeliveryDay,
+} = require('./delivery-day');
 
 const MAX_SEARCH_RESULTS = 15;
 const MAX_ORDERS_IN_CONTEXT = 200;
@@ -99,6 +115,50 @@ const TOOL_DEFINITIONS = [
     },
     strict: true,
   },
+  {
+    type: 'function',
+    name: 'get_delivery_day',
+    description:
+      'מחזיר את יום המשלוחים המלא לתאריך מסוים - כל המשלוחים לפי סדר השעות, כולל אלה שכבר נמסרו. ' +
+      'לכל משלוח: שם הלקוח, המלון, השעה, קישור ניווט, האם התקבלה תמונת מסירה, מה מצב הצ׳ק-אין של השליח וזמן ההגעה שמסר. ' +
+      'זה הכלי לתיאום מול פליקס - תשתמשי בו לפני שאת עונה על כל שאלה או עדכון שקשור למשלוחים.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'תאריך בפורמט YYYY-MM-DD. ברירת מחדל: היום לפי שעון דובאי' },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: false,
+  },
+  {
+    type: 'function',
+    name: 'set_delivery_checkin',
+    description:
+      'מתעדת עדכון של השליח על משלוח אחד: מצב הצ׳ק-אין (בדרך / מגיע בזמן / מתעכב), זמן הגעה משוער בדקות והערה חופשית. ' +
+      'זה כל מה שהיא משנה - היא לא משנה סטטוס הזמנה, לא תשלום ולא שום דבר אחר. ' +
+      'תאתרי קודם את ההזמנה הנכונה עם get_delivery_day או search_orders, ורק אז תקראי לכלי הזה עם המזהה שמצאת.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'מזהה ההזמנה (id)' },
+        state: {
+          type: 'string',
+          enum: KNOWN_CHECKIN_STATES,
+          description: 'onTheWay = בדרך, onTime = מגיע בזמן, delayed = מתעכב',
+        },
+        etaMinutes: {
+          type: ['number', 'null'],
+          description: 'תוך כמה דקות הוא מגיע, לפי מה שמסר. null אם לא מסר',
+        },
+        note: { type: ['string', 'null'], description: 'הערה קצרה בלשונו, או null' },
+      },
+      required: ['orderId', 'state', 'etaMinutes', 'note'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 function normalizedQuery(value) {
@@ -127,6 +187,25 @@ function summarizeOrder(order) {
     paid: order.paid,
     payMethod: order.payMethod,
     notes: order.notes,
+  };
+}
+
+// What Felix needs to hear about one stop, and what Mey needs to know to answer
+// about it without guessing: where it goes, whether he already reported in, and
+// whether a proof photo already closed it.
+function summarizeDelivery(order) {
+  return {
+    id: order.id,
+    name: orderName(order),
+    hotel: destinationLabel(order),
+    time: typeof order.time === 'string' ? order.time : null,
+    status: orderStatus(order),
+    navigationUrl: navigationHref(order),
+    hasProofPhoto: Boolean(order.deliveryProofUrl),
+    checkinState: order.courierCheckinState || null,
+    etaMinutes: Number.isFinite(order.courierEtaMinutes) ? order.courierEtaMinutes : null,
+    awaitingReply: Boolean(order.meyAwaitingReplySince),
+    deliveredAt: order.deliveredAt || null,
   };
 }
 
@@ -171,6 +250,17 @@ function createMeyTools({ repository, logger = console }) {
         menuOverrides: menu,
         note: 'menuOverrides מכיל רק שינויים שנעשו מברירת המחדל - לא בהכרח את כל התפריט המלא.',
       };
+    },
+
+    async get_delivery_day({ date }) {
+      const current = await repository.loadState();
+      const day = typeof date === 'string' && date.trim() !== '' ? date.trim() : dubaiDateString();
+      const deliveries = selectDeliveryDay(current.data, day, { includeDelivered: true }).map(summarizeDelivery);
+      return { date: day, count: deliveries.length, deliveries };
+    },
+
+    async set_delivery_checkin({ orderId, state, etaMinutes, note }) {
+      return setDeliveryCheckin(repository, orderId, { state, etaMinutes, note });
     },
 
     async set_item_stock({ itemName, inStock }) {

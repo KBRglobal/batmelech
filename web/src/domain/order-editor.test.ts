@@ -29,7 +29,7 @@ import {
   type HotelSearchResult,
   type OrderDraft,
 } from './order-editor.ts'
-import type { LegacyStore } from './store.ts'
+import type { LegacyOrder, LegacyStore } from './store.ts'
 import { buildDeliveryDashboard } from './delivery-dashboard.ts'
 
 const emptyStore: LegacyStore = { orders: [] }
@@ -1039,6 +1039,101 @@ describe('validation and AI review application', () => {
       hotelLongitude: null,
       navigationUrl: '',
       address: 'מסירה בקבלה',
+    })
+  })
+})
+
+describe('delivery-confirmation fields through an admin edit', () => {
+  const deliveryOwnedOrder = {
+    id: 'order-1',
+    date: '2026-08-14',
+    name: 'לקוחה',
+    phone: '+971501234567',
+    place: 'מלון',
+    address: 'Tower 7',
+    time: '11:00',
+    status: 'נמסרה',
+    total: '100.00',
+    paid: 'כן',
+    meyToken: 'mey-token',
+    meyLeadNudgeAt: 1_759_000_000_000,
+    meyPromptMessageId: 4242,
+    courierCheckinState: 'delayed',
+    courierCheckinAt: 1_759_999_000_000,
+    courierEtaMinutes: 20,
+    courierNote: 'תנועה כבדה',
+    deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+    deliveryProofAt: 1_760_000_000_000,
+    deliveryProofBy: 'שליח',
+    deliveredAt: 1_760_000_100_000,
+    statusBeforeProof: 'במשלוח',
+  } satisfies LegacyOrder
+
+  it('preserves every server-owned delivery field through the admin save round trip', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
+
+    const serialized = serializeOrderDraft({ ...draft, name: 'שם מעודכן' }, 'order-1')
+    const saved = { ...deliveryOwnedOrder, ...serialized }
+
+    expect(saved.name).toBe('שם מעודכן')
+    expect(saved).toMatchObject({
+      meyToken: 'mey-token',
+      meyLeadNudgeAt: 1_759_000_000_000,
+      meyPromptMessageId: 4242,
+      courierCheckinState: 'delayed',
+      courierCheckinAt: 1_759_999_000_000,
+      courierEtaMinutes: 20,
+      courierNote: 'תנועה כבדה',
+      deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+      deliveryProofAt: 1_760_000_000_000,
+      deliveryProofBy: 'שליח',
+      deliveredAt: 1_760_000_100_000,
+      statusBeforeProof: 'במשלוח',
+    })
+  })
+
+  it('preserves the proof URL even if the serialized draft carries no delivery fields at all', () => {
+    // The editor must never own these fields: the merge in applyOrderDraftToStore is what
+    // keeps them, so the round trip has to survive a draft that dropped them entirely.
+    const menu = buildOrderEditorMenu(emptyStore)
+    const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
+    const serialized: Record<string, unknown> = { ...serializeOrderDraft(draft, 'order-1') }
+    for (const field of [
+      'meyToken', 'meyLeadNudgeAt', 'meyPromptMessageId', 'courierCheckinState', 'courierCheckinAt',
+      'courierEtaMinutes', 'courierNote', 'deliveryProofUrl', 'deliveryProofAt', 'deliveryProofBy',
+      'deliveredAt', 'statusBeforeProof',
+    ]) delete serialized[field]
+
+    expect({ ...deliveryOwnedOrder, ...serialized }).toMatchObject({
+      deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+      deliveryProofAt: 1_760_000_000_000,
+      deliveryProofBy: 'שליח',
+      deliveredAt: 1_760_000_100_000,
+      courierCheckinState: 'delayed',
+    })
+  })
+
+  it('preserves the proof URL through the real applyOrderDraftToStore edit path', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const baseState: LegacyStore = { orders: [deliveryOwnedOrder] }
+    const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
+
+    const nextState = applyOrderDraftToStore(
+      baseState,
+      { ...draft, name: 'שם מעודכן', notes: 'הערה חדשה' },
+      { mode: 'edit', orderId: 'order-1' },
+    )
+
+    expect(nextState.orders[0]).toMatchObject({
+      name: 'שם מעודכן',
+      notes: 'הערה חדשה',
+      deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+      deliveryProofAt: 1_760_000_000_000,
+      deliveryProofBy: 'שליח',
+      deliveredAt: 1_760_000_100_000,
+      meyToken: 'mey-token',
+      statusBeforeProof: 'במשלוח',
     })
   })
 })

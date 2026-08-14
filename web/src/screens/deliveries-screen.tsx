@@ -19,13 +19,21 @@ import {
   applyNextDeliveryStatus,
   nextDeliveryStatus,
 } from '../domain/operational-state.ts'
+import { buildMultiStopMapsUrl, suggestRouteOrder } from '../domain/route-order.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
-import type { LegacyStore } from '../domain/store.ts'
+import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 const actionClassName =
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+
+const navigationActionClassName =
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-black text-primary-foreground'
+
+const DELIVERED_STATUS = 'נמסרה'
+const IN_TRANSIT_STATUS = 'במשלוח'
+const COURIER_LOCATION_MAX_AGE_MS = 3 * 60 * 60 * 1000
 
 interface DeliveriesInitialization {
   readonly baseEnvelope: VersionedStateEnvelope | null
@@ -43,8 +51,61 @@ function editOrderHref(orderId: string): string {
 
 function statusClassName(status: string): string {
   if (status === 'מוכנה') return 'border-emerald-100 bg-emerald-50 text-emerald-700'
-  if (status === 'במשלוח' || status === 'אושרה') return 'border-amber-100 bg-amber-50 text-amber-800'
+  if (status === IN_TRANSIT_STATUS || status === 'אושרה') return 'border-amber-100 bg-amber-50 text-amber-800'
   return 'border-rose-100 bg-rose-50 text-rose-700'
+}
+
+function checkinClassName(state: NonNullable<DeliveryOrderView['checkinState']>): string {
+  if (state === 'onTime') return 'border-emerald-100 bg-emerald-50 text-emerald-700'
+  if (state === 'delayed') return 'border-rose-100 bg-rose-50 text-rose-700'
+  return 'border-sky-100 bg-sky-50 text-sky-700'
+}
+
+interface RoutePlan {
+  readonly sequence: readonly DeliveryOrderView[]
+  readonly rankByView: ReadonlyMap<DeliveryOrderView, number>
+  readonly mapsUrls: readonly string[]
+}
+
+// The suggested driving sequence needs the stored coordinates, which the dashboard view
+// intentionally does not carry, so the plan is derived from the original orders and mapped
+// back onto the views by their source index.
+function buildRoutePlan(store: Readonly<LegacyStore>, group: DeliveryDateGroup): RoutePlan {
+  const viewByOrder = new Map<LegacyOrder, DeliveryOrderView>()
+  const stops: LegacyOrder[] = []
+  for (const destination of group.destinations) {
+    for (const view of destination.orders) {
+      const order = store.orders[view.sourceIndex]
+      if (order === undefined || viewByOrder.has(order)) continue
+      viewByOrder.set(order, view)
+      stops.push(order)
+    }
+  }
+  const routedStops = suggestRouteOrder(stops)
+  const sequence = routedStops.flatMap((order) => {
+    const view = viewByOrder.get(order)
+    return view === undefined ? [] : [view]
+  })
+  return {
+    sequence,
+    rankByView: new Map(sequence.map((view, index) => [view, index + 1])),
+    mapsUrls: buildMultiStopMapsUrl(routedStops),
+  }
+}
+
+function routeRank(plan: RoutePlan, destination: DeliveryDestinationGroup): number {
+  const ranks = destination.orders.flatMap((order) => {
+    const rank = plan.rankByView.get(order)
+    return rank === undefined ? [] : [rank]
+  })
+  return ranks.length === 0 ? Number.MAX_SAFE_INTEGER : Math.min(...ranks)
+}
+
+function deliveredOrderCount(store: Readonly<LegacyStore>, serviceDate: string | null): number {
+  if (serviceDate === null) return 0
+  return store.orders.filter(
+    (order) => order.date === serviceDate && order.status === DELIVERED_STATUS,
+  ).length
 }
 
 function warningText(warning: DeliveryWarning): string {
@@ -181,9 +242,25 @@ function DeliveryOrder({
               {order.time && <span className="text-xs font-black text-muted-foreground">{order.time}</span>}
               <h3 className="font-black text-primary">{order.customerName}</h3>
               <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${statusClassName(order.status)}`}>{order.status}</span>
+              {order.checkinState && order.checkinLabel && (
+                <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${checkinClassName(order.checkinState)}`}>{order.checkinLabel}</span>
+              )}
               {order.groupName && <span className="rounded-full bg-secondary px-2.5 py-1 text-[0.6875rem] font-black text-primary">{order.groupName}</span>}
             </div>
-            <div className="mt-2"><Collection order={order} /></div>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Collection order={order} />
+              {order.proofPhotoHref && (
+                <a
+                  href={order.proofPhotoHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-black text-primary underline"
+                >
+                  <LocalIcon name="ph:check-circle-bold" className="text-base" />
+                  <span>צילום מסירה</span>
+                </a>
+              )}
+            </div>
           </div>
         </div>
         <OrderActions
@@ -199,11 +276,13 @@ function DeliveryOrder({
 
 function Destination({
   destination,
+  routeRanks,
   onAdvance,
   saveStates,
   saveBlocked,
 }: {
   destination: DeliveryDestinationGroup
+  routeRanks: ReadonlyMap<DeliveryOrderView, number>
   onAdvance?: (order: DeliveryOrderView) => void
   saveStates: Readonly<Record<string, DeliverySaveState>>
   saveBlocked: boolean
@@ -238,7 +317,7 @@ function Destination({
           <DeliveryOrder
             key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`}
             order={order}
-            sequence={index + 1}
+            sequence={routeRanks.get(order) ?? index + 1}
             onAdvance={onAdvance}
             saveState={order.orderId === null ? undefined : saveStates[order.orderId]}
             saveBlocked={saveBlocked}
@@ -280,6 +359,84 @@ function Pickups({
         ))}
       </ol>
     </section>
+  )
+}
+
+function CourierLocationLine({ store }: { store: Readonly<LegacyStore> }) {
+  const location = store.settings?.meyCourierLocation
+  if (location == null) return null
+  const ageMinutes = Math.max(0, Math.round((Date.now() - location.at) / 60_000))
+  if (Date.now() - location.at > COURIER_LOCATION_MAX_AGE_MS) return null
+  if (!Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return null
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-xs font-black text-muted-foreground">
+      <LocalIcon name="ph:map-pin-bold" className="text-base text-primary" />
+      <span>עדכון מיקום אחרון לפני {ageMinutes} דק׳</span>
+      <a
+        href={`https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lon}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline"
+      >
+        מיקום השליח
+      </a>
+    </p>
+  )
+}
+
+function ProgressStrip({
+  store,
+  group,
+  plan,
+}: {
+  store: Readonly<LegacyStore>
+  group: DeliveryDateGroup
+  plan: RoutePlan
+}) {
+  const delivered = deliveredOrderCount(store, group.serviceDate)
+  const total = delivered + group.orderCount
+  const inTransit = plan.sequence.filter((order) => order.status === IN_TRANSIT_STATUS)
+  const currentStop = inTransit.length === 1 ? inTransit[0]! : null
+  const currentIndex = currentStop === null ? -1 : plan.sequence.indexOf(currentStop)
+  const nextStop = currentStop === null ? plan.sequence[0] : plan.sequence[currentIndex + 1]
+  return (
+    <div className="flex flex-col gap-3 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <p className="flex items-center gap-2 text-sm font-black text-primary">
+          <LocalIcon name="ph:truck-bold" className="text-xl" />
+          <span>נמסרו {delivered} מתוך {total}</span>
+        </p>
+        <p className="text-xs font-black text-primary">
+          {`עצירה נוכחית: ${currentStop === null ? 'אין עצירה בדרך' : currentStop.customerName}`}
+        </p>
+        <p className="text-xs font-black text-primary">
+          {`העצירה הבאה: ${nextStop === undefined ? 'אין עצירה נוספת' : nextStop.customerName}`}
+        </p>
+      </div>
+      <CourierLocationLine store={store} />
+    </div>
+  )
+}
+
+function RouteLinks({ mapsUrls }: { mapsUrls: readonly string[] }) {
+  if (mapsUrls.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-3">
+      {mapsUrls.map((url, index) => (
+        <a
+          key={url}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={navigationActionClassName}
+        >
+          <LocalIcon name="ph:map-pin-bold" className="text-lg" />
+          <span>
+            פתח מסלול מלא בניווט{mapsUrls.length > 1 ? ` · חלק ${index + 1}` : ''}
+          </span>
+        </a>
+      ))}
+    </div>
   )
 }
 
@@ -381,6 +538,12 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
     dashboard.groups.find(({ key }) => key === selectedGroupKey)
     ?? datedGroups.find(({ serviceDate }) => serviceDate === defaultServiceDate)
     ?? dashboard.groups[0]!
+  const routePlan = buildRoutePlan(displayStore, selectedGroup)
+  const routedDestinations = [...selectedGroup.destinations].sort((left, right) => {
+    const leftRank = routeRank(routePlan, left)
+    const rightRank = routeRank(routePlan, right)
+    return leftRank < rightRank ? -1 : leftRank > rightRank ? 1 : 0
+  })
 
   const advanceStatus = onSave === undefined
     ? undefined
@@ -483,11 +646,14 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
             <LocalIcon name="ph:calendar-bold" className="text-xl" />
             <span>{selectedGroup.localizedDate}</span>
           </h2>
+          <ProgressStrip store={displayStore} group={selectedGroup} plan={routePlan} />
+          <RouteLinks mapsUrls={routePlan.mapsUrls} />
           <DateSummary group={selectedGroup} />
-          {selectedGroup.destinations.map((destination) => (
+          {routedDestinations.map((destination) => (
             <Destination
               key={destination.key}
               destination={destination}
+              routeRanks={routePlan.rankByView}
               onAdvance={advanceStatus}
               saveStates={saveStates}
               saveBlocked={writeInFlight || acceptedEnvelopeRef.current !== null}

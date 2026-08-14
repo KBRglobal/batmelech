@@ -1308,3 +1308,76 @@ describe('OrderEditorScreen', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
+
+describe('OrderEditorScreen delivery proof section', () => {
+  const dubaiTimestamp = (value: number) =>
+    new Intl.DateTimeFormat('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Dubai' })
+      .format(new Date(value))
+
+  it('renders the read-only proof of a delivered order without exposing an editable field', async () => {
+    const order = {
+      id: 'proof-1',
+      date: '2099-08-20',
+      name: 'לקוחה עם אישור',
+      deliveryProofUrl: 'https://pub-abc123.r2.dev/proof.jpg',
+      deliveryProofAt: 1_760_000_000_000,
+      deliveryProofBy: 'שליח ראשי',
+      deliveredAt: 1_760_000_100_000,
+      courierCheckinState: 'delayed' as const,
+      courierCheckinAt: 1_759_999_000_000,
+      courierEtaMinutes: 20,
+      courierNote: 'תנועה כבדה',
+    }
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [order] } }))
+    renderEditor('/orders/proof-1/edit')
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'אישור מסירה' })).toBeTruthy())
+    const section = document.getElementById('order-proof')!
+    const photo = screen.getByAltText('צילום מסירה')
+    expect(photo.getAttribute('src')).toBe('https://pub-abc123.r2.dev/proof.jpg')
+    const photoLink = photo.closest('a')!
+    expect(photoLink.getAttribute('href')).toBe('https://pub-abc123.r2.dev/proof.jpg')
+    expect(photoLink.getAttribute('target')).toBe('_blank')
+    expect(photoLink.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(within(section).getByText(dubaiTimestamp(1_760_000_100_000))).toBeTruthy()
+    expect(within(section).getByText(dubaiTimestamp(1_760_000_000_000))).toBeTruthy()
+    expect(within(section).getByText('שליח ראשי')).toBeTruthy()
+    expect(within(section).getByText(`מתעכב · 20 דק׳ · ${dubaiTimestamp(1_759_999_000_000)}`)).toBeTruthy()
+    expect(within(section).getByText('תנועה כבדה')).toBeTruthy()
+    expect(section.querySelector('input, textarea, select')).toBeNull()
+    expect(screen.getByRole('button', { name: 'אישור מסירה' })).toBeTruthy()
+  })
+
+  it('refuses an untrusted proof URL but still reports the rest of the confirmation', async () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{
+          id: 'proof-2',
+          date: '2099-08-20',
+          name: 'לקוחה',
+          deliveryProofUrl: 'http://pub-abc123.r2.dev/proof.jpg',
+          deliveredAt: 1_760_000_100_000,
+        }],
+      },
+    }))
+    renderEditor('/orders/proof-2/edit')
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'אישור מסירה' })).toBeTruthy())
+    expect(screen.queryByAltText('צילום מסירה')).toBeNull()
+    expect(within(document.getElementById('order-proof')!).getByText(dubaiTimestamp(1_760_000_100_000))).toBeTruthy()
+  })
+
+  it('says there is no confirmation yet for an order without delivery fields and for a new order', async () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'plain-1', date: '2099-08-20', name: 'לקוחה רגילה' }] },
+    }))
+    const edit = renderEditor('/orders/plain-1/edit')
+    await waitFor(() => expect(screen.getByText('אין עדיין אישור מסירה')).toBeTruthy())
+    expect(screen.queryByAltText('צילום מסירה')).toBeNull()
+    edit.unmount()
+
+    mockedUseStore.mockReturnValue(queryResult())
+    renderEditor()
+    await waitFor(() => expect(screen.getByText('אין עדיין אישור מסירה')).toBeTruthy())
+  })
+})

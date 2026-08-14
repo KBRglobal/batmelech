@@ -114,11 +114,13 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.ok(siteStaticIndex > healthIndex, 'public site static mount must exist');
   assert.ok(rootIndex > siteStaticIndex, 'root route must mount after the public site static files');
   assert.ok(customerFormIndex > rootIndex, 'root must mount before the customer form');
-  assert.ok(authIndex > customerFormIndex, 'only public routes (site, root, customer form) may mount before the staff gate');
+  // Hotel search is deliberately public: the customer checkout picks its
+  // delivery hotel from it. It reads no customer or order state and rate limits
+  // per IP, so it is the only /api route allowed in front of the gate.
+  assert.ok(hotelSearchIndex > customerFormIndex, 'customer form must mount before hotel search');
+  assert.ok(authIndex > hotelSearchIndex, 'only public routes (site, root, customer form, hotel search) may mount before the staff gate');
   assert.ok(operationsReviewIndex > authIndex, 'operations AI review must remain behind the staff gate');
-  assert.ok(hotelSearchIndex > operationsReviewIndex, 'operations AI review must not shadow hotel search');
-  assert.ok(hotelSearchIndex > authIndex, 'hotel search must remain behind the staff gate');
-  assert.ok(stateApiIndex > hotelSearchIndex, 'hotel search must not shadow the state API');
+  assert.ok(stateApiIndex > operationsReviewIndex, 'operations AI review must not shadow the state API');
   assert.ok(stateApiIndex > authIndex, 'state API must remain behind the staff gate');
   assert.ok(legacyManagerIndex > stateApiIndex, 'legacy manager backup must use the versioned state API');
   assert.ok(reactIndex > legacyManagerIndex, 'React must not shadow the legacy manager backup');
@@ -126,6 +128,8 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /app\.get\('\/healthz'/);
   assert.match(source, /createCustomerOrderRouter\(\{ getContentRoot: \(\) => contentRoot \}\)/);
   assert.equal(source.match(/app\.use\('\/api\/hotels\/search'/g)?.length, 1);
+  // Public now, so it must stay wired to nothing: no repository, no pool, no secret.
+  assert.match(source, /createHotelSearchRouter\(\)/);
   assert.equal(source.match(/app\.use\('\/api\/ai\/operations-review'/g)?.length, 1);
   assert.match(source, /createOperationsReviewRouter\(\)/);
   assert.match(source, /app\.get\(\/\^\\\/legacy\$\//);

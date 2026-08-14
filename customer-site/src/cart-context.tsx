@@ -10,16 +10,30 @@ export type CartLine = {
 
 export type Fulfillment = 'delivery' | 'pickup'
 
+export type AddressMode = 'hotel' | 'free'
+
+/** One result from /api/hotels/search, kept only while the order is being placed. */
+export type SelectedHotel = {
+  id: string
+  name: string
+  fullAddress: string
+  latitude: number
+  longitude: number
+}
+
 export type CustomerDetails = {
   name: string
   phoneCode: string
   phone: string
   email: string
+  /** Free address in 'free' mode, room number and delivery notes in 'hotel' mode. */
   address: string
   notes: string
   fulfillment: Fulfillment
   date: string
   time: string
+  addressMode: AddressMode
+  hotel: SelectedHotel | null
 }
 
 type CartContextValue = {
@@ -35,7 +49,7 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-const EMPTY_CUSTOMER: CustomerDetails = { name: '', phoneCode: '+971', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery', date: '', time: '' }
+const EMPTY_CUSTOMER: CustomerDetails = { name: '', phoneCode: '+971', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery', date: '', time: '', addressMode: 'hotel', hotel: null }
 
 const STORAGE_KEY = 'bm-cart-v1'
 
