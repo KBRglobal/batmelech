@@ -1,18 +1,15 @@
 # STATE — batmelech (updated: 2026-08-14 02:45)
 
-## ⚠️ batmelech.ae has never actually pointed at Railway — found and reported, not fixed
-Checked because the site felt broken while testing tonight. `batmelech.ae`'s DNS (registrar:
-rrpproxy.net/aeserver.com backend, an .ae-specific registrar — NOT Cloudflare, NOT GoDaddy,
-no credential for it anywhere in `~/Documents/creds/`) has a plain A record to a DigitalOcean
-IP serving a generic AEserver parking page over HTTP; HTTPS is closed entirely. Railway's own
-custom-domain record (`domain_status` for `batmelech.ae`) shows `Verified: no`, cert stuck
-`VALIDATING_OWNERSHIP`, and the CNAME it wants (`→ 80xdnueu.up.railway.app`) was never added.
-This isn't a regression — it looks like it was **never** correctly configured. The real,
-working site right now is only reachable via the Railway-issued domain:
-`https://app-production-e89e.up.railway.app` (+ `/site`, `/admin`, etc.) — all testing tonight
-was done there. **Fix needs whoever holds the .ae registrar login** (not identified — ask
-Moshe) to add a CNAME `batmelech.ae → 80xdnueu.up.railway.app` (and same for `www`). This is a
-real platform wall, not something skippable with an API key.
+## batmelech.ae DNS — false alarm, tools in this sandbox gave a wrong read
+Mid-session, curl + DNS-over-HTTPS lookups run from this environment showed `batmelech.ae`
+resolving to an AEserver parking-page IP with HTTPS closed, and Railway's `domain_status` API
+showed the custom domain `Verified: no`. Read that as the domain never having worked. Moshe
+checked live in a fresh private tab and confirmed the real site loads fine — so that reading
+was wrong, likely a network/DNS quirk specific to this sandboxed environment, not a real
+production issue. Don't trust this environment's raw `curl`/DNS lookups against batmelech.ae
+as ground truth again; verify through Moshe or the Chrome browser tool instead. Railway's
+dashboard still shows the custom domain as unverified, which is odd given it works — worth a
+glance sometime, but not an active emergency.
 
 ## Now (in progress) — Shabbat menu split + מיי (Mey), Lin's Telegram AI assistant
 Built and deployed tonight (2026-08-14), live on the Railway domain above.
@@ -93,10 +90,7 @@ a lightweight CRM (`customers`, `customerNotes`, `customerTags`, `activityLog`) 
 here, but a good future idea if Lin wants to track repeat customers/preferences through מיי.
 
 ## Next
-1. **Get the .ae registrar login and fix batmelech.ae's DNS** — the real domain has likely
-   never worked over HTTPS. This is the highest-priority item; everything else "live" tonight
-   is only live on the Railway subdomain.
-2. Wire `/api/site/status` into the customer-site (banner strip, ordering-closed gate on
+1. Wire `/api/site/status` into the customer-site (banner strip, ordering-closed gate on
    checkout, sold-out badge on menu items using `outOfStockNames`) — the backend exists, the
    frontend doesn't consume it yet.
 3. Decide with Moshe the exact trigger rule for delivery-timing reminders, then build that half
