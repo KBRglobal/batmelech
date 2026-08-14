@@ -1,4 +1,23 @@
-# STATE — batmelech (updated: 2026-08-14 06:40)
+# STATE — batmelech (updated: 2026-08-14 08:10)
+
+## Now (in progress) — real menu editing + R2 image CDN
+Menu editing shipped and deployed: Settings → מחירון ותפריט now really edits (prices, dish
+names, add/remove dishes), not just displays. The editing engine
+(addCatalogItem/removeCatalogItem/addCatalogExtra/updateCatalogExtraPrice/updateLunchPrice/
+updateCatalogCorePrice in `web/src/domain/settings-catalog.ts`) already existed and was
+already tested — it just wasn't wired to any UI. Added the two functions that were missing
+(`renameCatalogItem`, `renameCatalogExtra`), same validation style as the rest.
+`docs/menu-source-of-truth-2026-08-14.md` has the exact pricing Moshe dictated live —
+cross-checked against `DEFAULT_SETTINGS_CATALOG`, which already matched almost everything
+(the customer-site's hardcoded numbers were what was wrong, not the admin defaults — see
+Gotchas, customer-site isn't live yet so that rewrite is lower priority).
+
+**Queued, not started:** move all images to Cloudflare R2 as a CDN (Moshe has Cloudflare
+browser + token access, expects this to "work perfectly"), show R2 storage usage vs the 25GB
+tier on some screen. AI allergy-detection layer reading the real menu, low-frequency Lin
+usage (she has her own OpenAI key already, ~$100/yr, doesn't log in daily). Telegram
+notification to Lin on new order. None of these started yet — surfaced mid-session, not
+acted on to avoid fragmenting the menu-editing work.
 
 ## Now (in progress) — disguised staff login, replacing Basic Auth
 Moshe's idea, built across one session, third deploy about to go out. The staff panel no longer
@@ -125,6 +144,22 @@ received and reviewed real test emails/invoices via traviquackson@gmail.com.
 - Parked unfinished auth-boundary work (session/csrf/argon2) to branch `wip/auth-boundary`.
 
 ## Gotchas / do-not-redo
+- customer-site (`customer-site/src/pages/shabbat-order.tsx`, `weekdays.tsx`) has its OWN
+  fully hardcoded, disconnected copy of the menu/prices — zero shared code with the admin
+  catalog. It's not live (no customer has the link yet per Moshe), so this is lower
+  priority than the admin panel, but it has REAL drift already: missing dishes (2 mains, 2
+  sides, the full schnitzel-plate, couscous+mafrum), wrong extra-fillet price ($25 vs the
+  confirmed-correct $30), and a flat $6.25/salad rate instead of the real $25-per-block-of-4
+  + $7-lone-extra rule. `'תוספת 4 סלטים לבחירה'` is NOT a separate purchasable extra
+  anywhere — it's `isAutomaticChargeName`-reserved in `order-total.ts` because it's computed
+  automatically from salad-selection quantity; don't ever add it as a manual extra (tried
+  once this session, `applyCatalogToStore` correctly threw "reserved for automatic
+  pricing" — reverted).
+- Before touching `DEFAULT_EXTRA_ROWS` again: several entries that look like stale/duplicate
+  cruft on first read (two vegetable-soup rows, `סט עריכה`, `תוספת יין`, the standalone
+  weekend-challah-schnitzel row) are actually locked in by explicit assertions in
+  `settings-catalog.test.ts` (line ~53) — they're deliberate, not leftovers. Don't remove
+  without checking that test first.
 - Never mount an alias path that overlaps with a real credential value — `/linaya` was tried and
   scrapped the same session because Moshe is folding "linaya" into Lin's new real username. A path
   segment matching part of a live username/password is a leak, not a bookmark.
