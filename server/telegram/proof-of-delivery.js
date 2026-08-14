@@ -19,6 +19,7 @@ const {
   DELIVERED_STATUS,
   dubaiDateString,
   nextStop,
+  orderName,
   selectDeliveryDay,
 } = require('./delivery-day');
 const { proofAmbiguous, proofRecorded } = require('./delivery-messages');
