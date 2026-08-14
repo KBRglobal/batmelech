@@ -1,39 +1,40 @@
 # STATE — batmelech (updated: 2026-08-14 06:40)
 
 ## Now (in progress) — disguised staff login, replacing Basic Auth
-Moshe's idea, fully built, tests passing, not yet deployed. The staff panel no longer shows
-Chrome's native Basic Auth popup at all — anyone hitting a protected route with no session
-(`/admin`, `/app`, `/orders/admin`, `/api/state`, etc.) gets `server/auth/decoy-page.html`: a
-branded 404 ("משהו התפקשש במטבח...") with a "שלחו לנו הודעה" contact box that is actually the
-login form, disguised. Real path Lin uses day to day: **`/admin`** (not indexed, not linked from
-anywhere, `/app` and `/orders/admin` still work as aliases for old bookmarks).
+Moshe's idea, built across one session, third deploy about to go out. The staff panel no longer
+shows Chrome's native Basic Auth popup at all. Real entry: **`/admin`** (not indexed, not linked;
+`/app` and `/orders/admin` still work as aliases). `/linaya` was tried and scrapped same session —
+see Gotchas.
 
-- Two-step hidden flow, both steps use the SAME visible input box: first message = username
-  (`BM_USER`), if correct the box silently resets for a second message = password (`BM_PASS`).
-  Wrong at either step (or a fresh/expired session) → same fake "ההודעה נשלחה בהצלחה!" every
-  real visitor would see from a normal 404 contact form. Right twice → real session cookie
-  (`bm_ref`, HMAC-signed, 30 days) → reload lands in `/admin/today`.
-- `POST /api/site/contact` (public, `server/auth/decoy-login-route.js`) is the actual check.
-  Response body never differs in shape between "right, continue" and "wrong" in an obvious way —
-  success carries a fake ticket ref (`{status:'received', ref:'RQ-12345'}`), failure omits it.
-  Both look like a normal contact-form ack in the Network tab.
-- Per-IP lockout: 3 wrong attempts (either step) → that IP gets the fake-success response
-  unconditionally for 24h, even with the correct credentials. In-memory `Map`, resets on deploy —
-  acceptable for a lockout, not a ban.
-- `server/auth/decoy-auth.js` — cookie signing (HMAC-SHA256, `BM_SESSION_SECRET`, new required
-  env var, fail-closed like `BM_USER`/`BM_PASS`), `hasValidSession()`, the gate middleware
-  (`createDecoyGate`) that replaced the old inline Basic Auth `app.use` block.
-- `app.set('trust proxy', 1)` added — needed for real per-IP lockout behind Railway's edge; also
-  fixes the existing `/api/site/orders` rate limiter, which was silently limiting by Railway's
-  proxy IP for everyone before this.
-- `web/src/router.tsx` `AppRouter` now also recognizes a `/admin` basename (alongside `/app` and
-  `/orders/admin`), detected from `window.location.pathname` same as the existing two.
-- BM_USER/BM_PASS did NOT change in meaning, only in how they're checked — but the actual values
-  changed at some point before this session (`lin`/`lin123` from the original 2026-08-06 deploy
-  no longer work). Current real values live only in Railway env vars now, not in any memory file —
-  do not hardcode them anywhere else.
-- `BM_SESSION_SECRET` already set on Railway (production env, `app` service) via MCP, `skip_deploys`
-  so it lands together with this code on the next real deploy, not before.
+**Two separate decoy pages, two separate endpoints — this split is load-bearing, see Gotchas:**
+- `/admin`, `/app`, `/orders/admin`, and the other real protected prefixes (`isProtectedPath` in
+  `decoy-auth.js`) show `decoy-gate-page.html` when logged out. Its hidden box posts to
+  `POST /api/site/access` (`decoy-login-route.js`) — the REAL two-step login (username, then
+  password, same box, wrong either step or expired → fake "ההודעה נשלחה בהצלחה!"). Right twice →
+  session cookie `bm_ref` (HMAC-signed, 30 days) → reload lands in `/admin/today`.
+- Every OTHER 404 site-wide (typos, bot probes, literally anything unmatched) shows
+  `decoy-page.html` instead. Its box posts to `POST /api/site/contact`
+  (`generic-contact-route.js`) — NO login capability at all, ever; it only emails the message to
+  Moshe via Resend (`traviquackson@gmail.com`, from `noreply@batmelech.ae`) and always returns the
+  same fake-success shape. A random broken link can never be used to guess the real login, even by
+  coincidence-typing the real username.
+- Per-IP lockout on the REAL login only: 3 wrong attempts (either step) → 24h fake-success
+  regardless of input, even the correct one. In-memory `Map`, resets on deploy.
+- Self-service credentials: Settings → "כניסה לפאנל" section (`staff-login-section.tsx`) lets Lin
+  set her own username/password, encrypted with `BM_SECRETS_KEY` (`staff_credentials` table, same
+  pattern as the Ziina key). The Railway `BM_USER`/`BM_PASS` pair keeps working UNCONDITIONALLY
+  alongside it — Moshe's explicit ask: changing Railway env vars must always stay a working
+  recovery key. `decoy-login-route.js` checks both pairs independently per attempt (`source: 'env'
+  | 'staff'` in the challenge token) and never lets a password from one pair complete the other's
+  username.
+- Real logout: `POST /api/auth/logout` clears `bm_ref`; sidebar button in both nav variants
+  (`app-shell.tsx`).
+- `app.set('trust proxy', 1)` — needed for real per-IP lockout behind Railway's edge; also fixes
+  the pre-existing `/api/site/orders` rate limiter, which was silently limiting by Railway's edge
+  IP for everyone before this.
+- BM_USER/BM_PASS values changed at some point before this session (`lin`/`lin123` from the
+  original 2026-08-06 deploy no longer work). Current values live only in Railway env vars, not in
+  any memory file.
 
 ## Now (in progress) — invoicing + payments build
 Moshe explicitly rejected installing an external ERP/OSS repo for this (confirmed: extend the
@@ -137,10 +138,24 @@ received and reviewed real test emails/invoices via traviquackson@gmail.com.
   popups and refuses any URL with embedded credentials — this was the actual reason the old
   mechanism had to go if Claude needed to self-serve into the panel; keep it in mind before ever
   reintroducing a Basic-Auth-style gate.
+- The gate/generic-404 split is load-bearing, not cosmetic: `createDecoyGate` only fires on
+  `PROTECTED_PREFIXES` (`decoy-auth.js`) and calls `next()` for everything else, so the REAL login
+  endpoint (`/api/site/access`) is only ever reachable from pages that already know a protected
+  path exists. Do not merge the two decoy pages or the two endpoints back into one "to simplify" —
+  that would make every random 404 site-wide login-capable again.
+- Real bug hit and fixed while building this: `contentRoot` in `server.js` is the WHOLE repo
+  checkout, not a curated `public/` folder. When the blanket gate got scoped to
+  `PROTECTED_PREFIXES`, the final `express.static(contentRoot)` catch-all briefly became reachable
+  by anyone unauthenticated — `/server.js`, `/package.json`, `/STATE.md`, etc. would have been
+  served as plain static files. Caught by a regression test before deploy (see
+  `tests/server-security.test.js`, "never gets repo source files as static content"). That
+  catch-all now has its own explicit `hasValidSession` check, independent of `isProtectedPath` —
+  if you ever touch the gate scoping again, re-run that test and think through every `app.use`
+  mounted between the gate and the final catch-all, not just the ones already in the prefix list.
 
-- `/site` (customer site) and `/app` (admin) both go through `createReactAppRouter` — static +
-  SPA fallback. `/site` is mounted BEFORE the Basic Auth wall (public); root `/` decides where to
-  send visitors via `hasValidBasicAuth(request)`, not by route order.
+- `/site` (customer site) and `/app`/`/admin` (admin) both go through `createReactAppRouter` —
+  static + SPA fallback. `/site` is mounted BEFORE the decoy gate (public); root `/` decides where
+  to send visitors via `hasValidSession(request, SESSION_SECRET)`, not by route order.
 - Railway MCP `deploy` tool ignores .gitignore, tars 350MB+ incl. node_modules, 502s/hangs. Use
   `railway up --service app --detach` (CLI) instead — .gitignore-aware, fast (~1-2 min build).
 - customer-site is its own Vite/React app (React 19, react-router 7, Tailwind v4). `vite.config.ts`

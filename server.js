@@ -13,8 +13,9 @@ const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
-const { createDecoyGate, hasValidSession, clearSessionCookie } = require('./server/auth/decoy-auth');
+const { createDecoyGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
 const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
+const { createGenericContactRouter } = require('./server/auth/generic-contact-route');
 const businessDataRepository = require('./server/business-data/repository');
 const { wrapRepositoryWithInvoiceTrigger } = require('./server/business-data/invoice-trigger');
 const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route');
@@ -110,15 +111,19 @@ if (stateRepository) {
     response.status(503).json({ error: 'order intake unavailable' });
   });
 }
-// Disguised staff login: a public "contact form" endpoint on the decoy page.
-// No admin auth of its own — it IS the auth, checked message by message.
-app.use('/api/site/contact', createDecoyLoginRouter({
+// Disguised staff login: only decoy-gate-page.html (served for /admin and
+// its aliases) ever posts here. No admin auth of its own — it IS the auth,
+// checked message by message.
+app.use('/api/site/access', createDecoyLoginRouter({
   authUser: AUTH_USER,
   authPass: AUTH_PASS,
   sessionSecret: SESSION_SECRET,
   pool,
   encryptionKey: process.env.BM_SECRETS_KEY,
 }));
+// Generic "contact us" form on every OTHER 404 site-wide — never grants
+// access, only emails the message. See generic-contact-route.js.
+app.use('/api/site/contact', createGenericContactRouter({ resendApiKey: process.env.RESEND_API_KEY }));
 // Public invoice-download link referenced from invoice emails — token-gated,
 // not just invoice number (numbers are sequential/guessable).
 if (pool) {
@@ -257,7 +262,19 @@ app.use('/index.html', createLegacyManagerRouter({ getContentRoot: () => content
 
 // bm-sync.js always comes from the server image (server-owned, not repo content)
 app.get('/bm-sync.js', (req, res) => res.sendFile(path.join(ROOT, 'bm-sync.js')));
-app.use((req, res, next) => express.static(contentRoot)(req, res, next));
+// contentRoot is the WHOLE repo checkout, not a curated public/ folder — this
+// must stay session-gated or every source file (server.js, STATE.md, client
+// requirement docs, ...) becomes a public static file. The decoy gate above
+// only covers its known protected prefixes, so this needs its own check.
+app.use((req, res, next) => {
+  if (!hasValidSession(req, SESSION_SECRET)) return next();
+  express.static(contentRoot)(req, res, next);
+});
+
+// Last resort: any path nothing above matched (bot probes, typos, dead
+// links) gets the same decoy 404 as everywhere else — never Express's
+// default error page, which would be the one inconsistent tell on the site.
+app.use(createGlobal404Handler());
 
 startAfterStateInitialization({
   repository: stateRepository,

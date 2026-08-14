@@ -178,7 +178,7 @@ test('only explicit legacy manager entry points can receive the sync bootstrap',
   assert.match(source, /app\.use\('\/legacy', createLegacyManagerRouter/);
   assert.match(source, /app\.use\('\/index\.html', createLegacyManagerRouter/);
   assert.doesNotMatch(source, /endsWith\('\.html'\)|readFile\(file|replace\('<head>'/);
-  assert.ok(source.indexOf("app.use('/index.html'") < source.indexOf("app.use((req, res, next) => express.static"));
+  assert.ok(source.indexOf("app.use('/index.html'") < source.indexOf('express.static(contentRoot)(req, res, next);'));
 });
 
 test('server fails closed before a database connection when the state capability is absent', () => {
@@ -214,8 +214,9 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
     const decoyBody = await before.text();
     assert.match(decoyBody, /שלחו לנו הודעה/);
     assert.doesNotMatch(decoyBody, /מסך היום המחובר|window\.__BM_STATE__/);
+    assert.match(decoyBody, /api\/site\/access/, 'the /admin decoy must post to the real login endpoint');
 
-    const wrongUser = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+    const wrongUser = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'not-the-username' }),
@@ -225,7 +226,7 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
     assert.equal(wrongUserBody.ref, undefined);
     assert.equal(cookieFrom(wrongUser, 'bm_rq'), null);
 
-    const rightUser = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+    const rightUser = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'decoy-test-user' }),
@@ -236,7 +237,7 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
     const challengeCookie = cookieFrom(rightUser, 'bm_rq');
     assert.ok(challengeCookie, 'a challenge cookie should be set after the username step');
 
-    const wrongPass = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+    const wrongPass = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: challengeCookie },
       body: JSON.stringify({ message: 'not-the-password' }),
@@ -244,7 +245,7 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
     const wrongPassBody = await wrongPass.json();
     assert.equal(wrongPassBody.ref, undefined, 'a wrong password must look identical to a wrong username');
 
-    const restartUser = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+    const restartUser = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'decoy-test-user' }),
@@ -252,7 +253,7 @@ test('the decoy gate: unauthenticated staff routes look like a 404, the hidden t
     const restartChallenge = cookieFrom(restartUser, 'bm_rq');
     assert.ok(restartChallenge, 'the flow must restart from the username step after any wrong step');
 
-    const rightPass = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+    const rightPass = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: restartChallenge },
       body: JSON.stringify({ message: 'decoy-test-password' }),
@@ -280,7 +281,7 @@ test('the decoy login locks an IP out after repeated wrong attempts, even once i
     await waitForHealth(port);
 
     for (let i = 0; i < 3; i += 1) {
-      const attempt = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      const attempt = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: `wrong-${i}` }),
@@ -289,13 +290,63 @@ test('the decoy login locks an IP out after repeated wrong attempts, even once i
       assert.equal(body.ref, undefined);
     }
 
-    const nowCorrect = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+    const nowCorrect = await fetch(`http://127.0.0.1:${port}/api/site/access`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'decoy-test-user' }),
     });
     const nowCorrectBody = await nowCorrect.json();
     assert.equal(nowCorrectBody.ref, undefined, 'a blocked IP must not get in even with the right username');
+  } finally {
+    server.kill();
+  }
+});
+
+test('every other 404 site-wide shows the same decoy page, whose form has no login capability', async () => {
+  const port = 34873;
+  const server = startDecoyServer(port);
+  try {
+    await waitForHealth(port);
+
+    const randomPath = await fetch(`http://127.0.0.1:${port}/wp-admin/setup-config.php`);
+    assert.equal(randomPath.status, 404);
+    const randomBody = await randomPath.text();
+    assert.match(randomBody, /שלחו לנו הודעה/, 'a random unmatched path must still get the decoy, not a bare 404');
+    assert.match(randomBody, /api\/site\/contact/, 'the generic decoy must post to the message-only endpoint');
+    assert.doesNotMatch(randomBody, /api\/site\/access/, 'the generic decoy must never reference the login endpoint');
+
+    const correctUsernameAsMessage = await fetch(`http://127.0.0.1:${port}/api/site/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'decoy-test-user' }),
+    });
+    const body = await correctUsernameAsMessage.json();
+    assert.equal(correctUsernameAsMessage.status, 200);
+    assert.equal(body.ref, undefined, 'the generic endpoint must never advance a login, even with the real username');
+    assert.equal(cookieFrom(correctUsernameAsMessage, 'bm_rq'), null, 'the generic endpoint must never set a challenge cookie');
+    assert.equal(cookieFrom(correctUsernameAsMessage, 'bm_ref'), null, 'the generic endpoint must never set a session cookie');
+  } finally {
+    server.kill();
+  }
+});
+
+test('an unauthenticated request never gets repo source files as static content', async () => {
+  // contentRoot is the whole repo checkout (see server.js), not a curated
+  // public/ folder. Regression test for a real bug introduced while scoping
+  // the decoy gate to protected prefixes: unmatched paths started falling
+  // through past the gate straight into express.static(contentRoot),
+  // serving server.js, package.json, STATE.md, etc. to anyone.
+  const port = 34874;
+  const server = startDecoyServer(port);
+  try {
+    await waitForHealth(port);
+
+    for (const filePath of ['/server.js', '/package.json', '/STATE.md']) {
+      const response = await fetch(`http://127.0.0.1:${port}${filePath}`);
+      assert.equal(response.status, 404, `${filePath} must not be served unauthenticated`);
+      const body = await response.text();
+      assert.match(body, /שלחו לנו הודעה/, `${filePath} must get the decoy page, not its real file content`);
+    }
   } finally {
     server.kill();
   }

@@ -170,6 +170,7 @@
   var input = document.getElementById('message-input');
   var supportSection = document.getElementById('support-section');
   var successStep = document.getElementById('success-step');
+  var step = 0;
   var busy = false;
 
   function showSuccess() {
@@ -183,11 +184,30 @@
     var message = input.value.trim();
     if (!message) return;
     busy = true;
-    fetch('/api/site/contact', {
+    fetch('/api/site/access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: message }),
-    }).finally(showSuccess);
+    })
+      .then(function (response) { return response.json().catch(function () { return {}; }); })
+      .then(function (data) {
+        busy = false;
+        if (data && data.ref) {
+          step += 1;
+          if (step >= 2) {
+            window.location.href = '/admin/today';
+            return;
+          }
+          input.value = '';
+          input.focus();
+          return;
+        }
+        showSuccess();
+      })
+      .catch(function () {
+        busy = false;
+        showSuccess();
+      });
   });
 })();
 </script>
