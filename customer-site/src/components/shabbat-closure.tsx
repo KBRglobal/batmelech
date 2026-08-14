@@ -29,7 +29,9 @@ function reopenSentence(reopensAt: number | null): string | null {
   const at = new Date(reopensAt)
   if (Number.isNaN(at.getTime())) return null
   const sameDay = dubaiDate(at) === dubaiDate(new Date())
-  const when = sameDay ? '' : `ביום ${dubaiWeekday(at)} `
+  // he-IL already renders the weekday as "יום שבת", so the preposition is a
+  // bare ב — "ביום שבת", never "ביום יום שבת".
+  const when = sameDay ? '' : `ב${dubaiWeekday(at)} `
   return `נחזור לקבל הזמנות ${when}בערך בשעה ${dubaiTime(at)}`
 }
 
