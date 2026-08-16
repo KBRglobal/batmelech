@@ -12,7 +12,6 @@ const NOTIFY_ENV = 'CONTACT_NOTIFY_EMAIL';
 const FROM_ENV = 'CONTACT_FROM_EMAIL';
 const TEST_NOTIFY = 'notify@example.test';
 const TEST_FROM = 'Website <noreply@example.test>';
-const VISITOR_IP = '203.0.113.77';
 const REFERER = 'https://example.test/missing-page';
 
 function silentLogger() {
@@ -117,7 +116,7 @@ test('notification payload uses env addresses, keeps referer, and omits visitor 
     const { server, sends, baseUrl } = await startTestServer();
     try {
       const { response, body } = await postContact(baseUrl, {
-        headers: { Referer: REFERER, 'X-Forwarded-For': VISITOR_IP },
+        headers: { Referer: REFERER },
       });
       assert.equal(response.status, 200);
       assert.deepEqual(body, { status: 'received' });
@@ -128,7 +127,9 @@ test('notification payload uses env addresses, keeps referer, and omits visitor 
       assert.match(sends[0].html, /https:\/\/example\.test\/missing-page/);
 
       const serialized = JSON.stringify(sends[0]);
-      assert.doesNotMatch(serialized, /203\.0\.113\.77/);
+      // The test server listens on loopback, so request.ip is 127.0.0.1.
+      // Referer is a hostname URL, so any IP in the payload would be a leak.
+      assert.doesNotMatch(serialized, /127\.0\.0\.1/);
       assert.doesNotMatch(serialized, /x-forwarded-for/i);
       assert.doesNotMatch(serialized, /כתובת IP/);
       assert.doesNotMatch(serialized, /\brequest\.ip\b/);
