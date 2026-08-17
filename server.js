@@ -15,6 +15,7 @@ const { PUBLIC_SITE_SECURITY_HEADERS, createReactAppRouter } = require('./server
 const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
 const { createSiteCatalogRouter } = require('./server/site-catalog-route');
+const { createStateHistoryRouter } = require('./server/state-history-route');
 const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
 const { createMeyAgent } = require('./server/telegram/mey-agent');
 const { createR2Storage } = require('./server/telegram/r2-storage');
@@ -296,6 +297,9 @@ if (pool) {
 
 // --- Versioned Postgres-backed app state with merge, history, and idempotency ---
 if (stateRepository) {
+  // History browse/restore must mount before the general state router so its
+  // subpaths are not swallowed. Same decoy-gated /api/state prefix.
+  app.use('/api/state/history', createStateHistoryRouter({ pool, repository: stateRepository }));
   app.use('/api/state', createStateRouter({
     service: createStateSafetyService({ repository: stateRepository }),
   }));
