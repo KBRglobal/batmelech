@@ -18,6 +18,8 @@ import {
   renameCatalogItem,
   resolvePreparationCatalog,
   recipeTargets,
+  updateCatalogItemDescription,
+  updateCatalogItemImage,
   updateLunchPrice,
   validateRecipeDrafts,
   validateSettingsCatalog,
@@ -264,6 +266,36 @@ describe('settings catalog', () => {
       fishExtraPrice: 30,
       saladBlockPrice: 25,
       saladUnitPrice: 7,
+    })
+  })
+
+  it('round-trips a dish photo and description through save and reload, and clears them cleanly', () => {
+    const withMeta = updateCatalogItemImage(
+      updateCatalogItemDescription(DEFAULT_SETTINGS_CATALOG, 'mains', 'shabbat-mains-01', 'קציצות של שבת'),
+      'mains',
+      'shabbat-mains-01',
+      'https://pub.example/menu/dish.jpg',
+    )
+    const saved = applyCatalogToStore(EMPTY_STORE, withMeta)
+    const reloaded = loadSettingsCatalog(saved)
+    expect(reloaded.warnings).toEqual([])
+    expect(reloaded.catalog.categories.mains.find((item) => item.id === 'shabbat-mains-01')).toMatchObject({
+      description: 'קציצות של שבת',
+      imageUrl: 'https://pub.example/menu/dish.jpg',
+    })
+
+    const cleared = updateCatalogItemImage(
+      updateCatalogItemDescription(reloaded.catalog, 'mains', 'shabbat-mains-01', ''),
+      'mains',
+      'shabbat-mains-01',
+      null,
+    )
+    const resaved = applyCatalogToStore(saved, cleared)
+    const meta = ((resaved as Record<string, unknown>).menu as { itemMeta: Record<string, unknown> }).itemMeta
+    expect(meta['shabbat-mains-01']).toBeUndefined()
+    expect(loadSettingsCatalog(resaved).catalog.categories.mains.find((item) => item.id === 'shabbat-mains-01')).toMatchObject({
+      description: '',
+      imageUrl: null,
     })
   })
 

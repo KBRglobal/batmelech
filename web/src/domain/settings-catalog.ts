@@ -810,6 +810,25 @@ function itemIdOverrides(menu: Readonly<Record<string, unknown>>, category: Menu
   return isRecord(mappings[category]) ? mappings[category] : {}
 }
 
+// Per-dish description and photo, stored alongside itemIds and keyed the same
+// way (by item ID) so a rename never orphans them.
+function itemMetaOverrides(menu: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return isRecord(menu.itemMeta) ? menu.itemMeta : {}
+}
+
+function itemMetaFor(
+  meta: Readonly<Record<string, unknown>>,
+  itemId: string,
+): { readonly description: string; readonly imageUrl: string | null } {
+  const entry = meta[itemId]
+  if (!isRecord(entry)) return { description: '', imageUrl: null }
+  return {
+    description: text(entry.description),
+    imageUrl:
+      typeof entry.imageUrl === 'string' && entry.imageUrl.trim() !== '' ? entry.imageUrl.trim() : null,
+  }
+}
+
 function validateItemIdStructure(
   menu: Readonly<Record<string, unknown>>,
   warnings: CatalogWarning[],
@@ -891,6 +910,7 @@ function normalizeCategory(
     names.push(name)
   })
   const ids = itemIdOverrides(menu, category)
+  const meta = itemMetaOverrides(menu)
   return names.map((name) => {
     const defaultItem = defaults.find((item) => item.name === name)
     const persistedId = text(ids[name])
@@ -901,15 +921,11 @@ function normalizeCategory(
         message: `${name} has an invalid persisted item ID`,
       })
     }
-    return {
-      id:
-        StableCatalogIdSchema.safeParse(persistedId).success
-          ? persistedId
-          : defaultItem?.id ?? generatedId(`custom-${category}`, name),
-      name,
-      description: defaultItem?.description ?? '',
-      imageUrl: defaultItem?.imageUrl ?? null,
-    }
+    const id =
+      StableCatalogIdSchema.safeParse(persistedId).success
+        ? persistedId
+        : defaultItem?.id ?? generatedId(`custom-${category}`, name)
+    return { id, name, ...itemMetaFor(meta, id) }
   })
 }
 
@@ -1661,12 +1677,21 @@ export function applyCatalogToStore(
             (text(value.id) === '' &&
               canonicalCatalogName(text(value.name)) === canonicalCatalogName(item.name))),
       )
-      const { id: _id, name: _name, price: _price, ...unknown } = isRecord(previous) ? previous : {}
+      const {
+        id: _id,
+        name: _name,
+        price: _price,
+        description: _description,
+        imageUrl: _imageUrl,
+        ...unknown
+      } = isRecord(previous) ? previous : {}
       return {
         ...unknown,
         id: item.id,
         name: item.name,
         price: decimalFromMinorUnits(item.priceMinorUnits),
+        ...(item.description === '' ? {} : { description: item.description }),
+        ...(item.imageUrl === null ? {} : { imageUrl: item.imageUrl }),
       }
     }),
     lunch: catalog.lunch.map((item) => {
@@ -1735,6 +1760,22 @@ export function applyCatalogToStore(
     dessertExtraPrice: decimalFromMinorUnits(catalog.extraDessertHalfUnitMinorUnits),
     saladBlockPrice: decimalFromMinorUnits(catalog.saladBlockMinorUnits),
     saladUnitPrice: decimalFromMinorUnits(catalog.saladRemainderMinorUnits),
+    itemMeta: (() => {
+      const nextMeta: Record<string, unknown> = { ...itemMetaOverrides(previousMenu) }
+      for (const category of MENU_CATEGORY_KEYS) {
+        for (const item of catalog.categories[category]) {
+          if (item.description === '' && item.imageUrl === null) {
+            delete nextMeta[item.id]
+          } else {
+            nextMeta[item.id] = {
+              ...(item.description === '' ? {} : { description: item.description }),
+              ...(item.imageUrl === null ? {} : { imageUrl: item.imageUrl }),
+            }
+          }
+        }
+      }
+      return nextMeta
+    })(),
     itemIds,
   }
   return {
@@ -1901,6 +1942,37 @@ export function updateCatalogExtraPrice(
   return withCatalogUpdate(catalog, {
     extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, priceMinorUnits } : item)),
   })
+}
+
+export function updateCatalogItemDescription(
+  catalog: SettingsCatalog,
+  category: MenuCategoryKey,
+  itemId: string,
+  rawDescription: string,
+): SettingsCatalog {
+  const description = text(rawDescription)
+  const categories = {
+    ...catalog.categories,
+    [category]: catalog.categories[category].map((item) =>
+      item.id === itemId ? { ...item, description } : item,
+    ),
+  }
+  return withCatalogUpdate(catalog, { categories })
+}
+
+export function updateCatalogItemImage(
+  catalog: SettingsCatalog,
+  category: MenuCategoryKey,
+  itemId: string,
+  imageUrl: string | null,
+): SettingsCatalog {
+  const categories = {
+    ...catalog.categories,
+    [category]: catalog.categories[category].map((item) =>
+      item.id === itemId ? { ...item, imageUrl } : item,
+    ),
+  }
+  return withCatalogUpdate(catalog, { categories })
 }
 
 export function updateCatalogExtraDescription(

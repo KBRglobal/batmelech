@@ -18,6 +18,8 @@ import {
   updateCatalogExtraDescription,
   updateCatalogExtraImage,
   updateCatalogExtraPrice,
+  updateCatalogItemDescription,
+  updateCatalogItemImage,
   updateLunchPrice,
   validateSettingsCatalog,
   type CatalogResult,
@@ -145,32 +147,52 @@ function CategoryEditor({
       <summary className="cursor-pointer text-sm font-black text-primary">
         {CATEGORY_LABELS[category]} ({items.length})
       </summary>
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3">
-            <input
-              aria-label={`שם המנה — ${item.name}`}
-              defaultValue={item.name}
-              disabled={locked}
+          <div key={item.id} className="space-y-3 rounded-xl bg-secondary/40 p-3">
+            <div className="flex items-center gap-3">
+              <ImageUploadField
+                label={item.name}
+                imageUrl={item.imageUrl}
+                onChange={(url) => onUpdate((current) => updateCatalogItemImage(current, category, item.id, url))}
+              />
+              <input
+                aria-label={`שם המנה — ${item.name}`}
+                defaultValue={item.name}
+                disabled={locked}
+                onBlur={(event) => {
+                  const next = event.currentTarget.value
+                  if (next.trim() !== '' && next !== item.name) {
+                    onUpdate((current) => renameCatalogItem(current, category, item.id, next))
+                  }
+                }}
+                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-border focus:bg-card disabled:cursor-not-allowed"
+              />
+              {locked ? (
+                <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onUpdate((current) => removeCatalogItem(current, category, item.id))}
+                  className="shrink-0 rounded-full px-3 py-1 text-xs font-black text-destructive hover:bg-rose-50"
+                >
+                  הסרה
+                </button>
+              )}
+            </div>
+            <textarea
+              aria-label={`תיאור — ${item.name}`}
+              defaultValue={item.description}
+              placeholder="תיאור (לא חובה)..."
+              rows={2}
               onBlur={(event) => {
                 const next = event.currentTarget.value
-                if (next.trim() !== '' && next !== item.name) {
-                  onUpdate((current) => renameCatalogItem(current, category, item.id, next))
+                if (next !== item.description) {
+                  onUpdate((current) => updateCatalogItemDescription(current, category, item.id, next))
                 }
               }}
-              className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-border focus:bg-card disabled:cursor-not-allowed"
+              className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary outline-none"
             />
-            {locked ? (
-              <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-black text-muted-foreground">קבוע</span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onUpdate((current) => removeCatalogItem(current, category, item.id))}
-                className="shrink-0 rounded-full px-3 py-1 text-xs font-black text-destructive hover:bg-rose-50"
-              >
-                הסרה
-              </button>
-            )}
           </div>
         ))}
         {locked ? (
@@ -512,17 +534,10 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-primary sm:text-4xl">מחירון ותפריט</h1>
-          <p className="mt-2 text-sm font-bold text-muted-foreground">עריכת מחירים, שמות מנות והוספה/הסרה. שינויים נשמרים רק בלחיצה על "שמירת התפריט".</p>
-        </div>
-        <button type="button" onClick={() => void commit()} disabled={saveState === 'saving'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground disabled:opacity-50">
-          <LocalIcon name="ph:check-circle-bold" />
-          <span>שמירת התפריט</span>
-        </button>
+      <header>
+        <h1 className="text-3xl font-black text-primary sm:text-4xl">מחירון ותפריט</h1>
+        <p className="mt-2 text-sm font-bold text-muted-foreground">עריכת מחירים, שמות מנות, תמונות ותיאורים. שינויים נשמרים רק בלחיצה על "שמירת התפריט" למטה.</p>
       </header>
-      <div className="mt-3"><SaveStatus state={saveState} message={saveMessage} /></div>
       {editError !== '' && (
         <p role="alert" className="mt-2 text-xs font-black text-destructive">{editError}</p>
       )}
@@ -583,13 +598,28 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
         </div>
       </section>
 
-      <section className="mt-8 space-y-3">
+      <section className="mt-8 space-y-3 pb-24">
         {MENU_CATEGORY_KEYS.map((category) => (
           <CategoryEditor key={category} category={category} catalog={current} onUpdate={onUpdate} />
         ))}
         <ExtrasEditor catalog={current} onUpdate={onUpdate} />
         <LunchEditor catalog={current} onUpdate={onUpdate} />
       </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background/90 px-5 py-3 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4">
+          <SaveStatus state={saveState} message={saveMessage} />
+          <button
+            type="button"
+            onClick={() => void commit()}
+            disabled={saveState === 'saving'}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground disabled:opacity-50"
+          >
+            <LocalIcon name="ph:check-circle-bold" />
+            <span>שמירת התפריט</span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
