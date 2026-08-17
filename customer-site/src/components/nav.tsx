@@ -1,14 +1,16 @@
 import { Icon } from '@iconify/react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useCart } from '../cart-context'
+import { canonicalPath, localizedHref, rememberLocale, useLocale, type Locale } from '../locale-context'
 
-const LINKS = [
-  { to: '/weekdays', label: 'יום חול' },
-  { to: '/shabbat-order', label: 'שבת קודש' },
-  { to: '/shabbat-extras', label: 'חיזוקים לסופ״ש' },
+const LINKS: readonly { readonly to: string; readonly label: Record<Locale, string> }[] = [
+  { to: '/weekdays', label: { he: 'יום חול', en: 'Weekdays', fr: 'Semaine' } },
+  { to: '/shabbat-order', label: { he: 'שבת קודש', en: 'Shabbat', fr: 'Chabbat' } },
+  { to: '/shabbat-extras', label: { he: 'חיזוקים לסופ״ש', en: 'Shabbat Extras', fr: 'Suppléments' } },
 ]
 
 export function Nav({ active }: { active: string }) {
+  const { locale, href } = useLocale()
   return (
     <nav className="flex items-center p-1 md:p-1.5 rounded-full shadow-2xl bg-black/20 backdrop-blur-xl border border-white/20 overflow-x-auto max-w-full">
       {LINKS.map((link) => {
@@ -16,12 +18,12 @@ export function Nav({ active }: { active: string }) {
         return (
           <Link
             key={link.to}
-            to={link.to}
+            to={href(link.to)}
             className={`px-3 md:px-6 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-black whitespace-nowrap transition-all ${
               isActive ? 'bg-white text-[#3B151A] shadow-lg' : 'text-white hover:text-white/80'
             }`}
           >
-            {link.label}
+            {link.label[locale]}
           </Link>
         )
       })}
@@ -31,11 +33,12 @@ export function Nav({ active }: { active: string }) {
 
 export function NavCartButton() {
   const { lines } = useCart()
+  const { href } = useLocale()
   const count = lines.reduce((n, l) => n + l.qty, 0)
 
   return (
     <Link
-      to="/checkout"
+      to={href('/checkout')}
       className="relative flex items-center justify-center w-9 h-9 md:w-11 md:h-11 rounded-full bg-white text-[#3B151A] shadow-xl shrink-0"
     >
       <Icon icon="ph:basket-fill" className="text-base md:text-lg" />
@@ -49,9 +52,10 @@ export function NavCartButton() {
 }
 
 export function NavLogo() {
+  const { href } = useLocale()
   return (
-    <Link to="/" className="shrink-0 w-10 h-10 md:w-16 md:h-16">
-      <img src="/site/assets/logo-cream.png" alt="מטעמי בת מלך" className="w-full h-full object-contain drop-shadow-[0_2px_10px_rgba(59,21,26,0.5)]" />
+    <Link to={href('/')} className="shrink-0 w-10 h-10 md:w-16 md:h-16">
+      <img src="/site/assets/logo-cream.png" alt="Bat Melech" className="w-full h-full object-contain drop-shadow-[0_2px_10px_rgba(59,21,26,0.5)]" />
     </Link>
   )
 }
@@ -69,6 +73,45 @@ export function PhoneBadge() {
   )
 }
 
+const LOCALE_LABELS: Readonly<Record<Locale, string>> = { he: 'עב', en: 'EN', fr: 'FR' }
+
+// Language button: switches locale in place (same page), remembers the
+// explicit choice so the device-language redirect never overrides it.
+export function LanguageSwitcher() {
+  const { locale } = useLocale()
+  const { pathname, search, hash } = useLocation()
+  const navigate = useNavigate()
+  const { path } = canonicalPath(pathname)
+
+  return (
+    <div
+      className="flex items-center gap-0.5 rounded-full bg-black/20 backdrop-blur-xl border border-white/20 p-1 shadow-xl shrink-0"
+      role="group"
+      aria-label="Language / שפה / Langue"
+      dir="ltr"
+    >
+      {(['he', 'en', 'fr'] as const).map((candidate) => (
+        <button
+          key={candidate}
+          type="button"
+          lang={candidate}
+          aria-pressed={candidate === locale}
+          onClick={() => {
+            if (candidate === locale) return
+            rememberLocale(candidate)
+            navigate(`${localizedHref(candidate, path)}${search}${hash}`)
+          }}
+          className={`min-w-8 md:min-w-9 h-7 md:h-8 px-1.5 rounded-full text-[11px] md:text-xs font-black transition-all ${
+            candidate === locale ? 'bg-white text-[#3B151A] shadow' : 'text-white/80 hover:text-white'
+          }`}
+        >
+          {LOCALE_LABELS[candidate]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function NavHeader({ active }: { active: string }) {
   return (
     <header className="w-full pt-5 px-4 md:pt-8 md:px-16 flex items-center justify-between gap-2 md:gap-6">
@@ -77,6 +120,7 @@ export function NavHeader({ active }: { active: string }) {
         <Nav active={active} />
       </div>
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
+        <LanguageSwitcher />
         <PhoneBadge />
         <NavCartButton />
       </div>

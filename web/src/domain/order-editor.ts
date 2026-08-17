@@ -1465,6 +1465,40 @@ export function calculateOrderDraftPricing(
   }
 }
 
+// Issues that only mean "the ENGINE cannot price this" (an overage with no
+// approved price, an unpriceable dessert, a computation failure). When the
+// operator typed an explicit manual total, that total IS the price — these
+// stop blocking the save and become visible warnings instead (Moshe,
+// 2026-08-18: a manually set price must always win). Data-integrity issues
+// (bad quantities, unknown variants, reserved items) are NOT in this list
+// and always block.
+export const PRICE_AVAILABILITY_ISSUE_CODES: ReadonlySet<string> = new Set([
+  'MAIN_OVERAGE',
+  'SIDE_OVERAGE',
+  'DESSERT_UNCLASSIFIED',
+  'PRICING_ERROR',
+])
+
+export function hasValidManualTotal(draft: OrderDraft): boolean {
+  return draft.total.trim() !== '' && parseUsdInputMinorUnits(draft.total) !== null
+}
+
+export function demotePriceAvailabilityIssues(
+  issues: readonly DraftIssue[],
+  draft: OrderDraft,
+): readonly DraftIssue[] {
+  if (!hasValidManualTotal(draft)) return issues
+  return issues.map((issue) =>
+    issue.blocking && PRICE_AVAILABILITY_ISSUE_CODES.has(issue.code)
+      ? {
+          ...issue,
+          blocking: false,
+          message: `${issue.message.replace(' ולכן אי אפשר לשמור', '')} נקבע מחיר ידני, וההזמנה נשמרת עם המחיר שהוקלד.`,
+        }
+      : issue,
+  )
+}
+
 export function orderPricingFingerprint(draft: OrderDraft): string {
   return JSON.stringify({
     meals: draft.meals,

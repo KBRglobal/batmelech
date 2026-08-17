@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  demotePriceAvailabilityIssues,
+  hasValidManualTotal,
   AIReviewSchema,
   DEFAULT_MENU_CATEGORIES,
   HOTEL_OPTIONS,
@@ -1233,5 +1235,40 @@ describe('delivery-confirmation fields through an admin edit', () => {
       meyToken: 'mey-token',
       statusBeforeProof: 'במשלוח',
     })
+  })
+})
+
+describe('manual total overrides price-availability blocks', () => {
+  const baseIssues = [
+    { code: 'MAIN_OVERAGE', message: 'נבחרו יותר מנות עיקריות ממספר הארוחות הזוגיות. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.', blocking: true },
+    { code: 'PRICING_ERROR', message: 'אי אפשר לחשב מחיר בטוח עד שהכמויות יתוקנו.', blocking: true },
+    { code: 'INVALID_CUSTOM_ITEM', message: 'פריט חופשי 1 חסר שם, כמות או מחיר תקין.', blocking: true },
+    { code: 'TOTAL_MISMATCH', message: 'סך התשלום שונה מהמחיר המחושב — התאמה ידנית.', blocking: false },
+  ] as const
+
+  it('demotes only pricing-availability issues, and only with a valid manual total', () => {
+    const menu = buildOrderEditorMenu({ orders: [] })
+    const priced = { ...createOrderDraft(menu), total: '200' }
+    const demoted = demotePriceAvailabilityIssues(baseIssues, priced)
+    expect(demoted.find((issue) => issue.code === 'MAIN_OVERAGE')?.blocking).toBe(false)
+    expect(demoted.find((issue) => issue.code === 'MAIN_OVERAGE')?.message).not.toContain('אי אפשר לשמור')
+    expect(demoted.find((issue) => issue.code === 'PRICING_ERROR')?.blocking).toBe(false)
+    // Data-integrity issues keep blocking even with a manual total.
+    expect(demoted.find((issue) => issue.code === 'INVALID_CUSTOM_ITEM')?.blocking).toBe(true)
+
+    const unpriced = { ...createOrderDraft(menu), total: '' }
+    expect(demotePriceAvailabilityIssues(baseIssues, unpriced)).toEqual(baseIssues)
+
+    const invalidTotal = { ...createOrderDraft(menu), total: 'abc' }
+    expect(demotePriceAvailabilityIssues(baseIssues, invalidTotal)).toEqual(baseIssues)
+  })
+
+  it('hasValidManualTotal accepts real amounts only', () => {
+    const menu = buildOrderEditorMenu({ orders: [] })
+    const draft = createOrderDraft(menu)
+    expect(hasValidManualTotal({ ...draft, total: '1320' })).toBe(true)
+    expect(hasValidManualTotal({ ...draft, total: '199.5' })).toBe(true)
+    expect(hasValidManualTotal({ ...draft, total: '' })).toBe(false)
+    expect(hasValidManualTotal({ ...draft, total: 'שתיים' })).toBe(false)
   })
 })

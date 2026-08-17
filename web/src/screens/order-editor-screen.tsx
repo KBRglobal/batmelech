@@ -22,6 +22,8 @@ import {
   buildAIOrderCatalog,
   buildOrderEditorMenu,
   calculateOrderDraftPricing,
+  demotePriceAvailabilityIssues,
+  hasValidManualTotal,
   classifyStoredOrderIds,
   classifyDraftSelectionMode,
   createCanonicalOrderId,
@@ -891,8 +893,12 @@ function OrderEditorContent({
     draft,
     requiresCurrentPricing ? pricing.result?.totalMinorUnits : undefined,
   )
-  const allIssues = [...validationIssues, ...pricing.issues]
+  // A typed manual total is the operator's explicit pricing decision: the
+  // "engine can't price this" issues stop blocking (still shown), and a
+  // missing computed result no longer freezes the save.
+  const allIssues = demotePriceAvailabilityIssues([...validationIssues, ...pricing.issues], draft)
   const hasBlockingIssue = allIssues.some((issue) => issue.blocking)
+  const manualTotalCoversPricing = hasValidManualTotal(draft)
   const unresolvedManagerFindings = managerReview === null
     ? []
     : managerFindings(managerReview, menu).filter((finding) => !acknowledgedManagerFindings.has(finding.id))
@@ -900,7 +906,7 @@ function OrderEditorContent({
     !persistenceReady ||
     hasBlockingIssue ||
     unresolvedManagerFindings.length > 0 ||
-    pricing.result === null ||
+    (pricing.result === null && !manualTotalCoversPricing) ||
     isSaving ||
     saveFeedback.kind === 'conflict' ||
     saveFeedback.kind === 'blocked'
@@ -1616,7 +1622,7 @@ function OrderEditorContent({
                 </button>
               </div>
             </div>
-          ) : <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">אי אפשר לחשב מחיר בטוח.</p>}
+          ) : <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">אי אפשר לחשב מחיר אוטומטי להזמנה הזאת. אפשר לקבוע מחיר ידני בשדה "סך לתשלום" למטה — ההזמנה תישמר עם המחיר שהוקלד.</p>}
           {allIssues.length > 0 && (
             <ul className="space-y-2" aria-label="אזהרות הזמנה">
               {allIssues.map((issue, index) => <li key={`${issue.code}-${index}`} className={`rounded-xl p-3 text-xs font-black ${issue.blocking ? 'bg-rose-50 text-destructive' : 'bg-amber-50 text-amber-900'}`}>{issue.message}</li>)}
@@ -1649,7 +1655,23 @@ function OrderEditorContent({
             {unresolvedManagerFindings.length > 0 && (
               <p className="mt-1 text-xs font-black text-amber-900">השמירה תיפתח אחרי סימון טופל בכל הבירורים.</p>
             )}
-            <p className="text-lg font-black text-primary" dir="ltr">{pricing.result ? formatUsdMinorUnits(pricing.result.totalMinorUnits) : '—'}</p>
+            {(() => {
+              // The footer shows what will actually be charged: the manual
+              // total when one is typed; the computed price is secondary.
+              const manualMinorUnits = parseUsdInputMinorUnits(draft.total)
+              const computedMinorUnits = pricing.result?.totalMinorUnits ?? null
+              const effective = manualMinorUnits ?? computedMinorUnits
+              return (
+                <>
+                  <p className="text-lg font-black text-primary" dir="ltr">{effective !== null ? formatUsdMinorUnits(effective) : '—'}</p>
+                  {manualMinorUnits !== null && computedMinorUnits !== null && manualMinorUnits !== computedMinorUnits && (
+                    <p className="text-[0.65rem] font-black text-amber-900" dir="ltr">
+                      {`מחושב: ${formatUsdMinorUnits(computedMinorUnits)} · נקבע ידנית`}
+                    </p>
+                  )}
+                </>
+              )
+            })()}
           </div>
           <div className="flex gap-2">
             <button type="button" disabled={isSaving} onClick={() => navigate(APP_ROUTES.orders)} className="min-h-11 rounded-full border border-border px-5 text-sm font-black text-primary hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60">ביטול</button>
@@ -1862,13 +1884,13 @@ export function OrderEditorScreen() {
       const pricing = calculateOrderDraftPricing(draft, menu, { allowMixedLunchAndShabbat })
       const requiresCurrentPricing =
         mode === 'new' || orderPricingFingerprint(draft) !== initialPricingFingerprint.current
-      const blockingIssues = [
+      const blockingIssues = demotePriceAvailabilityIssues([
         ...validateOrderDraft(
           draft,
           requiresCurrentPricing ? pricing.result?.totalMinorUnits : undefined,
         ),
         ...pricing.issues,
-      ].filter((issue) => issue.blocking)
+      ], draft).filter((issue) => issue.blocking)
       if (blockingIssues.length > 0) return
 
       let refreshedEnvelope: VersionedStateEnvelope | null = null
