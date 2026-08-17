@@ -58,9 +58,15 @@ describe('LabelsScreen', () => {
     }] } }))
     const { container } = renderLabels()
     const css = container.querySelector('style')?.textContent ?? ''
-    expect(css).toContain('@page bm-ql800 { size:62mm 29mm; margin:0; }')
+    expect(css).toContain('@page { size:62mm 29mm; margin:0; }')
     expect(css).toContain('width:62mm; height:29mm')
     expect(css).toContain('page-break-after:always')
+    // A named page is silently ignored for labels inside the absolutely positioned
+    // sheet, which printed 62x29mm labels onto full Letter/A4 pages on the QL-800.
+    expect(css).not.toContain('@page bm-ql800')
+    expect(css).not.toContain('page:bm-ql800')
+    // The last label must not emit a trailing blank label on the roll.
+    expect(css).toContain('.bm-label-card:last-child { page-break-after:auto; break-after:auto; }')
     const bag = container.querySelector('[data-label-kind="bag"]')?.textContent ?? ''
     for (const text of ['מטעמי בת מלך', 'מטבח ביתי אותנטי · כשר', 'לקוחה אמיתית', 'מלון אמיתי · 13:00', 'קבלה ראשית', 'טלפון: 050-0000000', 'לשמור בקירור עד החימום · חימום בכלי מכוסה', 'הוכן בתאריך']) expect(bag).toContain(text)
   })
@@ -155,6 +161,14 @@ describe('LabelsScreen', () => {
     expect(document.body.dataset.bmPrintKind).toBe('preparation')
     expect(print).toHaveBeenCalledTimes(2)
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps a browser-menu print limited to the bag sheet', () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [{ id: 'ctrl-p', date: '2099-08-14', name: 'מדפיסה', meals: 1 }] } }))
+    const { container } = renderLabels()
+    const css = container.querySelector('style')?.textContent ?? ''
+    expect(document.body.dataset.bmPrintKind).toBeUndefined()
+    expect(css).toContain('body:not([data-bm-print-kind]) .bm-preparation-labels { display:none !important; }')
   })
 
   it('fails closed when scoped order identities are malformed or duplicated', () => {

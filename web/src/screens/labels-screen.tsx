@@ -7,23 +7,34 @@ import { useStore } from '../data/use-store.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder } from '../domain/store.ts'
 
+/*
+ * The stylesheet only exists while this screen is mounted, so the page rule is
+ * scoped to label printing in practice. It must stay an unnamed `@page`: a named
+ * page (`@page bm-ql800` + `page:bm-ql800`) is ignored by Chrome when the labels
+ * live inside an out-of-flow box, and the sheet has to stay absolutely positioned
+ * so the surrounding app chrome cannot push the first label off its own label.
+ * With the named page the roll printed 62x29mm labels onto full Letter/A4 pages.
+ */
 const QL800_PRINT_CSS = `
 .bm-label-sheet { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .bm-label-card { min-width:0; overflow:hidden; border:2px dotted currentColor; border-radius:16px; padding:18px 12px; background:white; }
 @media (max-width:420px) { .bm-label-sheet { grid-template-columns:1fr; } }
-@page bm-ql800 { size:62mm 29mm; margin:0; }
+@page { size:62mm 29mm; margin:0; }
 @media print {
+  html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
   body * { visibility:hidden !important; }
   .bm-label-sheet, .bm-label-sheet * { visibility:visible !important; }
   body[data-bm-print-kind="bag"] .bm-preparation-labels { display:none !important; }
   body[data-bm-print-kind="preparation"] .bm-bag-labels { display:none !important; }
+  body:not([data-bm-print-kind]) .bm-preparation-labels { display:none !important; }
   .bm-label-sheet { position:absolute; inset:0; display:block; margin:0; }
   .bm-label-card {
-    page:bm-ql800; width:62mm; height:29mm; box-sizing:border-box; margin:0;
+    width:62mm; height:29mm; box-sizing:border-box; margin:0;
     border:0; border-radius:0; padding:1.2mm 2.5mm; display:flex; flex-direction:column;
     justify-content:center; gap:.3mm; overflow:hidden; page-break-after:always; break-after:page;
     break-inside:avoid; color:#000; background:#fff;
   }
+  .bm-label-card:last-child { page-break-after:auto; break-after:auto; }
   .bm-label-brand { font-size:8.5pt; line-height:1.1; }
   .bm-label-kosher { font-size:6pt; line-height:1.1; }
   .bm-label-name { font-size:10pt; margin:.8mm 0 .3mm; line-height:1.12; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
