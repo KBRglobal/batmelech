@@ -21,6 +21,19 @@ export const PAGE_RULE_ELEMENT_ID = 'bm-bon-page-rule'
 const CSS_PX_PER_MM = 96 / 25.4
 const PRINT_CLEANUP_TIMEOUT_MS = 3_000
 
+/*
+ * The logo file is square with wide white margins: the mark itself covers 47% of
+ * its width and 56% of its height, centred, leaving 21.9% of white above and
+ * below. Printing the file as-is would spend that white on the roll — and an
+ * image paints its white, so it cannot simply be overlapped. So the logo is
+ * drawn at LOGO_BOX_MM and pulled up into a frame exactly as tall as the mark.
+ */
+const LOGO_INK_HEIGHT_RATIO = 0.5617
+const LOGO_TOP_MARGIN_RATIO = 0.21875
+const LOGO_BOX_MM = 47
+const LOGO_INK_HEIGHT_MM = Math.round(LOGO_BOX_MM * LOGO_INK_HEIGHT_RATIO * 10) / 10
+const LOGO_MARGIN_MM = Math.round(LOGO_BOX_MM * LOGO_TOP_MARGIN_RATIO * 10) / 10
+
 export const BON_MEDIA_OPTIONS: readonly {
   readonly value: BonMedia
   readonly label: string
@@ -46,10 +59,15 @@ ${scope} {
 }
 ${scope} .bm-bon-bsd { font-size:6.5pt; margin:0; }
 ${scope} .bm-bon-head { padding-bottom:1.5mm; margin-bottom:1.5mm; }
-${scope} .bm-bon-title { font-size:13pt; margin:0; line-height:1.15; }
+${scope} .bm-bon-logo-frame { height:${LOGO_INK_HEIGHT_MM}mm; overflow:hidden; text-align:center; margin:.5mm 0 0; }
+${scope} .bm-bon-logo {
+  display:inline-block; width:${LOGO_BOX_MM}mm; height:${LOGO_BOX_MM}mm;
+  margin:${-LOGO_MARGIN_MM}mm 0 0; vertical-align:top;
+}
 ${scope} .bm-bon-sub { font-size:6.5pt; margin:.5mm 0 0; }
 ${scope} .bm-bon-meta { font-size:6.5pt; margin:0 0 1.5mm; gap:1mm; }
 ${scope} .bm-bon-body { font-size:8.5pt; line-height:1.4; margin:0; overflow-wrap:anywhere; }
+${scope} .bm-bon-total { font-size:11pt; margin:2mm 0 0; padding-top:1.5mm; border-top-width:.5mm; }
 ${scope} .bm-bon-foot { font-size:8pt; margin-top:2mm; padding-top:1.5mm; }
 `
 }

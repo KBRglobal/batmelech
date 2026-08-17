@@ -171,13 +171,19 @@ describe('LabelsScreen', () => {
     renderLabels()
     const user = userEvent.setup()
 
-    expect(screen.getByRole<HTMLInputElement>('radio', { name: '62×29 מ"מ' }).checked).toBe(true)
+    // The kitchen's roll is the continuous one, so it is the default.
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'גליל רציף 62 מ"מ' }).checked).toBe(true)
     await user.click(screen.getByRole('button', { name: 'הדפסת מדבקות לשקיות' }))
-    expect(document.body.dataset.bmLabelMedia).toBe('die-cut-29')
-    expect(document.getElementById('bm-label-page-rule')?.textContent).toContain('@page { size: 62mm 29mm; margin: 0; }')
+    expect(document.body.dataset.bmLabelMedia).toBe('continuous')
+    expect(document.getElementById('bm-label-page-rule')?.textContent).toContain(`@page { size: 62mm ${FALLBACK_LABEL_LENGTH_MM}mm; margin: 0; }`)
     fireEvent(window, new Event('afterprint'))
     expect(document.getElementById('bm-label-page-rule')).toBeNull()
     expect(document.body.dataset.bmLabelMedia).toBeUndefined()
+
+    await user.click(screen.getByRole('radio', { name: '62×29 מ"מ' }))
+    await user.click(screen.getByRole('button', { name: 'הדפסת מדבקות לשקיות' }))
+    expect(document.getElementById('bm-label-page-rule')?.textContent).toContain('@page { size: 62mm 29mm; margin: 0; }')
+    fireEvent(window, new Event('afterprint'))
 
     await user.click(screen.getByRole('radio', { name: '62×100 מ"מ' }))
     await user.click(screen.getByRole('button', { name: 'הדפסת מדבקות לשקיות' }))
@@ -193,7 +199,7 @@ describe('LabelsScreen', () => {
     expect(rule).toContain(`body[data-bm-label-media="continuous"] { --bm-label-length: ${FALLBACK_LABEL_LENGTH_MM}mm; }`)
     fireEvent(window, new Event('afterprint'))
 
-    await user.click(screen.getByRole('radio', { name: '62×29 מ"מ' }))
+    await user.click(screen.getByRole('radio', { name: 'גליל רציף 62 מ"מ' }))
   })
 
   it('keeps a browser-menu print limited to the bag sheet', () => {

@@ -31,9 +31,9 @@ export const LABEL_MEDIA_OPTIONS: readonly {
   readonly hint: string
   readonly fixedLengthMm: number | null
 }[] = [
+  { value: 'continuous', label: 'גליל רציף 62 מ"מ', hint: 'DK-22205 — האורך נקבע לפי המדבקה המלאה ביותר', fixedLengthMm: null },
   { value: 'die-cut-29', label: '62×29 מ"מ', hint: 'DK-11209 — מדבקת כתובת קטנה', fixedLengthMm: 29 },
   { value: 'die-cut-100', label: '62×100 מ"מ', hint: 'DK-11202 — מדבקת משלוח', fixedLengthMm: 100 },
-  { value: 'continuous', label: 'גליל רציף 62 מ"מ', hint: 'DK-22205 — האורך נקבע לפי המדבקה המלאה ביותר', fixedLengthMm: null },
 ]
 
 /*
@@ -102,9 +102,9 @@ ${labelBox('body[data-bm-label-media="continuous"] .bm-label-card', 'height:var(
 }
 `
 
-// The SPA keeps the loaded roll for the session — it does not change between
-// two prints in the same round.
-let lastLabelMedia: LabelMedia = 'die-cut-29'
+// The kitchen runs the continuous 62mm roll, so that is what the screen offers
+// first; the SPA then keeps the loaded roll for the rest of the session.
+let lastLabelMedia: LabelMedia = 'continuous'
 
 export function rememberedLabelMedia(): LabelMedia {
   return lastLabelMedia
