@@ -28,6 +28,7 @@ import {
   createDuplicateOrderDraft,
   createOrderDraft,
   createOrderDraftFromLegacy,
+  DELIVERY_ZONE_OPTIONS,
   formatUsdInputMinorUnits,
   applyOrderDraftToStore,
   legacyOrderEditIssue,
@@ -646,6 +647,7 @@ function OrderEditorContent({
   managerReview,
   managerSourceMessage,
   loadedOrder,
+  existingGroupNames,
 }: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
@@ -661,6 +663,7 @@ function OrderEditorContent({
   readonly managerReview: AIReview | null
   readonly managerSourceMessage: string | null
   readonly loadedOrder: LegacyOrder | null
+  readonly existingGroupNames: readonly string[]
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
@@ -675,6 +678,7 @@ function OrderEditorContent({
   >({ kind: 'idle' })
   const [staticHotelName, setStaticHotelName] = useState('')
   const [mixedOrderConfirmed, setMixedOrderConfirmed] = useState(false)
+  const [discountPercent, setDiscountPercent] = useState('')
   const [acknowledgedManagerFindings, setAcknowledgedManagerFindings] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -921,7 +925,17 @@ function OrderEditorContent({
             <QuantityStepper label="חלות" value={draft.challot} onChange={updateChallahs} />
           </div>
           <Field label="קבוצה / יעד משותף">
-            <input aria-label="קבוצה / יעד משותף" value={draft.group} onChange={(event) => patch({ group: event.currentTarget.value })} className={inputClassName} />
+            <input
+              aria-label="קבוצה / יעד משותף"
+              value={draft.group}
+              onChange={(event) => patch({ group: event.currentTarget.value })}
+              list="existing-group-names"
+              placeholder="הזמנה בודדת — בלי קבוצה"
+              className={inputClassName}
+            />
+            <datalist id="existing-group-names">
+              {existingGroupNames.map((name) => <option key={name} value={name} />)}
+            </datalist>
           </Field>
         </Section>
 
@@ -943,6 +957,33 @@ function OrderEditorContent({
           </label>
           {!draft.pickup && (
             <div className="space-y-5">
+              <Field label="אזור משלוח">
+                <div className="grid grid-cols-2 gap-3">
+                  {DELIVERY_ZONE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => patch({ deliveryZone: option.value })}
+                      className={`min-h-11 rounded-xl border-2 text-sm font-black transition-colors ${
+                        draft.deliveryZone === option.value
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-border px-4 text-sm font-black text-primary">
+                <input
+                  type="checkbox"
+                  checked={draft.freeDelivery}
+                  onChange={(event) => patch({ freeDelivery: event.currentTarget.checked })}
+                  className="size-5 accent-primary"
+                />
+                <span>משלוח חינם</span>
+              </label>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Field label="שם מלון / יעד">
                   <input
@@ -1094,7 +1135,6 @@ function OrderEditorContent({
 
         <Section id="desserts" title="קינוחים" summary={`2 סופלה או בקלאווה אחת לזוגית`}>
           <QuantityCategory names={menu.desserts} quantities={draft.desserts} outOfStock={outOfStock} update={(name, quantity) => updateCategory('desserts', name, quantity)} />
-          {pricing.dessert.excessHalfUnits > 0 && <p role="alert" className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-black text-amber-900">יש חריגה מזכאות הקינוח. לא הוספנו מחיר שלא אושר.</p>}
         </Section>
 
         <Section id="lunch" title="תפריט צהריים">
@@ -1194,6 +1234,28 @@ function OrderEditorContent({
               ))}
               <div className="flex justify-between border-t border-border pt-3 text-lg font-black text-primary"><span>מחיר מוצע</span><span dir="ltr">{formatUsdMinorUnits(pricing.result.totalMinorUnits)}</span></div>
               <button type="button" onClick={() => patch({ total: formatUsdInputMinorUnits(pricing.result!.totalMinorUnits) })} className="min-h-11 w-full rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background">להשתמש במחיר המוצע</button>
+              <div className="flex items-center gap-2">
+                <input
+                  aria-label="הנחה באחוזים"
+                  inputMode="decimal"
+                  value={discountPercent}
+                  onChange={(event) => setDiscountPercent(event.currentTarget.value)}
+                  placeholder="הנחה %"
+                  className="min-h-11 w-24 rounded-xl border border-border bg-card px-3 text-sm font-black text-primary outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const percent = Number.parseFloat(discountPercent)
+                    if (!Number.isFinite(percent) || percent < 0 || percent > 100) return
+                    const discounted = Math.round(pricing.result!.totalMinorUnits * (100 - percent) / 100)
+                    patch({ total: formatUsdInputMinorUnits(discounted) })
+                  }}
+                  className="min-h-11 flex-1 rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background"
+                >
+                  החלת הנחה על המחיר המוצע
+                </button>
+              </div>
             </div>
           ) : <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">אי אפשר לחשב מחיר בטוח.</p>}
           {allIssues.length > 0 && (
@@ -1271,6 +1333,15 @@ export function OrderEditorScreen() {
 
   const store = storeQuery.data?.data ?? null
   const menu = useMemo(() => buildOrderEditorMenu(store ?? { orders: [] }), [store])
+  const existingGroupNames = useMemo(
+    () =>
+      [...new Set(
+        (store?.orders ?? [])
+          .map((order) => (typeof order.group === 'string' ? order.group.trim() : ''))
+          .filter((name) => name !== ''),
+      )].sort((a, b) => a.localeCompare(b, 'he')),
+    [store],
+  )
   const mode = orderId === undefined ? 'new' : 'edit'
   const initializationKey = `${mode}:${orderId ?? ''}:${location.search}`
   const storedOrderIdStatus = store ? classifyStoredOrderIds(store.orders) : 'safe'
@@ -1585,6 +1656,7 @@ export function OrderEditorScreen() {
       managerReview={managerReview}
       managerSourceMessage={managerSourceMessage}
       loadedOrder={loadedOrder}
+      existingGroupNames={existingGroupNames}
     />
   )
 }

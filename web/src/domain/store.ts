@@ -13,6 +13,7 @@ export const LegacyOrderSchema = z
     address: z.string().optional(),
     time: z.string().optional(),
     pickup: z.boolean().optional(),
+    deliveryZone: z.enum(['dubai', 'abu-dhabi']).optional(),
     status: z.string().optional(),
     group: z.string().optional(),
     meals: NumberLikeSchema.optional(),

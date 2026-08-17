@@ -4,11 +4,10 @@ import { Link } from 'react-router'
 import { CurrencyNote } from '../components/currency-note'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
-import { useCart, type SelectedHotel } from '../cart-context'
+import { DELIVERY_FEES_USD, DELIVERY_ZONE_LABELS, useCart, type DeliveryZone, type SelectedHotel } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
 import { buildOrderMessage, selectedHotel, waLink } from '../whatsapp'
 
-const DELIVERY_FEE = 15
 const HOTEL_SEARCH_DEBOUNCE_MS = 300
 const HOTEL_QUERY_MIN_LENGTH = 2
 const HOTEL_QUERY_MAX_LENGTH = 100
@@ -31,7 +30,8 @@ export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
   const { orderingOpen } = useSiteStatus()
   const isPickup = customer.fulfillment === 'pickup'
-  const total = lines.length ? subtotal + (isPickup ? 0 : DELIVERY_FEE) : 0
+  const deliveryFee = DELIVERY_FEES_USD[customer.zone]
+  const total = lines.length ? subtotal + (isPickup ? 0 : deliveryFee) : 0
 
   if (lines.length === 0) {
     return (
@@ -69,6 +69,7 @@ export function Checkout() {
       body: JSON.stringify({
         customer: {
           ...customer,
+          zone: isPickup ? undefined : customer.zone,
           phone: `${customer.phoneCode}${customer.phone}`,
           // Flat fields, all five together or none — that is what the order
           // route accepts, and what the kitchen's delivery routing reads.
@@ -148,8 +149,8 @@ export function Checkout() {
               <span>${subtotal.toFixed(2).replace(/\.00$/, '')}</span>
             </div>
             <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
-              <span>{isPickup ? 'איסוף עצמי' : 'משלוח (דובאי)'}</span>
-              <span>{isPickup ? 'ללא עלות' : `$${DELIVERY_FEE}`}</span>
+              <span>{isPickup ? 'איסוף עצמי' : `משלוח (${DELIVERY_ZONE_LABELS[customer.zone]})`}</span>
+              <span>{isPickup ? 'ללא עלות' : `$${deliveryFee}`}</span>
             </div>
             <div className="flex justify-between text-2xl font-black pt-4">
               <span>סה"כ לתשלום</span>
@@ -172,7 +173,7 @@ export function Checkout() {
                 !isPickup ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
               }`}
             >
-              משלוח (${DELIVERY_FEE})
+              משלוח
             </button>
             <button
               type="button"
@@ -184,6 +185,22 @@ export function Checkout() {
               איסוף עצמי (ללא עלות)
             </button>
           </div>
+          {!isPickup && (
+            <div className="grid grid-cols-2 gap-4">
+              {(Object.keys(DELIVERY_ZONE_LABELS) as DeliveryZone[]).map((zone) => (
+                <button
+                  key={zone}
+                  type="button"
+                  onClick={() => setCustomer({ zone })}
+                  className={`p-4 rounded-2xl border-2 font-black text-center transition-all ${
+                    customer.zone === zone ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
+                  }`}
+                >
+                  {DELIVERY_ZONE_LABELS[zone]} (${DELIVERY_FEES_USD[zone]})
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field label="שם מלא">
               <input

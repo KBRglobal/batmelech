@@ -521,13 +521,12 @@ describe('OrderEditorScreen', () => {
 
     expect(screen.getAllByText('$282.00').length).toBeGreaterThan(0)
     expect(screen.getByText('$30.00')).toBeTruthy()
-    expect(screen.getByText('יש חריגה מזכאות הקינוח. לא הוספנו מחיר שלא אושר.')).toBeTruthy()
     expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('')
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
 
     await user.click(screen.getByRole('button', { name: 'להשתמש במחיר המוצע' }))
     expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.00')
-    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
 
     await user.click(screen.getByRole('button', { name: 'הפחתה מסוכריות בקלוואה' }))
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
@@ -536,10 +535,12 @@ describe('OrderEditorScreen', () => {
     await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט אמיתי')
     await user.type(screen.getByLabelText('מחיר פריט חופשי 1'), '0.10')
     expect(screen.getAllByText('$282.10').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.00')
+    expect(screen.getByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('blocks an arbitrary total and a deposit above the deterministic total', async () => {
+  it('allows a manually adjusted total but still blocks a deposit above it', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
     renderEditor()
@@ -547,8 +548,8 @@ describe('OrderEditorScreen', () => {
     const save = screen.getByRole('button', { name: 'שמירת ההזמנה' })
 
     await user.type(screen.getByLabelText('סך לתשלום'), '1.00')
-    expect(save.hasAttribute('disabled')).toBe(true)
-    expect(screen.getByText('סך התשלום חייב להיות זהה למחיר המחושב.')).toBeTruthy()
+    expect(save.hasAttribute('disabled')).toBe(false)
+    expect(screen.getByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeTruthy()
 
     await user.clear(screen.getByLabelText('סך לתשלום'))
     await user.type(screen.getByLabelText('סך לתשלום'), '245.00')

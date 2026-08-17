@@ -42,6 +42,7 @@ const OrderSubmissionSchema = z.object({
       address: z.string().trim().max(1_000).optional().default(''),
       notes: z.string().trim().max(2_000).optional(),
       fulfillment: z.enum(['delivery', 'pickup']).optional().default('delivery'),
+      zone: z.enum(['dubai', 'abu-dhabi']).optional().default('dubai'),
       date: z.union([z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/u), z.literal('')]).optional().default(''),
       time: z.union([z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/u), z.literal('')]).optional().default(''),
       hotelName: z.string().trim().min(1).max(200).optional(),
@@ -104,6 +105,7 @@ function buildLegacyOrder(submission, now) {
     phone: submission.customer.phone,
     email: submission.customer.email || undefined,
     address: isPickup ? 'איסוף עצמי' : deliveryAddress,
+    ...(isPickup ? {} : { deliveryZone: submission.customer.zone }),
     // Same field names the admin order editor writes (serializeOrderDraft), so
     // delivery routing reads a site hotel exactly like a staff-entered one.
     ...(hotelName

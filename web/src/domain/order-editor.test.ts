@@ -195,6 +195,25 @@ describe('order editor menu and drafts', () => {
     })
   })
 
+  it('defaults delivery zone to Dubai for legacy orders that never stored one, and round-trips a stored zone', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    expect(createOrderDraftFromLegacy({ id: 'legacy-no-zone', pickup: false }, menu)).toMatchObject({
+      deliveryZone: 'dubai',
+    })
+    expect(createOrderDraftFromLegacy(
+      { id: 'legacy-bad-zone', pickup: false, deliveryZone: 'sharjah' } as unknown as LegacyOrder,
+      menu,
+    )).toMatchObject({
+      deliveryZone: 'dubai',
+    })
+    const stored = serializeOrderDraft(
+      { ...createOrderDraft(menu), pickup: false, deliveryZone: 'abu-dhabi' },
+      'order-zone',
+    )
+    expect(stored.deliveryZone).toBe('abu-dhabi')
+    expect(createOrderDraftFromLegacy(stored, menu)).toMatchObject({ deliveryZone: 'abu-dhabi' })
+  })
+
   it('preserves unknown nested legacy fields without retaining duplicate storage aliases', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const edited = createOrderDraftFromLegacy({
@@ -614,13 +633,13 @@ describe('deterministic draft pricing and allowances', () => {
     })
   })
 
-  it('blocks blank, mismatched, and over-deposited totals against deterministic pricing', () => {
+  it('blocks blank and over-deposited totals, but only warns on a manually adjusted total', () => {
     const expected = 23_000
     expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '' }), expected)).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'INVALID_TOTAL', blocking: true })]),
     )
     expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '1.00' }), expected)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'TOTAL_MISMATCH', blocking: true })]),
+      expect.arrayContaining([expect.objectContaining({ code: 'TOTAL_MISMATCH', blocking: false })]),
     )
     expect(validateOrderDraft(draftWith({ name: 'לקוחה', total: '230.00', deposit: '231.00' }), expected)).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'DEPOSIT_EXCEEDS_TOTAL', blocking: true })]),
@@ -744,6 +763,16 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pickup.result?.totalMinorUnits).toBe(23_000)
   })
 
+  it('prices delivery by zone: Dubai at $15, Abu Dhabi at $55', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const dubai = calculateOrderDraftPricing(draftWith({ pickup: false, deliveryZone: 'dubai' }), menu)
+    const abuDhabi = calculateOrderDraftPricing(draftWith({ pickup: false, deliveryZone: 'abu-dhabi' }), menu)
+
+    expect(dubai.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 1_500 }))
+    expect(abuDhabi.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 5_500 }))
+    expect(abuDhabi.result?.totalMinorUnits).toBe(28_500)
+  })
+
   it('blocks unpriced Shabbat main and side overages, including standalone selections', () => {
     const pricing = calculateOrderDraftPricing(
       draftWith({
@@ -782,15 +811,21 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pricing.result?.totalMinorUnits).toBe(2_000)
   })
 
-  it('models two souffles or one baklava portion per couple and flags excess without inventing a price', () => {
+  it('models two souffles or one baklava portion per couple, and charges excess at the configured dessert price', () => {
     expect(calculateDessertAllowance(draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 2 } }))).toMatchObject({ selectedHalfUnits: 2, includedHalfUnits: 2, excessHalfUnits: 0 })
     expect(calculateDessertAllowance(draftWith({ meals: 2, desserts: { 'סוכריות בקלוואה': 2 } }))).toMatchObject({ selectedHalfUnits: 4, includedHalfUnits: 4, excessHalfUnits: 0 })
-    const pricing = calculateOrderDraftPricing(
+    const unpriced = calculateOrderDraftPricing(
       draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 1, 'סוכריות בקלוואה': 1 } }),
       buildOrderEditorMenu(emptyStore),
     )
-    expect(pricing.issues).toContainEqual(expect.objectContaining({ code: 'DESSERT_OVERAGE', blocking: true }))
-    expect(pricing.result?.lines.some((line) => line.name.includes('קינוח'))).toBe(false)
+    expect(unpriced.issues).not.toContainEqual(expect.objectContaining({ code: 'DESSERT_OVERAGE' }))
+    expect(unpriced.result?.lines).toContainEqual(expect.objectContaining({ name: 'קינוח נוסף', quantity: 1, amountMinorUnits: 0 }))
+
+    const priced = calculateOrderDraftPricing(
+      draftWith({ meals: 1, desserts: { 'סופלה שוקולד': 1, 'סוכריות בקלוואה': 1 } }),
+      { ...buildOrderEditorMenu(emptyStore), extraDessertHalfUnitMinorUnits: 500 },
+    )
+    expect(priced.result?.lines).toContainEqual(expect.objectContaining({ name: 'קינוח נוסף', quantity: 1, amountMinorUnits: 500 }))
   })
 })
 

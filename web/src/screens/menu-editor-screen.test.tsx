@@ -50,7 +50,7 @@ describe('MenuEditorScreen', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
-  it('shows editable prices for the couple meal, extras, and lunch, and a locked constant fillet price', () => {
+  it('shows editable prices for the couple meal, extras, lunch, fish fillet, and salad surcharge', () => {
     mockedUseStore.mockReturnValue(queryResult())
     render(<MenuEditorScreen />)
 
@@ -60,7 +60,11 @@ describe('MenuEditorScreen', () => {
     expect(screen.getByText('סלטים כלולים בזוגית').parentElement?.textContent).toContain('4')
     expect(screen.getByText('דגים כלולים בזוגית').parentElement?.textContent).toContain('2')
     expect((screen.getByLabelText('מחיר פילה דג נוסף') as HTMLInputElement).value).toBe('30')
-    expect((screen.getByLabelText('מחיר פילה דג נוסף') as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByLabelText('מחיר פילה דג נוסף') as HTMLInputElement).disabled).toBe(false)
+    expect((screen.getByLabelText('מחיר בלוק סלטים נוסף (כל 4)') as HTMLInputElement).value).toBe('25')
+    expect((screen.getByLabelText('מחיר בלוק סלטים נוסף (כל 4)') as HTMLInputElement).disabled).toBe(false)
+    expect((screen.getByLabelText('מחיר סלט בודד נוסף') as HTMLInputElement).value).toBe('7')
+    expect((screen.getByLabelText('מחיר סלט בודד נוסף') as HTMLInputElement).disabled).toBe(false)
     expect(screen.getByText('סלטים (17)')).toBeTruthy()
     expect(screen.getByText('ראשונות (3)')).toBeTruthy()
     expect(screen.getByText('עיקריות (8)')).toBeTruthy()

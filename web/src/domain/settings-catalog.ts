@@ -93,6 +93,10 @@ export interface SettingsCatalog {
   readonly couplePriceMinorUnits: number
   readonly extraChallahMinorUnits: number
   readonly includedChallahs: number
+  readonly saladBlockMinorUnits: number
+  readonly saladRemainderMinorUnits: number
+  readonly extraFishFilletMinorUnits: number
+  readonly extraDessertHalfUnitMinorUnits: number
   readonly categories: Readonly<Record<MenuCategoryKey, readonly CatalogItem[]>>
   readonly extras: readonly PricedCatalogItem[]
   readonly lunch: readonly LunchItem[]
@@ -395,6 +399,10 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
   couplePriceMinorUnits: 23_000,
   extraChallahMinorUnits: 1_000,
   includedChallahs: 2,
+  saladBlockMinorUnits: AUTHORITATIVE_ALLOWANCES.saladBlockMinorUnits,
+  saladRemainderMinorUnits: AUTHORITATIVE_ALLOWANCES.saladRemainderMinorUnits,
+  extraFishFilletMinorUnits: AUTHORITATIVE_ALLOWANCES.extraFishFilletMinorUnits,
+  extraDessertHalfUnitMinorUnits: 0,
   categories: Object.fromEntries(
     MENU_CATEGORY_KEYS.map((category) => [
       category,
@@ -1093,6 +1101,10 @@ export function validateSettingsCatalog(catalog: SettingsCatalog): readonly Cata
   const prices: Array<readonly [string, number]> = [
     ['couplePriceMinorUnits', catalog.couplePriceMinorUnits],
     ['extraChallahMinorUnits', catalog.extraChallahMinorUnits],
+    ['saladBlockMinorUnits', catalog.saladBlockMinorUnits],
+    ['saladRemainderMinorUnits', catalog.saladRemainderMinorUnits],
+    ['extraFishFilletMinorUnits', catalog.extraFishFilletMinorUnits],
+    ['extraDessertHalfUnitMinorUnits', catalog.extraDessertHalfUnitMinorUnits],
   ]
   const register = (item: CatalogItem, path: string): void => {
     if (!StableCatalogIdSchema.safeParse(item.id).success || text(item.name) === '') {
@@ -1212,6 +1224,30 @@ export function loadSettingsCatalog(store: Readonly<LegacyStore>): CatalogResult
       menu.includedChallot,
       DEFAULT_SETTINGS_CATALOG.includedChallahs,
       'includedChallot',
+      warnings,
+    ),
+    saladBlockMinorUnits: parsePrice(
+      menu.saladBlockPrice,
+      DEFAULT_SETTINGS_CATALOG.saladBlockMinorUnits,
+      'saladBlockPrice',
+      warnings,
+    ),
+    saladRemainderMinorUnits: parsePrice(
+      menu.saladUnitPrice,
+      DEFAULT_SETTINGS_CATALOG.saladRemainderMinorUnits,
+      'saladUnitPrice',
+      warnings,
+    ),
+    extraFishFilletMinorUnits: parsePrice(
+      menu.fishExtraPrice,
+      DEFAULT_SETTINGS_CATALOG.extraFishFilletMinorUnits,
+      'fishExtraPrice',
+      warnings,
+    ),
+    extraDessertHalfUnitMinorUnits: parsePrice(
+      menu.dessertExtraPrice,
+      DEFAULT_SETTINGS_CATALOG.extraDessertHalfUnitMinorUnits,
+      'dessertExtraPrice',
       warnings,
     ),
     categories: Object.fromEntries(
@@ -1676,9 +1712,10 @@ export function applyCatalogToStore(
     includedChallot: catalog.includedChallahs,
     includedSalads: AUTHORITATIVE_ALLOWANCES.includedSaladsPerCouple,
     includedFish: AUTHORITATIVE_ALLOWANCES.includedFishUnitsPerCouple,
-    fishExtraPrice: decimalFromMinorUnits(AUTHORITATIVE_ALLOWANCES.extraFishFilletMinorUnits),
-    saladBlockPrice: decimalFromMinorUnits(AUTHORITATIVE_ALLOWANCES.saladBlockMinorUnits),
-    saladUnitPrice: decimalFromMinorUnits(AUTHORITATIVE_ALLOWANCES.saladRemainderMinorUnits),
+    fishExtraPrice: decimalFromMinorUnits(catalog.extraFishFilletMinorUnits),
+    dessertExtraPrice: decimalFromMinorUnits(catalog.extraDessertHalfUnitMinorUnits),
+    saladBlockPrice: decimalFromMinorUnits(catalog.saladBlockMinorUnits),
+    saladUnitPrice: decimalFromMinorUnits(catalog.saladRemainderMinorUnits),
     itemIds,
   }
   return {
@@ -1723,7 +1760,13 @@ function withCatalogUpdate(
 
 export function updateCatalogCorePrice(
   catalog: SettingsCatalog,
-  field: 'couplePriceMinorUnits' | 'extraChallahMinorUnits',
+  field:
+    | 'couplePriceMinorUnits'
+    | 'extraChallahMinorUnits'
+    | 'saladBlockMinorUnits'
+    | 'saladRemainderMinorUnits'
+    | 'extraFishFilletMinorUnits'
+    | 'extraDessertHalfUnitMinorUnits',
   priceMinorUnits: number,
 ): SettingsCatalog {
   return withCatalogUpdate(catalog, { [field]: priceMinorUnits })

@@ -37,6 +37,9 @@ export interface OrderTotalInput {
   readonly orderedSalads: unknown
   readonly giftSalads?: unknown
   readonly chargeLines?: readonly ChargeLineInput[]
+  readonly extraFilletPriceMinorUnits?: unknown
+  readonly saladBlockPriceMinorUnits?: unknown
+  readonly saladRemainderPriceMinorUnits?: unknown
 }
 
 export interface OrderTotalLine {
@@ -147,19 +150,36 @@ export function calculateOrderTotal({
   orderedSalads,
   giftSalads = 0,
   chargeLines = [],
+  extraFilletPriceMinorUnits = EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
+  saladBlockPriceMinorUnits,
+  saladRemainderPriceMinorUnits,
 }: OrderTotalInput): OrderTotalResult {
   const meals = requireNonNegativeSafeInteger(coupleMeals, 'couple meals')
   const mealPrice = requireNonNegativeSafeInteger(
     coupleMealUnitPriceMinorUnits,
     'couple meal unit price minor units',
   )
+  const filletPrice = requireNonNegativeSafeInteger(
+    extraFilletPriceMinorUnits,
+    'extra fillet price minor units',
+  )
 
   if (!Array.isArray(chargeLines)) {
     throw new TypeError('chargeLines must be an array')
   }
 
-  const fish = calculateFishPricing({ coupleMeals: meals, quantities: fishQuantities })
-  const salads = calculateSaladPricing({ coupleMeals: meals, orderedSalads, giftSalads })
+  const fish = calculateFishPricing({
+    coupleMeals: meals,
+    quantities: fishQuantities,
+    extraFilletPriceMinorUnits: filletPrice,
+  })
+  const salads = calculateSaladPricing({
+    coupleMeals: meals,
+    orderedSalads,
+    giftSalads,
+    ...(saladBlockPriceMinorUnits === undefined ? {} : { blockPriceMinorUnits: saladBlockPriceMinorUnits }),
+    ...(saladRemainderPriceMinorUnits === undefined ? {} : { remainderPriceMinorUnits: saladRemainderPriceMinorUnits }),
+  })
   const lines: OrderTotalLine[] = []
   const excludedLegacyExtras: ExcludedLegacyExtra[] = []
 
@@ -173,7 +193,7 @@ export function calculateOrderTotal({
         'fish-surcharge',
         FISH_SURCHARGE_LINE_NAME,
         fish.extraUnits,
-        EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
+        filletPrice,
       ),
     )
   }

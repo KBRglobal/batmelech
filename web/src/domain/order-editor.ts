@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS } from './fish-pricing.ts'
 import { checkedAdd, checkedMultiply, requireNonNegativeSafeInteger } from './money.ts'
 import {
   DELIVERY_EXTRA_NAME,
@@ -7,6 +8,10 @@ import {
   type ChargeLineInput,
   type OrderTotalResult,
 } from './order-total.ts'
+import {
+  EXTRA_SALAD_BLOCK_PRICE_MINOR_UNITS,
+  EXTRA_SALAD_SINGLE_PRICE_MINOR_UNITS,
+} from './salad-pricing.ts'
 import type { LegacyOrder, LegacyStore } from './store.ts'
 
 export const DEFAULT_COUPLE_PRICE_MINOR_UNITS = 23_000
@@ -82,7 +87,21 @@ const DEFAULT_EXTRAS_DOLLARS = [
   ['תוספת יין', 5],
 ] as const
 
-const DELIVERY_PRICE_MINOR_UNITS = 1_500
+export type DeliveryZone = 'dubai' | 'abu-dhabi'
+
+export const DELIVERY_ZONE_OPTIONS: readonly { readonly value: DeliveryZone; readonly label: string }[] = [
+  { value: 'dubai', label: 'דובאי' },
+  { value: 'abu-dhabi', label: 'אבו דאבי' },
+]
+
+const DELIVERY_PRICE_MINOR_UNITS: Readonly<Record<DeliveryZone, number>> = {
+  dubai: 1_500,
+  'abu-dhabi': 5_500,
+}
+
+function isDeliveryZone(value: unknown): value is DeliveryZone {
+  return value === 'dubai' || value === 'abu-dhabi'
+}
 
 export interface MenuExtra {
   readonly name: string
@@ -119,6 +138,10 @@ export interface OrderEditorMenu {
   readonly couplePriceMinorUnits: number
   readonly challahPriceMinorUnits: number
   readonly includedChallahs: number
+  readonly saladBlockPriceMinorUnits: number
+  readonly saladRemainderPriceMinorUnits: number
+  readonly extraFishFilletPriceMinorUnits: number
+  readonly extraDessertHalfUnitMinorUnits: number
 }
 
 const DEFAULT_LUNCH: readonly LunchItem[] = [
@@ -368,6 +391,8 @@ export interface OrderDraft extends Record<string, unknown> {
   readonly navigationUrl: string
   readonly time: string
   readonly pickup: boolean
+  readonly deliveryZone: DeliveryZone
+  readonly freeDelivery: boolean
   readonly status: string
   readonly group: string
   readonly meals: number
@@ -710,6 +735,19 @@ export function buildOrderEditorMenu(store: LegacyStore): OrderEditorMenu {
       DEFAULT_CHALLAH_PRICE_MINOR_UNITS,
     ),
     includedChallahs: countOrFallback(rawMenu.includedChallot, 2),
+    saladBlockPriceMinorUnits: dollarsNumberToMinorUnits(
+      rawMenu.saladBlockPrice,
+      EXTRA_SALAD_BLOCK_PRICE_MINOR_UNITS,
+    ),
+    saladRemainderPriceMinorUnits: dollarsNumberToMinorUnits(
+      rawMenu.saladUnitPrice,
+      EXTRA_SALAD_SINGLE_PRICE_MINOR_UNITS,
+    ),
+    extraFishFilletPriceMinorUnits: dollarsNumberToMinorUnits(
+      rawMenu.fishExtraPrice,
+      EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
+    ),
+    extraDessertHalfUnitMinorUnits: dollarsNumberToMinorUnits(rawMenu.dessertExtraPrice, 0),
   }
 }
 
@@ -751,6 +789,8 @@ export function createOrderDraft(menu: OrderEditorMenu, now: Date = new Date()):
     navigationUrl: '',
     time: '',
     pickup: false,
+    deliveryZone: 'dubai',
+    freeDelivery: false,
     status: 'חדשה',
     group: '',
     meals: 1,
@@ -805,6 +845,8 @@ export function createOrderDraftFromLegacy(
     navigationUrl: text(raw.navigationUrl),
     time: text(order.time),
     pickup: order.pickup === true,
+    deliveryZone: isDeliveryZone(raw.deliveryZone) ? raw.deliveryZone : 'dubai',
+    freeDelivery: raw.freeDelivery === true,
     status: text(order.status) || 'חדשה',
     group: text(order.group),
     meals: countOrFallback(order.meals, defaults.meals),
@@ -1207,7 +1249,7 @@ export function calculateOrderDraftPricing(
       source: 'delivery',
       name: DELIVERY_EXTRA_NAME,
       quantity: 1,
-      unitPriceMinorUnits: DELIVERY_PRICE_MINOR_UNITS,
+      unitPriceMinorUnits: draft.freeDelivery ? 0 : DELIVERY_PRICE_MINOR_UNITS[draft.deliveryZone],
     })
   }
 
@@ -1236,11 +1278,11 @@ export function calculateOrderDraftPricing(
   )
   const dessert = calculateDessertAllowance(draft)
   if (dessert.excessHalfUnits > 0) {
-    issues.push({
-      code: 'DESSERT_OVERAGE',
-      message:
-        'בחירת הקינוחים חורגת מהזכאות: שני סופלה או מנת סוכריות בקלוואה לכל זוגית. המחיר לחריגה טרם הוגדר.',
-      blocking: true,
+    chargeLines.push({
+      source: 'other',
+      name: 'קינוח נוסף',
+      quantity: dessert.excessHalfUnits,
+      unitPriceMinorUnits: menu.extraDessertHalfUnitMinorUnits,
     })
   }
   if (dessert.unclassifiedQuantity > 0) {
@@ -1260,6 +1302,9 @@ export function calculateOrderDraftPricing(
         orderedSalads,
         giftSalads,
         chargeLines,
+        extraFilletPriceMinorUnits: menu.extraFishFilletPriceMinorUnits,
+        saladBlockPriceMinorUnits: menu.saladBlockPriceMinorUnits,
+        saladRemainderPriceMinorUnits: menu.saladRemainderPriceMinorUnits,
       }),
       issues,
       dessert,
@@ -1285,6 +1330,8 @@ export function orderPricingFingerprint(draft: OrderDraft): string {
     meals: draft.meals,
     challot: draft.challot,
     pickup: draft.pickup,
+    deliveryZone: draft.deliveryZone,
+    freeDelivery: draft.freeDelivery,
     salads: draft.salads,
     firsts: draft.firsts,
     mains: draft.mains,
@@ -1315,7 +1362,7 @@ export function validateOrderDraft(
     expectedTotalMinorUnits !== undefined &&
     totalMinorUnits !== expectedTotalMinorUnits
   ) {
-    issues.push({ code: 'TOTAL_MISMATCH', message: 'סך התשלום חייב להיות זהה למחיר המחושב.', blocking: true })
+    issues.push({ code: 'TOTAL_MISMATCH', message: 'סך התשלום שונה מהמחיר המחושב — התאמה ידנית.', blocking: false })
   }
   const depositMinorUnits = draft.deposit.trim() ? parseUsdInputMinorUnits(draft.deposit) : 0
   if (depositMinorUnits === null) {
@@ -1497,6 +1544,8 @@ export function serializeOrderDraft(draft: OrderDraft, orderId: string): LegacyO
     navigationUrl: draft.navigationUrl,
     time: draft.time,
     pickup: draft.pickup,
+    deliveryZone: draft.deliveryZone,
+    freeDelivery: draft.freeDelivery,
     status: draft.status,
     group: draft.group,
     meals: draft.meals,

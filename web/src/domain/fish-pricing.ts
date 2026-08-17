@@ -16,6 +16,7 @@ export const EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS = 3_000
 export interface FishPricingInput {
   readonly coupleMeals: unknown
   readonly quantities: unknown
+  readonly extraFilletPriceMinorUnits?: unknown
 }
 
 export interface FishPricingResult {
@@ -43,7 +44,12 @@ function requirePlainRecord(value: unknown): Readonly<Record<string, unknown>> {
 export function calculateFishPricing({
   coupleMeals,
   quantities,
+  extraFilletPriceMinorUnits = EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
 }: FishPricingInput): FishPricingResult {
+  const extraFilletPrice = requireNonNegativeSafeInteger(
+    extraFilletPriceMinorUnits,
+    'extra fillet price minor units',
+  )
   const quantityRecord = requirePlainRecord(quantities)
   let selectedUnits = 0
   for (const [itemName, rawQuantity] of Object.entries(quantityRecord)) {
@@ -60,7 +66,7 @@ export function calculateFishPricing({
   const extraUnits = Math.max(0, selectedUnits - includedUnits)
   const surchargeMinorUnits = checkedMultiply(
     extraUnits,
-    EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
+    extraFilletPrice,
     'fish surcharge',
   )
 

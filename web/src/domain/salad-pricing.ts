@@ -15,6 +15,8 @@ export interface SaladPricingInput {
   readonly coupleMeals: unknown
   readonly orderedSalads: unknown
   readonly giftSalads?: unknown
+  readonly blockPriceMinorUnits?: unknown
+  readonly remainderPriceMinorUnits?: unknown
 }
 
 export interface SaladPricingResult {
@@ -34,10 +36,14 @@ export function calculateSaladPricing({
   coupleMeals,
   orderedSalads,
   giftSalads = 0,
+  blockPriceMinorUnits = EXTRA_SALAD_BLOCK_PRICE_MINOR_UNITS,
+  remainderPriceMinorUnits = EXTRA_SALAD_SINGLE_PRICE_MINOR_UNITS,
 }: SaladPricingInput): SaladPricingResult {
   const meals = requireNonNegativeSafeInteger(coupleMeals, 'couple meals')
   const ordered = requireNonNegativeSafeInteger(orderedSalads, 'ordered salads')
   const gifts = requireNonNegativeSafeInteger(giftSalads, 'gift salads')
+  const blockPrice = requireNonNegativeSafeInteger(blockPriceMinorUnits, 'salad block price minor units')
+  const remainderPrice = requireNonNegativeSafeInteger(remainderPriceMinorUnits, 'salad remainder price minor units')
   const totalPreparedSalads = checkedAdd(ordered, gifts, 'prepared salads')
   const allowanceSalads = checkedMultiply(
     meals,
@@ -50,12 +56,12 @@ export function calculateSaladPricing({
   const extraSingles = extraSalads % EXTRA_SALAD_BLOCK_SIZE
   const blockCharge = checkedMultiply(
     extraBlocks,
-    EXTRA_SALAD_BLOCK_PRICE_MINOR_UNITS,
+    blockPrice,
     'salad block surcharge',
   )
   const singleCharge = checkedMultiply(
     extraSingles,
-    EXTRA_SALAD_SINGLE_PRICE_MINOR_UNITS,
+    remainderPrice,
     'salad single surcharge',
   )
   const surchargeMinorUnits = checkedAdd(blockCharge, singleCharge, 'salad surcharge')

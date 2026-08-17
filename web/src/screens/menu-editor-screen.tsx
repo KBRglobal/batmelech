@@ -442,10 +442,10 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
       <section className="mt-8 rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className="text-xl font-black text-primary">כללי הארוחה הזוגית</h2>
         <p className="mt-2 text-xs font-bold text-muted-foreground">
-          מחיר הארוחה והחלה הנוספת ניתנים לעריכה. הכללים (סלטים/דגים כלולים, מחיר פילה נוסף) קבועים
-          כרגע כי הם חלק מנוסחת התמחור האוטומטית.
+          כל המחירים כאן ניתנים לעריכה. הכמויות הכלולות (סלטים/דגים בזוגית) קבועות כי הן חלק ממבנה
+          המנה עצמה.
         </p>
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <PriceField
             label="מחיר ארוחה זוגית"
             value={current.couplePriceMinorUnits}
@@ -456,14 +456,33 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
             value={current.extraChallahMinorUnits}
             onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'extraChallahMinorUnits', next))}
           />
+          <PriceField
+            label="מחיר פילה דג נוסף"
+            value={current.extraFishFilletMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'extraFishFilletMinorUnits', next))}
+          />
           <FixedValue label="סלטים כלולים בזוגית" value={String(AUTHORITATIVE_ALLOWANCES.includedSaladsPerCouple)} />
+          <PriceField
+            label="מחיר בלוק סלטים נוסף (כל 4)"
+            value={current.saladBlockMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'saladBlockMinorUnits', next))}
+          />
+          <PriceField
+            label="מחיר סלט בודד נוסף"
+            value={current.saladRemainderMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'saladRemainderMinorUnits', next))}
+          />
           <FixedValue label="דגים כלולים בזוגית" value={String(AUTHORITATIVE_ALLOWANCES.includedFishUnitsPerCouple)} />
-          <PriceField label="מחיר פילה דג נוסף" value={AUTHORITATIVE_ALLOWANCES.extraFishFilletMinorUnits} fixed onCommit={() => undefined} />
+          <PriceField
+            label="מחיר קינוח נוסף (סופלה = יחידה, בקלוואה = 2 יחידות)"
+            value={current.extraDessertHalfUnitMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'extraDessertHalfUnitMinorUnits', next))}
+          />
         </div>
         <div className="mt-5 rounded-2xl bg-secondary p-4 text-sm font-bold leading-7 text-primary">
-          <p>בכל ארוחה זוגית כלולים שני פילטים, בכל שילוב של מרוקאי וחריימה. כל פילה מעבר לכמות הכלולה עולה 30$. מנת קציצות דגים אחת שווה למנת דג זוגית מלאה.</p>
-          <p className="mt-2">סלטים: 4 כלולים, כל בלוק נוסף של 4 עולה 25$, והיתרה עולה 7$ לסלט.</p>
-          <p className="mt-2">קינוח: 2 סופלה או מנת סוכריות בקלוואה אחת לכל זוגית.</p>
+          <p>בכל ארוחה זוגית כלולים שני פילטים, בכל שילוב של מרוקאי וחריימה. מנת קציצות דגים אחת שווה למנת דג זוגית מלאה.</p>
+          <p className="mt-2">סלטים: 4 כלולים בכל ארוחה זוגית, מעבר לזה נגבה לפי הבלוק/הסלט הבודד שמוגדרים למעלה.</p>
+          <p className="mt-2">קינוח: 2 סופלה או מנת סוכריות בקלוואה אחת לכל זוגית, מעבר לזה נגבה לפי המחיר שמוגדר למעלה.</p>
         </div>
       </section>
 

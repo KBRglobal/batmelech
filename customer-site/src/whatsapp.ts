@@ -1,4 +1,4 @@
-import type { CartLine, CustomerDetails } from './cart-context'
+import { DELIVERY_ZONE_LABELS, type CartLine, type CustomerDetails } from './cart-context'
 
 export const WA_NUMBER = '971586288776'
 
@@ -29,7 +29,9 @@ export function buildOrderMessage(lines: CartLine[], customer: CustomerDetails, 
     `תאריך מבוקש: ${customer.date || '-'}`,
     `שעה מבוקשת: ${customer.time || '-'}`,
     customer.email ? `אימייל: ${customer.email}` : undefined,
-    customer.fulfillment === 'pickup' ? 'איסוף עצמי' : `כתובת למשלוח: ${deliveryAddressText(customer)}`,
+    customer.fulfillment === 'pickup'
+      ? 'איסוף עצמי'
+      : `כתובת למשלוח (${DELIVERY_ZONE_LABELS[customer.zone]}): ${deliveryAddressText(customer)}`,
     hotel ? `כתובת המלון: ${hotel.fullAddress}` : undefined,
     customer.notes ? `הערות: ${customer.notes}` : undefined,
   ].filter(Boolean)

@@ -10,6 +10,18 @@ export type CartLine = {
 
 export type Fulfillment = 'delivery' | 'pickup'
 
+export type DeliveryZone = 'dubai' | 'abu-dhabi'
+
+export const DELIVERY_FEES_USD: Readonly<Record<DeliveryZone, number>> = {
+  dubai: 15,
+  'abu-dhabi': 55,
+}
+
+export const DELIVERY_ZONE_LABELS: Readonly<Record<DeliveryZone, string>> = {
+  dubai: 'דובאי',
+  'abu-dhabi': 'אבו דאבי',
+}
+
 export type AddressMode = 'hotel' | 'free'
 
 /** One result from /api/hotels/search, kept only while the order is being placed. */
@@ -30,6 +42,7 @@ export type CustomerDetails = {
   address: string
   notes: string
   fulfillment: Fulfillment
+  zone: DeliveryZone
   date: string
   time: string
   addressMode: AddressMode
@@ -49,7 +62,7 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-const EMPTY_CUSTOMER: CustomerDetails = { name: '', phoneCode: '+971', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery', date: '', time: '', addressMode: 'hotel', hotel: null }
+const EMPTY_CUSTOMER: CustomerDetails = { name: '', phoneCode: '+971', phone: '', email: '', address: '', notes: '', fulfillment: 'delivery', zone: 'dubai', date: '', time: '', addressMode: 'hotel', hotel: null }
 
 const STORAGE_KEY = 'bm-cart-v1'
 
