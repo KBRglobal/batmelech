@@ -135,7 +135,8 @@ describe('CustomersScreen', () => {
     expect(screen.getByText('VIP')).toBeTruthy()
     expect(screen.getByText('הזמנה קרובה')).toBeTruthy()
     expect(screen.getByText('העדפה אמיתית מהשרת')).toBeTruthy()
-    expect(screen.getByText('$0.30')).toBeTruthy()
+    expect(screen.getAllByText('$0.30')).toHaveLength(2)
+    expect(screen.getByText('לתשלום:')).toBeTruthy()
     expect(screen.getByRole('link', { name: '+972 50 123 4567' }).getAttribute('href')).toBe(
       'tel:+972501234567',
     )
@@ -185,6 +186,85 @@ describe('CustomersScreen', () => {
     expect(screen.getByText('דינה מהשרת')).toBeTruthy()
   })
 
+  it('computes outstanding from deposits and paid markers while skipping cancelled orders', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'a', date: '2099-08-10', name: 'לקוחה עם יתרה', total: '100', deposit: '30' },
+            { id: 'b', date: '2099-08-11', name: 'לקוחה עם יתרה', total: '50', paid: 'כן' },
+            { id: 'c', date: '2099-08-12', name: 'לקוחה עם יתרה', total: '20', status: 'בוטלה' },
+          ],
+        },
+      }),
+    )
+
+    renderCustomers()
+
+    expect(screen.getByText('לתשלום:')).toBeTruthy()
+    expect(screen.getByText('$70.00')).toBeTruthy()
+    expect(screen.getByText('$150.00')).toBeTruthy()
+    expect(screen.getByText(/3 הזמנות/)).toBeTruthy()
+  })
+
+  it('shows a settled chip when every active order is fully covered', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'a', date: '2099-08-10', name: 'לקוחה ששילמה', total: '80', paid: 'שת"פ' },
+            { id: 'b', date: '2099-08-11', name: 'לקוחה ששילמה', total: '40', deposit: '40' },
+          ],
+        },
+      }),
+    )
+
+    renderCustomers()
+
+    expect(screen.getByText('אין יתרה לתשלום')).toBeTruthy()
+    expect(screen.queryByText('לתשלום:')).toBeNull()
+  })
+
+  it('refuses to display an outstanding number when a deposit is malformed', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'a', date: '2099-08-10', name: 'לקוחה לבדיקה', total: '100', deposit: '1,2,3' },
+          ],
+        },
+      }),
+    )
+
+    renderCustomers()
+
+    expect(screen.getByText('לתשלום: לא ניתן לחשב')).toBeTruthy()
+    expect(screen.queryByText('אין יתרה לתשלום')).toBeNull()
+    expect(screen.getAllByText('$100.00')).toHaveLength(2)
+  })
+
+  it('keeps the outstanding chip attached to each customer when searching', async () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'a', date: '2099-08-10', name: 'שרה חייבת', phone: '0501111111', total: '90', deposit: '10' },
+            { id: 'b', date: '2099-08-11', name: 'דינה שילמה', phone: '0502222222', total: '60', paid: 'כן' },
+          ],
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    renderCustomers()
+
+    await user.type(screen.getByLabelText('חיפוש לקוחות'), 'שרה')
+
+    expect(screen.getByText('נמצאו 1 לקוחות')).toBeTruthy()
+    expect(screen.getByText('לתשלום:')).toBeTruthy()
+    expect(screen.getAllByText('$80.00')).toHaveLength(1)
+    expect(screen.queryByText('אין יתרה לתשלום')).toBeNull()
+  })
+
   it('renders a query-specific empty state as text rather than markup', async () => {
     mockedUseStore.mockReturnValue(
       queryResult({ store: { orders: [{ id: 'a', name: 'לקוחה קיימת' }] } }),
@@ -218,6 +298,7 @@ describe('CustomersScreen', () => {
     expect(within(alert).getByText(/סכום הזמנה אינו תקין/)).toBeTruthy()
     expect(within(alert).getAllByText(/מספר הטלפון אינו מתאים/)).toHaveLength(2)
     expect(screen.getByText('לא ניתן לחשב')).toBeTruthy()
+    expect(screen.getByText('לתשלום: לא ניתן לחשב')).toBeTruthy()
     expect(screen.queryByText('$123.00')).toBeNull()
     expect(
       screen.getByRole('button', { name: 'הזמנה חוזרת לא זמינה' }).hasAttribute('disabled'),

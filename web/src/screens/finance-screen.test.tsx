@@ -48,6 +48,19 @@ function renderFinance(onSave?: CustomerFinanceSaveHandler) {
   )
 }
 
+// Mirrors the screen's business-time-zone month bucketing (Asia/Dubai).
+function businessMonthKey(offsetMonths: number): string {
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+    year: 'numeric',
+    month: '2-digit',
+    timeZone: 'Asia/Dubai',
+  }).formatToParts(new Date())
+  const year = Number(parts.find((part) => part.type === 'year')!.value)
+  const month = Number(parts.find((part) => part.type === 'month')!.value)
+  const date = new Date(Date.UTC(year, month - 1 + offsetMonths, 1))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
 afterEach(cleanup)
 
 beforeEach(() => {
@@ -82,6 +95,11 @@ describe('FinanceScreen', () => {
     expect(screen.getByLabelText('חודש')).toBeTruthy()
     expect(screen.getByLabelText('תאריך ההוצאה')).toBeTruthy()
     expect(screen.getByLabelText('סכום ההוצאה בדולרים')).toBeTruthy()
+
+    const overview = screen.getByRole('region', { name: 'תמונת מצב כללית' })
+    expect(within(overview).getAllByText('$0.00')).toHaveLength(3)
+    expect(within(overview).getByText('0')).toBeTruthy()
+    expect(screen.getByText('אין יתרות פתוחות — כל ההזמנות הפעילות שולמו.')).toBeTruthy()
   })
 
   it('renders exact injected month and day financials, deposits, expenses, and normalized top customers', () => {
@@ -124,7 +142,7 @@ describe('FinanceScreen', () => {
     expect(within(summary).getByText('$0.10')).toBeTruthy()
     expect(within(summary).getByText('$0.20')).toBeTruthy()
     expect(within(summary).getByText('3')).toBeTruthy()
-    expect(screen.getByText('לקוחה אמיתית')).toBeTruthy()
+    expect(screen.getAllByText('לקוחה אמיתית').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('2 הזמנות בחודש')).toBeTruthy()
     expect(screen.queryByText('שרה לוי')).toBeNull()
     expect(container.querySelectorAll('input')).toHaveLength(2)
@@ -150,8 +168,9 @@ describe('FinanceScreen', () => {
     await user.selectOptions(select, '2099-09')
 
     expect(screen.getByRole('heading', { name: /כספים — ספטמבר 2099/ })).toBeTruthy()
-    expect(screen.getByText('ספטמבר')).toBeTruthy()
-    expect(screen.queryByText('אוגוסט')).toBeNull()
+    const topCustomers = screen.getByRole('region', { name: 'הלקוחות הגדולים' })
+    expect(within(topCustomers).getByText('ספטמבר')).toBeTruthy()
+    expect(within(topCustomers).queryByText('אוגוסט')).toBeNull()
     expect(screen.getAllByText('$2.00').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('שומר...')).toBeNull()
     expect(screen.queryByText('נשמר אוטומטית')).toBeNull()
@@ -351,5 +370,85 @@ describe('FinanceScreen', () => {
 
     expect(screen.getByRole('alert').textContent).toContain('לא בוצע שינוי בשרת')
     expect(screen.queryByText('ההוצאה נשמרה.')).toBeNull()
+  })
+
+  it('shows overview KPI cards for this month, last month, outstanding total, and unpaid count', () => {
+    const currentMonth = businessMonthKey(0)
+    const previousMonth = businessMonthKey(-1)
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'paid-now', date: `${currentMonth}-15`, name: 'שולמה', total: '10.00', paid: 'כן' },
+            {
+              id: 'prev',
+              date: `${previousMonth}-10`,
+              name: 'קודמת',
+              total: '5.00',
+              deposit: '2.00',
+              paid: 'לא',
+            },
+            { id: 'no-date', date: 'בלי תאריך', name: 'ללא תאריך', total: '7.25' },
+            { id: 'gone', date: `${currentMonth}-16`, name: 'בוטלה', total: '99.00', status: 'בוטלה' },
+          ],
+        },
+      }),
+    )
+    renderFinance()
+
+    const overview = screen.getByRole('region', { name: 'תמונת מצב כללית' })
+    expect(within(overview).getByText('$10.00')).toBeTruthy()
+    expect(within(overview).getByText('$5.00')).toBeTruthy()
+    expect(within(overview).getByText('$10.25')).toBeTruthy()
+    expect(within(overview).getByText('2')).toBeTruthy()
+    expect(within(overview).queryByText('$99.00')).toBeNull()
+    expect(screen.getByRole('note').textContent).toContain('1 עם תאריך לא תקין')
+
+    const outstanding = screen.getByRole('region', { name: 'יתרות פתוחות לגבייה' })
+    const link = within(outstanding).getByRole('link', { name: 'פתיחת ההזמנה של קודמת' })
+    expect(link.getAttribute('href')).toBe('/orders/prev/edit')
+    expect(within(outstanding).getByText('$3.00')).toBeTruthy()
+    expect(within(outstanding).queryByText('שולמה')).toBeNull()
+    expect(within(outstanding).queryByText('בוטלה')).toBeNull()
+  })
+
+  it('lists every unpaid non-cancelled order sorted by date descending with exact remaining amounts', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'x1', date: '2099-08-12', name: 'רות', total: '30.00', deposit: '10.00', paid: 'לא' },
+            { id: 'x2', date: '2099-09-01', name: 'חנה', total: '50.00', paid: 'מקדמה' },
+            { id: 'x3', date: '2099-08-20', name: 'שולמית', total: '20.00', paid: 'כן' },
+            { id: 'x4', date: '2099-08-21', name: 'שרה', total: '15.00', paid: 'שת"פ' },
+            { date: '2099-08-01', name: 'בלי מזהה', total: '5.00' },
+            { id: 'bad', date: '2099-08-05', name: 'סכום שבור', total: '1,2,3', paid: 'לא' },
+          ],
+        },
+      }),
+    )
+    renderFinance()
+
+    const outstanding = screen.getByRole('region', { name: 'יתרות פתוחות לגבייה' })
+    const names = within(outstanding)
+      .getAllByRole('rowheader')
+      .map((cell) => cell.textContent)
+    expect(names).toEqual(['חנה', 'רות', 'סכום שבור', 'בלי מזהה'])
+    expect(within(outstanding).queryByText('שולמית')).toBeNull()
+    expect(within(outstanding).queryByText('שרה')).toBeNull()
+    expect(within(outstanding).getByText('$20.00')).toBeTruthy()
+    expect(within(outstanding).getAllByText('$50.00')).toHaveLength(2)
+    expect(within(outstanding).getAllByText('סכום לא תקין')).toHaveLength(2)
+    expect(within(outstanding).getByText('אין מזהה לפתיחה')).toBeTruthy()
+    expect(
+      within(outstanding)
+        .getByRole('link', { name: 'פתיחת ההזמנה של רות' })
+        .getAttribute('href'),
+    ).toBe('/orders/x1/edit')
+
+    const overview = screen.getByRole('region', { name: 'תמונת מצב כללית' })
+    expect(within(overview).getByText('$75.00')).toBeTruthy()
+    expect(within(overview).getByText('4')).toBeTruthy()
+    expect(screen.getByRole('note').textContent).toContain('1 עם סכום לא תקין')
   })
 })

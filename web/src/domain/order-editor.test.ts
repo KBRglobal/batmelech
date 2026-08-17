@@ -753,6 +753,69 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pricing.result?.totalMinorUnits).toBe(26_000)
   })
 
+  it('prices each lunch plate by its own variant and pools included sides across plates', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const pricing = calculateOrderDraftPricing(
+      draftWith({
+        meals: 0,
+        challot: 0,
+        pickup: true,
+        lunch: {
+          'schnitzel-plate': {
+            quantity: 2,
+            variantKey: 'single',
+            addonQuantity: 0,
+            sides: { 'אורז לבן': 3 },
+            plates: [
+              { variantKey: 'single', sides: { 'אורז לבן': 1 } },
+              { variantKey: 'family', sides: { 'אורז לבן': 2 } },
+            ],
+          },
+        },
+      }),
+      menu,
+    )
+
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'שניצל בצלחת (אישית)', quantity: 1, amountMinorUnits: 3_500,
+    }))
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'שניצל בצלחת (משפחתית — כולל 2 תוספות)', quantity: 1, amountMinorUnits: 14_500,
+    }))
+    // 3 sides selected, 2 included by the family plate → 1 excess, charged at
+    // the highest side price among the chosen variants (the family's $25).
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'תוספות לשניצל בצלחת', quantity: 1, amountMinorUnits: 2_500,
+    }))
+    expect(pricing.result?.totalMinorUnits).toBe(20_500)
+  })
+
+  it('falls back to the pooled legacy lunch pricing when plates are stale or absent', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const stalePlates = calculateOrderDraftPricing(
+      draftWith({
+        meals: 0,
+        challot: 0,
+        pickup: true,
+        lunch: {
+          'schnitzel-plate': {
+            quantity: 2,
+            variantKey: 'single',
+            addonQuantity: 0,
+            sides: {},
+            plates: [{ variantKey: 'family', sides: {} }],
+          },
+        },
+      }),
+      menu,
+    )
+    // One plate for a quantity of two is stale — priced as 2 × single, not family.
+    expect(stalePlates.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'שניצל בצלחת (אישית)', quantity: 2, amountMinorUnits: 7_000,
+    }))
+    expect(stalePlates.result?.totalMinorUnits).toBe(7_000)
+  })
+
   it('adds exactly one delivery charge and no charge for pickup', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const delivery = calculateOrderDraftPricing(draftWith({ pickup: false }), menu)

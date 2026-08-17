@@ -183,7 +183,10 @@ describe('DeliveriesScreen', () => {
     renderDeliveries(onSave)
 
     expect(onSave).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'עדכון לקוחה לשמירה לסטטוס מוכנה' }))
+    const advanceButton = screen.getByRole('button', { name: 'עדכון לקוחה לשמירה לסטטוס מוכנה' })
+    expect(advanceButton.textContent).toBe('העברה ל"מוכנה"')
+    expect(advanceButton.hasAttribute('disabled')).toBe(false)
+    await user.click(advanceButton)
 
     expect(onSave).toHaveBeenCalledTimes(1)
     const request = onSave.mock.calls[0]![0]
@@ -196,6 +199,9 @@ describe('DeliveriesScreen', () => {
     })
     expect(screen.getByText('הסטטוס עודכן למוכנה.')).toBeTruthy()
     expect(screen.getByText('מוכנה')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'עדכון לקוחה לשמירה לסטטוס במשלוח' }).textContent,
+    ).toBe('העברה ל"במשלוח"')
   })
 
   it('fails closed for duplicate IDs and performs no write', () => {

@@ -14,6 +14,7 @@ import {
   type CustomerFinanceWarning,
   type CustomerMetadataUpdate,
   type CustomerOrderHistoryItem,
+  parseLegacyUsdAmount,
 } from '../domain/customers-finance.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
@@ -53,6 +54,54 @@ function repeatOrderRoute(orderId: string): To {
     pathname: APP_ROUTES.newOrder,
     search: `?${new URLSearchParams({ duplicate: orderId }).toString()}`,
   }
+}
+
+const PAID_IN_FULL_MARKERS = new Set(['כן', 'שת"פ'])
+
+function customerOutstandingMinorUnits(
+  store: Readonly<LegacyStore>,
+  customer: CustomerDirectoryEntry,
+): number | null {
+  let outstanding = 0
+  for (const item of customer.history) {
+    if (item.cancelled) continue
+    if (item.totalState === 'invalid' || item.totalMinorUnits === null) return null
+    const order = store.orders[item.sourceIndex]
+    if (order === undefined) return null
+    const deposit = parseLegacyUsdAmount(order.deposit)
+    if (deposit.state === 'invalid') return null
+    const paid = typeof order.paid === 'string' ? order.paid.trim() : ''
+    const dueMinorUnits = PAID_IN_FULL_MARKERS.has(paid)
+      ? 0
+      : Math.max(0, item.totalMinorUnits - deposit.minorUnits)
+    const next = outstanding + dueMinorUnits
+    if (!Number.isSafeInteger(next)) return null
+    outstanding = next
+  }
+  return outstanding
+}
+
+function OutstandingChip({ outstandingMinorUnits }: { outstandingMinorUnits: number | null }) {
+  if (outstandingMinorUnits === null) {
+    return (
+      <span className="rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[0.6875rem] font-black text-destructive">
+        לתשלום: לא ניתן לחשב
+      </span>
+    )
+  }
+  if (outstandingMinorUnits === 0) {
+    return (
+      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-black text-emerald-700">
+        אין יתרה לתשלום
+      </span>
+    )
+  }
+  return (
+    <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[0.6875rem] font-black text-amber-800">
+      <span>לתשלום: </span>
+      <span dir="ltr">{formatUsdMinorUnits(outstandingMinorUnits)}</span>
+    </span>
+  )
 }
 
 function statusClassName(item: CustomerOrderHistoryItem): string {
@@ -103,6 +152,7 @@ function HistoryRow({ item, customerName }: { item: CustomerOrderHistoryItem; cu
 
 function CustomerCard({
   customer,
+  outstandingMinorUnits,
   notes,
   saveState,
   onNotesChange,
@@ -110,6 +160,7 @@ function CustomerCard({
   onToggleVip,
 }: {
   customer: CustomerDirectoryEntry
+  outstandingMinorUnits: number | null
   notes: string
   saveState: CustomerSaveState
   onNotesChange: (notes: string) => void
@@ -136,6 +187,7 @@ function CustomerCard({
                   הזמנה קרובה
                 </span>
               )}
+              <OutstandingChip outstandingMinorUnits={outstandingMinorUnits} />
             </div>
             <p className="mt-1 text-xs font-bold text-muted-foreground">
               {customer.orderCount} הזמנות · אחרונה: {customer.localizedLastServiceDate}
@@ -523,6 +575,7 @@ export function CustomersScreen({ onSave }: { readonly onSave?: CustomerFinanceS
               <CustomerCard
                 key={customer.key}
                 customer={customer}
+                outstandingMinorUnits={customerOutstandingMinorUnits(displayStore, customer)}
                 notes={Object.prototype.hasOwnProperty.call(noteDrafts, customer.key)
                   ? noteDrafts[customer.key]!
                   : customer.notes}

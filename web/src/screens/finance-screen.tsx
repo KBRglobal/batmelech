@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { generatePath, Link } from 'react-router'
+import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
@@ -10,12 +12,14 @@ import {
   formatFinanceMonth,
   formatSignedUsdMinorUnits,
   hasStoredExpense,
+  parseLegacyUsdAmount,
   validateExpenseInput,
   type CustomerFinanceSaveHandler,
   type CustomerFinanceWarning,
   type FinanceDaySummary,
 } from '../domain/customers-finance.ts'
-import type { LegacyStore } from '../domain/store.ts'
+import { checkedAdd } from '../domain/money.ts'
+import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
 type ExpenseSaveState =
@@ -51,12 +55,14 @@ function MoneyValue({ value, signed = false }: { value: number | null; signed?: 
 function MetricCard({
   label,
   value,
+  caption,
   emphasis = false,
   danger = false,
   signed = false,
 }: {
   label: string
   value: number | null
+  caption?: string
   emphasis?: boolean
   danger?: boolean
   signed?: boolean
@@ -78,6 +84,9 @@ function MetricCard({
       <p className={`mt-1 text-2xl font-black ${valueClassName}`}>
         <MoneyValue value={value} signed={signed} />
       </p>
+      {caption !== undefined && (
+        <p className="mt-1 text-[0.625rem] font-bold text-muted-foreground">{caption}</p>
+      )}
     </article>
   )
 }
@@ -138,6 +147,247 @@ function defaultExpenseDate(month: string, currentMonth: string): string {
     parts.find((part) => part.type === type)?.value ?? ''
   const date = `${read('year')}-${read('month')}-${read('day')}`
   return date.startsWith(`${month}-`) ? date : `${month}-01`
+}
+
+// --- Local cross-month overview helpers -------------------------------------
+// buildFinanceDashboard is scoped to one selected month, so the screen computes
+// the cross-month snapshot (this month vs last month, all-time outstanding)
+// locally instead of changing the shared domain module.
+
+const OVERVIEW_TIME_ZONE = 'Asia/Dubai'
+const OVERVIEW_LOCALE = 'he-IL'
+const OVERVIEW_CANCELLED_STATUSES = new Set(['בוטלה', 'cancelled', 'canceled'])
+const OVERVIEW_SETTLED_PAID_VALUES = new Set(['כן', 'שת"פ'])
+const OVERVIEW_MAX_ID_LENGTH = 256
+
+interface OutstandingOrderRow {
+  readonly sourceIndex: number
+  readonly routeId: string | null
+  readonly customerName: string
+  readonly serviceDate: string | null
+  readonly localizedDate: string
+  readonly totalMinorUnits: number | null
+  readonly depositMinorUnits: number | null
+  readonly remainingMinorUnits: number | null
+}
+
+interface FinanceOverview {
+  readonly currentMonth: string
+  readonly previousMonth: string
+  readonly currentMonthRevenueMinorUnits: number | null
+  readonly previousMonthRevenueMinorUnits: number | null
+  readonly outstandingTotalMinorUnits: number | null
+  readonly unpaidOrderCount: number
+  readonly invalidDateOrderCount: number
+  readonly invalidAmountOrderCount: number
+  readonly outstandingRows: readonly OutstandingOrderRow[]
+}
+
+function overviewText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function isRealIsoOverviewDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (match === null) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function businessMonth(now: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', {
+    year: 'numeric',
+    month: '2-digit',
+    timeZone: OVERVIEW_TIME_ZONE,
+  }).formatToParts(now)
+  const read = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  return `${read('year')}-${read('month')}`
+}
+
+function monthBefore(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const date = new Date(Date.UTC(year!, monthNumber! - 2, 1))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+function localizedOverviewDate(serviceDate: string): string {
+  const [year, month, day] = serviceDate.split('-').map(Number)
+  return new Intl.DateTimeFormat(OVERVIEW_LOCALE, {
+    weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year!, month! - 1, day)))
+}
+
+function overviewSafeAdd(current: number | null, amount: number): number | null {
+  if (current === null) return null
+  try {
+    return checkedAdd(current, amount, 'finance.overview')
+  } catch {
+    return null
+  }
+}
+
+function overviewOrderRouteId(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed !== '' && value.length <= OVERVIEW_MAX_ID_LENGTH ? trimmed : null
+  }
+  return typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : null
+}
+
+function overviewRouteIds(orders: readonly LegacyOrder[]): Map<number, string | null> {
+  const counts = new Map<string, number>()
+  for (const order of orders) {
+    const id = overviewOrderRouteId(order.id)
+    if (id !== null) counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  return new Map(
+    orders.map((order, index) => {
+      const id = overviewOrderRouteId(order.id)
+      return [index, id !== null && counts.get(id) === 1 ? id : null]
+    }),
+  )
+}
+
+function buildFinanceOverview(store: Readonly<LegacyStore>, now: Date = new Date()): FinanceOverview {
+  const currentMonth = businessMonth(now)
+  const previousMonth = monthBefore(currentMonth)
+  const routeIdByIndex = overviewRouteIds(store.orders)
+  let currentMonthRevenueMinorUnits: number | null = 0
+  let previousMonthRevenueMinorUnits: number | null = 0
+  let outstandingTotalMinorUnits: number | null = 0
+  let unpaidOrderCount = 0
+  let invalidDateOrderCount = 0
+  let invalidAmountOrderCount = 0
+  const outstandingRows: OutstandingOrderRow[] = []
+
+  store.orders.forEach((order, sourceIndex) => {
+    if (OVERVIEW_CANCELLED_STATUSES.has(overviewText(order.status).toLocaleLowerCase('en-US'))) {
+      return
+    }
+    const total = parseLegacyUsdAmount(order.total)
+    const deposit = parseLegacyUsdAmount(order.deposit)
+    if (total.state === 'invalid' || deposit.state === 'invalid') invalidAmountOrderCount += 1
+
+    const rawDate = overviewText(order.date)
+    const serviceDate = isRealIsoOverviewDate(rawDate) ? rawDate : null
+    if (serviceDate === null) {
+      invalidDateOrderCount += 1
+    } else if (total.state !== 'invalid') {
+      const month = serviceDate.slice(0, 7)
+      if (month === currentMonth) {
+        currentMonthRevenueMinorUnits = overviewSafeAdd(currentMonthRevenueMinorUnits, total.minorUnits)
+      } else if (month === previousMonth) {
+        previousMonthRevenueMinorUnits = overviewSafeAdd(previousMonthRevenueMinorUnits, total.minorUnits)
+      }
+    }
+
+    if (OVERVIEW_SETTLED_PAID_VALUES.has(overviewText(order.paid))) return
+    unpaidOrderCount += 1
+    const remainingMinorUnits =
+      total.state === 'invalid' || deposit.state === 'invalid'
+        ? null
+        : Math.max(0, total.minorUnits - deposit.minorUnits)
+    if (remainingMinorUnits !== null) {
+      outstandingTotalMinorUnits = overviewSafeAdd(outstandingTotalMinorUnits, remainingMinorUnits)
+    }
+    outstandingRows.push({
+      sourceIndex,
+      routeId: routeIdByIndex.get(sourceIndex) ?? null,
+      customerName: overviewText(order.name) || 'ללא שם',
+      serviceDate,
+      localizedDate: serviceDate === null ? 'ללא תאריך תקין' : localizedOverviewDate(serviceDate),
+      totalMinorUnits: total.state === 'invalid' ? null : total.minorUnits,
+      depositMinorUnits: deposit.state === 'invalid' ? null : deposit.minorUnits,
+      remainingMinorUnits,
+    })
+  })
+
+  outstandingRows.sort((left, right) => {
+    const leftRank = left.serviceDate === null ? 1 : 0
+    const rightRank = right.serviceDate === null ? 1 : 0
+    return (
+      leftRank - rightRank ||
+      (right.serviceDate ?? '').localeCompare(left.serviceDate ?? '') ||
+      right.sourceIndex - left.sourceIndex
+    )
+  })
+
+  return {
+    currentMonth,
+    previousMonth,
+    currentMonthRevenueMinorUnits,
+    previousMonthRevenueMinorUnits,
+    outstandingTotalMinorUnits,
+    unpaidOrderCount,
+    invalidDateOrderCount,
+    invalidAmountOrderCount,
+    outstandingRows,
+  }
+}
+
+function overviewInvalidDataNote(overview: FinanceOverview): string | null {
+  const parts: string[] = []
+  if (overview.invalidDateOrderCount > 0) {
+    parts.push(`${overview.invalidDateOrderCount} עם תאריך לא תקין`)
+  }
+  if (overview.invalidAmountOrderCount > 0) {
+    parts.push(`${overview.invalidAmountOrderCount} עם סכום לא תקין`)
+  }
+  if (parts.length === 0) return null
+  return `הזמנות שלא נכללו בחישוב בגלל נתון לא תקין: ${parts.join(', ')}.`
+}
+
+function OutstandingMoney({ value }: { value: number | null }) {
+  if (value === null) return <span className="font-black text-destructive">סכום לא תקין</span>
+  return <span dir="ltr">{formatSignedUsdMinorUnits(value)}</span>
+}
+
+function OutstandingRow({ row }: { row: OutstandingOrderRow }) {
+  return (
+    <tr className="border-b border-border last:border-0">
+      <th scope="row" className="px-4 py-4 text-right font-black text-primary sm:px-6">
+        {row.customerName}
+      </th>
+      <td className="px-4 py-4 font-bold text-primary sm:px-6">{row.localizedDate}</td>
+      <td className="px-4 py-4 font-bold text-primary sm:px-6">
+        <OutstandingMoney value={row.totalMinorUnits} />
+      </td>
+      <td className="px-4 py-4 font-bold text-primary sm:px-6">
+        <OutstandingMoney value={row.depositMinorUnits} />
+      </td>
+      <td className="px-4 py-4 font-black text-destructive sm:px-6">
+        <OutstandingMoney value={row.remainingMinorUnits} />
+      </td>
+      <td className="px-4 py-4 text-left sm:px-6">
+        {row.routeId === null ? (
+          <span className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-destructive">
+            אין מזהה לפתיחה
+          </span>
+        ) : (
+          <Link
+            to={generatePath(APP_ROUTES.editOrder, { orderId: row.routeId })}
+            aria-label={`פתיחת ההזמנה של ${row.customerName}`}
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-black text-primary transition-colors hover:bg-secondary"
+          >
+            <LocalIcon name="ph:pencil-simple-bold" className="text-base" />
+            <span>לעריכה</span>
+          </Link>
+        )}
+      </td>
+    </tr>
+  )
 }
 
 function DayRow({ day, onEditExpense }: { day: FinanceDaySummary; onEditExpense: () => void }) {
@@ -254,6 +504,8 @@ export function FinanceScreen({ onSave }: { readonly onSave?: CustomerFinanceSav
     displayStore = applyDailyExpenseToStore(displayStore, date, minorUnits ?? 0)
   }
   const dashboard = buildFinanceDashboard(displayStore, { selectedMonth })
+  const overview = buildFinanceOverview(displayStore)
+  const overviewNote = overviewInvalidDataNote(overview)
   const activeMonth = dashboard.selectedMonth ?? dashboard.currentMonth
   const monthOptions = [...new Set([activeMonth, dashboard.currentMonth, ...dashboard.availableMonths])]
     .sort((left, right) => right.localeCompare(left))
@@ -373,6 +625,41 @@ export function FinanceScreen({ onSave }: { readonly onSave?: CustomerFinanceSav
       </header>
 
       <div className="mt-8 space-y-8">
+        <section aria-label="תמונת מצב כללית" className="space-y-3">
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <MetricCard
+              label="הכנסות החודש"
+              caption={formatFinanceMonth(overview.currentMonth)}
+              value={overview.currentMonthRevenueMinorUnits}
+            />
+            <MetricCard
+              label="הכנסות חודש שעבר"
+              caption={formatFinanceMonth(overview.previousMonth)}
+              value={overview.previousMonthRevenueMinorUnits}
+            />
+            <MetricCard
+              label="יתרות לגבייה"
+              caption="מכל החודשים"
+              value={overview.outstandingTotalMinorUnits}
+              danger
+              emphasis
+            />
+            <article className="rounded-[2rem] border border-border bg-card p-5 shadow-sm">
+              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-muted-foreground">
+                הזמנות שטרם שולמו
+              </p>
+              <p className="mt-1 text-2xl font-black text-primary">{overview.unpaidOrderCount}</p>
+              <p className="mt-1 text-[0.625rem] font-bold text-muted-foreground">מכל החודשים</p>
+            </article>
+          </div>
+          {overviewNote !== null && (
+            <p className="flex items-center gap-2 text-xs font-bold text-muted-foreground" role="note">
+              <LocalIcon name="ph:warning-circle-bold" className="text-base text-destructive" />
+              <span>{overviewNote}</span>
+            </p>
+          )}
+        </section>
+
         <FinanceWarnings warnings={dashboard.warnings} />
 
         {dashboard.globallyEmpty && (
@@ -550,7 +837,7 @@ export function FinanceScreen({ onSave }: { readonly onSave?: CustomerFinanceSav
             )}
           </section>
 
-          <section className="rounded-[2.5rem] border border-border bg-card shadow-sm">
+          <section className="rounded-[2.5rem] border border-border bg-card shadow-sm" aria-label="הלקוחות הגדולים">
             <header className="border-b border-border p-6 sm:p-8">
               <div className="flex items-center gap-2">
                 <LocalIcon name="ph:users-bold" className="text-xl text-accent" />
@@ -591,6 +878,46 @@ export function FinanceScreen({ onSave }: { readonly onSave?: CustomerFinanceSav
             )}
           </section>
         </div>
+
+        <section
+          className="overflow-hidden rounded-[2.5rem] border border-border bg-card shadow-sm"
+          aria-label="יתרות פתוחות לגבייה"
+        >
+          <header className="border-b border-border p-6 sm:p-8">
+            <div className="flex items-center gap-2">
+              <LocalIcon name="ph:coins-bold" className="text-xl text-accent" />
+              <h2 className="text-xl font-black text-primary">יתרות פתוחות לגבייה</h2>
+            </div>
+            <p className="mt-2 text-xs font-bold text-muted-foreground">
+              כל ההזמנות הפעילות שעדיין לא סומנו כשולמו, מכל החודשים. לחיצה על עריכה פותחת את ההזמנה.
+            </p>
+          </header>
+          {overview.outstandingRows.length === 0 ? (
+            <p className="p-8 text-sm font-bold leading-6 text-muted-foreground">
+              אין יתרות פתוחות — כל ההזמנות הפעילות שולמו.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-right text-xs">
+                <thead className="border-b border-border bg-secondary/40">
+                  <tr>
+                    <th className="px-4 py-4 font-black text-primary sm:px-6">לקוחה</th>
+                    <th className="px-4 py-4 font-black text-primary sm:px-6">תאריך</th>
+                    <th className="px-4 py-4 font-black text-primary sm:px-6">סה״כ</th>
+                    <th className="px-4 py-4 font-black text-primary sm:px-6">מקדמה</th>
+                    <th className="px-4 py-4 font-black text-primary sm:px-6">נשאר לתשלום</th>
+                    <th className="px-4 py-4 text-left font-black text-primary sm:px-6">פעולות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.outstandingRows.map((row) => (
+                    <OutstandingRow key={row.sourceIndex} row={row} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

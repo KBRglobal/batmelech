@@ -32,13 +32,17 @@ import {
   formatUsdInputMinorUnits,
   applyOrderDraftToStore,
   legacyOrderEditIssue,
+  mergedLunchPlateSides,
   orderPricingFingerprint,
+  readLunchPlates,
+  resizeLunchPlates,
   parseHotelSearchResponse,
   serializeOrderDraft,
   validateOrderDraft,
   type CustomDraftItem,
   type AIReview,
   type LunchDraftSelection,
+  type LunchPlateDraft,
   type HotelSearchResult,
   type OrderDraft,
   type OrderEditorMenu,
@@ -1180,30 +1184,84 @@ function OrderEditorContent({
           <div className="space-y-4">
             {menu.lunch.map((item) => {
               const selection = draft.lunch[item.key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
-              const selectedVariant = item.variants.find((variant) => variant.key === (selection.variantKey || item.variants[0]?.key))
+              const fallbackVariantKey = selection.variantKey || item.variants[0]?.key || ''
+              const plates = item.variants.length > 0 && selection.quantity > 0
+                ? readLunchPlates(selection, item) ?? resizeLunchPlates(
+                    [{ variantKey: fallbackVariantKey, sides: selection.sides }],
+                    selection.quantity,
+                    fallbackVariantKey,
+                  )
+                : null
+              const commitPlates = (quantity: number, nextPlates: readonly LunchPlateDraft[]) =>
+                updateLunch(item.key, {
+                  quantity,
+                  plates: nextPlates,
+                  sides: mergedLunchPlateSides(nextPlates),
+                  variantKey: nextPlates[0]?.variantKey ?? '',
+                })
+              const setPlate = (plateIndex: number, nextPlate: LunchPlateDraft) =>
+                commitPlates(
+                  selection.quantity,
+                  plates!.map((plate, index) => (index === plateIndex ? nextPlate : plate)),
+                )
               return (
                 <div key={item.key} className="rounded-2xl border border-border bg-background/60 p-4">
-                  <QuantityStepper label={item.name} value={selection.quantity} onChange={(quantity) => updateLunch(item.key, { quantity })} />
-                  {selection.quantity > 0 && item.variants.length > 0 && (
-                    <fieldset className="mt-4 flex flex-wrap gap-3">
-                      <legend className="mb-2 text-xs font-black text-muted-foreground">בחירת וריאציה</legend>
-                      {item.variants.map((variant) => (
-                        <label key={variant.key} className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-bold text-primary">
-                          <input type="radio" name={`lunch-${item.key}`} checked={(selection.variantKey || item.variants[0]?.key) === variant.key} onChange={() => updateLunch(item.key, { variantKey: variant.key })} />
-                          <span>{variant.label} · {formatUsdMinorUnits(variant.priceMinorUnits)}</span>
-                        </label>
-                      ))}
-                    </fieldset>
-                  )}
-                  {selection.quantity > 0 && item.sideChoice && selectedVariant && (
-                    <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                      {menu.lunchSides.map((sideName) => (
-                        <QuantityStepper
-                          key={sideName}
-                          label={sideName}
-                          value={selection.sides[sideName] ?? 0}
-                          onChange={(quantity) => updateLunch(item.key, { sides: updateQuantityRecord(selection.sides, sideName, quantity) })}
-                        />
+                  <QuantityStepper
+                    label={item.name}
+                    value={selection.quantity}
+                    onChange={(quantity) => {
+                      if (item.variants.length === 0) {
+                        updateLunch(item.key, { quantity })
+                        return
+                      }
+                      if (quantity === 0) {
+                        updateLunch(item.key, { quantity, plates: [], sides: {}, variantKey: '' })
+                        return
+                      }
+                      commitPlates(quantity, resizeLunchPlates(plates, quantity, fallbackVariantKey))
+                    }}
+                  />
+                  {plates !== null && (
+                    <div className="mt-4 space-y-3">
+                      {plates.map((plate, plateIndex) => (
+                        <div key={plateIndex} className="rounded-2xl border border-border bg-card p-4">
+                          {plates.length > 1 && (
+                            <p className="mb-2 text-xs font-black text-muted-foreground">
+                              מנה {plateIndex + 1} מתוך {plates.length}
+                            </p>
+                          )}
+                          <fieldset className="flex flex-wrap gap-3">
+                            <legend className="mb-2 text-xs font-black text-muted-foreground">בחירת וריאציה</legend>
+                            {item.variants.map((variant) => (
+                              <label key={variant.key} className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-background/60 px-3 text-xs font-bold text-primary">
+                                <input
+                                  type="radio"
+                                  name={`lunch-${item.key}-plate-${plateIndex}`}
+                                  checked={plate.variantKey === variant.key}
+                                  onChange={() => setPlate(plateIndex, { ...plate, variantKey: variant.key })}
+                                />
+                                <span>{variant.label} · {formatUsdMinorUnits(variant.priceMinorUnits)}</span>
+                              </label>
+                            ))}
+                          </fieldset>
+                          {item.sideChoice && (
+                            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                              {menu.lunchSides.map((sideName) => (
+                                <QuantityStepper
+                                  key={sideName}
+                                  label={plates.length > 1 ? `${sideName} — מנה ${plateIndex + 1}` : sideName}
+                                  value={plate.sides[sideName] ?? 0}
+                                  onChange={(quantity) =>
+                                    setPlate(plateIndex, {
+                                      ...plate,
+                                      sides: updateQuantityRecord(plate.sides, sideName, quantity),
+                                    })
+                                  }
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}

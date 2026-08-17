@@ -203,7 +203,7 @@ function OrderActions({
           {saveState?.kind === 'saving'
             ? 'שומרת...'
             : canAdvance
-              ? `מעבר ל${nextStatus}`
+              ? `העברה ל"${nextStatus}"`
               : 'עדכון סטטוס לא זמין'}
         </button>
       </div>

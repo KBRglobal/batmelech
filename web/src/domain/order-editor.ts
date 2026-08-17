@@ -375,6 +375,18 @@ export interface LunchDraftSelection {
   readonly addonQuantity: number
 }
 
+/**
+ * One diner's plate inside a lunch selection: its own variant and its own
+ * sides. Stored as `plates` on the persisted selection, while the legacy
+ * `v`/`sides` fields keep carrying the first plate's variant and the merged
+ * sides so preparation summaries, bons, and WhatsApp text stay correct
+ * without knowing plates exist.
+ */
+export interface LunchPlateDraft {
+  readonly variantKey: string
+  readonly sides: Readonly<Record<string, number>>
+}
+
 export interface OrderDraft extends Record<string, unknown> {
   readonly id: string | number | null
   readonly date: string
@@ -629,6 +641,61 @@ function normalizeLunch(value: unknown): Record<string, LunchDraftSelection> {
     }
   }
   return result
+}
+
+/**
+ * The per-diner plates of a lunch selection, or null when the selection has
+ * no valid plate breakdown (legacy orders, or a stale plates array whose
+ * length no longer matches the quantity) — callers fall back to the pooled
+ * legacy behaviour in that case, never to a guess.
+ */
+export function readLunchPlates(
+  selection: LunchDraftSelection,
+  item: LunchItem,
+): readonly LunchPlateDraft[] | null {
+  if (item.variants.length === 0 || selection.quantity < 1) return null
+  const raw = selection.plates
+  if (!Array.isArray(raw) || raw.length !== selection.quantity) return null
+  const plates: LunchPlateDraft[] = []
+  for (const value of raw) {
+    if (!isPlainRecord(value)) return null
+    plates.push({
+      variantKey: text(value.variantKey ?? value.v) || item.variants[0]!.key,
+      sides: normalizeQuantityMap(value.sides),
+    })
+  }
+  return plates
+}
+
+export function mergedLunchPlateSides(
+  plates: readonly LunchPlateDraft[],
+): Record<string, number> {
+  const merged: Record<string, number> = {}
+  for (const plate of plates) {
+    for (const [name, quantity] of Object.entries(plate.sides)) {
+      if (quantity > 0) merged[name] = checkedAdd(merged[name] ?? 0, quantity, 'merged plate sides')
+    }
+  }
+  return merged
+}
+
+/** Grows or shrinks the plates array to the requested count, keeping existing plates. */
+export function resizeLunchPlates(
+  plates: readonly LunchPlateDraft[] | null,
+  quantity: number,
+  defaultVariantKey: string,
+): LunchPlateDraft[] {
+  const next: LunchPlateDraft[] = []
+  for (let index = 0; index < quantity; index += 1) {
+    const existing = plates?.[index]
+    next.push(
+      existing ?? {
+        variantKey: plates?.[plates.length - 1]?.variantKey ?? defaultVariantKey,
+        sides: {},
+      },
+    )
+  }
+  return next
 }
 
 function dollarsNumberToMinorUnits(value: unknown, fallback: number): number {
@@ -1186,6 +1253,79 @@ export function calculateOrderDraftPricing(
   for (const item of menu.lunch) {
     const selection = draft.lunch[item.key]
     if (!selection || selection.quantity < 1) continue
+
+    const plates = readLunchPlates(selection, item)
+    if (plates !== null) {
+      const plateVariants: LunchVariant[] = []
+      let unknownVariant = false
+      for (const plate of plates) {
+        const variant = item.variants.find((candidate) => candidate.key === plate.variantKey)
+        if (variant === undefined) {
+          unknownVariant = true
+          break
+        }
+        plateVariants.push(variant)
+      }
+      if (unknownVariant) {
+        issues.push({
+          code: 'UNKNOWN_LUNCH_VARIANT',
+          message: `הווריאציה של ${item.name} אינה קיימת בתפריט.`,
+          blocking: true,
+        })
+        continue
+      }
+      if (plateVariants.some((variant) => variant.weekendOnly) && !isWeekendDate(draft.date)) {
+        issues.push({
+          code: 'WEEKDAY_LUNCH_CHALLAH',
+          message: 'חלת שניצל זמינה בסוף השבוע בלבד.',
+          blocking: false,
+        })
+      }
+      for (const variant of item.variants) {
+        const plateCount = plateVariants.filter((candidate) => candidate.key === variant.key).length
+        if (plateCount === 0) continue
+        chargeLines.push({
+          source: 'lunch',
+          name: `${item.name} (${variant.label})`,
+          quantity: plateCount,
+          unitPriceMinorUnits: variant.priceMinorUnits,
+        })
+      }
+      if (item.sideChoice) {
+        // Sides pool across the plates of one item, exactly like the legacy
+        // single-selection behaviour: a family plate's unused included side
+        // may cover a single plate's extra one.
+        const totalSides = sumCounts(
+          plates.map((plate) => sumCounts(Object.values(plate.sides), 'lunch plate sides')),
+          'lunch sides',
+        )
+        const includedSides = plateVariants.reduce(
+          (total, variant) => checkedAdd(total, variant.includedSides, 'included lunch sides'),
+          0,
+        )
+        const excessSides = Math.max(0, totalSides - includedSides)
+        if (excessSides > 0) {
+          chargeLines.push({
+            source: 'lunch',
+            name: `תוספות ל${item.name}`,
+            quantity: excessSides,
+            unitPriceMinorUnits: Math.max(
+              ...plateVariants.map((variant) => variant.sidePriceMinorUnits),
+            ),
+          })
+        }
+      }
+      if (item.addon && selection.addonQuantity > 0) {
+        chargeLines.push({
+          source: 'lunch',
+          name: `${item.addon.name} (ל${item.name})`,
+          quantity: selection.addonQuantity,
+          unitPriceMinorUnits: item.addon.priceMinorUnits,
+        })
+      }
+      continue
+    }
+
     let unitPriceMinorUnits = item.priceMinorUnits
     let selectedVariant: LunchVariant | undefined
     if (item.variants.length > 0) {
