@@ -9,6 +9,14 @@ Single message, a WHOLE pasted conversation (with mid-thread corrections),
 a screenshot of the chat (vision), a voice note (transcription infra exists
 in server/telegram/transcribe-voice.js), or any mix. Any language.
 
+**The whole-conversation flow is ONE native action, never screenshots**
+(Moshe flagged multi-screenshot as a dealbreaker): WhatsApp's built-in
+"Export chat" produces the entire thread as a single .txt in one tap, which
+Lin shares straight to Mey in Telegram or uploads/pastes into the panel —
+both intake paths MUST accept the exported-chat file/format (including its
+timestamp/sender line prefixes). For short threads: WhatsApp multi-select →
+copy → one paste. Screenshots remain a fallback only.
+
 ## B. Understanding
 Reads the conversation as a sequence: later corrections override earlier
 statements ("actually no salads"). Extracts dishes, quantities, date, time,
