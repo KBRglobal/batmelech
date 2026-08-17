@@ -1190,18 +1190,19 @@ function OrderEditorContent({
               )
             })}
           </div>
-          {selectionMode === 'mixed' && (
-            <label className="flex min-h-12 items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-black text-amber-950">
-              <input
-                type="checkbox"
-                checked={mixedOrderConfirmed}
-                onChange={(event) => setMixedOrderConfirmed(event.currentTarget.checked)}
-                className="mt-0.5 size-5 shrink-0 accent-primary"
-              />
-              <span>אני מאשרת שזו הזמנה משולבת של שבת וצהריים</span>
-            </label>
-          )}
         </Section>
+
+        {selectionMode === 'mixed' && (
+          <label className="flex min-h-12 items-start gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-sm font-black text-amber-950 shadow-sm">
+            <input
+              type="checkbox"
+              checked={mixedOrderConfirmed}
+              onChange={(event) => setMixedOrderConfirmed(event.currentTarget.checked)}
+              className="mt-0.5 size-5 shrink-0 accent-primary"
+            />
+            <span>אני מאשרת שזו הזמנה משולבת של שבת וצהריים</span>
+          </label>
+        )}
 
         <Section id="extras" title="אקסטרות ופריטים חופשיים" collapsible>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
