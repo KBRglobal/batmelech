@@ -75,14 +75,24 @@ function ShoppingListScreenWithSave() {
   return <ShoppingListScreen onSave={onSave} />
 }
 
+function OrdersScreenWithSave() {
+  const { onSave } = useVersionedScreenSave()
+  return <OrdersScreen onSave={async (request) => { await onSave(request) }} />
+}
+
+function TodayScreenWithSave() {
+  const { onSave } = useVersionedScreenSave()
+  return <TodayScreen onSave={async (request) => { await onSave(request) }} />
+}
+
 export function AppRoutes() {
   return (
     <Routes>
       <Route path={APP_ROUTES.root} element={<Navigate to={ROOT_ROUTE_TARGET} replace />} />
 
       <Route element={<OperatorLayout />}>
-        <Route path={APP_ROUTES.today} element={<TodayScreen />} />
-        <Route path={APP_ROUTES.orders} element={<OrdersScreen />} />
+        <Route path={APP_ROUTES.today} element={<TodayScreenWithSave />} />
+        <Route path={APP_ROUTES.orders} element={<OrdersScreenWithSave />} />
         <Route path={APP_ROUTES.newOrder} element={<OrderEditorScreen />} />
         <Route path={APP_ROUTES.editOrder} element={<OrderEditorScreen />} />
         <Route path={APP_ROUTES.orderBon} element={<OrderBonScreen />} />

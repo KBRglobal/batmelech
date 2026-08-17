@@ -152,7 +152,7 @@ describe('OrdersScreen', () => {
     expect(screen.getAllByText('מלון אמיתי')).toHaveLength(2)
     expect(screen.queryByText('יעד שלא נספר · מלון אמיתי')).toBeNull()
     expect(screen.getAllByText('$100.10').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('מוכנה')).toBeTruthy()
+    expect(screen.getAllByText('מוכנה').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('מקדמה')).toBeTruthy()
     expect(screen.getByText('בוטלה')).toBeTruthy()
     expect(screen.getByText('זוגית ×2')).toBeTruthy()

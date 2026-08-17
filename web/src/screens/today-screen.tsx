@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { generatePath, Link } from 'react-router'
 import type { To } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
+import { applyOrderQuickFields, nextOrderStatus } from '../domain/order-quick-actions.ts'
+import type { StoreSaveHandler } from '../domain/settings-catalog.ts'
 import {
   buildTodayDashboard,
   formatUsdMinorUnits,
@@ -13,6 +16,12 @@ import {
   type TodayFulfillment,
   type TodayWarning,
 } from '../domain/today-dashboard.ts'
+import { isVersionedStateEnvelope } from '../services/state-api.ts'
+
+interface TodayQuickActions {
+  readonly advance: (orderId: string, nextStatus: string) => void
+  readonly savingOrderId: string | null
+}
 
 const primaryLinkClassName =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-black text-primary-foreground shadow-[0_10px_30px_rgba(99,33,40,0.12)] transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
@@ -115,8 +124,13 @@ function BackupReminder({ reminder }: { reminder: TodayBackupReminder }) {
   )
 }
 
-function FulfillmentRow({ fulfillment }: { fulfillment: TodayFulfillment }) {
+function FulfillmentRow({ fulfillment, quick }: {
+  fulfillment: TodayFulfillment
+  quick?: TodayQuickActions
+}) {
   const locationIcon = fulfillment.pickup ? 'ph:storefront-bold' : 'ph:map-pin-bold'
+  const next = nextOrderStatus(fulfillment.status)
+  const saving = quick !== undefined && quick.savingOrderId === fulfillment.orderId
 
   return (
     <li className="flex flex-col gap-4 rounded-3xl border border-border bg-background/70 p-4 sm:flex-row sm:items-center">
@@ -140,14 +154,28 @@ function FulfillmentRow({ fulfillment }: { fulfillment: TodayFulfillment }) {
         </p>
       </div>
 
-      <EditOrderLink orderId={fulfillment.orderId} />
+      <div className="flex flex-wrap items-center gap-2">
+        {quick !== undefined && fulfillment.orderId !== null && next !== null && (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => quick.advance(fulfillment.orderId!, next)}
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            <LocalIcon name="ph:check-circle-bold" className="text-base" />
+            <span>{saving ? 'שומרת...' : `העברה ל"${next}"`}</span>
+          </button>
+        )}
+        <EditOrderLink orderId={fulfillment.orderId} />
+      </div>
     </li>
   )
 }
 
-function TodayFulfillments({ fulfillments, todayIso }: {
+function TodayFulfillments({ fulfillments, todayIso, quick }: {
   fulfillments: readonly TodayFulfillment[]
   todayIso: string
+  quick?: TodayQuickActions
 }) {
   if (fulfillments.length === 0) return null
 
@@ -168,6 +196,7 @@ function TodayFulfillments({ fulfillments, todayIso }: {
           <FulfillmentRow
             key={`${fulfillment.orderId ?? 'missing'}-${fulfillment.time ?? 'no-time'}-${index}`}
             fulfillment={fulfillment}
+            quick={quick}
           />
         ))}
       </ul>
@@ -393,8 +422,44 @@ function DataWarnings({ warnings }: { warnings: readonly TodayWarning[] }) {
   )
 }
 
-export function TodayScreen() {
+export function TodayScreen({ onSave }: { readonly onSave?: StoreSaveHandler } = {}) {
   const storeQuery = useStore()
+  const [savingOrderId, setSavingOrderId] = useState<string | null>(null)
+  const [quickError, setQuickError] = useState('')
+
+  const quick: TodayQuickActions | undefined = onSave === undefined
+    ? undefined
+    : {
+        savingOrderId,
+        advance: (orderId, nextStatus) => {
+          void (async () => {
+            const envelope = storeQuery.data
+            if (envelope === undefined || !isVersionedStateEnvelope(envelope)) {
+              setQuickError('השמירה המהירה אינה זמינה כרגע — הנתונים עדיין נטענים.')
+              return
+            }
+            const nextStore = applyOrderQuickFields(envelope.data, orderId, { status: nextStatus })
+            if (nextStore === null) {
+              setQuickError('אי אפשר לעדכן את ההזמנה — המזהה חסר או כפול.')
+              return
+            }
+            setSavingOrderId(orderId)
+            setQuickError('')
+            try {
+              await onSave({
+                reason: 'orders',
+                baseEnvelope: envelope,
+                baseStore: envelope.data,
+                nextStore,
+              })
+            } catch {
+              setQuickError('העדכון המהיר נכשל — ההזמנה לא שונתה. אפשר לנסות שוב.')
+            } finally {
+              setSavingOrderId(null)
+            }
+          })()
+        },
+      }
 
   if (storeQuery.isPending) {
     return <ScreenState kind="loading" title="טוענת את מסך היום" />
@@ -435,9 +500,13 @@ export function TodayScreen() {
         <div className="mt-8 space-y-8">
           <DataWarnings warnings={dashboard.warnings} />
           {dashboard.backupReminder && <BackupReminder reminder={dashboard.backupReminder} />}
+          {quickError !== '' && (
+            <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">{quickError}</p>
+          )}
           <TodayFulfillments
             fulfillments={dashboard.fulfillments}
             todayIso={dashboard.todayIso}
+            quick={quick}
           />
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <UpcomingCapacity

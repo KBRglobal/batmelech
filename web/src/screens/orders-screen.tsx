@@ -6,6 +6,12 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
+  applyOrderQuickFields,
+  nextOrderStatus,
+  QUICK_PAID_OPTIONS,
+  type OrderQuickFields,
+} from '../domain/order-quick-actions.ts'
+import {
   buildOrdersDashboard,
   type OrdersDateGroup,
   type OrdersDisplayBlock,
@@ -14,7 +20,14 @@ import {
   type OrdersSummaryChips,
   type OrdersWarning,
 } from '../domain/orders-dashboard.ts'
+import type { StoreSaveHandler } from '../domain/settings-catalog.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
+import { isVersionedStateEnvelope } from '../services/state-api.ts'
+
+export interface OrderQuickActions {
+  readonly update: (orderId: string, fields: OrderQuickFields) => void
+  readonly savingOrderId: string | null
+}
 
 const primaryLinkClassName =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-black text-primary-foreground shadow-[0_10px_30px_rgba(99,33,40,0.12)] transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
@@ -141,7 +154,46 @@ function OrderNavigation({ order }: { order: OrdersOrderView }) {
   )
 }
 
-function OrderCard({ order }: { order: OrdersOrderView }) {
+function OrderQuickBar({ order, quick }: { order: OrdersOrderView; quick?: OrderQuickActions }) {
+  if (!quick || order.orderId === null || order.cancelled) return null
+  const next = nextOrderStatus(order.status)
+  const saving = quick.savingOrderId === order.orderId
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      {next !== null && (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => quick.update(order.orderId!, { status: next })}
+          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          <LocalIcon name="ph:check-circle-bold" className="text-base" />
+          <span>{saving ? 'שומרת...' : `העברה ל"${next}"`}</span>
+        </button>
+      )}
+      <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-black text-primary">
+        <span>תשלום:</span>
+        <select
+          aria-label={`סטטוס תשלום — ${order.customerName}`}
+          value=""
+          disabled={saving}
+          onChange={(event) => {
+            const value = event.currentTarget.value
+            if (value !== '') quick.update(order.orderId!, { paid: value })
+          }}
+          className="bg-transparent font-black outline-none"
+        >
+          <option value="">{order.paidLabel}</option>
+          {QUICK_PAID_OPTIONS.map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+}
+
+function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuickActions }) {
   const labels = summaryLabels(order.summary)
   const hasInvalidSummary = Object.values(order.summary).some((value) => value === null)
 
@@ -207,6 +259,8 @@ function OrderCard({ order }: { order: OrdersOrderView }) {
         </pre>
       </details>
 
+      <OrderQuickBar order={order} quick={quick} />
+
       <div className="mt-5 border-t border-border pt-4">
         <OrderNavigation order={order} />
       </div>
@@ -214,7 +268,7 @@ function OrderCard({ order }: { order: OrdersOrderView }) {
   )
 }
 
-function LinkedGroup({ group }: { group: OrdersLinkedGroup }) {
+function LinkedGroup({ group, quick }: { group: OrdersLinkedGroup; quick?: OrderQuickActions }) {
   return (
     <section className="rounded-[2rem] border-2 border-primary/10 bg-card p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-secondary/60 p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -240,22 +294,42 @@ function LinkedGroup({ group }: { group: OrdersLinkedGroup }) {
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {group.orders.map((order) => (
-          <OrderCard key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`} order={order} />
+          <OrderCard key={`${order.orderId ?? 'missing'}-${order.sourceIndex}`} order={order} quick={quick} />
         ))}
       </div>
     </section>
   )
 }
 
-function DisplayBlock({ block }: { block: OrdersDisplayBlock }) {
+function DisplayBlock({ block, quick }: { block: OrdersDisplayBlock; quick?: OrderQuickActions }) {
   return block.kind === 'linked-group' ? (
-    <LinkedGroup group={block} />
+    <LinkedGroup group={block} quick={quick} />
   ) : (
-    <OrderCard order={block.order} />
+    <OrderCard order={block.order} quick={quick} />
   )
 }
 
-function DateGroup({ group }: { group: OrdersDateGroup }) {
+function DateGroup({ group, quick, blockFilter }: {
+  group: OrdersDateGroup
+  quick?: OrderQuickActions
+  blockFilter?: (order: OrdersOrderView) => boolean
+}) {
+  const blocks = blockFilter === undefined
+    ? group.blocks
+    : group.blocks.filter((block) =>
+        block.kind === 'linked-group'
+          ? block.orders.some((order) => blockFilter(order))
+          : blockFilter(block.order),
+      )
+  if (blocks.length === 0) return null
+  return <DateGroupBody group={group} quick={quick} blocks={blocks} />
+}
+
+function DateGroupBody({ group, quick, blocks }: {
+  group: OrdersDateGroup
+  quick?: OrderQuickActions
+  blocks: readonly OrdersDisplayBlock[]
+}) {
   const capacityText =
     group.activeMeals === null
       ? 'לא ניתן לחשב זוגיות'
@@ -293,12 +367,12 @@ function DateGroup({ group }: { group: OrdersDateGroup }) {
         )}
       </header>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {group.blocks.map((block) => (
+        {blocks.map((block) => (
           <div
             key={block.kind === 'linked-group' ? `group-${block.name}` : `single-${block.order.orderId ?? block.order.sourceIndex}`}
             className={block.kind === 'linked-group' ? 'lg:col-span-2' : ''}
           >
-            <DisplayBlock block={block} />
+            <DisplayBlock block={block} quick={quick} />
           </div>
         ))}
       </div>
@@ -342,10 +416,64 @@ function Warnings({ warnings }: { warnings: readonly OrdersWarning[] }) {
   )
 }
 
-export function OrdersScreen() {
+const STATUS_FILTERS = ['הכל', 'פעילות', 'חדשה', 'אושרה', 'מוכנה', 'במשלוח', 'נמסרה'] as const
+const PAYMENT_FILTERS = ['הכל', 'לא שולם', 'שולם'] as const
+
+export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } = {}) {
   const storeQuery = useStore()
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('הכל')
+  const [paymentFilter, setPaymentFilter] = useState<(typeof PAYMENT_FILTERS)[number]>('הכל')
+  const [savingOrderId, setSavingOrderId] = useState<string | null>(null)
+  const [quickError, setQuickError] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
+
+  const quick: OrderQuickActions | undefined = onSave === undefined
+    ? undefined
+    : {
+        savingOrderId,
+        update: (orderId, fields) => {
+          void (async () => {
+            const envelope = storeQuery.data
+            if (envelope === undefined || !isVersionedStateEnvelope(envelope)) {
+              setQuickError('השמירה המהירה אינה זמינה כרגע — הנתונים עדיין נטענים.')
+              return
+            }
+            const nextStore = applyOrderQuickFields(envelope.data, orderId, fields)
+            if (nextStore === null) {
+              setQuickError('אי אפשר לעדכן את ההזמנה — המזהה חסר או כפול.')
+              return
+            }
+            setSavingOrderId(orderId)
+            setQuickError('')
+            try {
+              await onSave({
+                reason: 'orders',
+                baseEnvelope: envelope,
+                baseStore: envelope.data,
+                nextStore,
+              })
+            } catch {
+              setQuickError('העדכון המהיר נכשל — ההזמנה לא שונתה. אפשר לנסות שוב.')
+            } finally {
+              setSavingOrderId(null)
+            }
+          })()
+        },
+      }
+
+  const blockFilter = statusFilter === 'הכל' && paymentFilter === 'הכל'
+    ? undefined
+    : (order: OrdersOrderView): boolean => {
+        if (statusFilter === 'פעילות') {
+          if (order.cancelled || order.status === 'נמסרה') return false
+        } else if (statusFilter !== 'הכל' && order.status !== statusFilter) {
+          return false
+        }
+        if (paymentFilter === 'שולם' && order.paidLabel !== 'שולם') return false
+        if (paymentFilter === 'לא שולם' && order.paidLabel === 'שולם') return false
+        return true
+      }
 
   if (storeQuery.isPending) {
     return <ScreenState kind="loading" title="טוענת את ההזמנות" />
@@ -421,6 +549,42 @@ export function OrdersScreen() {
         </button>
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {STATUS_FILTERS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setStatusFilter(value)}
+            className={`min-h-9 rounded-full border px-3.5 text-xs font-black transition-colors ${
+              statusFilter === value
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-primary hover:bg-secondary'
+            }`}
+          >
+            {value}
+          </button>
+        ))}
+        <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+        {PAYMENT_FILTERS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setPaymentFilter(value)}
+            className={`min-h-9 rounded-full border px-3.5 text-xs font-black transition-colors ${
+              paymentFilter === value
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-primary hover:bg-secondary'
+            }`}
+          >
+            {value === 'הכל' ? 'כל תשלום' : value}
+          </button>
+        ))}
+      </div>
+
+      {quickError !== '' && (
+        <p role="alert" className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">{quickError}</p>
+      )}
+
       <div className="mt-8 space-y-9">
         <Warnings warnings={dashboard.warnings} />
 
@@ -438,7 +602,7 @@ export function OrdersScreen() {
                 נמצאו {dashboard.matchCount} הזמנות, כולל הזמנות שעברו
               </p>
               {dashboard.searchGroups.map((group) => (
-                <DateGroup key={group.key} group={group} />
+                <DateGroup key={group.key} group={group} quick={quick} blockFilter={blockFilter} />
               ))}
             </section>
           )
@@ -450,7 +614,7 @@ export function OrdersScreen() {
                 <h2 className="mt-3 font-black text-primary">אין הזמנות קרובות</h2>
               </section>
             ) : (
-              dashboard.upcomingGroups.map((group) => <DateGroup key={group.key} group={group} />)
+              dashboard.upcomingGroups.map((group) => <DateGroup key={group.key} group={group} quick={quick} blockFilter={blockFilter} />)
             )}
 
             {dashboard.pastGroups.length > 0 && (
@@ -460,7 +624,7 @@ export function OrdersScreen() {
                 </summary>
                 <div className="mt-6 space-y-9">
                   {dashboard.pastGroups.map((group) => (
-                    <DateGroup key={group.key} group={group} />
+                    <DateGroup key={group.key} group={group} quick={quick} blockFilter={blockFilter} />
                   ))}
                 </div>
               </details>

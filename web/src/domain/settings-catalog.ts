@@ -149,6 +149,7 @@ export interface StoreSaveRequest {
     | 'deliveries'
     | 'preparation'
     | 'shopping'
+    | 'orders'
   readonly baseEnvelope: Readonly<VersionedStateEnvelope>
   readonly baseStore: Readonly<LegacyStore>
   readonly nextStore: LegacyStore
