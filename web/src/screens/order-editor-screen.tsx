@@ -410,19 +410,34 @@ function Section({
   id,
   title,
   summary,
+  collapsible = false,
   children,
 }: {
   readonly id: string
   readonly title: string
   readonly summary?: string
+  readonly collapsible?: boolean
   readonly children: React.ReactNode
 }) {
+  const header = (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-r-4 border-primary pr-4">
+      <h2 className="text-lg font-black text-primary">{title}</h2>
+      {summary && <span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-primary">{summary}</span>}
+    </div>
+  )
+
+  if (collapsible) {
+    return (
+      <details id={`order-${id}`} open className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{header}</summary>
+        <div className="space-y-5 pt-1">{children}</div>
+      </details>
+    )
+  }
+
   return (
     <section id={`order-${id}`} className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-r-4 border-primary pr-4">
-        <h2 className="text-lg font-black text-primary">{title}</h2>
-        {summary && <span className="rounded-full bg-secondary px-3 py-1 text-xs font-black text-primary">{summary}</span>}
-      </div>
+      {header}
       {children}
     </section>
   )
@@ -1090,7 +1105,7 @@ function OrderEditorContent({
           )}
         </Section>
 
-        <Section id="salads" title="סלטים" summary={`${orderedSalads}/${draft.meals * 4} כלולים · ${giftSalads} פינוק`}>
+        <Section id="salads" title="סלטים" summary={`${orderedSalads}/${draft.meals * 4} כלולים · ${giftSalads} פינוק`} collapsible>
           <p className="text-xs font-bold text-muted-foreground">עמודת פינוק לא מקטינה את הזכאות ולא מחויבת.</p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {menu.salads.map((name) => {
@@ -1109,7 +1124,7 @@ function OrderEditorContent({
           </div>
         </Section>
 
-        <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${draft.meals * 2} יחידות`}>
+        <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${draft.meals * 2} יחידות`} collapsible>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-bold leading-6 text-amber-900">
             בכל זוגית כלולות שתי יחידות פילה. מנת קציצות דגים שווה לשתי יחידות. כל יחידה מעבר לכלול מחויבת ב־30$.
           </div>
@@ -1124,20 +1139,20 @@ function OrderEditorContent({
           </div>
         </Section>
 
-        <Section id="mains" title="עיקריות" summary={`${countRecord(draft.mains)} נבחרו`}>
+        <Section id="mains" title="עיקריות" summary={`${countRecord(draft.mains)} נבחרו`} collapsible>
           <QuantityCategory names={menu.mains} quantities={draft.mains} outOfStock={outOfStock} update={(name, quantity) => updateCategory('mains', name, quantity)} />
           <Field label="הערה לעיקריות"><input aria-label="הערה לעיקריות" value={draft.mainsNote} onChange={(event) => patch({ mainsNote: event.currentTarget.value })} className={inputClassName} /></Field>
         </Section>
 
-        <Section id="sides" title="תוספות" summary={`${countRecord(draft.sides)} נבחרו`}>
+        <Section id="sides" title="תוספות" summary={`${countRecord(draft.sides)} נבחרו`} collapsible>
           <QuantityCategory names={menu.sides} quantities={draft.sides} outOfStock={outOfStock} update={(name, quantity) => updateCategory('sides', name, quantity)} />
         </Section>
 
-        <Section id="desserts" title="קינוחים" summary={`2 סופלה או בקלאווה אחת לזוגית`}>
+        <Section id="desserts" title="קינוחים" summary={`2 סופלה או בקלאווה אחת לזוגית`} collapsible>
           <QuantityCategory names={menu.desserts} quantities={draft.desserts} outOfStock={outOfStock} update={(name, quantity) => updateCategory('desserts', name, quantity)} />
         </Section>
 
-        <Section id="lunch" title="תפריט צהריים">
+        <Section id="lunch" title="תפריט צהריים" collapsible>
           <div className="space-y-4">
             {menu.lunch.map((item) => {
               const selection = draft.lunch[item.key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
@@ -1188,7 +1203,7 @@ function OrderEditorContent({
           )}
         </Section>
 
-        <Section id="extras" title="אקסטרות ופריטים חופשיים">
+        <Section id="extras" title="אקסטרות ופריטים חופשיים" collapsible>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {menu.extras.map((extra) => {
               const selection = draft.extras[extra.name] ?? { quantity: 0, note: '' }
