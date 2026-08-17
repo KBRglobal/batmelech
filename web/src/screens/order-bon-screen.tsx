@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
@@ -6,16 +7,14 @@ import { useStore } from '../data/use-store.ts'
 import { CANONICAL_ORDER_ID_PATTERN } from '../domain/order-editor.ts'
 import { formatLegacyOrderText } from '../domain/orders-dashboard.ts'
 import type { LegacyOrder } from '../domain/store.ts'
-
-const BON_PRINT_CSS = `
-@media print {
-  @page { size: auto; margin: 12mm; }
-  body * { visibility: hidden !important; }
-  .bm-order-bon, .bm-order-bon * { visibility: visible !important; }
-  .bm-order-bon { position: absolute; inset: 0; width: 100%; max-width: none !important; border: 0 !important; box-shadow: none !important; break-after: page; }
-  .bm-no-print { display: none !important; }
-}
-`
+import {
+  BON_MEDIA_OPTIONS,
+  BON_PRINT_CSS,
+  type BonMedia,
+  printBon,
+  rememberBonMedia,
+  rememberedBonMedia,
+} from '../services/bon-print.ts'
 
 function isSafeRouteOrderId(value: string | undefined): value is string {
   return value !== undefined && CANONICAL_ORDER_ID_PATTERN.test(value)
@@ -46,20 +45,20 @@ function OrderBon({ order }: { readonly order: Readonly<LegacyOrder> }) {
       data-order-id={orderId}
       dir="rtl"
     >
-      <p className="text-left text-xs font-black text-foreground">בס&quot;ד</p>
-      <header className="border-b border-dashed border-border pb-5 text-center">
-        <h1 className="font-heading text-2xl font-black text-primary">מטעמי בת מלך</h1>
-        <p className="mt-1 text-xs font-bold text-muted-foreground">מטבח ביתי אותנטי · כשר</p>
+      <p className="bm-bon-bsd text-left text-xs font-black text-foreground">בס&quot;ד</p>
+      <header className="bm-bon-head border-b border-dashed border-border pb-5 text-center">
+        <h1 className="bm-bon-title font-heading text-2xl font-black text-primary">מטעמי בת מלך</h1>
+        <p className="bm-bon-sub mt-1 text-xs font-bold text-muted-foreground">מטבח ביתי אותנטי · כשר</p>
       </header>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
+      <div className="bm-bon-meta mt-5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
         <span>מזהה הזמנה: {orderId}</span>
         <span>סטטוס: {status}</span>
       </div>
-      <pre className="mt-5 whitespace-pre-wrap break-words font-sans text-sm font-semibold leading-7 text-foreground">
+      <pre className="bm-bon-body mt-5 whitespace-pre-wrap break-words font-sans text-sm font-semibold leading-7 text-foreground">
         {orderText}
       </pre>
-      <footer className="mt-6 border-t border-dashed border-border pt-5 text-center text-sm font-black text-primary">
+      <footer className="bm-bon-foot mt-6 border-t border-dashed border-border pt-5 text-center text-sm font-black text-primary">
         בשם השם נעשה ונצליח!
       </footer>
     </article>
@@ -69,6 +68,7 @@ function OrderBon({ order }: { readonly order: Readonly<LegacyOrder> }) {
 export function OrderBonScreen() {
   const { orderId } = useParams<{ orderId?: string }>()
   const storeQuery = useStore()
+  const [media, setMedia] = useState<BonMedia>(rememberedBonMedia())
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את הבון" />
   if (storeQuery.isError) {
@@ -102,6 +102,11 @@ export function OrderBonScreen() {
   }
 
   const order = matches[0]!
+  const selectMedia = (value: BonMedia) => {
+    rememberBonMedia(value)
+    setMedia(value)
+  }
+
   return (
     <div className="min-h-full bg-background px-5 py-8 sm:px-8" dir="rtl">
       <style>{BON_PRINT_CSS}</style>
@@ -115,13 +120,39 @@ export function OrderBonScreen() {
         </Link>
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={() => printBon(media, document.querySelector('.bm-order-bon'))}
           className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90"
         >
           <LocalIcon name="ph:package-bold" className="text-lg" />
           <span>הדפסת הבון</span>
         </button>
       </div>
+
+      <fieldset className="bm-no-print mx-auto mb-6 w-full max-w-2xl rounded-3xl border border-border bg-card p-4">
+        <legend className="px-2 text-xs font-black text-muted-foreground">על מה מדפיסים?</legend>
+        <div className="flex flex-wrap gap-2">
+          {BON_MEDIA_OPTIONS.map((option) => (
+            <label
+              key={option.value}
+              className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-black ${media === option.value ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-primary hover:bg-secondary'}`}
+            >
+              <input
+                type="radio"
+                name="bm-bon-media"
+                value={option.value}
+                checked={media === option.value}
+                onChange={() => selectMedia(option.value)}
+                className="sr-only"
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-3 text-xs font-bold text-muted-foreground">
+          {BON_MEDIA_OPTIONS.find((option) => option.value === media)?.hint}
+        </p>
+      </fieldset>
+
       <OrderBon order={order} />
     </div>
   )

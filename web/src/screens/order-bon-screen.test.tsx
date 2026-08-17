@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_ROUTES } from '../app/routes.ts'
 import { useStore } from '../data/use-store.ts'
 import type { LegacyStore } from '../domain/store.ts'
+import { bonPageRule, measureRollLengthMm } from '../services/bon-print.ts'
 import { OrderBonScreen } from './order-bon-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
@@ -123,5 +124,50 @@ describe('OrderBonScreen', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'הדפסת הבון' }))
     expect(print).toHaveBeenCalledTimes(1)
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('builds a QL-800 roll page of the measured length and a plain page otherwise', () => {
+    // `size: 62mm auto` is not valid CSS and silently falls back to Letter, so
+    // the roll length has to be a real number in the rule.
+    expect(bonPageRule('roll', 161)).toBe('@page { size: 62mm 161mm; margin: 0; }')
+    expect(bonPageRule('page', 161)).toBe('@page { size: auto; margin: 12mm; }')
+    expect(measureRollLengthMm(null)).toBe(150)
+    expect(measureRollLengthMm(document.createElement('article'))).toBe(150)
+  })
+
+  it('prints on the 62 mm roll by default and cleans the page rule up afterwards', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [{ id: 'live-1', name: 'לקוחה' }] } }))
+    vi.spyOn(window, 'print').mockImplementation(() => undefined)
+    renderBon()
+
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'גליל 62 מ"מ' }).checked).toBe(true)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'הדפסת הבון' }))
+
+    expect(document.body.dataset.bmBonMedia).toBe('roll')
+    expect(document.getElementById('bm-bon-page-rule')?.textContent).toContain('size: 62mm')
+    fireEvent(window, new Event('afterprint'))
+    expect(document.getElementById('bm-bon-page-rule')).toBeNull()
+    expect(document.body.dataset.bmBonMedia).toBeUndefined()
+  })
+
+  it('switches the bon to a plain page when that media is chosen', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [{ id: 'live-1', name: 'לקוחה' }] } }))
+    vi.spyOn(window, 'print').mockImplementation(() => undefined)
+    renderBon()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('radio', { name: 'דף רגיל' }))
+    await user.click(screen.getByRole('button', { name: 'הדפסת הבון' }))
+
+    expect(document.body.dataset.bmBonMedia).toBe('page')
+    expect(document.getElementById('bm-bon-page-rule')?.textContent).toBe('@page { size: auto; margin: 12mm; }')
+    fireEvent(window, new Event('afterprint'))
+
+    // The choice is remembered for the next bon in the same printing round.
+    cleanup()
+    renderBon()
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'דף רגיל' }).checked).toBe(true)
+
+    await user.click(screen.getByRole('radio', { name: 'גליל 62 מ"מ' }))
   })
 })
