@@ -6,6 +6,7 @@ import { CustomersScreen } from './screens/customers-screen.tsx'
 import { CustomerOrderScreen } from './screens/customer-order-screen.tsx'
 import { DeliveriesScreen } from './screens/deliveries-screen.tsx'
 import { FinanceScreen } from './screens/finance-screen.tsx'
+import { CalendarScreen } from './screens/calendar-screen.tsx'
 import { InsightsScreen } from './screens/insights-screen.tsx'
 import { InvoicesScreen } from './screens/invoices-screen.tsx'
 import { LabelsScreen } from './screens/labels-screen.tsx'
@@ -113,6 +114,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.deliveries} element={<DeliveriesScreenWithSave />} />
         <Route path={APP_ROUTES.finance} element={<FinanceScreenWithSave />} />
         <Route path={APP_ROUTES.insights} element={<InsightsScreen />} />
+        <Route path={APP_ROUTES.calendar} element={<CalendarScreen />} />
         <Route path={APP_ROUTES.invoices} element={<InvoicesScreen />} />
         <Route path={APP_ROUTES.customers} element={<CustomersScreenWithSave />} />
         <Route path={APP_ROUTES.settings} element={<SettingsScreenWithSave />} />

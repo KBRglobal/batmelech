@@ -14,6 +14,7 @@ export const APP_ROUTES = {
   deliveries: '/deliveries',
   finance: '/finance',
   insights: '/insights',
+  calendar: '/calendar',
   invoices: '/invoices',
   customers: '/customers',
   settings: '/settings',

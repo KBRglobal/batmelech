@@ -20,6 +20,7 @@ type PrimaryNavigationItem = {
     | typeof APP_ROUTES.deliveries
     | typeof APP_ROUTES.finance
     | typeof APP_ROUTES.insights
+    | typeof APP_ROUTES.calendar
     | typeof APP_ROUTES.invoices
     | typeof APP_ROUTES.customers
     | typeof APP_ROUTES.settings
@@ -51,6 +52,12 @@ const PRIMARY_NAVIGATION = [
     path: APP_ROUTES.preparation,
     icon: 'ph:cooking-pot-bold',
     end: false,
+  },
+  {
+    label: 'לוח שנה',
+    path: APP_ROUTES.calendar,
+    icon: 'ph:calendar-bold',
+    end: true,
   },
   {
     label: 'רשימת קניות',

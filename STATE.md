@@ -241,6 +241,13 @@ here, but a good future idea if Lin wants to track repeat customers/preferences 
 
 ## Next
 
+### Approved by Moshe (2026-08-18, explicit "כן") — build next
+- Full safety net: every saved state change keeps a history snapshot server-side, with an
+  admin UI to browse recent versions and restore one in a click ("גם אם תמחקי הכל בטעות,
+  שום דבר לא הולך לאיבוד"). Constraint: new table must NOT match the bm_state% name pattern
+  (state-repository schema validator throws on unexpected bm_state% relations) — use a plain
+  name like state_snapshots with its own migration, per server/business-data/ pattern.
+
 ### Blocked on real content from Moshe/Lin — do NOT fabricate, ask/wait instead
 - Kashrut page never names the certifying body, rabbi, or certificate — a hard dealbreaker for
   an observant guest. Waiting on the real certification info ("טרם קיבלנו את הכשרות" —
