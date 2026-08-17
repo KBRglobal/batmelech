@@ -12,6 +12,7 @@ function createMeyAgent({
   repository,
   logger = console,
   env = process.env,
+  whatsappIntake = null,
   clientFactory = (options) => new OpenAI(options),
 } = {}) {
   if (!repository || typeof repository.loadState !== 'function') {
@@ -34,7 +35,7 @@ function createMeyAgent({
     return client;
   }
 
-  const tools = createMeyTools({ repository, logger });
+  const tools = createMeyTools({ repository, logger, whatsappIntake });
 
   return {
     async reply(userMessage, sender) {

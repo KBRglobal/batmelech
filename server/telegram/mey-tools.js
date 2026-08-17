@@ -18,6 +18,17 @@ const {
   orderStatus,
   selectDeliveryDay,
 } = require('./delivery-day');
+const {
+  ORDER_FIELD_VALIDATORS,
+  deleteOrder,
+  editMenuItem,
+  freezeWrites,
+  isWritesFrozen,
+  setBasePrices,
+  setExtraPrice,
+  undoMeyChange,
+  updateOrderDetails,
+} = require('./mey-audited-actions');
 
 const MAX_SEARCH_RESULTS = 15;
 const MAX_ORDERS_IN_CONTEXT = 200;
@@ -139,6 +150,155 @@ const TOOL_DEFINITIONS = [
   },
   {
     type: 'function',
+    name: 'build_order_from_whatsapp',
+    description:
+      'בונה טיוטת הזמנה משיחת וואטסאפ שלין העבירה. מקבלת את הטקסט המלא של השיחה או ההודעה (אפשר כמה הודעות, כולל תיקונים), ' +
+      'מפענחת מנות/כמויות/תאריך/שעה/מלון מול התפריט החי בלבד, שומרת הזמנה חדשה בסטטוס "חדשה" לבדיקה בפאנל, ' +
+      'ומחזירה: סיכום, מה חסר, טיוטת תשובה ללקוח (להעתקה — לין שולחת בעצמה), וקישור להזמנה. ' +
+      'להשתמש רק כשלין מעבירה שיחה/הודעה של לקוח ומבקשת לבנות ממנה הזמנה.',
+    parameters: {
+      type: 'object',
+      properties: {
+        conversationText: {
+          type: 'string',
+          description: 'הטקסט המלא של השיחה או ההודעה מהלקוח, בדיוק כפי שהועבר',
+        },
+      },
+      required: ['conversationText'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'update_order_details',
+    description:
+      'מעדכנת פרטים בהזמנה קיימת: שם, טלפון, אימייל, כתובת, מלון (place), תאריך (YYYY-MM-DD), שעה (HH:MM), הערות, ' +
+      'קבוצה, סכום (total), מקדמה (deposit), אמצעי תשלום, שולם (כן/לא), סטטוס. שולחים רק את השדות שמשתנים. ' +
+      'כל שינוי נרשם ביומן וניתן לביטול עם undo_last_change. חפשי קודם עם search_orders לוודא את ההזמנה הנכונה.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'מזהה ההזמנה (id)' },
+        fields: {
+          type: 'object',
+          description: 'רק השדות לעדכון. למשל {"time": "15:00", "total": 320}',
+          properties: {
+            name: { type: 'string' },
+            phone: { type: 'string' },
+            email: { type: 'string' },
+            address: { type: 'string' },
+            place: { type: 'string' },
+            date: { type: 'string' },
+            time: { type: 'string' },
+            notes: { type: 'string' },
+            group: { type: 'string' },
+            total: { type: 'number' },
+            deposit: { type: 'number' },
+            payMethod: { type: 'string' },
+            paid: { type: 'string', enum: ['כן', 'לא'] },
+            status: { type: 'string', enum: KNOWN_ORDER_STATUSES },
+          },
+          additionalProperties: false,
+        },
+      },
+      required: ['orderId', 'fields'],
+      additionalProperties: false,
+    },
+    strict: false,
+  },
+  {
+    type: 'function',
+    name: 'delete_order',
+    description:
+      'מוחקת הזמנה. המחיקה נרשמת ביומן וניתנת לשחזור מלא עם undo_last_change או מהפאנל. ' +
+      'לפני מחיקה תמיד תוודאי עם search_orders שזו ההזמנה הנכונה, ותאשרי מול מי שביקש בציון שם הלקוח.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'מזהה ההזמנה (id)' },
+      },
+      required: ['orderId'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'edit_menu_item',
+    description:
+      'עורכת את התפריט עצמו: הוספת מנה, הסרת מנה, או שינוי שם מנה באחת הקטגוריות ' +
+      '(salads/firsts/mains/sides/desserts). כל שינוי נרשם ביומן וניתן לביטול.',
+    parameters: {
+      type: 'object',
+      properties: {
+        op: { type: 'string', enum: ['add', 'remove', 'rename'], description: 'הפעולה' },
+        category: { type: 'string', enum: ['salads', 'firsts', 'mains', 'sides', 'desserts'] },
+        name: { type: 'string', description: 'שם המנה המדויק' },
+        newName: { type: ['string', 'null'], description: 'שם חדש (רק ל-rename)' },
+      },
+      required: ['op', 'category', 'name', 'newName'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'set_extra_price',
+    description: 'מעדכנת מחיר של תוספת בתשלום בתפריט (extras). נרשם ביומן וניתן לביטול.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'שם התוספת המדויק' },
+        priceUsd: { type: 'number', description: 'המחיר החדש בדולרים' },
+      },
+      required: ['name', 'priceUsd'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'set_base_prices',
+    description: 'מעדכנת את מחיר הארוחה הזוגית ו/או מחיר החלה. נרשם ביומן וניתן לביטול.',
+    parameters: {
+      type: 'object',
+      properties: {
+        couplePriceUsd: { type: ['number', 'null'], description: 'מחיר ארוחה זוגית בדולרים, או null אם לא משתנה' },
+        challahPriceUsd: { type: ['number', 'null'], description: 'מחיר חלה בדולרים, או null אם לא משתנה' },
+      },
+      required: ['couplePriceUsd', 'challahPriceUsd'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'undo_last_change',
+    description:
+      'מבטלת את הפעולה האחרונה שלך (או פעולה ספציפית לפי מזהה מהיומן): מחזירה הזמנה ששונתה למצבה הקודם, ' +
+      'משחזרת הזמנה שנמחקה, מוחקת הזמנה שנוצרה, ומחזירה שינויי תפריט ומחירים. עובדת גם במצב הקפאה.',
+    parameters: {
+      type: 'object',
+      properties: {
+        entryId: { type: ['string', 'null'], description: 'מזהה פעולה מהיומן, או null לביטול הפעולה האחרונה' },
+      },
+      required: ['entryId'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'freeze_writes',
+    description:
+      'הקפאת חירום: עוצרת מיד את כל יכולות הכתיבה שלך (חוץ מביטול שינויים). ' +
+      'להפעיל כשמישהו כותב "עצרי הכל" או כשמשהו נראה חשוד/פרוץ. שחרור ההקפאה — רק מהפאנל, בהגדרות.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    strict: true,
+  },
+  {
+    type: 'function',
     name: 'set_delivery_checkin',
     description:
       'מתעדת עדכון של השליח על משלוח אחד: מצב הצ׳ק-אין (בדרך / מגיע בזמן / מתעכב), זמן הגעה משוער בדקות והערה חופשית. ' +
@@ -214,7 +374,7 @@ function summarizeDelivery(order) {
   };
 }
 
-function createMeyTools({ repository, logger = console }) {
+function createMeyTools({ repository, logger = console, whatsappIntake = null }) {
   if (!repository || typeof repository.loadState !== 'function') {
     throw new TypeError('A state repository is required');
   }
@@ -270,9 +430,65 @@ function createMeyTools({ repository, logger = console }) {
       return setDeliveryCheckin(repository, orderId, { state, etaMinutes, note });
     },
 
+    async build_order_from_whatsapp({ conversationText }) {
+      if (!whatsappIntake || typeof whatsappIntake.intake !== 'function') {
+        return { error: 'קליטת וואטסאפ לא זמינה כרגע' };
+      }
+      const result = await whatsappIntake.intake(conversationText);
+      if (!result.ok) {
+        return { error: `הקליטה נכשלה (${result.error}) — אפשר לנסות שוב או להזין בפאנל` };
+      }
+      return {
+        ok: true,
+        orderId: result.orderId,
+        orderUrl: result.orderUrl,
+        items: result.review.draft.items.map((item) => ({
+          name: item.catalogItemName,
+          quantity: item.quantity,
+        })),
+        customerName: result.review.draft.customerName,
+        customerPhone: result.review.draft.customerPhone,
+        serviceDate: result.review.draft.serviceDate,
+        serviceTime: result.review.draft.serviceTime,
+        deliveryLocation: result.review.draft.deliveryLocation,
+        unknownItems: result.review.unknownItems.map((unknown) => unknown.sourceText),
+        missingFields: result.review.missingFields.map((field) => field.field),
+        replyDraftForCustomer: result.replyDraft,
+        note: 'ההזמנה נשמרה בסטטוס חדשה וטעונה בדיקה בפאנל. את טיוטת התשובה לין מעתיקה ושולחת בעצמה.',
+      };
+    },
+
     async set_item_stock({ itemName, inStock }) {
       const result = await setItemStock(repository, itemName, inStock);
       return result;
+    },
+
+    async update_order_details({ orderId, fields }) {
+      return updateOrderDetails(repository, orderId, fields);
+    },
+
+    async delete_order({ orderId }) {
+      return deleteOrder(repository, orderId);
+    },
+
+    async edit_menu_item({ op, category, name, newName }) {
+      return editMenuItem(repository, { op, category, name, newName: newName || undefined });
+    },
+
+    async set_extra_price({ name, priceUsd }) {
+      return setExtraPrice(repository, { name, priceUsd });
+    },
+
+    async set_base_prices({ couplePriceUsd, challahPriceUsd }) {
+      return setBasePrices(repository, { couplePriceUsd, challahPriceUsd });
+    },
+
+    async undo_last_change({ entryId }) {
+      return undoMeyChange(repository, entryId || undefined);
+    },
+
+    async freeze_writes() {
+      return freezeWrites(repository);
     },
 
     async set_order_status({ orderId, status }) {
@@ -288,6 +504,28 @@ function createMeyTools({ repository, logger = console }) {
     },
   };
 
+  // Every state-changing tool honors the emergency freeze. freeze_writes and
+  // undo_last_change stay usable while frozen — stopping and reverting damage
+  // must always work; unfreezing is panel-only.
+  const WRITE_TOOLS = new Set([
+    'set_item_stock',
+    'set_order_status',
+    'set_ordering_open',
+    'set_site_banner',
+    'set_delivery_checkin',
+    'build_order_from_whatsapp',
+    'update_order_details',
+    'delete_order',
+    'edit_menu_item',
+    'set_extra_price',
+    'set_base_prices',
+  ]);
+
+  async function writesAreFrozen() {
+    const settings = await loadSettings();
+    return isWritesFrozen(settings);
+  }
+
   return {
     definitions: TOOL_DEFINITIONS,
     async execute(name, args) {
@@ -296,6 +534,9 @@ function createMeyTools({ repository, logger = console }) {
         return { error: `unknown tool: ${name}` };
       }
       try {
+        if (WRITE_TOOLS.has(name) && (await writesAreFrozen())) {
+          return { error: 'מצב הקפאה פעיל — כל הכתיבות שלך חסומות. שחרור רק מהפאנל (הגדרות). אפשר עדיין לבטל שינויים עם undo_last_change.' };
+        }
         return await handler(args || {});
       } catch (error) {
         logger.error(`mey tool ${name} failed`, error);

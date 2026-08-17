@@ -60,6 +60,11 @@ export const LegacyOrderSchema = z
     deliveryProofBy: z.string().optional(),
     deliveredAt: z.number().optional(),
     statusBeforeProof: z.string().optional(),
+    // The original WhatsApp conversation an order was built from. Same rule
+    // as the mey*/courier* fields above: NEVER add it to OrderDraft /
+    // serializeOrderDraft — staying out of the draft is what preserves it
+    // through admin edits. Read-only in the panel.
+    intakeConversation: z.string().optional(),
   })
   .passthrough()
 

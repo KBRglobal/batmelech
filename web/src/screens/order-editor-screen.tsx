@@ -48,7 +48,7 @@ import {
   type OrderEditorMenu,
 } from '../domain/order-editor.ts'
 import { deliveryProofSummary } from '../domain/delivery-dashboard.ts'
-import type { LegacyOrder } from '../domain/store.ts'
+import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
@@ -110,7 +110,7 @@ function recoverReviewedMessage(value: unknown): string | null {
   const reviewedMessage = (value as { reviewedMessage?: unknown }).reviewedMessage
   if (typeof reviewedMessage !== 'string') return null
   const trimmed = reviewedMessage.trim()
-  return trimmed.length >= 1 && trimmed.length <= 6000 ? trimmed : null
+  return trimmed.length >= 1 && trimmed.length <= 24000 ? trimmed : null
 }
 
 function readReviewState(
@@ -141,7 +141,7 @@ function readReviewState(
   ) return null
   const sourceMessage = state.reviewedMessage === undefined
     ? null
-    : typeof state.reviewedMessage === 'string' && state.reviewedMessage.trim().length >= 1 && state.reviewedMessage.trim().length <= 6000
+    : typeof state.reviewedMessage === 'string' && state.reviewedMessage.trim().length >= 1 && state.reviewedMessage.trim().length <= 24000
       ? state.reviewedMessage.trim()
       : null
   if (state.reviewedMessage !== undefined && sourceMessage === null) return null
@@ -410,6 +410,117 @@ function OrderManagerPanel({
   )
 }
 
+// Drafts the WhatsApp reply Lin copies to the customer: summary + price from
+// the panel's own pricing, missing details as questions, in the customer's
+// language. The system never sends anything — copy only.
+function ReplyDraftBox({
+  conversation,
+  review,
+  draft,
+  menu,
+}: {
+  readonly conversation: string
+  readonly review: AIReview
+  readonly draft: OrderDraft
+  readonly menu: OrderEditorMenu
+}) {
+  const [state, setState] = useState<
+    | { readonly kind: 'idle' }
+    | { readonly kind: 'loading' }
+    | { readonly kind: 'ready'; readonly reply: string; readonly copied: boolean }
+    | { readonly kind: 'error'; readonly message: string }
+  >({ kind: 'idle' })
+
+  const requestReply = async () => {
+    setState({ kind: 'loading' })
+    try {
+      const pricing = calculateOrderDraftPricing(draft, menu, { allowMixedLunchAndShabbat: true })
+      const totalUsd = pricing.result ? pricing.result.totalMinorUnits / 100 : null
+      const recognized = recognizedReviewItems(review, menu)
+      const lines = recognized.flatMap(({ reviewItem, catalogItem }) =>
+        reviewItem.quantity === null
+          ? []
+          : [{
+              name: catalogItem.name,
+              qty: reviewItem.quantity,
+              priceUsd: catalogItem.isPaidExtra ? catalogItem.price : null,
+            }],
+      )
+      const missing = [...new Set([
+        ...review.missingFields.map((finding) => MISSING_FIELD_LABELS[finding.field]),
+        ...recognized.flatMap(({ reviewItem, catalogItem }) =>
+          reviewItem.quantity === null ? [`כמות עבור ${catalogItem.name}`] : []),
+      ])].slice(0, 30)
+      const response = await fetch('/api/ai/order-reply/', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          conversation,
+          summary: {
+            lines,
+            totalUsd,
+            serviceDate: draft.date || null,
+            serviceTime: draft.time || null,
+            deliveryLocation: draft.pickup ? null : draft.place.trim() || draft.address.trim() || null,
+            fulfillment: draft.pickup ? 'pickup' : 'delivery',
+          },
+          missing,
+        }),
+      })
+      if (!response.ok) throw new Error('reply request failed')
+      const data: unknown = await response.json()
+      const reply = typeof (data as { reply?: unknown }).reply === 'string' ? (data as { reply: string }).reply : ''
+      if (!reply) throw new Error('empty reply')
+      setState({ kind: 'ready', reply, copied: false })
+    } catch {
+      setState({ kind: 'error', message: 'לא הצלחנו לנסח תשובה כרגע. אפשר לנסות שוב.' })
+    }
+  }
+
+  return (
+    <section aria-label="טיוטת תשובה ללקוח" className="rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-primary">
+          <LocalIcon name="ph:chat-circle-text-bold" className="text-2xl" />
+          <div>
+            <h2 className="font-heading text-xl font-black">טיוטת תשובה ללקוח</h2>
+            <p className="mt-1 text-xs font-bold text-muted-foreground">מנוסחת בשפה של הלקוח, עם הסיכום, המחיר והשאלות על מה שחסר. את מעתיקה ושולחת בעצמך — המערכת לא שולחת כלום.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={state.kind === 'loading'}
+          onClick={() => { void requestReply() }}
+          className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
+        >
+          <LocalIcon name="ph:magic-wand-bold" className={state.kind === 'loading' ? 'animate-spin text-lg' : 'text-lg'} />
+          <span>{state.kind === 'loading' ? 'מנסחת תשובה' : state.kind === 'ready' ? 'ניסוח מחדש' : 'ניסוח תשובה'}</span>
+        </button>
+      </div>
+      {state.kind === 'error' && <p role="alert" className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">{state.message}</p>}
+      {state.kind === 'ready' && (
+        <div className="mt-4 space-y-3">
+          <blockquote dir="auto" className="rounded-2xl border border-border bg-background p-4 text-sm font-bold whitespace-pre-wrap break-words text-primary [overflow-wrap:anywhere]">{state.reply}</blockquote>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(state.reply).then(() => {
+                setState((current) => current.kind === 'ready' ? { ...current, copied: true } : current)
+              })
+            }}
+            className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary"
+          >
+            <LocalIcon name={state.copied ? 'ph:check-circle-bold' : 'ph:copy-bold'} className="text-lg" />
+            <span>{state.copied ? 'הועתק — אפשר להדביק בוואטסאפ' : 'העתקת התשובה'}</span>
+          </button>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function Section({
   id,
   title,
@@ -619,6 +730,71 @@ function updateExtraRecord(
   if (selection.quantity === 0 && selection.note.trim().length === 0) delete next[name]
   else next[name] = selection
   return next
+}
+
+// The change list shown for a follow-up message: base is the order as it is
+// saved today, next is the reviewed draft with the customer's changes applied.
+function draftDeltaLines(base: OrderDraft, next: OrderDraft): readonly string[] {
+  const lines: string[] = []
+  const scalar = (label: string, before: string, after: string) => {
+    if (before.trim() !== after.trim()) lines.push(`${label}: ${before.trim() || '—'} ← ${after.trim() || '—'}`)
+  }
+  scalar('תאריך', base.date, next.date)
+  scalar('שעה', base.time, next.time)
+  scalar('שם', base.name, next.name)
+  scalar('טלפון', base.phone, next.phone)
+  scalar('יעד', base.place || base.address, next.place || next.address)
+  if (base.pickup !== next.pickup) lines.push(`אופן מסירה: ${base.pickup ? 'איסוף עצמי' : 'משלוח'} ← ${next.pickup ? 'איסוף עצמי' : 'משלוח'}`)
+  const numeric = (label: string, before: number, after: number) => {
+    if (before !== after) lines.push(`${label}: ${before} ← ${after}`)
+  }
+  numeric('ארוחות זוגיות', base.meals, next.meals)
+  numeric('חלות', base.challot, next.challot)
+  const records: readonly [string, Readonly<Record<string, number>>, Readonly<Record<string, number>>][] = [
+    ['סלטים', Object.fromEntries(Object.entries(base.salads).map(([name, value]) => [name, value.ordered])), Object.fromEntries(Object.entries(next.salads).map(([name, value]) => [name, value.ordered]))],
+    ['ראשונות', base.firsts, next.firsts],
+    ['עיקריות', base.mains, next.mains],
+    ['תוספות חמות', base.sides, next.sides],
+    ['קינוחים', base.desserts, next.desserts],
+    ['תוספות', Object.fromEntries(Object.entries(base.extras).map(([name, value]) => [name, value.quantity])), Object.fromEntries(Object.entries(next.extras).map(([name, value]) => [name, value.quantity]))],
+  ]
+  for (const [label, before, after] of records) {
+    for (const name of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      const beforeQuantity = before[name] ?? 0
+      const afterQuantity = after[name] ?? 0
+      if (beforeQuantity !== afterQuantity) lines.push(`${label} · ${name}: ${beforeQuantity} ← ${afterQuantity}`)
+    }
+  }
+  for (const key of new Set([...Object.keys(base.lunch), ...Object.keys(next.lunch)])) {
+    const beforeQuantity = base.lunch[key]?.quantity ?? 0
+    const afterQuantity = next.lunch[key]?.quantity ?? 0
+    if (beforeQuantity !== afterQuantity) lines.push(`צהריים · ${key}: ${beforeQuantity} ← ${afterQuantity}`)
+  }
+  if (base.notes.trim() !== next.notes.trim()) lines.push('הערות ההזמנה עודכנו')
+  return lines
+}
+
+// Stamps the source WhatsApp conversation onto the saved order, outside the
+// draft (same preservation rule as the mey*/courier* fields). Follow-ups
+// append; a fresh intake sets.
+function withIntakeConversation(
+  state: LegacyStore,
+  orderId: string,
+  conversation: string | null,
+  mode: 'new' | 'edit',
+): LegacyStore {
+  if (!conversation || conversation.trim() === '') return state
+  return {
+    ...state,
+    orders: state.orders.map((order) => {
+      if (order.id !== orderId) return order
+      const existing = typeof order.intakeConversation === 'string' ? order.intakeConversation.trim() : ''
+      const next = mode === 'edit' && existing !== '' && existing !== conversation.trim()
+        ? `${existing}\n\n--- הודעת המשך ---\n${conversation.trim()}`.slice(0, 60000)
+        : conversation.trim()
+      return { ...order, intakeConversation: next }
+    }),
+  }
 }
 
 function createOrderImportBaseDraft(draft: OrderDraft): OrderDraft {
@@ -887,6 +1063,42 @@ function OrderEditorContent({
           />
         )}
 
+        {mode === 'edit' && managerReview && loadedOrder && (() => {
+          let deltaLines: readonly string[] = []
+          try {
+            deltaLines = draftDeltaLines(createOrderDraftFromLegacy(loadedOrder, menu), draft)
+          } catch {
+            deltaLines = []
+          }
+          return (
+            <section aria-label="השינויים מהודעת ההמשך" className="rounded-[2rem] border border-primary/20 bg-secondary p-5 shadow-sm sm:p-6">
+              <div className="flex items-center gap-3 text-primary">
+                <LocalIcon name="ph:arrows-clockwise-bold" className="text-2xl" />
+                <h2 className="font-heading text-xl font-black">השינויים המוצעים על ההזמנה</h2>
+              </div>
+              {deltaLines.length > 0 ? (
+                <ul className="mt-4 space-y-2">
+                  {deltaLines.map((line, index) => (
+                    <li key={index} className="rounded-2xl border border-border bg-card p-3 text-sm font-black text-primary">{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm font-bold text-muted-foreground">לא זוהה שינוי לעומת ההזמנה השמורה — כדאי לבדוק את ההודעה ידנית.</p>
+              )}
+              <p className="mt-3 text-xs font-bold text-muted-foreground">שום דבר לא נשמר עד לחיצה על שמירת השינויים למטה.</p>
+            </section>
+          )
+        })()}
+
+        {managerReview && managerSourceMessage && (
+          <ReplyDraftBox
+            conversation={managerSourceMessage}
+            review={managerReview}
+            draft={draft}
+            menu={menu}
+          />
+        )}
+
         {mode === 'new' && (
           <section className="rounded-[2rem] border border-border bg-secondary p-5 sm:p-7">
             <div className="flex items-center gap-3 text-primary">
@@ -924,6 +1136,31 @@ function OrderEditorContent({
             >
               <LocalIcon name="ph:plus-circle-bold" className="text-lg" />
               <span>בניית הזמנה מההודעה</span>
+            </button>
+          </section>
+        )}
+
+        {mode === 'edit' && !managerReview && typeof draft.id === 'string' && (
+          <section className="rounded-[2rem] border border-border bg-secondary p-5 sm:p-7">
+            <div className="flex items-center gap-3 text-primary">
+              <LocalIcon name="ph:arrows-clockwise-bold" className="text-2xl" />
+              <h2 className="font-black">הלקוח שלח הודעת המשך?</h2>
+            </div>
+            <p className="mt-2 text-xs font-bold text-muted-foreground">מדביקים את ההודעה החדשה ("תוסיפי 2 חלות ותשני ל-15:00") — המערכת תציע רק את השינויים על ההזמנה הזאת, לאישור לפני שמירה.</p>
+            <button
+              type="button"
+              onClick={() => {
+                navigate(APP_ROUTES.orderImportReview, {
+                  state: {
+                    baseDraft: { ...draft, id: null },
+                    followUpOrderId: draft.id,
+                  },
+                })
+              }}
+              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary"
+            >
+              <LocalIcon name="ph:chat-dots-bold" className="text-lg" />
+              <span>פענוח הודעת המשך</span>
             </button>
           </section>
         )}
@@ -1371,6 +1608,14 @@ function OrderEditorContent({
         </Section>
 
         <DeliveryProofSection order={loadedOrder} />
+
+        {typeof loadedOrder?.intakeConversation === 'string' && loadedOrder.intakeConversation.trim() !== '' && (
+          <Section id="intake-conversation" title="השיחה המקורית מוואטסאפ" collapsible>
+            <blockquote dir="auto" className="break-words whitespace-pre-wrap rounded-2xl border border-border bg-background p-4 text-sm font-bold text-muted-foreground [overflow-wrap:anywhere]">
+              {loadedOrder.intakeConversation}
+            </blockquote>
+          </Section>
+        )}
       </div>
 
       <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
@@ -1459,7 +1704,7 @@ export function OrderEditorScreen() {
       return
     }
     const reviewHandoffPresent = hasReviewHandoffState(location.state)
-    const reviewHandoff = reviewHandoffPresent && mode === 'new' && isVersionedStateEnvelope(storeQuery.data)
+    const reviewHandoff = reviewHandoffPresent && isVersionedStateEnvelope(storeQuery.data)
       ? readReviewState(
           location.state,
           currentCatalogSignature(menu),
@@ -1480,22 +1725,33 @@ export function OrderEditorScreen() {
     }
     if (mode === 'edit') {
       initialDraftKind.current = 'other'
-      setManagerReview(null)
-      setManagerSourceMessage(null)
       setReviewLoadIssue(null)
       const matches = (store?.orders ?? []).filter((order) => order.id === orderId)
       if (matches.length !== 1) {
+        setManagerReview(null)
+        setManagerSourceMessage(null)
         setDraft(null)
         return
       }
       const issue = legacyOrderEditIssue(matches[0]!)
       if (issue !== null) {
+        setManagerReview(null)
+        setManagerSourceMessage(null)
         setEditLoadIssue(issue)
         setDraft(null)
         return
       }
-      const nextDraft = createOrderDraftFromLegacy(matches[0]!, menu)
-      initialPricingFingerprint.current = orderPricingFingerprint(nextDraft)
+      const baseline = createOrderDraftFromLegacy(matches[0]!, menu)
+      // A follow-up review lands here with the customer's changes already
+      // applied over this order's own draft; the original keeps its identity
+      // and pricing is forced through a fresh calculation (the fingerprint
+      // below is the ORIGINAL order's, so any change requires repricing).
+      const nextDraft = reviewHandoff?.draft
+        ? { ...reviewHandoff.draft, id: baseline.id, status: reviewHandoff.draft.status || baseline.status }
+        : baseline
+      initialPricingFingerprint.current = orderPricingFingerprint(baseline)
+      setManagerReview(reviewHandoff?.review ?? null)
+      setManagerSourceMessage(reviewHandoff?.sourceMessage ?? null)
       setEditLoadIssue(null)
       setDuplicateLoadIssue(null)
       setDraft(nextDraft)
@@ -1628,10 +1884,15 @@ export function OrderEditorScreen() {
           change: prepareVersionedStateChange(
             loadedBase,
             requestId,
-            (baseStateCopy) => applyOrderDraftToStore(baseStateCopy, draft, {
+            (baseStateCopy) => withIntakeConversation(
+              applyOrderDraftToStore(baseStateCopy, draft, {
+                mode,
+                orderId: targetOrderId,
+              }),
+              targetOrderId,
+              managerSourceMessage,
               mode,
-              orderId: targetOrderId,
-            }),
+            ),
           ),
         }
         retryAttempt.current = attempt

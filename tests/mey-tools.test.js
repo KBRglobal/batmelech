@@ -190,10 +190,10 @@ test('set_delivery_checkin rejects an unknown state and an unknown order', async
   assert.equal(missing.error, 'order not found');
 });
 
-test('the tool surface exposes nine well-formed definitions', async () => {
+test('the tool surface exposes seventeen well-formed definitions', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
 
-  assert.equal(tools.definitions.length, 9);
+  assert.equal(tools.definitions.length, 17);
   for (const definition of tools.definitions) {
     assert.equal(definition.type, 'function', `${definition.name} must be a function tool`);
     assert.equal(typeof definition.name, 'string');
@@ -208,6 +208,7 @@ test('the tool surface exposes nine well-formed definitions', async () => {
   const names = tools.definitions.map((definition) => definition.name);
   assert.ok(names.includes('get_delivery_day'));
   assert.ok(names.includes('set_delivery_checkin'));
+  assert.ok(names.includes('build_order_from_whatsapp'));
 });
 
 test('get_menu_and_settings answers with the ordering state as it is right now', async () => {

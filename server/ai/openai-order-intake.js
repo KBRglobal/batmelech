@@ -11,6 +11,7 @@ const {
   ORDER_INTAKE_SYSTEM_PROMPT,
   buildOrderIntakeUserPrompt,
 } = require('./order-intake-prompt');
+const { normalizeWhatsAppInput } = require('./whatsapp-chat');
 
 const SERVICE_ERROR_CODES = Object.freeze({
   INVALID_INPUT: 'invalid_request',
@@ -371,6 +372,48 @@ function evidenceIsGrounded(review, message) {
       quantityIsGrounded(item.sourceText, item.requestedQuantity)
     )
   );
+}
+
+// Deterministic group-order detection ("we are 4 families at the same
+// hotel"). Kept outside the structured AI call on purpose: the review
+// schema stays untouched and the hint can never be hallucinated.
+const GROUP_SIGNAL_PATTERN = new RegExp(
+  [
+    'משפחות',
+    'כמה משפחות',
+    'שתי משפחות',
+    'הזמנות נפרדות',
+    'חשבונות נפרדים',
+    'כל משפחה',
+    'קבוצה של',
+    'families',
+    'separate orders',
+    'separate bills',
+    'each family',
+    'group of',
+  ].join('|'),
+  'iu'
+);
+
+function detectGroupSignal(message) {
+  return GROUP_SIGNAL_PATTERN.test(message);
+}
+
+function withGroupWarning(review, message) {
+  if (!detectGroupSignal(message)) return review;
+  if (review.warnings.length >= REVIEW_LIMITS.warnings) return review;
+  return {
+    ...review,
+    warnings: [
+      ...review.warnings,
+      {
+        code: 'other',
+        severity: 'warning',
+        message:
+          'נראה שמדובר בקבוצה של כמה משפחות. אפשר לשמור את ההזמנה הזאת עם שם קבוצה, ואז לשכפל אותה לכל משפחה תחת אותה קבוצה.',
+      },
+    ],
+  };
 }
 
 function isStructuredOutputParseError(error) {
@@ -800,7 +843,13 @@ function createOpenAIOrderIntake({
 
     const selectedModel = resolveModel();
     const selectedClient = resolveClient();
-    const normalizedMessage = message.trim();
+    // Exported WhatsApp chats arrive with timestamp/sender prefixes and
+    // directional marks; grounding quotes must run against the same cleaned
+    // transcript the model reads, so normalization happens here, once.
+    const normalizedMessage = normalizeWhatsAppInput(message);
+    if (normalizedMessage === '') {
+      throw serviceError(SERVICE_ERROR_CODES.INVALID_INPUT);
+    }
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const isRetry = attempt === 1;
@@ -889,7 +938,7 @@ function createOpenAIOrderIntake({
         throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'sanitization_failed');
       }
 
-      return sanitizedReview;
+      return withGroupWarning(sanitizedReview, normalizedMessage);
     }
 
     throw serviceError(SERVICE_ERROR_CODES.INVALID_PROVIDER_OUTPUT, 'retry_exhausted');
@@ -897,6 +946,7 @@ function createOpenAIOrderIntake({
 }
 
 module.exports = {
+  detectGroupSignal,
   OPENAI_CLIENT_OPTIONS,
   OPENAI_REQUEST_LIMITS,
   OPENAI_RETRY_LIMITS,

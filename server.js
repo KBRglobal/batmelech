@@ -6,6 +6,7 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const { createOrderIntakeRouter } = require('./server/ai/order-intake-route');
+const { createOrderReplyRouter } = require('./server/ai/order-reply-route');
 const { createOperationsReviewRouter } = require('./server/ai/operations-review-route');
 const { createCustomerOrderRouter } = require('./server/customer-order-route');
 const { createPublicLandingRouter } = require('./server/public-landing-route');
@@ -18,6 +19,10 @@ const { createSiteCatalogRouter } = require('./server/site-catalog-route');
 const { createStateHistoryRouter } = require('./server/state-history-route');
 const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
 const { createMeyAgent } = require('./server/telegram/mey-agent');
+const { createWhatsAppIntake } = require('./server/telegram/whatsapp-intake');
+const { createMeyAuditRouter } = require('./server/telegram/mey-audit-route');
+const { createOpenAIOrderIntake } = require('./server/ai/openai-order-intake');
+const { createOpenAIOrderReply } = require('./server/ai/openai-order-reply');
 const { createR2Storage } = require('./server/telegram/r2-storage');
 const { createVoiceTranscriber } = require('./server/telegram/transcribe-voice');
 const { createProofHandler } = require('./server/telegram/proof-of-delivery');
@@ -145,7 +150,14 @@ if (stateRepository) {
 if (stateRepository && process.env.TELEGRAM_WEBHOOK_SECRET && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ORDERS_CHAT_ID) {
   const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
   const telegramChatId = process.env.TELEGRAM_ORDERS_CHAT_ID;
-  const meyAgent = createMeyAgent({ repository: stateRepository });
+  // Phone-only WhatsApp intake: same review pipeline as the panel, wired so
+  // מיי can build a draft order from a forwarded conversation or export file.
+  const whatsappIntake = createWhatsAppIntake({
+    repository: stateRepository,
+    reviewOrderIntake: createOpenAIOrderIntake(),
+    draftOrderReply: createOpenAIOrderReply(),
+  });
+  const meyAgent = createMeyAgent({ repository: stateRepository, whatsappIntake });
   const r2Storage = createR2Storage();
   app.use(
     '/api/telegram/webhook',
@@ -171,6 +183,7 @@ if (stateRepository && process.env.TELEGRAM_WEBHOOK_SECRET && process.env.TELEGR
         agent: meyAgent,
       }),
       telegramFiles: { getFilePath, downloadFile },
+      whatsappIntake,
     })
   );
   // Proactive delivery reminders (Friday digest, lead/check-in/late nudges).
@@ -247,6 +260,19 @@ app.use(express.json({ limit: '15mb' }));
 
 // --- AI-assisted order interpretation (review-only; never persists state) ---
 app.use('/api/ai/order-intake', createOrderIntakeRouter());
+
+// --- AI-drafted WhatsApp reply for Lin to copy (read-only; system never sends) ---
+app.use('/api/ai/order-reply', createOrderReplyRouter({ repository: stateRepository }));
+
+// --- מיי audit log: browse/undo her changes, emergency freeze control ---
+if (stateRepository) {
+  app.use('/api/mey/audit', createMeyAuditRouter({ repository: stateRepository }));
+} else {
+  app.use('/api/mey/audit', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'audit unavailable' });
+  });
+}
 
 // --- AI-assisted operations analysis (sanitized advisory; never persists state) ---
 app.use('/api/ai/operations-review', createOperationsReviewRouter());

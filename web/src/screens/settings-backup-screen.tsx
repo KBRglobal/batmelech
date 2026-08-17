@@ -5,6 +5,7 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { StaffLoginSection } from '../components/staff-login-section.tsx'
 import { StateHistorySection } from '../components/state-history-section.tsx'
+import { MeyAuditSection } from '../components/mey-audit-section.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
@@ -344,6 +345,8 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
         <StaffLoginSection />
 
         <StateHistorySection />
+
+        <MeyAuditSection />
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-xl font-black text-primary">מצב האתר</h2>

@@ -8,6 +8,7 @@ import { useStore } from '../data/use-store.ts'
 import {
   AIReviewSchema,
   applyAIReviewToDraft,
+  applyHotelDestinationInput,
   buildAIOrderCatalog,
   buildOrderEditorMenu,
   createOrderDraft,
@@ -20,7 +21,11 @@ import {
 import { isAutomaticChargeName } from '../domain/order-total.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
-const AIResponseSchema = z.object({ review: AIReviewSchema }).strict()
+const MAX_CONVERSATION_LENGTH = 24000
+const AIResponseSchema = z.object({
+  review: AIReviewSchema,
+  conversation: z.string().trim().min(1).max(MAX_CONVERSATION_LENGTH).optional(),
+}).strict()
 
 const AIErrorCodeSchema = z.enum([
   'ai_rate_limited',
@@ -170,6 +175,22 @@ function initialBaseDraft(value: unknown): { readonly present: boolean; readonly
     return { present: false, value: null }
   }
   return { present: true, value: (value as { baseDraft?: unknown }).baseDraft }
+}
+
+// A follow-up message pasted onto an EXISTING order (the "add 2 challahs and
+// change to 15:00" flow): the editor sends its order id along with the base
+// draft, and the reviewed result goes back to that order's edit screen.
+function initialFollowUpOrderId(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return null
+  const id = (value as { followUpOrderId?: unknown }).followUpOrderId
+  return typeof id === 'string' && id.trim() !== '' ? id.trim() : null
+}
+
+function normalizedPhoneDigits(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const digits = value.replace(/\D+/gu, '')
+  if (digits.length < 7) return ''
+  return digits.slice(-9)
 }
 
 function displaySafeReviewedMessage(message: string, isBM1: boolean): string {
@@ -370,7 +391,9 @@ export function OrderImportReviewScreen() {
   const location = useLocation()
   const navigate = useNavigate()
   const baseDraftInput = initialBaseDraft(location.state)
+  const followUpOrderId = initialFollowUpOrderId(location.state)
   const [message, setMessage] = useState(() => initialMessage(location.state))
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'checking' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -401,31 +424,77 @@ export function OrderImportReviewScreen() {
     ) {
       throw new Error('CHANGED_STATE')
     }
-    const reviewedDraft = context.exactDraft ?? applyAIReviewToDraft(
+    let reviewedDraft = context.exactDraft ?? applyAIReviewToDraft(
       context.baseDraft,
       review,
       context.targetsById,
       context.menu,
     )
-    navigate(APP_ROUTES.newOrder, {
-      state: {
-        review,
-        reviewedCatalogSignature: context.catalogSignature,
-        reviewedRevision: context.revision,
-        reviewedHash: context.hash,
-        reviewedTs: context.ts,
-        reviewedStateSignature: context.stateSignature,
-        reviewedDraft,
-        reviewedMessage,
+    let reviewedForHandoff = review
+    // Returning-customer memory: a known phone fills the name and hotel from
+    // the previous visit, and says so — never silently.
+    if (!followUpOrderId && !context.exactDraft) {
+      const phoneKey = normalizedPhoneDigits(reviewedDraft.phone)
+      if (phoneKey !== '' && refreshed.data) {
+        const pastOrders = (refreshed.data.data.orders ?? []).filter(
+          (order) => normalizedPhoneDigits(order.phone) === phoneKey,
+        )
+        const lastKnown = pastOrders[pastOrders.length - 1]
+        if (lastKnown) {
+          const filled: string[] = []
+          if (!reviewedDraft.name.trim() && typeof lastKnown.name === 'string' && lastKnown.name.trim() !== '') {
+            reviewedDraft = { ...reviewedDraft, name: lastKnown.name.trim() }
+            filled.push('שם')
+          }
+          const knownPlace = typeof lastKnown.place === 'string' && lastKnown.place.trim() !== ''
+            ? lastKnown.place.trim()
+            : typeof lastKnown.hotelName === 'string' && lastKnown.hotelName.trim() !== ''
+              ? lastKnown.hotelName.trim()
+              : ''
+          if (!reviewedDraft.pickup && !reviewedDraft.place.trim() && !reviewedDraft.address.trim() && knownPlace !== '') {
+            reviewedDraft = applyHotelDestinationInput(reviewedDraft, knownPlace)
+            filled.push('מלון')
+          }
+          if (filled.length > 0 && review.warnings.length < 100) {
+            reviewedForHandoff = AIReviewSchema.parse({
+              ...review,
+              warnings: [
+                ...review.warnings,
+                {
+                  code: 'other',
+                  severity: 'warning',
+                  message: `לקוח/ה מוכר/ה לפי הטלפון — הושלמו מהביקור הקודם: ${filled.join(', ')}. צריך לוודא שזה עדיין נכון.`,
+                },
+              ],
+            })
+          }
+        }
+      }
+    }
+    navigate(
+      followUpOrderId
+        ? APP_ROUTES.editOrder.replace(':orderId', encodeURIComponent(followUpOrderId))
+        : APP_ROUTES.newOrder,
+      {
+        state: {
+          review: reviewedForHandoff,
+          reviewedCatalogSignature: context.catalogSignature,
+          reviewedRevision: context.revision,
+          reviewedHash: context.hash,
+          reviewedTs: context.ts,
+          reviewedStateSignature: context.stateSignature,
+          reviewedDraft,
+          reviewedMessage,
+        },
       },
-    })
+    )
   }
 
   const requestReview = async () => {
     const normalizedMessage = message.trim()
-    if (!normalizedMessage) {
+    if (!normalizedMessage && !imageDataUrl) {
       setStatus('error')
-      setErrorMessage('הדביקי קודם את הודעת הלקוח.')
+      setErrorMessage('הדביקי את הודעת הלקוח, או העלי קובץ ייצוא שיחה או צילום מסך.')
       return
     }
     setStatus('loading')
@@ -445,7 +514,7 @@ export function OrderImportReviewScreen() {
         ? validatedBaseDraft(baseDraftInput.value, menu)
         : zeroCoupleDraft(menu)
       if (!baseDraft) throw new Error('INVALID_BASE_DRAFT')
-      const exactDraft = decodeBM1Draft(normalizedMessage, menu)
+      const exactDraft = imageDataUrl ? null : decodeBM1Draft(normalizedMessage, menu)
       const requestedContext: ReviewContext = {
         revision: refreshed.data.revision,
         hash: refreshed.data.hash,
@@ -470,12 +539,21 @@ export function OrderImportReviewScreen() {
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         cache: 'no-store',
-        body: JSON.stringify({ message: normalizedMessage, catalog: catalog.items }),
+        body: JSON.stringify(
+          imageDataUrl
+            ? { image: imageDataUrl, catalog: catalog.items }
+            : { message: normalizedMessage, catalog: catalog.items },
+        ),
       })
       if (!response.ok) throw new AIReviewHttpError(await safeAIHttpErrorMessage(response))
       const parsed = AIResponseSchema.safeParse(await response.json())
       if (!parsed.success) throw new Error('INVALID_RESPONSE')
-      await handoffReview(parsed.data.review, requestedContext, normalizedMessage)
+      // The server returns the cleaned transcript it actually reviewed (an
+      // exported chat stripped of timestamps, or the text read out of a
+      // screenshot) — that transcript is what the editor must show.
+      const reviewedConversation = parsed.data.conversation ?? normalizedMessage
+      if (!reviewedConversation) throw new Error('INVALID_RESPONSE')
+      await handoffReview(parsed.data.review, requestedContext, reviewedConversation)
     } catch (error) {
       setStatus('error')
       setErrorMessage(
@@ -499,10 +577,14 @@ export function OrderImportReviewScreen() {
       <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-8 sm:py-10">
         <header>
           <div className="flex items-center gap-3 text-primary">
-            <LocalIcon name="ph:plus-circle-bold" className="text-3xl" />
-            <h1 className="font-heading text-3xl font-black">בניית הזמנה מהודעת וואטסאפ</h1>
+            <LocalIcon name={followUpOrderId ? 'ph:arrows-clockwise-bold' : 'ph:plus-circle-bold'} className="text-3xl" />
+            <h1 className="font-heading text-3xl font-black">{followUpOrderId ? 'הודעת המשך על הזמנה קיימת' : 'בניית הזמנה מהודעת וואטסאפ'}</h1>
           </div>
-          <p className="mt-2 text-sm font-bold text-muted-foreground">המערכת בונה טופס הזמנה מלא מההודעה. שום דבר לא נשמר עד שמירה בטופס.</p>
+          <p className="mt-2 text-sm font-bold text-muted-foreground">
+            {followUpOrderId
+              ? 'מדביקים את ההודעה החדשה מהלקוח — המערכת תציע רק את השינויים על ההזמנה הקיימת. שום דבר לא נשמר עד שמירה בטופס.'
+              : 'אפשר להדביק הודעה או שיחה שלמה, להעלות קובץ ייצוא שיחה מוואטסאפ, או צילום מסך. שום דבר לא נשמר עד שמירה בטופס.'}
+          </p>
         </header>
 
         <section className="rounded-[2rem] border border-border bg-card p-5 text-primary shadow-sm sm:p-6">
@@ -512,7 +594,7 @@ export function OrderImportReviewScreen() {
             <textarea
               id="review-message"
               value={message}
-              maxLength={6000}
+              maxLength={MAX_CONVERSATION_LENGTH}
               onChange={(event) => {
                 setMessage(event.currentTarget.value)
                 if (status === 'error') setStatus('idle')
@@ -520,8 +602,62 @@ export function OrderImportReviewScreen() {
               className="min-h-40 w-full resize-y rounded-2xl border border-border bg-background px-4 py-3 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
               placeholder="מדביקים את ההודעה המלאה..."
             />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-2xl border border-border bg-background px-4 text-xs font-black text-primary hover:bg-secondary">
+                <LocalIcon name="ph:file-text-bold" className="text-lg" />
+                <span>קובץ ייצוא שיחה (txt)</span>
+                <input
+                  type="file"
+                  accept=".txt,text/plain"
+                  className="sr-only"
+                  disabled={isBusy}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0]
+                    event.currentTarget.value = ''
+                    if (!file) return
+                    void file.text().then((text) => {
+                      setImageDataUrl(null)
+                      setMessage(text.slice(0, MAX_CONVERSATION_LENGTH))
+                      setStatus('idle')
+                    })
+                  }}
+                />
+              </label>
+              <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-2xl border border-border bg-background px-4 text-xs font-black text-primary hover:bg-secondary">
+                <LocalIcon name="ph:image-bold" className="text-lg" />
+                <span>צילום מסך של השיחה</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  disabled={isBusy}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0]
+                    event.currentTarget.value = ''
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = () => {
+                      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
+                        setImageDataUrl(reader.result)
+                        setStatus('idle')
+                      }
+                    }
+                    reader.readAsDataURL(file)
+                  }}
+                />
+              </label>
+              {imageDataUrl && (
+                <span className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-secondary px-4 text-xs font-black text-primary">
+                  <img src={imageDataUrl} alt="צילום מסך שהועלה" className="h-8 w-8 rounded-lg object-cover" />
+                  <span>צילום מסך מוכן לפענוח</span>
+                  <button type="button" aria-label="הסרת צילום המסך" disabled={isBusy} onClick={() => setImageDataUrl(null)} className="text-destructive">
+                    <LocalIcon name="ph:x-circle-bold" className="text-lg" />
+                  </button>
+                </span>
+              )}
+            </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs font-bold text-muted-foreground" dir="ltr">{message.length}/6000</span>
+              <span className="text-xs font-bold text-muted-foreground" dir="ltr">{message.length}/24000</span>
               <button
                 type="button"
                 disabled={isBusy}
@@ -541,7 +677,16 @@ export function OrderImportReviewScreen() {
       <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <p className="text-xs font-black text-muted-foreground">שום דבר לא נשמר עד שמירה בטופס</p>
-          <button type="button" disabled={isBusy} onClick={() => navigate(APP_ROUTES.newOrder)} className="min-h-11 rounded-full border border-border px-5 text-sm font-black text-primary hover:bg-secondary disabled:cursor-wait disabled:opacity-60">ביטול</button>
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => navigate(
+              followUpOrderId
+                ? APP_ROUTES.editOrder.replace(':orderId', encodeURIComponent(followUpOrderId))
+                : APP_ROUTES.newOrder,
+            )}
+            className="min-h-11 rounded-full border border-border px-5 text-sm font-black text-primary hover:bg-secondary disabled:cursor-wait disabled:opacity-60"
+          >ביטול</button>
         </div>
       </footer>
     </div>

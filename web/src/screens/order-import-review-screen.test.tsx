@@ -194,7 +194,7 @@ describe('OrderImportReviewScreen', () => {
     expect(screen.getAllByText(/שום דבר לא נשמר עד שמירה בטופס/)).toHaveLength(2)
     await user.click(screen.getByRole('button', { name: 'בניית טופס ההזמנה' }))
 
-    expect(screen.getByRole('alert').textContent).toContain('הדביקי קודם')
+    expect(screen.getByRole('alert').textContent).toContain('הדביקי את הודעת הלקוח')
     expect(screen.getByTestId('location').textContent).toContain(APP_ROUTES.orderImportReview)
     expect(fetchSpy).not.toHaveBeenCalled()
   })

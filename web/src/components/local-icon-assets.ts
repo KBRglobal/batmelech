@@ -1,6 +1,17 @@
 const PUBLIC_BASE = import.meta.env.BASE_URL
 
 export const LOCAL_ICON_PATHS = {
+  'ph:arrows-clockwise-bold': `${PUBLIC_BASE}icons/ph-arrows-clockwise-bold.svg`,
+  'ph:chat-circle-text-bold': `${PUBLIC_BASE}icons/ph-chat-circle-text-bold.svg`,
+  'ph:chat-dots-bold': `${PUBLIC_BASE}icons/ph-chat-dots-bold.svg`,
+  'ph:copy-bold': `${PUBLIC_BASE}icons/ph-copy-bold.svg`,
+  'ph:file-text-bold': `${PUBLIC_BASE}icons/ph-file-text-bold.svg`,
+  'ph:floppy-disk-bold': `${PUBLIC_BASE}icons/ph-floppy-disk-bold.svg`,
+  'ph:magic-wand-bold': `${PUBLIC_BASE}icons/ph-magic-wand-bold.svg`,
+  'ph:pause-circle-bold': `${PUBLIC_BASE}icons/ph-pause-circle-bold.svg`,
+  'ph:play-circle-bold': `${PUBLIC_BASE}icons/ph-play-circle-bold.svg`,
+  'ph:robot-bold': `${PUBLIC_BASE}icons/ph-robot-bold.svg`,
+  'ph:x-circle-bold': `${PUBLIC_BASE}icons/ph-x-circle-bold.svg`,
   'ph:arrow-counter-clockwise-bold': `${PUBLIC_BASE}icons/ph-arrow-counter-clockwise-bold.svg`,
   'ph:arrow-left-bold': `${PUBLIC_BASE}icons/ph-arrow-left-bold.svg`,
   'ph:calendar-bold': `${PUBLIC_BASE}icons/ph-calendar-bold.svg`,

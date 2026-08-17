@@ -1155,16 +1155,18 @@ test('route returns review data only and performs zero persistence writes', asyn
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(response.body, { review: providerReview });
-  assert.deepEqual(Object.keys(response.body), ['review']);
+  assert.deepEqual(response.body, { review: providerReview, conversation: 'הזמנה לבדיקה' });
+  assert.deepEqual(Object.keys(response.body), ['review', 'conversation']);
   assert.deepEqual(persistenceCalls, []);
   assert.equal(fetchCalls, 0);
   assert.equal(fake.calls.length, 1);
 
   const router = createOrderIntakeRouter({ reviewOrderIntake: reviewer });
-  assert.equal(router.stack.length, 1);
-  assert.equal(router.stack[0].route.methods.post, true);
-  assert.equal(router.stack[0].route.stack.length, 2);
+  // json body parser (for screenshot data URLs) + the POST route itself.
+  assert.equal(router.stack.length, 2);
+  const postLayer = router.stack.find((layer) => layer.route);
+  assert.equal(postLayer.route.methods.post, true);
+  assert.equal(postLayer.route.stack.length, 2);
 });
 
 test('route validates message and catalog size before calling OpenAI', async () => {

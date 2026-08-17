@@ -17,6 +17,57 @@ const { setCourierLocation } = require('../business-actions');
 const { sendTelegramMessage } = require('./send-message');
 
 const VOICE_FAILED_TEXT = 'לא הצלחתי להבין את ההקלטה, אפשר לכתוב?';
+const CHAT_FILE_FAILED_TEXT = 'לא הצלחתי לקרוא את קובץ השיחה 😔 אפשר לנסות שוב, או להדביק את הטקסט ישירות.';
+const MAX_CHAT_FILE_BYTES = 300_000;
+
+const INTAKE_ERROR_TEXTS = {
+  frozen: 'מצב הקפאה פעיל — אני לא יוצרת הזמנות כרגע. שחרור מהפאנל, בהגדרות.',
+  empty: 'הקובץ ריק או לא בפורמט של ייצוא שיחה מוואטסאפ.',
+  menu_unavailable: 'התפריט לא זמין כרגע אז אני לא יכולה לפענח בבטחה. נסי שוב עוד רגע 🙏',
+  review_failed: 'לא הצלחתי לפענח את השיחה בבטחה. אפשר לנסות שוב, או להזין את ההזמנה בפאנל.',
+  save_failed: 'פיענחתי את השיחה אבל השמירה נכשלה. נסי לשלוח שוב עוד רגע 🙏',
+};
+
+// Deterministic Hebrew reply for an exported-chat file — never through
+// agent.reply, same rule as the delivery-scheduler templates.
+function chatFileReplyText(result) {
+  if (!result.ok) return INTAKE_ERROR_TEXTS[result.error] || CHAT_FILE_FAILED_TEXT;
+  const lines = ['קלטתי את השיחה ובניתי טיוטת הזמנה 🌸', ''];
+  const draft = result.review.draft;
+  if (draft.customerName) lines.push(`לקוח/ה: ${draft.customerName}`);
+  if (draft.items.length > 0) {
+    lines.push('פריטים:');
+    for (const item of draft.items) {
+      lines.push(`• ${item.catalogItemName}${item.quantity === null ? ' (כמות לא צוינה)' : ` x${item.quantity}`}`);
+    }
+  } else {
+    lines.push('לא זיהיתי פריטים ודאיים — צריך לבדוק בפאנל.');
+  }
+  if (result.review.unknownItems.length > 0) {
+    lines.push(`בקשות שלא מצאתי בתפריט: ${result.review.unknownItems.length}`);
+  }
+  if (result.review.missingFields.length > 0) {
+    lines.push('יש פרטים חסרים — פירטתי בתוך ההזמנה.');
+  }
+  lines.push('');
+  lines.push(`ההזמנה נשמרה לבדיקה: ${result.orderUrl}`);
+  if (result.replyDraft) {
+    lines.push('');
+    lines.push('טיוטת תשובה ללקוח (להעתקה, את שולחת בעצמך):');
+    lines.push('');
+    lines.push(result.replyDraft);
+  }
+  return lines.join('\n');
+}
+
+function isChatTextDocument(document) {
+  if (!document || typeof document !== 'object' || !document.file_id) return false;
+  const name = typeof document.file_name === 'string' ? document.file_name.toLowerCase() : '';
+  const mime = typeof document.mime_type === 'string' ? document.mime_type : '';
+  const size = Number(document.file_size);
+  if (Number.isFinite(size) && size > MAX_CHAT_FILE_BYTES) return false;
+  return name.endsWith('.txt') || mime === 'text/plain';
+}
 
 function createTelegramWebhookRouter({
   webhookSecret,
@@ -29,6 +80,7 @@ function createTelegramWebhookRouter({
   voiceTranscriber = null,
   callbackHandler = null,
   telegramFiles = null,
+  whatsappIntake = null,
 }) {
   if (typeof webhookSecret !== 'string' || !webhookSecret.trim()) {
     throw new TypeError('A webhook secret is required');
@@ -109,6 +161,22 @@ function createTelegramWebhookRouter({
       return;
     }
 
+    // A .txt document is WhatsApp's native "Export chat" file — the approved
+    // whole-conversation intake path. Runs the deterministic pipeline, never
+    // the conversational agent.
+    if (message.document && isChatTextDocument(message.document)) {
+      if (!telegramFiles || !whatsappIntake) return;
+      const filePath = await telegramFiles.getFilePath({ botToken, fileId: message.document.file_id, logger });
+      const buffer = filePath ? await telegramFiles.downloadFile({ botToken, filePath, logger }) : null;
+      if (!buffer || buffer.length === 0 || buffer.length > MAX_CHAT_FILE_BYTES) {
+        await say(CHAT_FILE_FAILED_TEXT);
+        return;
+      }
+      const result = await whatsappIntake.intake(buffer.toString('utf8'));
+      await say(chatFileReplyText(result));
+      return;
+    }
+
     if (message.location) {
       await noteLocation(message.location);
       return;
@@ -132,4 +200,9 @@ function createTelegramWebhookRouter({
   return router;
 }
 
-module.exports = { VOICE_FAILED_TEXT, createTelegramWebhookRouter };
+module.exports = {
+  CHAT_FILE_FAILED_TEXT,
+  VOICE_FAILED_TEXT,
+  chatFileReplyText,
+  createTelegramWebhookRouter,
+};
