@@ -643,20 +643,6 @@ function extraLines(order: Readonly<LegacyOrder>): string[] {
   return extras
 }
 
-function savedDeliveryNotes(order: Readonly<LegacyOrder>): string[] {
-  const record = order as Readonly<Record<string, unknown>>
-  const fields = [
-    ['שם המלון השמור', record.hotelName],
-    ['כתובת המלון השמורה', record.hotelAddress],
-    ['קישור ניווט שמור', record.navigationUrl],
-  ] as const
-  return fields.flatMap(([label, value]) =>
-    typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_TEXT_FIELD_LENGTH
-      ? [`${label}: ${value.trim()}`]
-      : [],
-  )
-}
-
 /**
  * The bon as labelled rows, in the order the kitchen reads them: who and where
  * first, then the order itself from the table setting down to the extras.
@@ -681,7 +667,6 @@ export function buildBonFields(order: Readonly<LegacyOrder>): readonly BonField[
     [
       order.pickup !== true && text(order.time) ? `שעת הגעה: ${text(order.time)}` : '',
       order.pickup !== true && text(order.address) ? `כתובת: ${text(order.address)}` : '',
-      ...savedDeliveryNotes(order),
     ],
   )
   push('קבוצה', text(order.group))

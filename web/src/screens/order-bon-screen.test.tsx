@@ -95,10 +95,7 @@ describe('OrderBonScreen', () => {
       'סופלה ×2', 'אורז ×2 (בקופסאות נפרדות), מנה מיוחדת ×3 (12.50$) — ללא אגוזים',
       'שניצל בצלחת (משפחתית) ×1 — תוספות: פסטה אדומה ×2', 'להתקשר בהגעה',
     ])
-    expect(rows[2]?.notes).toEqual([
-      'שעת הגעה: 12:30', 'כתובת: קומה 7', 'שם המלון השמור: Stored Hotel',
-      'כתובת המלון השמורה: Stored Address', 'קישור ניווט שמור: https://maps.example/saved',
-    ])
+    expect(rows[2]?.notes).toEqual(['שעת הגעה: 12:30', 'כתובת: קומה 7'])
     expect(rows[8]?.notes).toEqual(['חריפות הדג: חריף', 'אחד בלי כוסברה'])
     expect(rows[9]?.notes).toEqual(['לחתוך'])
 
