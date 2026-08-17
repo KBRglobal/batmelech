@@ -1,4 +1,33 @@
-# STATE — batmelech (updated: 2026-08-14 17:25)
+# STATE — batmelech (updated: 2026-08-18 03:30)
+
+## Now (start here in a new session)
+Collection phase is DONE; everything decided is persisted:
+- docs/product-roadmap-v3.md — full approved/rejected/pending idea list + the governing
+  philosophy Moshe chose: inline-edit everything (no edit screens) + drag-and-drop system-wide.
+- docs/whatsapp-intake-spec.md — deep approved spec for the flagship WhatsApp intake
+  (Export-Chat file is the whole-conversation path, NOT screenshots; phone-only via Mey).
+- Rule Moshe set explicitly: COLLECT first, build only when he says "בנה". When building:
+  verify green (web 638+ tests, server 397+), commit, push, deploy via
+  `railway up --service app --detach` (auto-deploy from GitHub is unreliable), verify the
+  LIVE bundle hash/content before reporting.
+
+## Shipped this session (2026-08-17→18, all deployed + live-verified)
+Delivery zones (Dubai $15/Abu Dhabi $55/free toggle) admin+site · manual total override
+unblocked + % discount · editable salad/fish/dessert surcharge prices · dessert overage now
+priced, not blocking · photos+descriptions for EVERY dish (R2 upload via
+/api/settings/menu-image) admin-editable · collapsible order-editor sections (mixed-order
+confirm checkbox moved OUT of collapsed section — regression fixed) · group-name click-to-pick
+dropdown (native datalist failed) · per-diner lunch plates (plates[] with legacy v/sides kept
+in sync, pooled sides pricing, stale plates fall back) · quick status-advance + paid stamp on
+order cards (Orders/Today/Deliveries) + status/payment filter chips · customers outstanding
+chips + wa.me/tel · finance KPIs + outstanding-balances list · insights screen (תובנות) ·
+month calendar screen (לוח שנה) · public /api/site/catalog (whitelisted projection, 60s cache)
++ customer-site pages (weekdays/shabbat-order/shabbat-extras) consume live catalog with safe
+fallback · history & restore (bm_state_versions surfaced: /api/state/history + restore-as-new-
+version + Settings section) · bon cleanup (no nav-link lines) · apex batmelech.ae DNS fixed
+(A→69.46.46.44 at aeserver; SSL cert was still pending issue at last check — verify!).
+
+## Older context below (2026-08-14)
 
 ## מיי identity awareness SHIPPED (2026-08-14 evening)
 Every message to מיי now carries a sender line ([השולח: name @username], injected by
