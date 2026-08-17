@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
@@ -15,6 +15,8 @@ import {
   renameCatalogExtra,
   renameCatalogItem,
   updateCatalogCorePrice,
+  updateCatalogExtraDescription,
+  updateCatalogExtraImage,
   updateCatalogExtraPrice,
   updateLunchPrice,
   validateSettingsCatalog,
@@ -203,6 +205,81 @@ function CategoryEditor({
   )
 }
 
+function ImageUploadField({
+  label,
+  imageUrl,
+  onChange,
+}: {
+  label: string
+  imageUrl: string | null
+  onChange: (url: string | null) => void
+}) {
+  const [state, setState] = useState<'idle' | 'uploading' | 'error'>('idle')
+  const inputId = useId()
+
+  const upload = async (file: File) => {
+    setState('uploading')
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(reader.error ?? new Error('read failed'))
+        reader.readAsDataURL(file)
+      })
+      const response = await fetch('/api/settings/menu-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      })
+      if (!response.ok) throw new Error('upload failed')
+      const body = (await response.json()) as { url: string }
+      onChange(body.url)
+      setState('idle')
+    } catch {
+      setState('error')
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      {imageUrl ? (
+        <div className="relative">
+          <img src={imageUrl} alt={label} className="size-16 rounded-xl border border-border object-cover" />
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            aria-label={`הסרת תמונה — ${label}`}
+            className="absolute -left-2 -top-2 flex size-6 items-center justify-center rounded-full bg-destructive text-primary-foreground"
+          >
+            <LocalIcon name="ph:x-bold" className="text-xs" />
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={inputId}
+          className="flex size-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:bg-secondary"
+        >
+          <LocalIcon name={state === 'uploading' ? 'ph:arrow-counter-clockwise-bold' : 'ph:image-bold'} className={`text-lg ${state === 'uploading' ? 'animate-spin' : ''}`} />
+          <span className="text-[0.6rem] font-black">תמונה</span>
+        </label>
+      )}
+      <input
+        id={inputId}
+        aria-label={`העלאת תמונה — ${label}`}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          if (file) void upload(file)
+        }}
+      />
+      {state === 'error' && <span className="text-xs font-black text-destructive">ההעלאה נכשלה, נסי שוב</span>}
+    </div>
+  )
+}
+
 function ExtrasEditor({
   catalog,
   onUpdate,
@@ -217,32 +294,52 @@ function ExtrasEditor({
       <summary className="cursor-pointer text-sm font-black text-primary">
         אקסטרות ומחירים ({catalog.extras.length})
       </summary>
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-3">
         {catalog.extras.map((item) => (
-          <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-secondary/40 p-3">
-            <input
-              aria-label={`שם האקסטרה — ${item.name}`}
-              defaultValue={item.name}
+          <div key={item.id} className="space-y-3 rounded-xl bg-secondary/40 p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <ImageUploadField
+                label={item.name}
+                imageUrl={item.imageUrl}
+                onChange={(url) => onUpdate((current) => updateCatalogExtraImage(current, item.id, url))}
+              />
+              <input
+                aria-label={`שם האקסטרה — ${item.name}`}
+                defaultValue={item.name}
+                onBlur={(event) => {
+                  const next = event.currentTarget.value
+                  if (next.trim() !== '' && next !== item.name) {
+                    onUpdate((current) => renameCatalogExtra(current, item.id, next))
+                  }
+                }}
+                className="min-w-48 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-border focus:bg-card"
+              />
+              <PriceField
+                label={`מחיר ${item.name}`}
+                value={item.priceMinorUnits}
+                onCommit={(next) => onUpdate((current) => updateCatalogExtraPrice(current, item.id, next))}
+              />
+              <button
+                type="button"
+                onClick={() => onUpdate((current) => removeCatalogExtra(current, item.id))}
+                className="shrink-0 rounded-full px-3 py-1 text-xs font-black text-destructive hover:bg-rose-50"
+              >
+                הסרה
+              </button>
+            </div>
+            <textarea
+              aria-label={`תיאור — ${item.name}`}
+              defaultValue={item.description}
+              placeholder="תיאור (לא חובה)..."
+              rows={2}
               onBlur={(event) => {
                 const next = event.currentTarget.value
-                if (next.trim() !== '' && next !== item.name) {
-                  onUpdate((current) => renameCatalogExtra(current, item.id, next))
+                if (next !== item.description) {
+                  onUpdate((current) => updateCatalogExtraDescription(current, item.id, next))
                 }
               }}
-              className="min-w-48 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-border focus:bg-card"
+              className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary outline-none"
             />
-            <PriceField
-              label={`מחיר ${item.name}`}
-              value={item.priceMinorUnits}
-              onCommit={(next) => onUpdate((current) => updateCatalogExtraPrice(current, item.id, next))}
-            />
-            <button
-              type="button"
-              onClick={() => onUpdate((current) => removeCatalogExtra(current, item.id))}
-              className="shrink-0 rounded-full px-3 py-1 text-xs font-black text-destructive hover:bg-rose-50"
-            >
-              הסרה
-            </button>
           </div>
         ))}
         <form

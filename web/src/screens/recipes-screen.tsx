@@ -244,7 +244,7 @@ function RecipeEditor({
   )
 }
 
-function matchesSearch(target: CatalogItem, query: string): boolean {
+function matchesSearch(target: Pick<CatalogItem, 'id' | 'name'>, query: string): boolean {
   const normalized = query.trim().normalize('NFKC').toLocaleLowerCase('he-IL')
   if (normalized === '') return true
   return `${target.name} ${target.id}`.normalize('NFKC').toLocaleLowerCase('he-IL').includes(normalized)
@@ -299,7 +299,7 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
     setSaveState(IDLE)
   }
 
-  const createMissingRecipe = (target: CatalogItem) => {
+  const createMissingRecipe = (target: Pick<CatalogItem, 'id' | 'name'>) => {
     const next = [...currentDrafts, createRecipeDraft(target)]
     setDrafts(next)
     setSelectedIndex(next.length - 1)

@@ -21,6 +21,8 @@ import {
   updateLunchPrice,
   validateRecipeDrafts,
   validateSettingsCatalog,
+  type CatalogItem,
+  type PricedCatalogItem,
   type RecipeDraft,
   type SettingsCatalog,
 } from './settings-catalog.ts'
@@ -64,7 +66,9 @@ describe('settings catalog', () => {
     ]))
     expect(result.catalog.extras.map((item) => item.name)).not.toEqual(expect.arrayContaining([...SUPERSEDED_MANUAL_EXTRAS]))
     expect(result.catalog.extras.map((item) => item.name)).not.toContain('משלוח')
-    expect(result.catalog.categories.firsts).toEqual(AUTHORITATIVE_FIRST_COURSE_ITEMS)
+    expect(result.catalog.categories.firsts).toEqual(
+      AUTHORITATIVE_FIRST_COURSE_ITEMS.map((item) => ({ ...item, description: '', imageUrl: null })),
+    )
   })
 
   it('keeps lunch structure fixed while accepting exact valid price overrides', () => {
@@ -122,7 +126,9 @@ describe('settings catalog', () => {
 
     const result = loadSettingsCatalog(store)
 
-    expect(result.catalog.extras).toEqual([{ id: 'extra-safe', name: 'אקסטרה בטוחה', priceMinorUnits: 1_234 }])
+    expect(result.catalog.extras).toEqual([
+      { id: 'extra-safe', name: 'אקסטרה בטוחה', priceMinorUnits: 1_234, description: '', imageUrl: null },
+    ])
     expect(result.warnings.filter((warning) => warning.code === 'SUPERSEDED_EXTRA_REMOVED')).toHaveLength(4)
   })
 
@@ -146,6 +152,8 @@ describe('settings catalog', () => {
         id: expect.stringMatching(/^extra-/),
         name: 'אקסטרה בטוחה',
         priceMinorUnits: 1_200,
+        description: '',
+        imageUrl: null,
       },
     ])
     expect(loaded.warnings.filter((warning) => warning.code === 'SUPERSEDED_EXTRA_REMOVED')).toHaveLength(3)
@@ -165,10 +173,12 @@ describe('settings catalog', () => {
     ])
 
     const unsafe = structuredClone(DEFAULT_SETTINGS_CATALOG) as SettingsCatalog
-    ;(unsafe.extras as Array<{ id: string; name: string; priceMinorUnits: number }>).push({
+    ;(unsafe.extras as PricedCatalogItem[]).push({
       id: 'unsafe-delivery-extra',
       name: '  משלוח\u00a0 ',
       priceMinorUnits: 1_500,
+      description: '',
+      imageUrl: null,
     })
     expect(validateSettingsCatalog(unsafe)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'SUPERSEDED_EXTRA_REMOVED' }),
@@ -187,7 +197,7 @@ describe('settings catalog', () => {
     )
 
     const renamed = structuredClone(DEFAULT_SETTINGS_CATALOG) as SettingsCatalog
-    ;(renamed.categories.firsts as Array<{ id: string; name: string }>)[0] = {
+    ;(renamed.categories.firsts as CatalogItem[])[0] = {
       ...renamed.categories.firsts[0]!,
       name: 'פילה חלופי',
     }
@@ -392,7 +402,7 @@ describe('settings catalog', () => {
         resolved.catalog.items
           .filter((item) => item.category === category)
           .map((item) => ({ id: item.id, name: item.name })),
-      ).toEqual(DEFAULT_SETTINGS_CATALOG.categories[category])
+      ).toEqual(DEFAULT_SETTINGS_CATALOG.categories[category].map((item) => ({ id: item.id, name: item.name })))
     }
     expect(
       resolved.catalog.items
@@ -697,11 +707,11 @@ describe('settings catalog', () => {
   it('rejects duplicate IDs and every malformed core, extra, and lunch price', () => {
     const catalog = structuredClone(DEFAULT_SETTINGS_CATALOG) as SettingsCatalog
     const duplicateId = catalog.categories.salads[0]!.id
-    ;(catalog.categories.mains as Array<{ id: string; name: string }>)[0] = {
+    ;(catalog.categories.mains as CatalogItem[])[0] = {
       ...catalog.categories.mains[0]!,
       id: duplicateId,
     }
-    ;(catalog.extras as Array<{ id: string; name: string; priceMinorUnits: number }>)[0] = {
+    ;(catalog.extras as PricedCatalogItem[])[0] = {
       ...catalog.extras[0]!,
       priceMinorUnits: -1,
     }

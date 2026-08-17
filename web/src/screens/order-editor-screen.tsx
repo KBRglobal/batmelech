@@ -694,6 +694,7 @@ function OrderEditorContent({
   const [staticHotelName, setStaticHotelName] = useState('')
   const [mixedOrderConfirmed, setMixedOrderConfirmed] = useState(false)
   const [discountPercent, setDiscountPercent] = useState('')
+  const [groupSuggestionsOpen, setGroupSuggestionsOpen] = useState(false)
   const [acknowledgedManagerFindings, setAcknowledgedManagerFindings] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -940,17 +941,40 @@ function OrderEditorContent({
             <QuantityStepper label="חלות" value={draft.challot} onChange={updateChallahs} />
           </div>
           <Field label="קבוצה / יעד משותף">
-            <input
-              aria-label="קבוצה / יעד משותף"
-              value={draft.group}
-              onChange={(event) => patch({ group: event.currentTarget.value })}
-              list="existing-group-names"
-              placeholder="הזמנה בודדת — בלי קבוצה"
-              className={inputClassName}
-            />
-            <datalist id="existing-group-names">
-              {existingGroupNames.map((name) => <option key={name} value={name} />)}
-            </datalist>
+            <div className="relative">
+              <input
+                aria-label="קבוצה / יעד משותף"
+                value={draft.group}
+                onChange={(event) => { patch({ group: event.currentTarget.value }); setGroupSuggestionsOpen(true) }}
+                onFocus={() => setGroupSuggestionsOpen(true)}
+                onBlur={() => window.setTimeout(() => setGroupSuggestionsOpen(false), 150)}
+                placeholder="הזמנה בודדת — בלי קבוצה"
+                autoComplete="off"
+                className={inputClassName}
+              />
+              {groupSuggestionsOpen && existingGroupNames.length > 0 && (() => {
+                const query = draft.group.trim().toLocaleLowerCase('he-IL')
+                const matches = existingGroupNames.filter((name) => name.toLocaleLowerCase('he-IL').includes(query))
+                if (matches.length === 0) return null
+                return (
+                  <ul className="absolute z-10 mt-2 w-full space-y-1 rounded-2xl border border-border bg-card p-2 shadow-lg">
+                    {matches.map((name) => (
+                      <li key={name}>
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => { patch({ group: name }); setGroupSuggestionsOpen(false) }}
+                          className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-right text-sm font-bold text-primary hover:bg-secondary"
+                        >
+                          <LocalIcon name="ph:users-bold" className="text-base" />
+                          <span>{name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              })()}
+            </div>
           </Field>
         </Section>
 

@@ -86,6 +86,29 @@ function createR2Storage({ env = process.env, clientFactory = (options) => new S
       }
       return { url: `${env.R2_PUBLIC_URL.trim().replace(/\/$/u, '')}/${key}`, key };
     },
+    // Dish photos for the menu editor. Same bucket, its own prefix — public
+    // by design, the whole point is showing the picture on the menu.
+    async putMenuItemImage({ buffer, contentType = 'image/jpeg' } = {}) {
+      if (!Buffer.isBuffer(buffer) || buffer.byteLength === 0) {
+        logger.error('putMenuItemImage: empty buffer');
+        return null;
+      }
+      const extension = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+      const suffix = crypto.randomBytes(8).toString('hex');
+      const key = `menu/${Date.now()}-${suffix}.${extension}`;
+      try {
+        await resolveClient().send(new PutObjectCommand({
+          Bucket: env.R2_BUCKET_NAME.trim(),
+          Key: key,
+          Body: buffer,
+          ContentType: typeof contentType === 'string' && contentType.trim() !== '' ? contentType.trim() : 'image/jpeg',
+        }));
+      } catch (error) {
+        logger.error('putMenuItemImage failed', error);
+        return null;
+      }
+      return { url: `${env.R2_PUBLIC_URL.trim().replace(/\/$/u, '')}/${key}`, key };
+    },
   };
 }
 

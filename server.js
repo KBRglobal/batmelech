@@ -31,6 +31,7 @@ const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route
 const { createStaffCredentialsRouter } = require('./server/auth/staff-credentials-route');
 const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-download-route');
 const { createInvoiceBrowseRouter } = require('./server/business-data/invoice-browse-route');
+const { createMenuImageRouter } = require('./server/menu-image-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
@@ -262,6 +263,19 @@ if (pool && process.env.BM_SECRETS_KEY) {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'not configured' });
   });
+}
+
+// --- Admin-only dish photo upload for the menu editor. ---
+{
+  const menuImageStorage = createR2Storage();
+  if (menuImageStorage.enabled) {
+    app.use('/api/settings/menu-image', createMenuImageRouter({ storage: menuImageStorage }));
+  } else {
+    app.use('/api/settings/menu-image', (_request, response) => {
+      response.set('Cache-Control', 'no-store');
+      response.status(503).json({ error: 'not configured' });
+    });
+  }
 }
 
 // --- Staff-only invoice history: browse issued invoices and re-send one ---

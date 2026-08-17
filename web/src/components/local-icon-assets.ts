@@ -11,6 +11,7 @@ export const LOCAL_ICON_PATHS = {
   'ph:coins-bold': `${PUBLIC_BASE}icons/ph-coins-bold.svg`,
   'ph:cooking-pot-bold': `${PUBLIC_BASE}icons/ph-cooking-pot-bold.svg`,
   'ph:gear-six-bold': `${PUBLIC_BASE}icons/ph-gear-six-bold.svg`,
+  'ph:image-bold': `${PUBLIC_BASE}icons/ph-image-bold.svg`,
   'ph:list-checks-bold': `${PUBLIC_BASE}icons/ph-list-checks-bold.svg`,
   'ph:map-pin-bold': `${PUBLIC_BASE}icons/ph-map-pin-bold.svg`,
   'ph:package-bold': `${PUBLIC_BASE}icons/ph-package-bold.svg`,
@@ -24,6 +25,7 @@ export const LOCAL_ICON_PATHS = {
   'ph:truck-bold': `${PUBLIC_BASE}icons/ph-truck-bold.svg`,
   'ph:users-bold': `${PUBLIC_BASE}icons/ph-users-bold.svg`,
   'ph:warning-circle-bold': `${PUBLIC_BASE}icons/ph-warning-circle-bold.svg`,
+  'ph:x-bold': `${PUBLIC_BASE}icons/ph-x-bold.svg`,
 } as const
 
 export type LocalIconName = keyof typeof LOCAL_ICON_PATHS

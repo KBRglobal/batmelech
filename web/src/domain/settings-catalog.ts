@@ -63,6 +63,8 @@ const MAX_TEXT_LENGTH = 240
 export interface CatalogItem {
   readonly id: string
   readonly name: string
+  readonly description: string
+  readonly imageUrl: string | null
 }
 
 export interface PricedCatalogItem extends CatalogItem {
@@ -315,6 +317,8 @@ const DEFAULT_LUNCH: readonly LunchItem[] = [
       id: 'lunch-couscous-mafrum',
       name: 'מנת מפרום ביתי',
       priceMinorUnits: 2_000,
+      description: '',
+      imageUrl: null,
     },
   },
 ]
@@ -409,6 +413,8 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
       DEFAULT_CATEGORY_NAMES[category].map((name, index) => ({
         id: `shabbat-${category}-${String(index + 1).padStart(2, '0')}`,
         name,
+        description: '',
+        imageUrl: null,
       })),
     ]),
   ) as Record<MenuCategoryKey, CatalogItem[]>,
@@ -416,9 +422,16 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
     id: generatedId('extra', name),
     name,
     priceMinorUnits,
+    description: '',
+    imageUrl: null,
   })),
   lunch: DEFAULT_LUNCH,
-  lunchSides: DEFAULT_LUNCH_SIDES.map((name) => ({ id: generatedId('lunch-side', name), name })),
+  lunchSides: DEFAULT_LUNCH_SIDES.map((name) => ({
+    id: generatedId('lunch-side', name),
+    name,
+    description: '',
+    imageUrl: null,
+  })),
 }
 
 function menuSource(
@@ -894,6 +907,8 @@ function normalizeCategory(
           ? persistedId
           : defaultItem?.id ?? generatedId(`custom-${category}`, name),
       name,
+      description: defaultItem?.description ?? '',
+      imageUrl: defaultItem?.imageUrl ?? null,
     }
   })
 }
@@ -924,6 +939,8 @@ function normalizeExtras(source: unknown, warnings: CatalogWarning[]): PricedCat
       id: text(value.id) || generatedId('extra', name),
       name,
       priceMinorUnits: parsePrice(value.price, fallback, `extras.${index}.price`, warnings),
+      description: text(value.description),
+      imageUrl: typeof value.imageUrl === 'string' && value.imageUrl.trim() !== '' ? value.imageUrl.trim() : null,
     })
   })
   return items
@@ -1092,6 +1109,8 @@ function normalizeLunchSides(source: unknown, warnings: CatalogWarning[]): Catal
   return names.map((name) => ({
     id: generatedId('lunch-side', name),
     name,
+    description: '',
+    imageUrl: null,
   }))
 }
 
@@ -1106,7 +1125,7 @@ export function validateSettingsCatalog(catalog: SettingsCatalog): readonly Cata
     ['extraFishFilletMinorUnits', catalog.extraFishFilletMinorUnits],
     ['extraDessertHalfUnitMinorUnits', catalog.extraDessertHalfUnitMinorUnits],
   ]
-  const register = (item: CatalogItem, path: string): void => {
+  const register = (item: Pick<CatalogItem, 'id' | 'name'>, path: string): void => {
     if (!StableCatalogIdSchema.safeParse(item.id).success || text(item.name) === '') {
       warnings.push({ code: 'INVALID_MENU_ITEM', path, message: `${path} has an invalid ID or name` })
     }
@@ -1846,7 +1865,10 @@ export function addCatalogExtra(
     throw new RangeError('extra name already exists')
   }
   return withCatalogUpdate(catalog, {
-    extras: [...catalog.extras, { id: nextStableItemId('extra', name, catalog), name, priceMinorUnits }],
+    extras: [
+      ...catalog.extras,
+      { id: nextStableItemId('extra', name, catalog), name, priceMinorUnits, description: '', imageUrl: null },
+    ],
   })
 }
 
@@ -1878,6 +1900,27 @@ export function updateCatalogExtraPrice(
   }
   return withCatalogUpdate(catalog, {
     extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, priceMinorUnits } : item)),
+  })
+}
+
+export function updateCatalogExtraDescription(
+  catalog: SettingsCatalog,
+  itemId: string,
+  rawDescription: string,
+): SettingsCatalog {
+  const description = text(rawDescription)
+  return withCatalogUpdate(catalog, {
+    extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, description } : item)),
+  })
+}
+
+export function updateCatalogExtraImage(
+  catalog: SettingsCatalog,
+  itemId: string,
+  imageUrl: string | null,
+): SettingsCatalog {
+  return withCatalogUpdate(catalog, {
+    extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, imageUrl } : item)),
   })
 }
 
@@ -1943,7 +1986,7 @@ export interface RecipeBookRecord {
 export interface RecipeBook {
   readonly records: readonly RecipeBookRecord[]
   readonly recipes: readonly RecipeDefinition[]
-  readonly missingTargets: readonly CatalogItem[]
+  readonly missingTargets: readonly Pick<CatalogItem, 'id' | 'name'>[]
   readonly issues: readonly string[]
   readonly saveable: boolean
 }
@@ -1951,7 +1994,7 @@ export interface RecipeBook {
 export function recipeTargets(
   catalog: SettingsCatalog,
   store: Readonly<LegacyStore> = { orders: [] },
-): readonly CatalogItem[] {
+): readonly Pick<CatalogItem, 'id' | 'name'>[] {
   const preparation = buildPreparationCatalog(catalog, store)
   return [
     ...preparation.items.flatMap((item) =>
@@ -2062,7 +2105,7 @@ export const RecipeDraftSchema = z
 
 export type RecipeDraft = z.infer<typeof RecipeDraftSchema>
 
-export function createRecipeDraft(target: CatalogItem): RecipeDraft {
+export function createRecipeDraft(target: Pick<CatalogItem, 'id' | 'name'>): RecipeDraft {
   const itemId = StableCatalogIdSchema.parse(target.id)
   const name = text(target.name)
   if (name === '') throw new RangeError('recipe target name must be nonblank')
