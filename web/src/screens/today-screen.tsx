@@ -88,6 +88,10 @@ function TodayHeader({ greeting, localizedDate }: { greeting: string; localizedD
           <LocalIcon name="ph:cooking-pot-bold" className="text-lg" />
           <span>סיכום הכנות</span>
         </Link>
+        <Link to={APP_ROUTES.preparationBons} className={secondaryLinkClassName}>
+          <LocalIcon name="ph:receipt-bold" className="text-lg" />
+          <span>הדפסת בונים</span>
+        </Link>
       </div>
     </header>
   )
