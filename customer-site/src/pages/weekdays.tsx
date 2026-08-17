@@ -7,8 +7,9 @@ import { Reveal } from '../components/reveal'
 import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
+import { useSiteCatalog } from '../catalog-context'
 
-type Variant = { id: string; label: string; price: number }
+type Variant = { id: string; label: string; price: number; catalogKey?: string }
 type MenuItem = {
   id: string
   name: string
@@ -19,6 +20,7 @@ type MenuItem = {
   price?: number
   variants?: Variant[]
   realPhoto?: boolean
+  lunchKey?: string
 }
 
 const ALLERGY_ICON: Record<MenuItem['allergies'][number], string> = {
@@ -37,9 +39,10 @@ const MENU: MenuItem[] = [
     img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7VXcb8xTxLR.jpeg',
     allergies: ['gluten', 'egg'],
     variants: [
-      { id: 'schnitzel-baguette-bread', label: 'בגט', price: 25 },
-      { id: 'schnitzel-baguette-challah', label: 'חלה', price: 28 },
+      { id: 'schnitzel-baguette-bread', label: 'בגט', price: 25, catalogKey: 'baguette' },
+      { id: 'schnitzel-baguette-challah', label: 'חלה', price: 28, catalogKey: 'challah' },
     ],
+    lunchKey: 'schnitzel-roll',
   },
   {
     id: 'tunisian-baguette',
@@ -49,6 +52,7 @@ const MENU: MenuItem[] = [
     img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L2KsnsfAZbI.jpeg',
     allergies: ['gluten', 'egg'],
     price: 22,
+    lunchKey: 'baguette',
   },
   {
     id: 'kubbe-selek',
@@ -59,12 +63,14 @@ const MENU: MenuItem[] = [
     allergies: ['gluten-free'],
     price: 35,
     realPhoto: true,
+    lunchKey: 'kubeh',
   },
 ]
 
 export function Weekdays() {
   const { addLine } = useCart()
   const { isOutOfStock } = useSiteStatus()
+  const { lunchItem, dishByName } = useSiteCatalog()
 
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
@@ -101,6 +107,9 @@ export function Weekdays() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 md:gap-16">
           {MENU.map((item, i) => {
             const soldOut = isOutOfStock(item.name)
+            const live = item.lunchKey !== undefined ? lunchItem(item.lunchKey) : null
+            const dish = dishByName(item.name)
+            const itemPrice = item.price !== undefined ? (live?.priceUsd ?? item.price) : undefined
             return (
             <Reveal
               key={item.id}
@@ -122,29 +131,47 @@ export function Weekdays() {
                 <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight">{item.name}</h3>
                 <p className="text-[10px] text-[#3B151A]/40 font-black mb-4">{item.ingredients}</p>
                 <p className="text-[#3B151A]/60 font-bold mb-8 leading-relaxed text-lg">{item.desc}</p>
+                {dish !== null && (dish.imageUrl !== null || dish.description !== '') && (
+                  <div className="mb-8 flex flex-col gap-3">
+                    {dish.imageUrl !== null && (
+                      <img
+                        src={dish.imageUrl}
+                        alt={dish.name}
+                        loading="lazy"
+                        className="w-full max-h-40 object-cover rounded-[2rem] shadow-xl"
+                      />
+                    )}
+                    {dish.description !== '' && (
+                      <p className="text-[#3B151A]/60 font-bold leading-relaxed">{dish.description}</p>
+                    )}
+                  </div>
+                )}
               </div>
               {item.variants ? (
                 <div className="pt-8 border-t-2 border-[#EDB2C1]/10 flex flex-col gap-3">
-                  {item.variants.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      disabled={soldOut}
-                      onClick={() => addLine({ id: v.id, name: `${item.name} (${v.label})`, unitPrice: v.price })}
-                      className="flex items-center justify-between bg-[#F7ECE6] rounded-2xl px-6 py-4 font-black transition-all enabled:hover:bg-[#3B151A] enabled:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <span>{v.label}</span>
-                      <span>${v.price}</span>
-                    </button>
-                  ))}
+                  {item.variants.map((v) => {
+                    const variantPrice = live?.variants.find((c) => c.key === v.catalogKey)?.priceUsd ?? v.price
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        disabled={soldOut}
+                        onClick={() => addLine({ id: v.id, name: `${item.name} (${v.label})`, unitPrice: variantPrice })}
+                        className="flex items-center justify-between bg-[#F7ECE6] rounded-2xl px-6 py-4 font-black transition-all enabled:hover:bg-[#3B151A] enabled:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <span>{v.label}</span>
+                        <span>${variantPrice}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="pt-8 border-t-2 border-[#EDB2C1]/10 flex items-center justify-between mt-auto">
-                  <span className="text-3xl md:text-4xl font-black">${item.price}</span>
+                  <span className="text-3xl md:text-4xl font-black">${itemPrice}</span>
                   <button
                     type="button"
                     disabled={soldOut}
-                    onClick={() => addLine({ id: item.id, name: item.name, unitPrice: item.price! })}
+                    onClick={() => addLine({ id: item.id, name: item.name, unitPrice: itemPrice! })}
                     className="w-16 h-16 md:w-20 md:h-20 rounded-[2rem] md:rounded-[2.5rem] bg-[#3B151A] text-white flex items-center justify-center shadow-xl transition-all duration-500 enabled:hover:bg-[#F5A83A] enabled:hover:text-[#3B151A] enabled:hover:rotate-90 disabled:bg-[#3B151A]/30 disabled:cursor-not-allowed"
                   >
                     <Icon icon="ph:plus-bold" className="text-3xl md:text-4xl" />

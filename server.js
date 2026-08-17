@@ -14,6 +14,7 @@ const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route'
 const { PUBLIC_SITE_SECURITY_HEADERS, createReactAppRouter } = require('./server/react-app-route');
 const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
+const { createSiteCatalogRouter } = require('./server/site-catalog-route');
 const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
 const { createMeyAgent } = require('./server/telegram/mey-agent');
 const { createR2Storage } = require('./server/telegram/r2-storage');
@@ -120,6 +121,7 @@ app.use('/site', createReactAppRouter({
 if (stateRepository) {
   app.use('/api/site/orders', createSiteOrderRouter({ repository: stateRepository }));
   app.use('/api/site/status', createSiteStatusRouter({ repository: stateRepository }));
+  app.use('/api/site/catalog', createSiteCatalogRouter({ repository: stateRepository }));
 } else {
   app.use('/api/site/orders', (_request, response) => {
     response.set('Cache-Control', 'no-store');
@@ -128,6 +130,10 @@ if (stateRepository) {
   app.use('/api/site/status', (_request, response) => {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'status unavailable' });
+  });
+  app.use('/api/site/catalog', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'catalog unavailable' });
   });
 }
 // מיי — Lin's Telegram assistant, now also Felix's delivery dispatcher.

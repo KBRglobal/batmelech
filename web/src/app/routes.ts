@@ -13,6 +13,7 @@ export const APP_ROUTES = {
   preparationBons: '/preparation/bons',
   deliveries: '/deliveries',
   finance: '/finance',
+  insights: '/insights',
   invoices: '/invoices',
   customers: '/customers',
   settings: '/settings',

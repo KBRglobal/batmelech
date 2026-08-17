@@ -7,6 +7,7 @@ import { Photo } from '../components/photo'
 import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
+import { useSiteCatalog, type CatalogDish } from '../catalog-context'
 
 const BASE_PRICE = 230
 const INCLUDED_SALADS = 4
@@ -16,10 +17,17 @@ const FIRST_EXTRA_PRICE = 25
 const INCLUDED_MAIN = 1
 const MAIN_EXTRA_PRICE = 45
 
-type Salad = { id: string; name: string; img: string; allergy?: 'gluten-free' | 'egg' | 'spicy'; realPhoto?: boolean }
-type Choice = { id: string; name: string; img: string; allergy?: 'gluten' | 'gluten-free' | 'egg' }
+type Allergy = 'gluten' | 'gluten-free' | 'egg' | 'spicy'
+type Option = {
+  id: string
+  name: string
+  img: string
+  allergy?: Allergy
+  realPhoto?: boolean
+  description?: string
+}
 
-const SALADS: Salad[] = [
+const SALADS: Option[] = [
   { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
   { id: 'salad-cabbage-purple', name: 'כרוב סגול במיונז', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-381-bR993g9VsLN.jpeg', allergy: 'egg' },
   { id: 'salad-coleslaw', name: 'קולסלאו', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/FV0qotWV27P.jpeg', allergy: 'egg' },
@@ -39,12 +47,12 @@ const SALADS: Salad[] = [
   { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/yt88LuvAVmz.jpeg', allergy: 'egg' },
 ]
 
-const FIRST_COURSES: Choice[] = [
+const FIRST_COURSES: Option[] = [
   { id: 'first-fish-pair', name: 'זוג פילה דג בר טרי (חריימה/מרוקאי)', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/DNV0D2JBB1h.jpeg', allergy: 'gluten-free' },
   { id: 'first-fish-balls', name: 'קציצות דגים ברוטב מרוקאי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1UoTNxPxBpB.jpeg' },
 ]
 
-const MAIN_COURSES: Choice[] = [
+const MAIN_COURSES: Option[] = [
   { id: 'main-meat-red', name: 'קציצות בשר ברוטב אדום עשיר', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-40-yVr6wFVvFkl.jpeg', allergy: 'gluten' },
   { id: 'main-meat-pea', name: 'קציצות בשר עם אפונה וארטישוק', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nQX6y7PSyNL.jpeg' },
   { id: 'main-meat-chestnut', name: 'קציצות בשר בריבת בצל וערמונים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/qVICFmHhkmz.jpeg' },
@@ -53,13 +61,13 @@ const MAIN_COURSES: Choice[] = [
   { id: 'main-chicken-yellow', name: 'טבחה עוף צהובה עם תפו"א', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/00bCUcj59KN.jpeg' },
 ]
 
-const SIDES = [
-  { id: 'side-rice-white', name: 'אורז לבן' },
-  { id: 'side-rice-persian', name: 'אורז פרסי עם עשבי תיבול' },
-  { id: 'side-couscous', name: 'קוסקוס עננים' },
+const SIDES: Option[] = [
+  { id: 'side-rice-white', name: 'אורז לבן', img: '' },
+  { id: 'side-rice-persian', name: 'אורז פרסי עם עשבי תיבול', img: '' },
+  { id: 'side-couscous', name: 'קוסקוס עננים', img: '' },
 ]
 
-const DESSERTS: Choice[] = [
+const DESSERTS: Option[] = [
   { id: 'dessert-baklava', name: 'סוכריות בקלאווה', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/JCOJo8pP96p.jpeg' },
   { id: 'dessert-souffle', name: 'סופלה שוקולד', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/MmM6NDYjm66.jpeg' },
 ]
@@ -71,10 +79,54 @@ const ALLERGY_ICON: Record<string, string> = {
   gluten: 'ph:bread-bold',
 }
 
+/**
+ * Hardcoded lists stay the fallback; when the live catalog has dishes for a
+ * category they replace the list, keeping local ids/photos/allergy badges for
+ * names that still match. Photos and descriptions are overridden either way.
+ */
+function mergeOptions(
+  local: Option[],
+  live: CatalogDish[] | undefined,
+  dishByName: (name: string) => CatalogDish | null,
+  idPrefix: string,
+): Option[] {
+  if (live === undefined || live.length === 0) {
+    return local.map((item) => {
+      const dish = dishByName(item.name)
+      if (dish === null) return item
+      return {
+        ...item,
+        img: dish.imageUrl ?? item.img,
+        realPhoto: dish.imageUrl !== null ? true : item.realPhoto,
+        description: dish.description !== '' ? dish.description : item.description,
+      }
+    })
+  }
+  return live.map((dish) => {
+    const match = local.find((item) => item.name === dish.name)
+    return {
+      id: match?.id ?? `${idPrefix}-${dish.name}`,
+      name: dish.name,
+      img: dish.imageUrl ?? match?.img ?? '',
+      allergy: match?.allergy,
+      realPhoto: dish.imageUrl !== null ? true : match?.realPhoto,
+      description: dish.description !== '' ? dish.description : match?.description,
+    }
+  })
+}
+
 export function ShabbatOrder() {
   const { addLine } = useCart()
   const { isOutOfStock } = useSiteStatus()
+  const { catalog, dishByName } = useSiteCatalog()
   const navigate = useNavigate()
+
+  const basePrice = catalog?.couplePriceUsd ?? BASE_PRICE
+  const saladOptions = useMemo(() => mergeOptions(SALADS, catalog?.categories.salads, dishByName, 'catalog-salad'), [catalog, dishByName])
+  const firstOptions = useMemo(() => mergeOptions(FIRST_COURSES, catalog?.categories.firsts, dishByName, 'catalog-first'), [catalog, dishByName])
+  const mainOptions = useMemo(() => mergeOptions(MAIN_COURSES, catalog?.categories.mains, dishByName, 'catalog-main'), [catalog, dishByName])
+  const sideOptions = useMemo(() => mergeOptions(SIDES, catalog?.categories.sides, dishByName, 'catalog-side'), [catalog, dishByName])
+  const dessertOptions = useMemo(() => mergeOptions(DESSERTS, catalog?.categories.desserts, dishByName, 'catalog-dessert'), [catalog, dishByName])
 
   const [salads, setSalads] = useState<Set<string>>(new Set())
   const [firstQty, setFirstQty] = useState<Record<string, number>>({})
@@ -85,7 +137,8 @@ export function ShabbatOrder() {
   const toggleSalad = (id: string) =>
     setSalads((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
 
@@ -105,9 +158,9 @@ export function ShabbatOrder() {
       saladExtra: saladExtraN,
       firstExtra: firstExtraN,
       mainExtra: mainExtraN,
-      total: BASE_PRICE + saladExtraN + firstExtraN + mainExtraN,
+      total: basePrice + saladExtraN + firstExtraN + mainExtraN,
     }
-  }, [salads, firstCount, mainCount])
+  }, [salads, firstCount, mainCount, basePrice])
 
   const missing: string[] = []
   if (salads.size < INCLUDED_SALADS) {
@@ -123,22 +176,22 @@ export function ShabbatOrder() {
   // second tab marks it). The picks stay put — the builder just refuses to
   // continue until they are swapped out.
   const soldOutPicks = [
-    ...SALADS.filter((s) => salads.has(s.id)),
-    ...FIRST_COURSES.filter((c) => (firstQty[c.id] ?? 0) > 0),
-    ...MAIN_COURSES.filter((c) => (mainQty[c.id] ?? 0) > 0),
-    ...SIDES.filter((s) => s.id === side),
-    ...DESSERTS.filter((d) => d.id === dessert),
+    ...saladOptions.filter((s) => salads.has(s.id)),
+    ...firstOptions.filter((c) => (firstQty[c.id] ?? 0) > 0),
+    ...mainOptions.filter((c) => (mainQty[c.id] ?? 0) > 0),
+    ...sideOptions.filter((s) => s.id === side),
+    ...dessertOptions.filter((d) => d.id === dessert),
   ].filter((item) => isOutOfStock(item.name))
 
   const canContinue = missing.length === 0 && soldOutPicks.length === 0
 
   const handleContinue = () => {
     if (!canContinue) return
-    const saladNames = SALADS.filter((s) => salads.has(s.id)).map((s) => s.name)
-    const firstNames = FIRST_COURSES.filter((c) => (firstQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${firstQty[c.id]}`)
-    const mainNames = MAIN_COURSES.filter((c) => (mainQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${mainQty[c.id]}`)
-    const sideName = SIDES.find((s) => s.id === side)?.name
-    const dessertName = DESSERTS.find((d) => d.id === dessert)?.name
+    const saladNames = saladOptions.filter((s) => salads.has(s.id)).map((s) => s.name)
+    const firstNames = firstOptions.filter((c) => (firstQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${firstQty[c.id]}`)
+    const mainNames = mainOptions.filter((c) => (mainQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${mainQty[c.id]}`)
+    const sideName = sideOptions.find((s) => s.id === side)?.name
+    const dessertName = dessertOptions.find((d) => d.id === dessert)?.name
     const note = [
       `סלטים: ${saladNames.join(', ')}`,
       `ראשונה: ${firstNames.join(', ')}`,
@@ -182,7 +235,7 @@ export function ShabbatOrder() {
           <div>
             <h5 className="font-black text-amber-900 text-xl mb-2">שיטת הבחירה במארז</h5>
             <p className="text-amber-800 font-bold text-sm leading-relaxed">
-              המחיר הבסיסי ($230 USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.
+              {`המחיר הבסיסי ($${basePrice} USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.`}
               <br />
               כל בחירה מעבר למכסה מתווספת אוטומטית למחיר למטה.
             </p>
@@ -191,7 +244,7 @@ export function ShabbatOrder() {
 
         <SectionHeader n={1} title="סלטים טריים" hint={`יש לבחור לפחות 4 (סלט חמישי ומעלה: $${SALAD_EXTRA_PRICE} ליחידה)`} />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 -mt-12">
-          {SALADS.map((s) => {
+          {saladOptions.map((s) => {
             const picked = salads.has(s.id)
             const soldOut = isOutOfStock(s.name)
             return (
@@ -205,12 +258,18 @@ export function ShabbatOrder() {
                 className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all text-right enabled:hover:shadow-xl disabled:cursor-not-allowed"
               >
                 <div className="aspect-square overflow-hidden relative">
-                  <Photo
-                    src={s.img}
-                    alt={s.name}
-                    className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`}
-                    real={s.realPhoto}
-                  />
+                  {s.img === '' ? (
+                    <div className="w-full h-full bg-[#F7ECE6] flex items-center justify-center">
+                      <Icon icon="ph:fork-knife" className="text-5xl text-[#3B151A]/20" />
+                    </div>
+                  ) : (
+                    <Photo
+                      src={s.img}
+                      alt={s.name}
+                      className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`}
+                      real={s.realPhoto}
+                    />
+                  )}
                   {s.allergy && (
                     <span className="absolute top-2 left-2 bg-white/90 p-1.5 rounded-lg shadow-md">
                       <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
@@ -227,6 +286,9 @@ export function ShabbatOrder() {
                 </div>
                 <div className="p-4">
                   <h4 className="text-sm font-black">{s.name}</h4>
+                  {s.description !== undefined && (
+                    <p className="text-xs font-bold text-[#3B151A]/50 mt-1 leading-snug">{s.description}</p>
+                  )}
                 </div>
               </button>
             )
@@ -238,7 +300,7 @@ export function ShabbatOrder() {
 
         <SectionHeader n={2} title="מנות ראשונות" hint={`מנה שניה ומעלה: $${FIRST_EXTRA_PRICE} ליחידה`} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">
-          {FIRST_COURSES.map((c) => (
+          {firstOptions.map((c) => (
             <QtyCard key={c.id} choice={c} qty={firstQty[c.id] ?? 0} onBump={(d) => bumpFirst(c.id, d)} soldOut={isOutOfStock(c.name)} />
           ))}
         </div>
@@ -246,7 +308,7 @@ export function ShabbatOrder() {
 
         <SectionHeader n={3} title="עיקריות לשבת" hint={`מנה שניה ומעלה: $${MAIN_EXTRA_PRICE} ליחידה`} />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 -mt-12">
-          {MAIN_COURSES.map((c) => (
+          {mainOptions.map((c) => (
             <QtyCard key={c.id} choice={c} qty={mainQty[c.id] ?? 0} onBump={(d) => bumpMain(c.id, d)} soldOut={isOutOfStock(c.name)} compact />
           ))}
         </div>
@@ -254,7 +316,7 @@ export function ShabbatOrder() {
 
         <SectionHeader n={4} title="תוספות לעיקריות" hint="יש לבחור תוספת אחת" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 -mt-12">
-          {SIDES.map((s) => {
+          {sideOptions.map((s) => {
             const soldOut = isOutOfStock(s.name)
             return (
               <button
@@ -266,7 +328,13 @@ export function ShabbatOrder() {
                   side === s.id ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-transparent bg-white'
                 }`}
               >
+                {s.img !== '' && (
+                  <img src={s.img} alt={s.name} loading="lazy" className="w-16 h-16 rounded-2xl object-cover shadow-md" />
+                )}
                 {s.name}
+                {s.description !== undefined && (
+                  <span className="text-xs font-bold text-[#3B151A]/50 leading-snug">{s.description}</span>
+                )}
                 {soldOut && <OutOfStockBadge />}
               </button>
             )
@@ -275,7 +343,7 @@ export function ShabbatOrder() {
 
         <SectionHeader n={5} title="סיום מתוק (פרווה)" hint="יש לבחור מנה אחת" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">
-          {DESSERTS.map((d) => {
+          {dessertOptions.map((d) => {
             const soldOut = isOutOfStock(d.name)
             return (
               <button
@@ -288,9 +356,20 @@ export function ShabbatOrder() {
                 }`}
               >
                 <div className="aspect-video overflow-hidden relative">
-                  <Photo src={d.img} alt={d.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} />
+                  {d.img === '' ? (
+                    <div className="w-full h-full bg-[#F7ECE6] flex items-center justify-center">
+                      <Icon icon="ph:fork-knife" className="text-6xl text-[#3B151A]/20" />
+                    </div>
+                  ) : (
+                    <Photo src={d.img} alt={d.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={d.realPhoto} />
+                  )}
                   {soldOut && <OutOfStockBadge className="absolute top-4 left-4" />}
-                  <div className="absolute bottom-4 right-4 px-8 py-3 rounded-2xl bg-white font-black shadow-2xl">{d.name}</div>
+                  <div className="absolute bottom-4 right-4 max-w-[75%] px-8 py-3 rounded-2xl bg-white shadow-2xl text-right">
+                    <span className="font-black block">{d.name}</span>
+                    {d.description !== undefined && (
+                      <span className="text-xs font-bold text-[#3B151A]/60 block">{d.description}</span>
+                    )}
+                  </div>
                 </div>
               </button>
             )
@@ -351,7 +430,7 @@ function QtyCard({
   soldOut = false,
   compact = false,
 }: {
-  choice: Choice
+  choice: Option
   qty: number
   onBump: (delta: number) => void
   soldOut?: boolean
@@ -360,7 +439,13 @@ function QtyCard({
   return (
     <div className="group relative bg-white rounded-[3.5rem] overflow-hidden border-4 border-transparent transition-all hover:shadow-xl">
       <div className={compact ? 'aspect-video overflow-hidden relative' : 'aspect-video overflow-hidden relative'}>
-        <Photo src={choice.img} alt={choice.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} />
+        {choice.img === '' ? (
+          <div className="w-full h-full bg-[#F7ECE6] flex items-center justify-center">
+            <Icon icon="ph:fork-knife" className="text-6xl text-[#3B151A]/20" />
+          </div>
+        ) : (
+          <Photo src={choice.img} alt={choice.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={choice.realPhoto} />
+        )}
         {choice.allergy && (
           <span className="absolute top-4 left-4 bg-white/90 p-2 rounded-xl shadow-lg">
             <Icon icon={ALLERGY_ICON[choice.allergy]} className="text-lg" />
@@ -384,6 +469,9 @@ function QtyCard({
       </div>
       <div className={compact ? 'p-6' : 'p-8 text-center'}>
         <h4 className={compact ? 'text-lg font-black' : 'text-2xl font-black'}>{choice.name}</h4>
+        {choice.description !== undefined && (
+          <p className="text-sm font-bold text-[#3B151A]/50 mt-2 leading-relaxed">{choice.description}</p>
+        )}
       </div>
     </div>
   )
