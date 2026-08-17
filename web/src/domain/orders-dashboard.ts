@@ -689,7 +689,7 @@ export function buildBonFields(order: Readonly<LegacyOrder>): readonly BonField[
   const meals = displayQuantity(order.meals)
   if (meals > 0) push('ארוחה זוגית', `×${meals}`)
   const tableSettings = displayQuantity(order.aricha)
-  if (tableSettings > 0) push('עריכה', `${tableSettings} איש`)
+  if (tableSettings > 0) push('עריכה', tableSettings === 1 ? 'סועד אחד' : `${tableSettings} סועדים`)
   const challahs = displayQuantity(order.challot)
   if (challahs > 0) push('חלות', `${challahs} יחידות`)
 

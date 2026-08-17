@@ -470,6 +470,10 @@ describe('buildBonFields', () => {
       label: 'לאן המשלוח', value: 'מלון אמיתי',
       notes: ['שעת הגעה: 12:30', 'כתובת: קומה 7'],
     })
+    // עריכה is the number of diners the table is laid for.
+    expect(value('עריכה')?.value).toBe('4 סועדים')
+    expect(buildBonFields({ id: 'one', aricha: 1 }).find((field) => field.label === 'עריכה')?.value)
+      .toBe('סועד אחד')
     expect(value('סלטים')?.value).toBe('מטבוחה ×2, מטבוחה — פינוק')
     expect(value('מנה ראשונה')?.notes).toEqual(['חריפות הדג: חריף', 'בלי כוסברה'])
     expect(value('אקסטרות')?.value).toBe('אורז ×2 (בנפרד)')
