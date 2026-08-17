@@ -30,6 +30,12 @@ const { createCallbackHandler } = require('./server/telegram/callback-handler');
 const { createDeliveryScheduler } = require('./server/telegram/delivery-scheduler');
 const { getFilePath, downloadFile } = require('./server/telegram/telegram-files');
 const { createDecoyGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
+const {
+  createKitchenApiRouter,
+  createKitchenAppRouter,
+  createKitchenAssetBridge,
+  createKitchenLoginRouter,
+} = require('./server/auth/kitchen-route');
 const { createDecoyLoginRouter } = require('./server/auth/decoy-login-route');
 const { createGenericContactRouter } = require('./server/auth/generic-contact-route');
 const businessDataRepository = require('./server/business-data/repository');
@@ -234,9 +240,37 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /app',
     'Disallow: /api',
     'Disallow: /legacy',
+    'Disallow: /kitchen',
     'Sitemap: https://www.batmelech.ae/site/sitemap.xml',
   ].join('\n') + '\n');
 });
+
+// --- מצב מטבח: the wall-tablet surface. Its OWN low-privilege login (Moshe:
+// separate user/pass, can only view and mark prep done — nothing else). All
+// kitchen mounts sit BEFORE the decoy gate; the asset bridge lets a kitchen
+// session load the bundle's static files without a staff session. ---
+{
+  const kitchenUser = process.env.BM_KITCHEN_USER || 'lin';
+  const kitchenPass = process.env.BM_KITCHEN_PASS || 'lin123';
+  app.use('/api/kitchen/login', createKitchenLoginRouter({
+    kitchenUser,
+    kitchenPass,
+    sessionSecret: SESSION_SECRET,
+  }));
+  if (stateRepository) {
+    app.use('/api/kitchen', createKitchenApiRouter({
+      repository: stateRepository,
+      sessionSecret: SESSION_SECRET,
+    }));
+  } else {
+    app.use('/api/kitchen', (_request, response) => {
+      response.set('Cache-Control', 'no-store');
+      response.status(503).json({ error: 'kitchen unavailable' });
+    });
+  }
+  app.use('/kitchen', createKitchenAppRouter({ reactRoot: REACT_ROOT, sessionSecret: SESSION_SECRET }));
+  app.use('/app', createKitchenAssetBridge({ reactRoot: REACT_ROOT, sessionSecret: SESSION_SECRET }));
+}
 
 // --- Public customer form: no manager sync, state API, or admin authentication ---
 app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => contentRoot }));

@@ -128,6 +128,23 @@ const SiteCatalogContext = createContext<SiteCatalogValue>({
   lunchItem: () => null,
 })
 
+// Drag-to-order support: the admin's saved category order is the order the
+// site shows. Items the live catalog does not know keep their place at the
+// end, in their original relative order — the page never loses a dish.
+export function orderByCatalog<T extends { name: string }>(
+  items: readonly T[],
+  liveDishes: readonly { name: string }[] | undefined,
+): T[] {
+  if (!liveDishes || liveDishes.length === 0) return [...items]
+  const indexByName = new Map(liveDishes.map((dish, index) => [dish.name.trim(), index]))
+  return [...items].sort((a, b) => {
+    const aIndex = indexByName.get(a.name.trim()) ?? Number.MAX_SAFE_INTEGER
+    const bIndex = indexByName.get(b.name.trim()) ?? Number.MAX_SAFE_INTEGER
+    if (aIndex !== bIndex) return aIndex - bIndex
+    return items.indexOf(a) - items.indexOf(b)
+  })
+}
+
 export function SiteCatalogProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<SiteCatalog | null>(null)
 

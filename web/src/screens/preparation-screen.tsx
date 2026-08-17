@@ -599,6 +599,10 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
           <p className="mt-2 text-sm font-bold text-muted-foreground">כמויות, הערות וגבייה מתוך ההזמנות השמורות.</p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
+          <Link to={APP_ROUTES.kitchen} className={linkClassName}>
+            <LocalIcon name="ph:cooking-pot-bold" className="text-lg" />
+            <span>מצב מטבח</span>
+          </Link>
           <Link to={APP_ROUTES.preparationLabels} className={linkClassName}>
             <LocalIcon name="ph:package-bold" className="text-lg" />
             <span>מדבקות הכנה</span>

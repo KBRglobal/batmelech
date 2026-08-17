@@ -9,6 +9,7 @@ export const APP_ROUTES = {
   orderBon: '/orders/:orderId/bon',
   orderImportReview: '/orders/new/import-review',
   preparation: '/preparation',
+  kitchen: '/kitchen',
   preparationLabels: '/preparation/labels',
   preparationBons: '/preparation/bons',
   deliveries: '/deliveries',

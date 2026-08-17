@@ -6,7 +6,7 @@ import { CurrencyNote } from '../components/currency-note'
 import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
-import { useSiteCatalog } from '../catalog-context'
+import { orderByCatalog, useSiteCatalog } from '../catalog-context'
 
 const SALAD_PRICE = 6.25
 const FIRST_PRICE = 25
@@ -74,6 +74,10 @@ export function ShabbatExtras() {
 
   const couplePrice = catalog?.couplePriceUsd ?? 230
 
+  // The admin's saved menu order (drag-to-order) drives the display order.
+  const orderedSalads = useMemo(() => orderByCatalog(SALADS, catalog?.categories.salads), [catalog])
+  const orderedFirstCourses = useMemo(() => orderByCatalog(FIRST_COURSES, catalog?.categories.firsts), [catalog])
+
   // Live extras the page does not list yet, appended after the hardcoded
   // royal items. Extras without a price cannot be sold and are skipped.
   const royalItems = useMemo<Royal[]>(() => {
@@ -132,7 +136,7 @@ export function ShabbatExtras() {
         </div>
         <div className="bg-white rounded-[2.5rem] md:rounded-[4rem] p-6 md:p-12 shadow-xl border border-[#3B151A]/5 -mt-16 md:-mt-28">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
-            {SALADS.map((s) => {
+            {orderedSalads.map((s) => {
               const qty = qtyOf(s.id)
               const soldOut = isOutOfStock(s.name)
               const dish = dishByName(s.name)
@@ -198,7 +202,7 @@ export function ShabbatExtras() {
 
         <SectionIntro icon="ph:star-fill" iconBg="dark" n={2} title="מנות ראשונות חגיגיות" quote={`"טעמו וראו כי טוב ה'" - מנות פתיחה שיכניסו אתכם לאווירת המלכות`} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 -mt-16 md:-mt-28">
-          {FIRST_COURSES.map((c) => {
+          {orderedFirstCourses.map((c) => {
             const qty = qtyOf(c.id)
             const soldOut = isOutOfStock(c.name)
             const dish = dishByName(c.name)

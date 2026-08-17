@@ -30,6 +30,7 @@ import {
   createOrderDraftFromLegacy,
   DELIVERY_ZONE_OPTIONS,
   formatUsdInputMinorUnits,
+  parseUsdInputMinorUnits,
   applyOrderDraftToStore,
   legacyOrderEditIssue,
   mergedLunchPlateSides,
@@ -874,6 +875,7 @@ function OrderEditorContent({
   const [staticHotelName, setStaticHotelName] = useState('')
   const [mixedOrderConfirmed, setMixedOrderConfirmed] = useState(false)
   const [discountPercent, setDiscountPercent] = useState('')
+  const [manualPrice, setManualPrice] = useState('')
   const [groupSuggestionsOpen, setGroupSuggestionsOpen] = useState(false)
   const [acknowledgedManagerFindings, setAcknowledgedManagerFindings] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -1589,6 +1591,28 @@ function OrderEditorContent({
                   className="min-h-11 flex-1 rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background"
                 >
                   החלת הנחה על המחיר המוצע
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  aria-label="מחיר ידני בדולרים"
+                  inputMode="decimal"
+                  value={manualPrice}
+                  onChange={(event) => setManualPrice(event.currentTarget.value)}
+                  placeholder="מחיר ידני $"
+                  className="min-h-11 w-24 rounded-xl border border-border bg-card px-3 text-sm font-black text-primary outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const minorUnits = parseUsdInputMinorUnits(manualPrice)
+                    if (minorUnits === null) return
+                    patch({ total: formatUsdInputMinorUnits(minorUnits) })
+                    setManualPrice('')
+                  }}
+                  className="min-h-11 flex-1 rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background"
+                >
+                  קביעת מחיר ידני (במקום המחושב)
                 </button>
               </div>
             </div>

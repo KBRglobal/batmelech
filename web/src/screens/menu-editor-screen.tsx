@@ -11,6 +11,7 @@ import {
   applyCatalogToStore,
   loadSettingsCatalog,
   removeCatalogExtra,
+  moveCatalogItem,
   removeCatalogItem,
   renameCatalogExtra,
   renameCatalogItem,
@@ -142,15 +143,64 @@ function CategoryEditor({
   const items = catalog.categories[category]
   const locked = category === 'firsts'
   const [newName, setNewName] = useState('')
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const moveTo = (itemId: string, targetIndex: number) => {
+    onUpdate((current) => moveCatalogItem(current, category, itemId, targetIndex))
+  }
   return (
     <details className="rounded-2xl border border-border bg-card p-4">
       <summary className="cursor-pointer text-sm font-black text-primary">
         {CATEGORY_LABELS[category]} ({items.length})
       </summary>
+      <p className="mt-2 text-xs font-bold text-muted-foreground">הסדר כאן הוא הסדר שמוצג באתר — אפשר לגרור את הידית או להזיז עם החצים.</p>
       <div className="mt-4 space-y-3">
-        {items.map((item) => (
-          <div key={item.id} className="space-y-3 rounded-xl bg-secondary/40 p-3">
+        {items.map((item, index) => (
+          <div
+            key={item.id}
+            onDragOver={(event) => {
+              if (draggedId !== null && draggedId !== item.id) event.preventDefault()
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              if (draggedId !== null && draggedId !== item.id) moveTo(draggedId, index)
+              setDraggedId(null)
+            }}
+            className={`space-y-3 rounded-xl bg-secondary/40 p-3 ${draggedId === item.id ? 'opacity-50' : ''}`}
+          >
             <div className="flex items-center gap-3">
+              <span
+                draggable
+                role="button"
+                aria-label={`גרירת ${item.name} לשינוי הסדר`}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  setDraggedId(item.id)
+                }}
+                onDragEnd={() => setDraggedId(null)}
+                className="flex min-h-10 shrink-0 cursor-grab items-center text-muted-foreground active:cursor-grabbing"
+              >
+                <LocalIcon name="ph:dots-six-vertical-bold" className="text-xl" />
+              </span>
+              <div className="flex shrink-0 flex-col">
+                <button
+                  type="button"
+                  aria-label={`העברת ${item.name} מעלה`}
+                  disabled={index === 0}
+                  onClick={() => moveTo(item.id, index - 1)}
+                  className="rounded p-0.5 text-muted-foreground hover:text-primary disabled:opacity-30"
+                >
+                  <LocalIcon name="ph:caret-up-bold" className="text-sm" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`העברת ${item.name} מטה`}
+                  disabled={index === items.length - 1}
+                  onClick={() => moveTo(item.id, index + 1)}
+                  className="rounded p-0.5 text-muted-foreground hover:text-primary disabled:opacity-30"
+                >
+                  <LocalIcon name="ph:caret-down-bold" className="text-sm" />
+                </button>
+              </div>
               <ImageUploadField
                 label={item.name}
                 imageUrl={item.imageUrl}

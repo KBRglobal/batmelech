@@ -9,6 +9,7 @@ import { FinanceScreen } from './screens/finance-screen.tsx'
 import { CalendarScreen } from './screens/calendar-screen.tsx'
 import { InsightsScreen } from './screens/insights-screen.tsx'
 import { InvoicesScreen } from './screens/invoices-screen.tsx'
+import { KitchenScreen, KitchenStandaloneScreen } from './screens/kitchen-screen.tsx'
 import { LabelsScreen } from './screens/labels-screen.tsx'
 import { MenuEditorScreen } from './screens/menu-editor-screen.tsx'
 import { OrderBonScreen } from './screens/order-bon-screen.tsx'
@@ -70,6 +71,11 @@ function DeliveriesScreenWithSave() {
 function PreparationScreenWithSave() {
   const { onSave } = useVersionedScreenSave()
   return <PreparationScreen onSave={onSave} />
+}
+
+function KitchenScreenWithSave() {
+  const { onSave } = useVersionedScreenSave()
+  return <KitchenScreen onSave={onSave} />
 }
 
 function ShoppingListScreenWithSave() {
@@ -136,6 +142,8 @@ export function AppRoutes() {
         />
       </Route>
 
+      <Route path={APP_ROUTES.kitchen} element={<KitchenScreenWithSave />} />
+
       <Route path={APP_ROUTES.customerOrder} element={<CustomerOrderScreen />} />
       {LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES.map((alias) => (
         <Route
@@ -150,6 +158,17 @@ export function AppRoutes() {
 
 export function AppRouter() {
   const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+  // The wall-tablet surface: the whole bundle serves ONLY the kitchen board
+  // under /kitchen — no other screen exists there, by design.
+  if (pathname.startsWith('/kitchen')) {
+    return (
+      <BrowserRouter basename="/kitchen">
+        <Routes>
+          <Route path="*" element={<KitchenStandaloneScreen />} />
+        </Routes>
+      </BrowserRouter>
+    )
+  }
   const operatorBasePath = pathname.startsWith('/orders/admin')
     ? '/orders/admin'
     : pathname.startsWith('/admin')

@@ -148,6 +148,7 @@ export interface StoreSaveRequest {
     | 'finance'
     | 'deliveries'
     | 'preparation'
+    | 'kitchen'
     | 'shopping'
     | 'orders'
   readonly baseEnvelope: Readonly<VersionedStateEnvelope>
@@ -1888,6 +1889,27 @@ export function removeCatalogItem(
     [category]: catalog.categories[category].filter((item) => item.id !== itemId),
   }
   return withCatalogUpdate(catalog, { categories })
+}
+
+// Drag-to-order: the array order IS the menu order, on the admin screens and
+// on the public site catalog alike (the site projection preserves it).
+export function moveCatalogItem(
+  catalog: SettingsCatalog,
+  category: MenuCategoryKey,
+  itemId: string,
+  targetIndex: number,
+): SettingsCatalog {
+  const items = catalog.categories[category]
+  const fromIndex = items.findIndex((item) => item.id === itemId)
+  if (fromIndex < 0) throw new RangeError('unknown catalog item')
+  const boundedTarget = Math.max(0, Math.min(items.length - 1, Math.trunc(targetIndex)))
+  if (boundedTarget === fromIndex) return catalog
+  const reordered = [...items]
+  const [moved] = reordered.splice(fromIndex, 1)
+  reordered.splice(boundedTarget, 0, moved!)
+  return withCatalogUpdate(catalog, {
+    categories: { ...catalog.categories, [category]: reordered },
+  })
 }
 
 export function addCatalogExtra(
