@@ -65,9 +65,15 @@ ${scope} .bm-bon-logo {
   margin:${-LOGO_MARGIN_MM}mm 0 0; vertical-align:top;
 }
 ${scope} .bm-bon-sub { font-size:6.5pt; margin:.5mm 0 0; }
-${scope} .bm-bon-meta { font-size:6.5pt; margin:0 0 1.5mm; gap:1mm; }
-${scope} .bm-bon-body { font-size:8.5pt; line-height:1.4; margin:0; overflow-wrap:anywhere; }
+${scope} .bm-bon-date { font-size:10pt; margin:1.5mm 0 0; }
+${scope} .bm-bon-meta { font-size:6.5pt; margin:.8mm 0 0; gap:1mm; }
+${scope} .bm-bon-fields { font-size:8.5pt; line-height:1.3; margin:1.5mm 0 0; }
+${scope} .bm-bon-row { gap:1.5mm; padding:.7mm 0; }
+${scope} .bm-bon-label { font-size:8.5pt; }
+${scope} .bm-bon-value { overflow-wrap:anywhere; }
+${scope} .bm-bon-note { font-size:7.5pt; line-height:1.25; }
 ${scope} .bm-bon-total { font-size:11pt; margin:2mm 0 0; padding-top:1.5mm; border-top-width:.5mm; }
+${scope} .bm-bon-payment { font-size:7.5pt; margin:1mm 0 0; gap:0 2.5mm; }
 ${scope} .bm-bon-foot { font-size:8pt; margin-top:2mm; padding-top:1.5mm; }
 `
 }

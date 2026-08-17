@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { LegacyStore } from './store.ts'
 import {
+  bonPaymentFields,
+  bonServiceDate,
+  buildBonFields,
   buildOrdersDashboard,
   buildWhatsAppOrderHref,
   formatLegacyOrderText,
@@ -440,5 +443,58 @@ describe('order communication helpers', () => {
     expect(formatted).toContain('חלות: 2 יחידות')
     expect(formatted).not.toContain('schnitzel-plate')
     expect(formatted).not.toContain('sides')
+  })
+})
+
+describe('buildBonFields', () => {
+  it('lists the bon in kitchen order and keeps every stored detail', () => {
+    const fields = buildBonFields({
+      id: 'bon-1', date: '2099-08-14', name: 'לקוחה', phone: '050-1234567',
+      place: 'מלון אמיתי', address: 'קומה 7', time: '12:30', group: 'משפחות לוי',
+      meals: 2, aricha: 4, challot: 4,
+      salads: { מטבוחה: { o: 2, p: 1 } }, firsts: { 'פילה מרוקאי': 2 }, heat: 'חריף',
+      firstsNote: 'בלי כוסברה', mains: { 'עוף ביתי': 1 }, mainsNote: 'לחתוך',
+      sides: { קוסקוס: 1 }, desserts: { סופלה: 2 },
+      extras: { אורז: { q: 2, note: 'בנפרד' } },
+      lunch: { 'schnitzel-plate': { q: 1, v: 'family' } },
+      notes: 'להתקשר בהגעה', total: '500', deposit: '100', paid: 'מקדמה',
+    })
+
+    expect(fields.map((field) => field.label)).toEqual([
+      'שם מלא', 'טלפון', 'לאן המשלוח', 'קבוצה', 'ארוחה זוגית', 'עריכה', 'חלות',
+      'סלטים', 'מנה ראשונה', 'מנה עיקרית', 'תוספת', 'קינוח', 'אקסטרות',
+      'תפריט צהריים', 'הערות',
+    ])
+    const value = (label: string) => fields.find((field) => field.label === label)
+    expect(value('לאן המשלוח')).toEqual({
+      label: 'לאן המשלוח', value: 'מלון אמיתי',
+      notes: ['שעת הגעה: 12:30', 'כתובת: קומה 7'],
+    })
+    expect(value('סלטים')?.value).toBe('מטבוחה ×2, מטבוחה — פינוק')
+    expect(value('מנה ראשונה')?.notes).toEqual(['חריפות הדג: חריף', 'בלי כוסברה'])
+    expect(value('אקסטרות')?.value).toBe('אורז ×2 (בנפרד)')
+    // Money never appears twice: the bon prints the amount as its own block.
+    expect(fields.some((field) => field.label.includes('תשלום'))).toBe(false)
+  })
+
+  it('drops empty rows and still shows notes whose course was never chosen', () => {
+    const fields = buildBonFields({ id: 'bon-2', name: 'רות', pickup: true, heat: 'חריף', mainsNote: 'לחתוך' })
+
+    expect(fields.map((field) => field.label)).toEqual(['שם מלא', 'לאן המשלוח', 'הערות למנות'])
+    expect(fields[1]).toEqual({ label: 'לאן המשלוח', value: 'איסוף עצמי', notes: [] })
+    expect(fields[2]?.value).toBe('חריפות הדג: חריף · לחתוך')
+  })
+
+  it('reads the service date and the payment lines', () => {
+    expect(bonServiceDate({ id: 'bon-3', date: '2099-08-14' })).toContain('14.08.2099')
+    expect(bonServiceDate({ id: 'bon-4', date: 'לא תאריך' })).toBe('לא תאריך')
+    expect(bonServiceDate({ id: 'bon-5' })).toBe('ללא תאריך')
+    expect(bonPaymentFields({ id: 'bon-6', deposit: '100', payMethod: 'לינק', paid: 'מקדמה' }))
+      .toEqual([
+        { label: 'מקדמה', value: '100', notes: [] },
+        { label: 'דרך תשלום', value: 'לינק', notes: [] },
+        { label: 'שולם', value: 'מקדמה', notes: [] },
+      ])
+    expect(bonPaymentFields({ id: 'bon-7' })).toEqual([{ label: 'שולם', value: 'לא', notes: [] }])
   })
 })

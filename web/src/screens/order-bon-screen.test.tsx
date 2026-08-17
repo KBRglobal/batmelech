@@ -78,17 +78,44 @@ describe('OrderBonScreen', () => {
     }))
     const { container } = renderBon()
 
-    const text = container.querySelector('.bm-order-bon')?.textContent ?? ''
-    for (const value of [
-      '<script>לקוחה</script>', '050-1234567', 'מלון אמיתי', 'קומה 7', '12:30', 'אושרה',
-      'משפחות לוי', 'ארוחה זוגית ×2', 'מטבוחה ×2', 'מטבוחה — פינוק', 'פילה מרוקאי ×2',
-      'חריף', 'אחד בלי כוסברה', 'עוף ביתי', 'לחתוך', 'קוסקוס עננים', 'סופלה ×2',
-      'אורז ×2 (בקופסאות נפרדות)', 'מנה מיוחדת ×3 (12.50$) — ללא אגוזים',
-      'שניצל בצלחת (משפחתית) ×1', 'פסטה אדומה ×2', 'עריכה: 4 איש', 'חלות: 4 יחידות',
-      'להתקשר בהגעה', '500.25', '100.25', 'לינק', 'מקדמה', 'Stored Hotel',
-      'Stored Address', 'https://maps.example/saved',
-    ]) expect(text).toContain(value)
+    const rows = [...container.querySelectorAll('.bm-bon-row')].map((row) => ({
+      label: row.querySelector('dt')?.textContent ?? '',
+      value: row.querySelector('dd')?.firstChild?.textContent ?? '',
+      notes: [...row.querySelectorAll('.bm-bon-note')].map((note) => note.textContent),
+    }))
+
+    expect(rows.map((row) => row.label)).toEqual([
+      'שם מלא:', 'טלפון:', 'לאן המשלוח:', 'קבוצה:', 'ארוחה זוגית:', 'עריכה:', 'חלות:',
+      'סלטים:', 'מנה ראשונה:', 'מנה עיקרית:', 'תוספת:', 'קינוח:', 'אקסטרות:',
+      'תפריט צהריים:', 'הערות:',
+    ])
+    expect(rows.map((row) => row.value)).toEqual([
+      '<script>לקוחה</script>', '050-1234567', 'מלון אמיתי', 'משפחות לוי', '×2', '4 איש',
+      '4 יחידות', 'מטבוחה ×2, מטבוחה — פינוק', 'פילה מרוקאי ×2', 'עוף ביתי', 'קוסקוס עננים',
+      'סופלה ×2', 'אורז ×2 (בקופסאות נפרדות), מנה מיוחדת ×3 (12.50$) — ללא אגוזים',
+      'שניצל בצלחת (משפחתית) ×1 — תוספות: פסטה אדומה ×2', 'להתקשר בהגעה',
+    ])
+    expect(rows[2]?.notes).toEqual([
+      'שעת הגעה: 12:30', 'כתובת: קומה 7', 'שם המלון השמור: Stored Hotel',
+      'כתובת המלון השמורה: Stored Address', 'קישור ניווט שמור: https://maps.example/saved',
+    ])
+    expect(rows[8]?.notes).toEqual(['חריפות הדג: חריף', 'אחד בלי כוסברה'])
+    expect(rows[9]?.notes).toEqual(['לחתוך'])
+
+    const bon = container.querySelector('.bm-order-bon')?.textContent ?? ''
+    expect(container.querySelector('.bm-bon-date')?.textContent).toContain('14.08.2099')
+    expect(container.querySelector('.bm-bon-total')?.textContent).toBe('סכום לתשלום: $500.25')
+    expect(container.querySelector('.bm-bon-payment')?.textContent).toBe('מקדמה:100.25דרך תשלום:לינקשולם:מקדמה')
+    expect(bon).toContain('אושרה')
     expect(container.querySelector('script')).toBeNull()
+  })
+
+  it('prints a stored amount it cannot parse verbatim rather than dropping it', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'live-1', name: 'לקוחה', total: 'בערך 500 דולר' }] },
+    }))
+    const { container } = renderBon()
+    expect(container.querySelector('.bm-bon-total')?.textContent).toBe('סכום לתשלום: בערך 500 דולר')
   })
 
   it('fails closed for malformed, missing, and duplicate IDs', () => {

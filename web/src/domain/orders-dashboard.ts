@@ -605,6 +605,138 @@ export function formatLegacyOrderText(order: Readonly<LegacyOrder>, locale = DEF
   return lines.join('\n')
 }
 
+export interface BonField {
+  readonly label: string
+  readonly value: string
+  readonly notes: readonly string[]
+}
+
+function extraLines(order: Readonly<LegacyOrder>): string[] {
+  const extras: string[] = []
+  for (const [name, value] of boundedEntries(order.extras ?? {})) {
+    if (isRecord(value)) {
+      const quantity = displayQuantity(value.q)
+      if (quantity > 0) extras.push(`${safeKey(name)}${quantity > 1 ? ` ×${quantity}` : ''}`)
+    }
+  }
+  for (const [name, value] of boundedEntries(order.extras ?? {})) {
+    if (!isRecord(value) || displayQuantity(value.q) === 0 || text(value.note) === '') continue
+    const index = extras.findIndex((line) => line.startsWith(name))
+    if (index >= 0) extras[index] = `${extras[index]} (${text(value.note)})`
+  }
+  const custom = order.custom ?? []
+  for (let index = 0; index < Math.min(custom.length, MAX_COLLECTION_ENTRIES); index += 1) {
+    const value = custom[index]
+    if (!isRecord(value) || text(value.name) === '') continue
+    const quantity = displayQuantity(value.qty)
+    let line = `${text(value.name)}${quantity > 0 ? ` ×${quantity}` : ''}`
+    const price =
+      typeof value.price === 'string'
+        ? text(value.price)
+        : typeof value.price === 'number'
+          ? String(value.price)
+          : ''
+    if (price) line += ` (${price}$)`
+    if (text(value.note)) line += ` — ${text(value.note)}`
+    extras.push(line)
+  }
+  return extras
+}
+
+function savedDeliveryNotes(order: Readonly<LegacyOrder>): string[] {
+  const record = order as Readonly<Record<string, unknown>>
+  const fields = [
+    ['שם המלון השמור', record.hotelName],
+    ['כתובת המלון השמורה', record.hotelAddress],
+    ['קישור ניווט שמור', record.navigationUrl],
+  ] as const
+  return fields.flatMap(([label, value]) =>
+    typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_TEXT_FIELD_LENGTH
+      ? [`${label}: ${value.trim()}`]
+      : [],
+  )
+}
+
+/**
+ * The bon as labelled rows, in the order the kitchen reads them: who and where
+ * first, then the order itself from the table setting down to the extras.
+ *
+ * This is deliberately its own shape rather than a parse of
+ * `formatLegacyOrderText` — that text is what goes out to WhatsApp and the
+ * clipboard, and a value there may legitimately carry a colon of its own.
+ * The money lines are left out; the bon prints the amount as its own block.
+ */
+export function buildBonFields(order: Readonly<LegacyOrder>): readonly BonField[] {
+  const fields: BonField[] = []
+  const push = (label: string, value: string, notes: readonly string[] = []) => {
+    if (value.trim() === '') return
+    fields.push({ label, value, notes: notes.filter((note) => note.trim() !== '') })
+  }
+
+  push('שם מלא', customerName(order))
+  push('טלפון', text(order.phone))
+  push(
+    'לאן המשלוח',
+    order.pickup === true ? 'איסוף עצמי' : text(order.place) || 'לא צוין יעד',
+    [
+      order.pickup !== true && text(order.time) ? `שעת הגעה: ${text(order.time)}` : '',
+      order.pickup !== true && text(order.address) ? `כתובת: ${text(order.address)}` : '',
+      ...savedDeliveryNotes(order),
+    ],
+  )
+  push('קבוצה', text(order.group))
+
+  const meals = displayQuantity(order.meals)
+  if (meals > 0) push('ארוחה זוגית', `×${meals}`)
+  const tableSettings = displayQuantity(order.aricha)
+  if (tableSettings > 0) push('עריכה', `${tableSettings} איש`)
+  const challahs = displayQuantity(order.challot)
+  if (challahs > 0) push('חלות', `${challahs} יחידות`)
+
+  push('סלטים', [
+    ...positiveSelectionLines(order.salads, 'o'),
+    ...positiveSelectionLines(order.salads, 'p').map((line) => `${line} — פינוק`),
+  ].join(', '))
+  push('מנה ראשונה', positiveSelectionLines(order.firsts).join(', '), [
+    text(order.heat) ? `חריפות הדג: ${text(order.heat)}` : '',
+    text(order.firstsNote),
+  ])
+  push('מנה עיקרית', positiveSelectionLines(order.mains).join(', '), [text(order.mainsNote)])
+  push('תוספת', positiveSelectionLines(order.sides).join(', '))
+  push('קינוח', positiveSelectionLines(order.desserts).join(', '))
+  push('אקסטרות', extraLines(order).join(', '))
+  push('תפריט צהריים', lunchTextLines(order).join(', '))
+  push('הערות', text(order.notes))
+
+  // A heat level or a note the kitchen must see, on an order that never chose
+  // the course it belongs to, would otherwise be dropped from the bon.
+  const orphanNotes = [
+    fields.some((field) => field.label === 'מנה ראשונה') ? '' : text(order.heat) ? `חריפות הדג: ${text(order.heat)}` : '',
+    fields.some((field) => field.label === 'מנה ראשונה') ? '' : text(order.firstsNote),
+    fields.some((field) => field.label === 'מנה עיקרית') ? '' : text(order.mainsNote),
+  ].filter((note) => note.trim() !== '')
+  if (orphanNotes.length > 0) push('הערות למנות', orphanNotes.join(' · '))
+
+  return fields
+}
+
+/** The date line a bon leads with, already localized. */
+export function bonServiceDate(order: Readonly<LegacyOrder>, locale = DEFAULT_LOCALE): string {
+  const rawDate = text(order.date)
+  if (rawDate === '') return 'ללא תאריך'
+  return isRealIsoDate(rawDate) ? localizedServiceDate(rawDate, locale) : rawDate
+}
+
+/** The payment lines the bon prints under the amount. */
+export function bonPaymentFields(order: Readonly<LegacyOrder>): readonly BonField[] {
+  const fields: BonField[] = []
+  const depositText = typeof order.deposit === 'number' ? String(order.deposit) : text(order.deposit)
+  if (depositText) fields.push({ label: 'מקדמה', value: depositText, notes: [] })
+  if (text(order.payMethod)) fields.push({ label: 'דרך תשלום', value: text(order.payMethod), notes: [] })
+  fields.push({ label: 'שולם', value: text(order.paid) || 'לא', notes: [] })
+  return fields
+}
+
 export function normalizeWhatsAppPhone(phone: string): string | null {
   let digits = phone.replace(/\D/g, '')
   if (digits === '') return null
