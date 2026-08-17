@@ -241,6 +241,11 @@ here, but a good future idea if Lin wants to track repeat customers/preferences 
 
 ## Next
 
+### Roadmap v3 — full collected/approved/rejected list lives in docs/product-roadmap-v3.md
+Collection-first rule (Moshe, explicit): collect ideas, build ONLY after he says build.
+Governing philosophy he chose: inline-edit everything (no edit screens) + drag-and-drop
+across the whole system.
+
 ### Approved by Moshe (2026-08-18, explicit "כן") — build next
 - Full safety net: every saved state change keeps a history snapshot server-side, with an
   admin UI to browse recent versions and restore one in a click ("גם אם תמחקי הכל בטעות,
