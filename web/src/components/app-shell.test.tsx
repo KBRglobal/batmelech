@@ -52,6 +52,27 @@ describe('AppShell', () => {
     expect(container.innerHTML).not.toContain('api.iconify.design')
   })
 
+  it('keeps its navigation chrome and full-screen height out of every print', () => {
+    // The chrome stays in the layout while hidden, so a bon used to leave a
+    // blank trailing page and a label roll could start past its first label.
+    const { container } = render(
+      <MemoryRouter initialEntries={[APP_ROUTES.today]}>
+        <AppShell>
+          <LocationProbe />
+        </AppShell>
+      </MemoryRouter>,
+    )
+
+    const root = container.firstElementChild!
+    expect(root.className).toContain('print:min-h-0')
+    for (const chrome of [container.querySelector('aside'), container.querySelector('header'), container.querySelector('nav[aria-label="ניווט ראשי לנייד"]')]) {
+      expect(chrome?.className).toContain('print:hidden')
+    }
+    const main = container.querySelector('#main-content')!
+    expect(main.className).toContain('print:min-h-0')
+    expect(main.className).toContain('print:pb-0')
+  })
+
   it('navigates through an operator link and updates its active state', async () => {
     const user = userEvent.setup()
 

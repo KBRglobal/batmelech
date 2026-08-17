@@ -112,7 +112,7 @@ async function handleLogout() {
 
 function DesktopNavigation() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-l border-border bg-card/90 px-5 py-6 shadow-[0_0_40px_rgba(99,33,40,0.04)] backdrop-blur-xl md:flex">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-l border-border bg-card/90 px-5 py-6 shadow-[0_0_40px_rgba(99,33,40,0.04)] backdrop-blur-xl md:flex print:hidden">
       <Link
         to={APP_ROUTES.today}
         aria-label="בת מלך — היום"
@@ -155,7 +155,7 @@ function DesktopNavigation() {
 
 function MobileHeader() {
   return (
-    <header className="sticky top-0 z-30 flex h-20 items-center justify-center border-b border-border bg-card/90 px-4 backdrop-blur-xl md:hidden">
+    <header className="sticky top-0 z-30 flex h-20 items-center justify-center border-b border-border bg-card/90 px-4 backdrop-blur-xl md:hidden print:hidden">
       <Link
         to={APP_ROUTES.today}
         aria-label="בת מלך — היום"
@@ -171,7 +171,7 @@ function MobileNavigation() {
   return (
     <nav
       aria-label="ניווט ראשי לנייד"
-      className="fixed inset-x-0 bottom-0 z-40 overflow-x-auto border-t border-border bg-card/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(99,33,40,0.08)] backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 overflow-x-auto border-t border-border bg-card/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(99,33,40,0.08)] backdrop-blur-xl md:hidden print:hidden"
     >
       <div className="mx-auto flex w-max min-w-full items-stretch justify-start gap-1">
         {PRIMARY_NAVIGATION.map((item) => (
@@ -207,12 +207,12 @@ function MobileNavigation() {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
+    <div className="flex min-h-screen bg-background text-foreground print:block print:min-h-0" dir="rtl">
       <DesktopNavigation />
 
       <div className="min-w-0 flex-1">
         <MobileHeader />
-        <main id="main-content" className="min-h-screen pb-28 md:pb-0">
+        <main id="main-content" className="min-h-screen pb-28 md:pb-0 print:min-h-0 print:pb-0">
           {children}
         </main>
       </div>
