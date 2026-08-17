@@ -10,6 +10,7 @@ export const APP_ROUTES = {
   orderImportReview: '/orders/new/import-review',
   preparation: '/preparation',
   preparationLabels: '/preparation/labels',
+  preparationBons: '/preparation/bons',
   deliveries: '/deliveries',
   finance: '/finance',
   invoices: '/invoices',

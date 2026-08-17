@@ -1,11 +1,13 @@
 /*
- * Printing a bon on the Brother QL-800.
+ * Printing bons on the Brother QL-800.
  *
  * The QL-800's continuous roll is 62mm wide with a free length, and CSS cannot
  * express that: `size: 62mm auto` is invalid and silently falls back to Letter,
- * which is how 62mm bons ended up laid out on A4 pages. So the roll length is
- * measured from the real content before every print and written into a
- * temporary `@page` rule that is removed again once printing ends.
+ * which is how 62mm bons ended up laid out on A4 pages. So every bon about to
+ * be printed is laid out off-screen at the exact roll width, and the longest
+ * one becomes a temporary `@page` rule that is removed again once printing
+ * ends. One `@page` rule covers the whole document, so a batch prints every bon
+ * at the length of its longest member.
  */
 
 export type BonMedia = 'roll' | 'page'
@@ -57,12 +59,17 @@ export const BON_PRINT_CSS = `
 ${rollMetrics('.bm-bon-roll')}
 @media print {
   body * { visibility: hidden !important; }
-  .bm-order-bon, .bm-order-bon * { visibility: visible !important; }
+  .bm-bon-sheet, .bm-bon-sheet * { visibility: visible !important; }
   .bm-no-print { display: none !important; }
   html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
-  .bm-order-bon { position:absolute; inset-block-start:0; inset-inline-start:0; }
+  .bm-bon-sheet {
+    position:absolute; inset-block-start:0; inset-inline-start:0;
+    display:block; margin:0; padding:0; gap:0;
+  }
+  .bm-order-bon { break-after:page; page-break-after:always; break-inside:auto; }
+  .bm-order-bon:last-child { break-after:auto; page-break-after:auto; }
   body[data-bm-bon-media="page"] .bm-order-bon {
-    width:100%; max-width:none; border:0; box-shadow:none; break-after:auto;
+    width:100%; max-width:none; border:0; box-shadow:none;
   }
 ${rollMetrics('body[data-bm-bon-media="roll"] .bm-order-bon')}
   /* The QL-800 is a monochrome thermal printer: brand maroon and muted grey
@@ -85,18 +92,23 @@ export function rememberBonMedia(media: BonMedia) {
 }
 
 /**
- * Lays the bon out at the exact printed roll width off-screen and returns the
- * length of roll it needs, in whole millimetres. Falls back to a usable length
- * whenever the browser cannot measure (no layout engine, detached node).
+ * Lays every bon out at the exact printed roll width off-screen and returns the
+ * length of roll the longest one needs, in whole millimetres. Falls back to a
+ * usable length whenever the browser cannot measure (no layout engine, detached
+ * nodes, nothing to print).
  */
-export function measureRollLengthMm(bon: Element | null): number {
-  if (!(bon instanceof HTMLElement)) return FALLBACK_ROLL_LENGTH_MM
-  const clone = bon.cloneNode(true) as HTMLElement
-  clone.classList.add('bm-bon-roll')
-  clone.setAttribute('aria-hidden', 'true')
-  document.body.append(clone)
-  const pixels = clone.getBoundingClientRect().height
-  clone.remove()
+export function measureRollLengthMm(bons: Iterable<Element> | Element | null): number {
+  const nodes = bons === null ? [] : bons instanceof Element ? [bons] : [...bons]
+  let pixels = 0
+  for (const node of nodes) {
+    if (!(node instanceof HTMLElement)) continue
+    const clone = node.cloneNode(true) as HTMLElement
+    clone.classList.add('bm-bon-roll')
+    clone.setAttribute('aria-hidden', 'true')
+    document.body.append(clone)
+    pixels = Math.max(pixels, clone.getBoundingClientRect().height)
+    clone.remove()
+  }
   if (!Number.isFinite(pixels) || pixels <= 0) return FALLBACK_ROLL_LENGTH_MM
   // A whole extra millimetre keeps a last line from being pushed onto a second
   // strip by rounding alone.
@@ -110,10 +122,10 @@ export function bonPageRule(media: BonMedia, rollLengthMm: number): string {
     : '@page { size: auto; margin: 12mm; }'
 }
 
-export function printBon(media: BonMedia, bon: Element | null) {
+export function printBons(media: BonMedia, bons: Iterable<Element> | Element | null) {
   const rule = document.createElement('style')
   rule.id = PAGE_RULE_ELEMENT_ID
-  rule.textContent = bonPageRule(media, measureRollLengthMm(bon))
+  rule.textContent = bonPageRule(media, measureRollLengthMm(bons))
   document.head.append(rule)
   document.body.dataset.bmBonMedia = media
 

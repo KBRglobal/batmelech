@@ -6,44 +6,14 @@ import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder } from '../domain/store.ts'
-
-/*
- * The stylesheet only exists while this screen is mounted, so the page rule is
- * scoped to label printing in practice. It must stay an unnamed `@page`: a named
- * page (`@page bm-ql800` + `page:bm-ql800`) is ignored by Chrome when the labels
- * live inside an out-of-flow box, and the sheet has to stay absolutely positioned
- * so the surrounding app chrome cannot push the first label off its own label.
- * With the named page the roll printed 62x29mm labels onto full Letter/A4 pages.
- */
-const QL800_PRINT_CSS = `
-.bm-label-sheet { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.bm-label-card { min-width:0; overflow:hidden; border:2px dotted currentColor; border-radius:16px; padding:18px 12px; background:white; }
-@media (max-width:420px) { .bm-label-sheet { grid-template-columns:1fr; } }
-@page { size:62mm 29mm; margin:0; }
-@media print {
-  html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
-  body * { visibility:hidden !important; }
-  .bm-label-sheet, .bm-label-sheet * { visibility:visible !important; }
-  body[data-bm-print-kind="bag"] .bm-preparation-labels { display:none !important; }
-  body[data-bm-print-kind="preparation"] .bm-bag-labels { display:none !important; }
-  body:not([data-bm-print-kind]) .bm-preparation-labels { display:none !important; }
-  .bm-label-sheet { position:absolute; inset:0; display:block; margin:0; }
-  .bm-label-card {
-    width:62mm; height:29mm; box-sizing:border-box; margin:0;
-    border:0; border-radius:0; padding:1.2mm 2.5mm; display:flex; flex-direction:column;
-    justify-content:center; gap:.3mm; overflow:hidden; page-break-after:always; break-after:page;
-    break-inside:avoid; color:#000; background:#fff;
-  }
-  .bm-label-card:last-child { page-break-after:auto; break-after:auto; }
-  .bm-label-brand { font-size:8.5pt; line-height:1.1; }
-  .bm-label-kosher { font-size:6pt; line-height:1.1; }
-  .bm-label-name { font-size:10pt; margin:.8mm 0 .3mm; line-height:1.12; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .bm-label-meta { font-size:7.5pt; line-height:1.18; overflow-wrap:anywhere; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .bm-label-guidance { margin-top:.8mm; padding-top:.8mm; border-top:.2mm dashed #333; font-size:5.5pt; line-height:1.15; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .bm-label-prep-details { font-size:6pt; line-height:1.12; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .bm-label-screen-only { display:none !important; }
-}
-`
+import {
+  LABEL_MEDIA_OPTIONS,
+  LABEL_PRINT_CSS,
+  type LabelMedia,
+  printLabels,
+  rememberLabelMedia,
+  rememberedLabelMedia,
+} from '../services/label-print.ts'
 
 const SAFE_ORDER_ID = /^(?!\.{1,2}$)[A-Za-z0-9][A-Za-z0-9._~-]{0,255}$/u
 const FORBIDDEN_ORDER_IDS = new Set(['__proto__', 'constructor', 'prototype'])
@@ -297,22 +267,12 @@ function PreparationLabel({ label }: { readonly label: PreparationLabelData }) {
   )
 }
 
-function printKind(kind: 'bag' | 'preparation') {
-  document.body.dataset.bmPrintKind = kind
-  const cleanup = () => {
-    delete document.body.dataset.bmPrintKind
-    window.removeEventListener('afterprint', cleanup)
-  }
-  window.addEventListener('afterprint', cleanup)
-  window.print()
-  window.setTimeout(cleanup, 3_000)
-}
-
 export function LabelsScreen() {
   const storeQuery = useStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const [revision, setRevision] = useState(0)
   const [printMessage, setPrintMessage] = useState('')
+  const [media, setMedia] = useState<LabelMedia>(rememberedLabelMedia())
 
   const orders = storeQuery.data?.data?.orders ?? EMPTY_ORDERS
   const dates = useMemo(() => [...new Set(orders.filter(active).map((order) => order.date).filter(realDate))].sort(), [orders])
@@ -390,18 +350,23 @@ export function LabelsScreen() {
       return
     }
     setPrintMessage('')
-    printKind(kind)
+    const sheet = kind === 'bag' ? '.bm-bag-labels' : '.bm-preparation-labels'
+    printLabels(kind, media, document.querySelectorAll(`${sheet} .bm-label-card`))
+  }
+  const selectMedia = (value: LabelMedia) => {
+    rememberLabelMedia(value)
+    setMedia(value)
   }
 
   return (
     <div className="min-h-full bg-background px-5 py-8 sm:px-8" dir="rtl">
-      <style>{QL800_PRINT_CSS}</style>
+      <style>{LABEL_PRINT_CSS}</style>
       <div className="bm-label-screen-only mx-auto max-w-6xl">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black text-accent-foreground">Brother QL-800 · גליל 62 מ&quot;מ</p>
             <h1 className="mt-2 font-heading text-3xl font-black text-primary">מדבקות הכנה ושקיות</h1>
-            <p className="mt-2 text-sm font-bold text-muted-foreground">ההדפסה מוגדרת למדבקה אחת בכל עמוד בגודל 62×29 מ&quot;מ.</p>
+            <p className="mt-2 text-sm font-bold text-muted-foreground">מדבקה אחת בכל עמוד, בגודל הגליל שנבחר.</p>
           </div>
           <Link to={{ pathname: APP_ROUTES.preparation, search: `?${new URLSearchParams({ date: selectedDate })}` }} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-card px-5 text-sm font-black text-primary hover:bg-secondary">
             <LocalIcon name="ph:arrow-left-bold" className="rotate-180 text-lg" />
@@ -421,6 +386,31 @@ export function LabelsScreen() {
           </select>
         </label>
 
+
+        <fieldset className="mt-6 rounded-3xl border border-border bg-card p-4">
+          <legend className="px-2 text-xs font-black text-muted-foreground">איזה גליל טעון במדפסת?</legend>
+          <div className="flex flex-wrap gap-2">
+            {LABEL_MEDIA_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-black ${media === option.value ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-primary hover:bg-secondary'}`}
+              >
+                <input
+                  type="radio"
+                  name="bm-label-media"
+                  value={option.value}
+                  checked={media === option.value}
+                  onChange={() => selectMedia(option.value)}
+                  className="sr-only"
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-3 text-xs font-bold text-muted-foreground">
+            {LABEL_MEDIA_OPTIONS.find((option) => option.value === media)?.hint}
+          </p>
+        </fieldset>
         <section className="mt-8 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

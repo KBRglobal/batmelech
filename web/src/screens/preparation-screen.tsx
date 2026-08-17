@@ -603,6 +603,10 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
             <LocalIcon name="ph:package-bold" className="text-lg" />
             <span>מדבקות הכנה</span>
           </Link>
+          <Link to={APP_ROUTES.preparationBons} className={linkClassName}>
+            <LocalIcon name="ph:receipt-bold" className="text-lg" />
+            <span>בונים להדפסה</span>
+          </Link>
           <label className="flex flex-col gap-1 text-xs font-black text-muted-foreground">
             תאריך הכנה
             <select

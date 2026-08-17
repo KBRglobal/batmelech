@@ -10,6 +10,7 @@ import { InvoicesScreen } from './screens/invoices-screen.tsx'
 import { LabelsScreen } from './screens/labels-screen.tsx'
 import { MenuEditorScreen } from './screens/menu-editor-screen.tsx'
 import { OrderBonScreen } from './screens/order-bon-screen.tsx'
+import { OrderBonsBatchScreen } from './screens/order-bons-batch-screen.tsx'
 import { OrderEditorScreen } from './screens/order-editor-screen.tsx'
 import { OrderImportReviewScreen } from './screens/order-import-review-screen.tsx'
 import { OrdersScreen } from './screens/orders-screen.tsx'
@@ -93,6 +94,10 @@ export function AppRoutes() {
         <Route
           path={APP_ROUTES.preparationLabels}
           element={<LabelsScreen />}
+        />
+        <Route
+          path={APP_ROUTES.preparationBons}
+          element={<OrderBonsBatchScreen />}
         />
         <Route path={APP_ROUTES.deliveries} element={<DeliveriesScreenWithSave />} />
         <Route path={APP_ROUTES.finance} element={<FinanceScreenWithSave />} />

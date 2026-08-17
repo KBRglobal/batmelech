@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../data/use-store.ts'
 import type { LegacyStore } from '../domain/store.ts'
+import { FALLBACK_LABEL_LENGTH_MM } from '../services/label-print.ts'
 import { LabelsScreen } from './labels-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
@@ -29,6 +30,8 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   delete document.body.dataset.bmPrintKind
+  delete document.body.dataset.bmLabelMedia
+  document.getElementById('bm-label-page-rule')?.remove()
 })
 beforeEach(() => mockedUseStore.mockReset())
 
@@ -58,8 +61,7 @@ describe('LabelsScreen', () => {
     }] } }))
     const { container } = renderLabels()
     const css = container.querySelector('style')?.textContent ?? ''
-    expect(css).toContain('@page { size:62mm 29mm; margin:0; }')
-    expect(css).toContain('width:62mm; height:29mm')
+    expect(css).toContain('width:62mm; height:29mm;')
     expect(css).toContain('page-break-after:always')
     // A named page is silently ignored for labels inside the absolutely positioned
     // sheet, which printed 62x29mm labels onto full Letter/A4 pages on the QL-800.
@@ -161,6 +163,37 @@ describe('LabelsScreen', () => {
     expect(document.body.dataset.bmPrintKind).toBe('preparation')
     expect(print).toHaveBeenCalledTimes(2)
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('prints the roll that is actually loaded and cleans the page rule up', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [{ id: 'roll-1', date: '2099-08-14', name: 'מדפיסה', meals: 1 }] } }))
+    vi.spyOn(window, 'print').mockImplementation(() => undefined)
+    renderLabels()
+    const user = userEvent.setup()
+
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: '62×29 מ"מ' }).checked).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'הדפסת מדבקות לשקיות' }))
+    expect(document.body.dataset.bmLabelMedia).toBe('die-cut-29')
+    expect(document.getElementById('bm-label-page-rule')?.textContent).toContain('@page { size: 62mm 29mm; margin: 0; }')
+    fireEvent(window, new Event('afterprint'))
+    expect(document.getElementById('bm-label-page-rule')).toBeNull()
+    expect(document.body.dataset.bmLabelMedia).toBeUndefined()
+
+    await user.click(screen.getByRole('radio', { name: '62×100 מ"מ' }))
+    await user.click(screen.getByRole('button', { name: 'הדפסת מדבקות לשקיות' }))
+    expect(document.getElementById('bm-label-page-rule')?.textContent).toContain('@page { size: 62mm 100mm; margin: 0; }')
+    fireEvent(window, new Event('afterprint'))
+
+    // The continuous roll has no fixed length, so it is measured from the labels
+    // themselves and the same length drives the card height.
+    await user.click(screen.getByRole('radio', { name: 'גליל רציף 62 מ"מ' }))
+    await user.click(screen.getByRole('button', { name: 'הדפסת מדבקות לשקיות' }))
+    const rule = document.getElementById('bm-label-page-rule')?.textContent ?? ''
+    expect(rule).toContain(`@page { size: 62mm ${FALLBACK_LABEL_LENGTH_MM}mm; margin: 0; }`)
+    expect(rule).toContain(`body[data-bm-label-media="continuous"] { --bm-label-length: ${FALLBACK_LABEL_LENGTH_MM}mm; }`)
+    fireEvent(window, new Event('afterprint'))
+
+    await user.click(screen.getByRole('radio', { name: '62×29 מ"מ' }))
   })
 
   it('keeps a browser-menu print limited to the bag sheet', () => {
