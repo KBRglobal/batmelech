@@ -888,17 +888,26 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
           <h1 className="font-heading text-3xl font-black tracking-tight text-primary sm:text-4xl">משלוחים ואיסופים</h1>
           <p className="mt-2 text-sm font-bold text-muted-foreground">יעדים, זמני אספקה וגבייה מתוך ההזמנות הפעילות.</p>
         </div>
-        <label className="flex flex-col gap-1 text-xs font-black text-muted-foreground">
-          תאריך אספקה
-          <select
-            aria-label="תאריך אספקה"
-            value={selectedGroup.key}
-            onChange={(event) => setSelectedGroupKey(event.currentTarget.value)}
-            className="min-h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs font-black text-muted-foreground">
+            תאריך אספקה
+            <select
+              aria-label="תאריך אספקה"
+              value={selectedGroup.key}
+              onChange={(event) => setSelectedGroupKey(event.currentTarget.value)}
+              className="min-h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              {dashboard.groups.map((group) => <option key={group.key} value={group.key}>{group.localizedDate}</option>)}
+            </select>
+          </label>
+          <Link
+            to={APP_ROUTES.deliveryPhotos}
+            className={actionClassName}
           >
-            {dashboard.groups.map((group) => <option key={group.key} value={group.key}>{group.localizedDate}</option>)}
-          </select>
-        </label>
+            <LocalIcon name="ph:image-bold" className="text-base" />
+            <span>תמונות מסירה</span>
+          </Link>
+        </div>
       </header>
 
       <div className="mt-8 space-y-8">

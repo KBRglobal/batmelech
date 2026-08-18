@@ -1,8 +1,8 @@
-# STATE — batmelech (updated: 2026-08-18 16:35)
+# STATE — batmelech (updated: 2026-08-18 17:40)
 
 ## Now (start here in a new session)
-Batch4 (where Claude stopped) is MERGED, TESTED and DEPLOYED. The remaining approved
-roadmap v3 items that do not depend on Moshe/Lin content are the next wave.
+Delivery-photos gallery is BUILT, TESTED and ready to deploy. Next content-independent
+roadmap item is copy-last-year holiday menu, then multi-currency display.
 
 ## Merged this session — batch4 into main (2026-08-18)
 Claude's in-progress `origin/wip/batch4-2026-08-14` branch was merged directly to
@@ -19,18 +19,22 @@ Claude's in-progress `origin/wip/batch4-2026-08-14` branch was merged directly t
 - **Customer outreach messages** — `web/src/domain/outreach-messages.ts`; deposit request,
   Google review request, and reorder-invite WhatsApp drafts for Lin.
 
-**Test/deploy state:** server 586 pass / 0 fail, web 780 pass / 0 fail,
-customer-site 5 pass. Deployed with `railway up --service app --detach`;
-verified `/healthz`, `/api/site/status`, `/site`, `/kitchen`.
+## Done this session — delivery-photos gallery
+- `server/business-data/delivery-photos-route.js`: staff-only `GET /api/delivery-photos`,
+  safe field set only, sorted by `deliveryProofAt` desc.
+- `web/src/screens/delivery-photos-screen.tsx`: grid gallery with empty state
+  "עדיין אין תמונות מסירה", linked from Deliveries screen header.
+- Route mounted behind decoy gate; `/api/delivery-photos` added to `PROTECTED_PREFIXES`.
+- Tests: `tests/delivery-photos-route.test.js` + `web/src/screens/delivery-photos-screen.test.tsx`.
+
+**Test state:** server 598 pass / 0 fail / 1 skipped, web 832 pass / 0 fail.
 
 ## Now — next wave (remaining approved roadmap v3 items, content-independent)
-The items below are approved/pending in `docs/product-roadmap-v3.md` and do NOT
-require real content from Moshe/Lin. Build next, in priority order:
-1. ~~Block-a-customer flag~~ — DONE (panel toggle + site checkout rejection + tests).
-2. ~~Closed-day calendar toggle~~ — DONE (panel per-day toggle + site checkout block + tests).
-3. ~~Minimum order amount for Abu Dhabi~~ — DONE (settings USD input + site checkout block + tests).
-4. ~~Weekly automatic backup to email~~ — DONE (settings email + Sunday 08:00 Dubai scheduler + Resend attachment + tests).
-5. Delivery-photos gallery.
+1. ~~Block-a-customer flag~~ — DONE.
+2. ~~Closed-day calendar toggle~~ — DONE.
+3. ~~Minimum order amount for Abu Dhabi~~ — DONE.
+4. ~~Weekly automatic backup to email~~ — DONE.
+5. ~~Delivery-photos gallery~~ — DONE.
 6. Copy-last-year holiday menu.
 7. Multi-currency display USD/EUR/AED.
 8. Auto image compression on upload.

@@ -93,6 +93,7 @@ function clearSessionCookie(response) {
 // point of having a separate, login-incapable page for real 404s.
 const PROTECTED_PREFIXES = [
   '/api/ai',
+  '/api/delivery-photos',
   '/api/hotels/search',
   '/api/invoices',
   '/api/holidays',

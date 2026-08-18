@@ -5,6 +5,7 @@ import useVersionedScreenSave from './data/versioned-screen-save.tsx'
 import { CustomersScreen } from './screens/customers-screen.tsx'
 import { CustomerOrderScreen } from './screens/customer-order-screen.tsx'
 import { DeliveriesScreen } from './screens/deliveries-screen.tsx'
+import { DeliveryPhotosScreen } from './screens/delivery-photos-screen.tsx'
 import { FinanceScreen } from './screens/finance-screen.tsx'
 import { ActivityScreen } from './screens/activity-screen.tsx'
 import { CalendarScreen } from './screens/calendar-screen.tsx'
@@ -75,6 +76,11 @@ function DeliveriesScreenWithSave() {
   return <DeliveriesScreen onSave={onSave} />
 }
 
+function DeliveryPhotosScreenWithSave() {
+  useVersionedScreenSave()
+  return <DeliveryPhotosScreen />
+}
+
 function PreparationScreenWithSave() {
   const { onSave } = useVersionedScreenSave()
   return <PreparationScreen onSave={onSave} />
@@ -120,6 +126,7 @@ export function AppRoutes() {
           element={<OrderBonsBatchScreen />}
         />
         <Route path={APP_ROUTES.deliveries} element={<DeliveriesScreenWithSave />} />
+        <Route path={APP_ROUTES.deliveryPhotos} element={<DeliveryPhotosScreenWithSave />} />
         <Route path={APP_ROUTES.finance} element={<FinanceScreenWithSave />} />
         <Route path={APP_ROUTES.insights} element={<InsightsScreen />} />
         <Route path={APP_ROUTES.activity} element={<ActivityScreen />} />

@@ -13,6 +13,7 @@ export const APP_ROUTES = {
   preparationLabels: '/preparation/labels',
   preparationBons: '/preparation/bons',
   deliveries: '/deliveries',
+  deliveryPhotos: '/delivery-photos',
   finance: '/finance',
   insights: '/insights',
   activity: '/activity',

@@ -49,6 +49,7 @@ const { createZiinaKeyRouter } = require('./server/business-data/ziina-key-route
 const { createStaffCredentialsRouter } = require('./server/auth/staff-credentials-route');
 const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-download-route');
 const { createInvoiceBrowseRouter } = require('./server/business-data/invoice-browse-route');
+const { createDeliveryPhotosRouter } = require('./server/business-data/delivery-photos-route');
 const { createMenuImageRouter } = require('./server/menu-image-route');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
@@ -452,6 +453,9 @@ if (stateRepository) {
     response.status(503).json({ error: 'state unavailable' });
   });
 }
+
+// --- Staff-only delivery proof photo gallery: read-only, safe field set only ---
+app.use('/api/delivery-photos', createDeliveryPhotosRouter({ repository: stateRepository }));
 
 // --- Permanent legacy manager backup: authenticated, same versioned state ---
 app.get(/^\/legacy$/, (req, res) => res.redirect(308, '/legacy/'));
