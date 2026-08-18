@@ -54,6 +54,11 @@ const FRESH_EXTRAS = [
   ['מיץ תפוזים', '1.4', 'ליטר', 990],
 ];
 
+// Pantry staples priced by Moshe.
+const PANTRY_EXTRAS = [
+  ['אורז', '20', 'ק"ג', 15000], // 20kg sack, 150 AED
+];
+
 // Brought from Israel by friends (₪≈AED) — recorded under the Rimon/kosher channel.
 const ISRAEL_EXTRAS = [
   ['בורגול', '1', 'ק"ג', 600],
@@ -129,6 +134,9 @@ async function main() {
     }
     for (const [name, packSize, packUnit, priceMinorUnits] of ISRAEL_EXTRAS) {
       upsert(name, packSize, packUnit, priceMinorUnits, 'rimon', 'מזווה');
+    }
+    for (const [name, packSize, packUnit, priceMinorUnits] of PANTRY_EXTRAS) {
+      upsert(name, packSize, packUnit, priceMinorUnits, 'nesto', 'יבשים');
     }
 
     const localState = { ...data, productLibrary: entries };
