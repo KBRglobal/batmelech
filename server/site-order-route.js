@@ -76,6 +76,17 @@ function dubaiDateString(now) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(now);
 }
 
+function digitsOnlyPhone(phone) {
+  return String(phone ?? '').replace(/\D/g, '');
+}
+
+function isPhoneBlocked(phone, settings) {
+  const normalized = digitsOnlyPhone(phone);
+  if (normalized === '') return false;
+  const list = settings && Array.isArray(settings.blockedPhones) ? settings.blockedPhones : [];
+  return list.some((entry) => typeof entry === 'string' && digitsOnlyPhone(entry) === normalized);
+}
+
 function orderId(now) {
   return `site-${now.getTime()}-${crypto.randomBytes(4).toString('hex')}`;
 }
@@ -197,6 +208,13 @@ function createSiteOrderRouter({ repository, logger = console, clock = () => new
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
       try {
         const current = await repository.loadState();
+        if (isPhoneBlocked(parsed.data.customer.phone, current.data.settings)) {
+          return response.status(403).json({
+            ok: false,
+            error: 'phone_blocked',
+            message: 'מספר הטלפון הזה אינו יכול לבצע הזמנות כרגע. נשמח לעזור בוואטסאפ.',
+          });
+        }
         // Capacity is re-checked on every attempt against the freshly loaded
         // state: two simultaneous checkouts race on saveState's revision
         // check, and the loser re-validates against a state that already

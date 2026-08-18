@@ -97,6 +97,9 @@ export const LegacySettingsSchema = z
     googleReviewUrl: z.string().optional(),
     meyDigestSentFor: z.string().optional(),
     meyPlataDigestSentFor: z.string().optional(),
+    // Operational lists managed from the panel, not the generic Settings form.
+    blockedPhones: z.array(z.string()).optional(),
+    closedDates: z.array(z.string()).optional(),
     meyPendingProof: z
       .object({ url: z.string(), at: z.number(), by: z.string().optional() })
       .nullable()

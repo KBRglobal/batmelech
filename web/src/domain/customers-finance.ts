@@ -1,4 +1,5 @@
 import { checkedAdd, requireNonNegativeSafeInteger } from './money.ts'
+import { digitsOnlyPhone, isPhoneBlocked } from './customers.ts'
 import { normalizeWhatsAppPhone } from './orders-dashboard.ts'
 import type { LegacyOrder, LegacyStore } from './store.ts'
 import type { VersionedStateEnvelope } from '../services/state-api.ts'
@@ -61,6 +62,7 @@ export interface CustomerDirectoryEntry {
   readonly telephoneHref: string | null
   readonly whatsappHref: string | null
   readonly vip: boolean
+  readonly blocked: boolean
   readonly notes: string
   readonly orderCount: number
   readonly activeOrderCount: number
@@ -153,6 +155,11 @@ export type CustomerMetadataUpdate =
       readonly kind: 'notes'
       readonly customerKey: string
       readonly notes: string
+    }
+  | {
+      readonly kind: 'blocked'
+      readonly customerKey: string
+      readonly blocked: boolean
     }
 
 export type ExpenseInputValidation =
@@ -574,6 +581,8 @@ export function applyCustomerMetadataToStore(
     if (typeof update.notes !== 'string' || update.notes.length > MAX_TEXT_LENGTH) {
       throw new RangeError('notes must be bounded text')
     }
+  } else if (update.kind === 'blocked') {
+    if (typeof update.blocked !== 'boolean') throw new TypeError('blocked must be boolean')
   } else {
     throw new TypeError('customer metadata update kind is not supported')
   }
@@ -582,10 +591,41 @@ export function applyCustomerMetadataToStore(
   const contexts = allContexts.filter((context) => context.identity.key === update.customerKey)
   if (contexts.length === 0) throw new RangeError('customerKey does not exist in the loaded store')
 
+  const nextStore = structuredClone(store) as LegacyStore
+
+  if (update.kind === 'blocked') {
+    const phoneDigits = new Set<string>()
+    for (const context of contexts) {
+      if (context.identity.rawPhoneDigits !== '') {
+        phoneDigits.add(context.identity.rawPhoneDigits)
+      }
+      if (context.identity.normalizedPhone !== null) {
+        phoneDigits.add(context.identity.normalizedPhone)
+      }
+    }
+    if (phoneDigits.size === 0) {
+      throw new RangeError('customer has no usable phone to block')
+    }
+    const settings = nextStore.settings ?? {}
+    const sourceList = Array.isArray(settings.blockedPhones) ? settings.blockedPhones : []
+    const blockedSet = new Set(sourceList.map((entry) => typeof entry === 'string' ? digitsOnlyPhone(entry) : '').filter(Boolean))
+    for (const digits of phoneDigits) {
+      if (update.blocked) {
+        blockedSet.add(digits)
+      } else {
+        blockedSet.delete(digits)
+      }
+    }
+    nextStore.settings = {
+      ...settings,
+      blockedPhones: [...blockedSet],
+    }
+    return nextStore
+  }
+
   const sourceMetadata = store.customerMeta ?? {}
   const compatibilityAliases = metaCandidates(contexts, allContexts)
   const targetKeys = [...new Set([update.customerKey, ...compatibilityAliases])]
-  const nextStore = structuredClone(store) as LegacyStore
   const nextMetadata = structuredClone(sourceMetadata) as Record<string, unknown>
 
   for (const key of targetKeys) {
@@ -774,6 +814,7 @@ export function buildCustomersDirectory(
       telephoneHref: normalizedPhone === null ? null : `tel:+${normalizedPhone}`,
       whatsappHref: normalizedPhone === null ? null : `https://wa.me/${normalizedPhone}`,
       vip: meta.vip,
+      blocked: isPhoneBlocked(phone, store),
       notes: meta.notes,
       orderCount: sorted.length,
       activeOrderCount: active.length,

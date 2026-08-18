@@ -68,6 +68,7 @@ const HE = {
   kitchenNotesPlaceholder: 'בלי חריף, אקסטרה מטבוחה...',
   infoWhatsApp: 'לאחר לחיצה על "אישור ושליחה", ההזמנה תיפתח כהודעת וואטסאפ מוכנה אל בת מלך לאישור סופי.',
   infoPayment: 'אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.',
+  phoneBlockedError: 'מספר הטלפון הזה אינו יכול לבצע הזמנות כרגע. נשמח לעזור בוואטסאפ.',
   submitCta: 'אישור ושליחת הזמנה',
   hintClosed: 'האתר לא מקבל הזמנות כרגע',
   hintShabbatClosed: 'המטבח שלנו שומר שבת — לא מקבלים הזמנות כרגע',
@@ -145,6 +146,7 @@ export const COPY: Record<Locale, typeof HE> = {
     kitchenNotesPlaceholder: 'No spicy, extra matbucha...',
     infoWhatsApp: 'When you tap "Confirm & Send", your order opens as a ready-made WhatsApp message to Bat Melech for final confirmation.',
     infoPayment: 'No payment is taken on the site. Payment is arranged directly with Bat Melech on WhatsApp — cash on delivery, bank transfer, Bit, or PayBox.',
+    phoneBlockedError: 'This phone number cannot place orders right now. We would be happy to help on WhatsApp.',
     submitCta: 'Confirm & Send Order',
     hintClosed: 'We are not taking orders right now',
     hintShabbatClosed: 'We keep Shabbat — we are not taking orders right now',
@@ -214,6 +216,7 @@ export const COPY: Record<Locale, typeof HE> = {
     kitchenNotesPlaceholder: 'Sans piment, extra matboukha...',
     infoWhatsApp: 'Après avoir appuyé sur « Confirmer et envoyer », votre commande s\'ouvrira sous forme de message WhatsApp prêt à envoyer à Bat Melech pour confirmation finale.',
     infoPayment: 'Aucun paiement sur le site. Le règlement se fait directement avec Bat Melech sur WhatsApp — espèces à la livraison, virement bancaire, Bit ou PayBox.',
+    phoneBlockedError: 'Ce numéro de téléphone ne peut pas passer de commande pour le moment. Nous serons ravis de vous aider sur WhatsApp.',
     submitCta: 'Confirmer et envoyer la commande',
     hintClosed: 'Le site ne prend pas de commandes pour le moment',
     hintShabbatClosed: 'Nous gardons le Shabbat — le site ne prend pas de commandes pour le moment',
@@ -327,6 +330,7 @@ export function Checkout() {
   // Empty = free time field (feature off, pickup, no date yet, or fetch
   // failed — fail open, availability must never block a purchase).
   const [deliveryWindows, setDeliveryWindows] = useState<DeliveryWindow[]>([])
+  const [orderError, setOrderError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isPickup || !customer.date) {
@@ -394,33 +398,45 @@ export function Checkout() {
     customer.time.trim() &&
     (isPickup || (isHotelMode ? hotel !== null : customer.address.trim()))
 
-  const submitOrderToKitchen = () => {
-    fetch('/api/site/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer: {
-          ...customer,
-          zone: isPickup ? undefined : customer.zone,
-          phone: `${customer.phoneCode}${customer.phone}`,
-          // Flat fields, all five together or none — that is what the order
-          // route accepts, and what the kitchen's delivery routing reads.
-          ...(hotel
-            ? {
-                hotelName: hotel.name,
-                hotelAddress: hotel.fullAddress,
-                hotelLatitude: hotel.latitude,
-                hotelLongitude: hotel.longitude,
-                hotelProviderId: hotel.id,
-              }
-            : {}),
-        },
-        lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
-        total,
-      }),
-    }).catch(() => {
+  const submitOrderToKitchen = async (): Promise<boolean> => {
+    setOrderError(null)
+    try {
+      const response = await fetch('/api/site/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: {
+            ...customer,
+            zone: isPickup ? undefined : customer.zone,
+            phone: `${customer.phoneCode}${customer.phone}`,
+            // Flat fields, all five together or none — that is what the order
+            // route accepts, and what the kitchen's delivery routing reads.
+            ...(hotel
+              ? {
+                  hotelName: hotel.name,
+                  hotelAddress: hotel.fullAddress,
+                  hotelLatitude: hotel.latitude,
+                  hotelLongitude: hotel.longitude,
+                  hotelProviderId: hotel.id,
+                }
+              : {}),
+          },
+          lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
+          total,
+        }),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        if (response.status === 403 && body.error === 'phone_blocked') {
+          setOrderError(t.phoneBlockedError)
+        }
+        return false
+      }
+      return true
+    } catch {
       // Best-effort — the WhatsApp message is the order of record either way.
-    })
+      return true
+    }
   }
 
   const orderMessage =
@@ -714,24 +730,28 @@ export function Checkout() {
 
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#F7ECE6]/90 backdrop-blur-xl border-t border-[#EDB2C1]/30 z-[100]">
         <div className="max-w-3xl mx-auto">
-          <a
-            href={canSubmit ? waLink(orderMessage) : undefined}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => {
-              if (!canSubmit) {
-                e.preventDefault()
-                return
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={async () => {
+              if (!canSubmit) return
+              const accepted = await submitOrderToKitchen()
+              if (accepted) {
+                window.open(waLink(orderMessage), '_blank', 'noopener,noreferrer')
+                clear()
               }
-              submitOrderToKitchen()
-              clear()
             }}
             className={`w-full py-6 rounded-[2.5rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 group ${
               canSubmit ? 'bg-[#3B151A] text-white hover:bg-black' : 'bg-[#3B151A]/30 text-white/60 cursor-not-allowed'
             }`}
           >
             {t.submitCta} <Icon icon="ph:check-circle-fill" className="text-3xl group-hover:scale-125 transition-transform" />
-          </a>
+          </button>
+          {orderError && (
+            <p className="text-center text-sm font-black text-[#8D182C] mt-3" role="alert">
+              {orderError}
+            </p>
+          )}
           {!canSubmit && (
             <p className="text-center text-xs font-bold text-[#8D182C] mt-3">
               {shabbatClosed

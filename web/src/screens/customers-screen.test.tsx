@@ -495,6 +495,26 @@ describe('CustomersScreen', () => {
     })
   })
 
+  it('blocks and unblocks a customer phone through the settings blockedPhones list', async () => {
+    const store = {
+      orders: [{ id: 'real', name: 'לקוחה', phone: '0501234567' }],
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store, revision: 7 }))
+    const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderCustomers(onSave)
+
+    await user.click(screen.getByRole('button', { name: 'חסימה עבור לקוחה' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.settings?.blockedPhones).toContain('0501234567')
+    expect(onSave.mock.calls[0]![0].nextStore.settings?.blockedPhones).toContain('972501234567')
+    expect(await screen.findByText('חסום')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'ביטול חסימה עבור לקוחה' }))
+    expect(onSave).toHaveBeenCalledTimes(2)
+    expect(onSave.mock.calls[1]![0].nextStore.settings?.blockedPhones).toEqual([])
+  })
+
   it('retains the note draft and performs zero writes when the loaded envelope becomes stale', async () => {
     const store = { orders: [{ id: 'real', name: 'לקוחה', phone: '0501234567' }] } as LegacyStore
     const onSave = vi.fn<CustomerFinanceSaveHandler>().mockResolvedValue(undefined)

@@ -170,6 +170,7 @@ function CustomerCard({
   onNotesChange,
   onSaveNotes,
   onToggleVip,
+  onToggleBlocked,
 }: {
   customer: CustomerDirectoryEntry
   outstandingMinorUnits: number | null
@@ -179,6 +180,7 @@ function CustomerCard({
   onNotesChange: (notes: string) => void
   onSaveNotes: () => void
   onToggleVip: () => void
+  onToggleBlocked: () => void
 }) {
   const saving = saveState.kind === 'saving'
   // Reuse the directory's outbound gate: no whatsappHref means the phone is not
@@ -204,6 +206,11 @@ function CustomerCard({
               {customer.hasUpcomingOrder && (
                 <span className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-black text-emerald-700">
                   הזמנה קרובה
+                </span>
+              )}
+              {customer.blocked && (
+                <span className="rounded-lg border border-rose-100 bg-rose-50 px-2.5 py-1 text-[0.6875rem] font-black text-destructive">
+                  חסום
                 </span>
               )}
               <OutstandingChip outstandingMinorUnits={outstandingMinorUnits} />
@@ -287,6 +294,19 @@ function CustomerCard({
               className="min-h-10 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-black text-primary hover:bg-secondary disabled:cursor-wait disabled:opacity-50"
             >
               {customer.vip ? 'הסרת VIP' : 'סימון VIP'}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleBlocked}
+              disabled={saving}
+              aria-label={`${customer.blocked ? 'ביטול חסימה' : 'חסימה'} עבור ${customer.name}`}
+              className={`min-h-10 w-full rounded-xl border px-4 py-2.5 text-xs font-black disabled:cursor-wait disabled:opacity-50 ${
+                customer.blocked
+                  ? 'border-rose-200 bg-rose-50 text-destructive hover:bg-rose-100'
+                  : 'border-border bg-card text-primary hover:bg-secondary'
+              }`}
+            >
+              {customer.blocked ? 'ביטול חסימה' : 'חסימה'}
             </button>
           </div>
 
@@ -653,6 +673,13 @@ export function CustomersScreen({ onSave }: { readonly onSave?: CustomerFinanceS
                     kind: 'vip',
                     customerKey: customer.key,
                     vip: !customer.vip,
+                  })
+                }}
+                onToggleBlocked={() => {
+                  void saveCustomer(customer, {
+                    kind: 'blocked',
+                    customerKey: customer.key,
+                    blocked: !customer.blocked,
                   })
                 }}
               />
