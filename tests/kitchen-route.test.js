@@ -132,11 +132,12 @@ test('kitchen state is a strict whitelist — no phones, payments, or notes leav
     const order = body.data.orders[0];
     assert.equal(order.id, 'a1');
     assert.deepEqual(order.mains, { 'עוף': 3 });
-    for (const forbidden of ['phone', 'email', 'address', 'notes', 'total', 'paid', 'payMethod', 'name']) {
+    assert.equal(order.name, 'קטי סודי'); // the cook needs to see whose order it is
+    for (const forbidden of ['phone', 'email', 'address', 'notes', 'total', 'paid', 'payMethod']) {
       assert.equal(order[forbidden], undefined, `${forbidden} must not be exposed to the kitchen surface`);
     }
     const serialized = JSON.stringify(body);
-    assert.doesNotMatch(serialized, /971500000000|secret@example|סודי, חדר|הערה פרטית/u);
+    assert.doesNotMatch(serialized, /971500000000|secret@example|חדר 12|הערה פרטית/u);
   } finally {
     site.close();
   }
@@ -221,5 +222,47 @@ test('kitchen app serves the login page without a session and the bundle with on
   } finally {
     site.close();
     fs.rmSync(reactRoot, { recursive: true, force: true });
+  }
+});
+
+test('kitchen one-tap order status is bounded to the known statuses', async () => {
+  const repository = fakeRepository(kitchenState());
+  const site = await serve((app) => {
+    app.use('/api/kitchen/login', createKitchenLoginRouter({ kitchenUser: 'lin', kitchenPass: 'lin123', sessionSecret: SECRET }));
+    app.use('/api/kitchen', createKitchenApiRouter({ repository, sessionSecret: SECRET, logger: { error() {} } }));
+  });
+  try {
+    const cookie = await loginCookie(site.url(''));
+
+    const ok = await fetch(site.url('/api/kitchen/order-status'), {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: 'a1', status: 'מוכנה' }),
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(repository._current().orders[0].status, 'מוכנה');
+
+    const badStatus = await fetch(site.url('/api/kitchen/order-status'), {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: 'a1', status: 'בוטלה' }),
+    });
+    assert.equal(badStatus.status, 400);
+
+    const missingOrder = await fetch(site.url('/api/kitchen/order-status'), {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: 'nope', status: 'מוכנה' }),
+    });
+    assert.equal(missingOrder.status, 409);
+
+    const anonymous = await fetch(site.url('/api/kitchen/order-status'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: 'a1', status: 'מוכנה' }),
+    });
+    assert.equal(anonymous.status, 401);
+  } finally {
+    site.close();
   }
 });

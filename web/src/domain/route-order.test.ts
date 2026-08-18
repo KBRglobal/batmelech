@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildMultiStopMapsUrl, suggestRouteOrder } from './route-order.ts'
+import {
+  applyRouteOverride,
+  buildMultiStopMapsUrl,
+  readRouteOverride,
+  stopCoordinates,
+  suggestRouteOrder,
+} from './route-order.ts'
 
 interface TestStop {
   readonly id: string
@@ -100,6 +106,98 @@ describe('suggestRouteOrder', () => {
 
   it('returns an empty route for no stops', () => {
     expect(suggestRouteOrder<TestStop>([])).toEqual([])
+  })
+})
+
+describe('applyRouteOverride', () => {
+  const suggested = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }] as const
+
+  it('puts overridden stops first in the override sequence', () => {
+    expect(applyRouteOverride(suggested, ['d', 'b', 'a', 'c'])).toEqual([
+      { id: 'd' },
+      { id: 'b' },
+      { id: 'a' },
+      { id: 'c' },
+    ])
+  })
+
+  it('ignores override ids that no longer exist and never drops a stop', () => {
+    expect(applyRouteOverride(suggested, ['gone', 'c', 'also-gone', 'a'])).toEqual([
+      { id: 'c' },
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'd' },
+    ])
+  })
+
+  it('appends stops missing from the override in their suggested relative order', () => {
+    expect(applyRouteOverride(suggested, ['c'])).toEqual([
+      { id: 'c' },
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'd' },
+    ])
+  })
+
+  it('returns the suggested order untouched for a null or empty override', () => {
+    expect(applyRouteOverride(suggested, null)).toBe(suggested)
+    expect(applyRouteOverride(suggested, undefined)).toBe(suggested)
+    expect(applyRouteOverride(suggested, [])).toBe(suggested)
+  })
+
+  it('never matches a numeric or missing id against a string override id', () => {
+    const stops = [{ id: 7 }, {}, { id: '7' }] as const
+    expect(applyRouteOverride(stops, ['7'])).toEqual([{ id: '7' }, { id: 7 }, {}])
+  })
+
+  it('uses each stop at most once even when the override repeats an id', () => {
+    const stops = [{ id: 'twin' }, { id: 'twin' }, { id: 'solo' }] as const
+    const routed = applyRouteOverride(stops, ['twin', 'twin', 'twin'])
+    expect(routed).toHaveLength(3)
+    expect(routed).toEqual([{ id: 'twin' }, { id: 'twin' }, { id: 'solo' }])
+  })
+
+  it('does not mutate the suggested order', () => {
+    const stops = [{ id: 'a' }, { id: 'b' }]
+    const snapshot = structuredClone(stops)
+    applyRouteOverride(stops, ['b', 'a'])
+    expect(stops).toEqual(snapshot)
+  })
+})
+
+describe('readRouteOverride', () => {
+  it('reads the stored id list for the requested date', () => {
+    expect(readRouteOverride({ '2099-08-14': ['b', 'a'] }, '2099-08-14')).toEqual(['b', 'a'])
+  })
+
+  it('returns null when the date has no entry', () => {
+    expect(readRouteOverride({ '2099-08-15': ['b'] }, '2099-08-14')).toBeNull()
+    expect(readRouteOverride({}, '2099-08-14')).toBeNull()
+    expect(readRouteOverride(undefined, '2099-08-14')).toBeNull()
+  })
+
+  it('rejects malformed override data instead of trusting it', () => {
+    expect(readRouteOverride('not-an-object', '2099-08-14')).toBeNull()
+    expect(readRouteOverride(['a'], '2099-08-14')).toBeNull()
+    expect(readRouteOverride({ '2099-08-14': 'not-an-array' }, '2099-08-14')).toBeNull()
+    expect(readRouteOverride({ '2099-08-14': [] }, '2099-08-14')).toBeNull()
+    expect(readRouteOverride({ '2099-08-14': [1, null, {}] }, '2099-08-14')).toBeNull()
+  })
+
+  it('keeps only string ids out of a mixed array', () => {
+    expect(readRouteOverride({ '2099-08-14': ['a', 7, null, 'b'] }, '2099-08-14')).toEqual(['a', 'b'])
+  })
+})
+
+describe('stopCoordinates', () => {
+  it('returns validated coordinates and null for unusable values', () => {
+    expect(stopCoordinates({ hotelLatitude: 25.2, hotelLongitude: 55.3 })).toEqual({
+      latitude: 25.2,
+      longitude: 55.3,
+    })
+    expect(stopCoordinates({ hotelLatitude: 999, hotelLongitude: 55.3 })).toBeNull()
+    expect(stopCoordinates({ hotelLatitude: '25.2', hotelLongitude: 55.3 })).toBeNull()
+    expect(stopCoordinates({})).toBeNull()
   })
 })
 

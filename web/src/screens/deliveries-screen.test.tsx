@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -351,6 +351,174 @@ describe('DeliveriesScreen', () => {
     expect(
       [...document.querySelectorAll('article ol > li')].map((stop) => stop.querySelector('span')?.textContent),
     ).toEqual(['1', '2'])
+  })
+
+  it('renders the deliveries map with unlocated stops listed, and no map without coordinates', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          {
+            id: 'located', date: '2099-08-14', name: 'לקוחה ממופה', place: 'מלון ממופה',
+            hotelLatitude: 25.21, hotelLongitude: 55.28, time: '10:00',
+          },
+          { id: 'unlocated', date: '2099-08-14', name: 'לקוחה בלי מיקום', place: 'מלון עלום', time: '11:00' },
+        ],
+      },
+    }))
+    const withMap = renderDeliveries()
+
+    expect(screen.getByRole('region', { name: 'מפת המשלוחים' })).toBeTruthy()
+    expect(screen.getByTestId('deliveries-map-canvas')).toBeTruthy()
+    expect(screen.getByText('בלי מיקום במפה: לקוחה בלי מיקום')).toBeTruthy()
+    withMap.unmount()
+
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{ id: 'unlocated', date: '2099-08-14', name: 'לקוחה בלי מיקום', place: 'מלון עלום' }],
+      },
+    }))
+    renderDeliveries()
+    expect(screen.queryByRole('region', { name: 'מפת המשלוחים' })).toBeNull()
+    expect(screen.queryByText(/בלי מיקום במפה/)).toBeNull()
+  })
+
+  it('applies a saved manual override to the route order and shows the manual badge', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          { id: 'first', date: '2099-08-14', name: 'ראשונה בזמן', place: 'מלון ראשון', time: '10:00' },
+          { id: 'second', date: '2099-08-14', name: 'שנייה בזמן', place: 'מלון שני', time: '11:00' },
+        ],
+        settings: { routeOverrides: { '2099-08-14': ['second', 'ghost', 'first'] } },
+      },
+    }))
+    renderDeliveries()
+
+    expect(screen.getByText('סדר ידני')).toBeTruthy()
+    expect([...document.querySelectorAll('article h2')].map((heading) => heading.textContent))
+      .toEqual(['מלון שני', 'מלון ראשון'])
+    expect(
+      [...document.querySelectorAll('article ol > li')].map((stop) => stop.querySelector('span')?.textContent),
+    ).toEqual(['1', '2'])
+  })
+
+  it('hides the manual badge and the reorder controls without an override or a save handler', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          { id: 'first', date: '2099-08-14', name: 'ראשונה בזמן', place: 'מלון ראשון', time: '10:00' },
+          { id: 'second', date: '2099-08-14', name: 'שנייה בזמן', place: 'מלון שני', time: '11:00' },
+        ],
+      },
+    }))
+    renderDeliveries()
+
+    expect(screen.queryByText('סדר ידני')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'חזרה לסדר המוצע' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /לשינוי סדר המסלול/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /במסלול$/ })).toBeNull()
+  })
+
+  it('persists the new order through the arrows and reflects the manual order after the save', async () => {
+    const store = {
+      orders: [
+        { id: 'first', date: '2099-08-14', name: 'ראשונה בזמן', place: 'מלון ראשון', time: '10:00' },
+        { id: 'second', date: '2099-08-14', name: 'שנייה בזמן', place: 'מלון שני', time: '11:00' },
+      ],
+      settings: { keepMe: true },
+    } satisfies LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderDeliveries(onSave)
+
+    await userEvent.setup().click(
+      screen.getByRole('button', { name: 'העברת ראשונה בזמן מאוחר יותר במסלול' }),
+    )
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const request = onSave.mock.calls[0]![0]
+    expect(request.reason).toBe('deliveries')
+    expect(request.nextStore).toEqual({
+      ...store,
+      settings: { keepMe: true, routeOverrides: { '2099-08-14': ['second', 'first'] } },
+    })
+    expect(request.nextStore.orders).toEqual(store.orders)
+    expect(screen.getByText('סדר המסלול נשמר.')).toBeTruthy()
+    expect(screen.getByText('סדר ידני')).toBeTruthy()
+    expect([...document.querySelectorAll('article h2')].map((heading) => heading.textContent))
+      .toEqual(['מלון שני', 'מלון ראשון'])
+  })
+
+  it('persists a dragged stop at its drop position', async () => {
+    const store = {
+      orders: [
+        { id: 'first', date: '2099-08-14', name: 'ראשונה בזמן', place: 'מלון ראשון', time: '10:00' },
+        { id: 'second', date: '2099-08-14', name: 'שנייה בזמן', place: 'מלון שני', time: '11:00' },
+        { id: 'third', date: '2099-08-14', name: 'שלישית בזמן', place: 'מלון שלישי', time: '12:00' },
+      ],
+    } satisfies LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderDeliveries(onSave)
+
+    const handle = screen.getByRole('button', { name: 'גרירת שלישית בזמן לשינוי סדר המסלול' })
+    fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: 'move' } })
+    const target = screen
+      .getByRole('button', { name: 'גרירת ראשונה בזמן לשינוי סדר המסלול' })
+      .closest('li')!
+    fireEvent.dragOver(target)
+    fireEvent.drop(target)
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.settings).toEqual({
+      routeOverrides: { '2099-08-14': ['third', 'first', 'second'] },
+    })
+    expect(await screen.findByText('סדר המסלול נשמר.')).toBeTruthy()
+    expect([...document.querySelectorAll('article h2')].map((heading) => heading.textContent))
+      .toEqual(['מלון שלישי', 'מלון ראשון', 'מלון שני'])
+  })
+
+  it('deletes only the selected date override when returning to the suggested order', async () => {
+    const store = {
+      orders: [
+        { id: 'first', date: '2099-08-14', name: 'ראשונה בזמן', place: 'מלון ראשון', time: '10:00' },
+        { id: 'second', date: '2099-08-14', name: 'שנייה בזמן', place: 'מלון שני', time: '11:00' },
+      ],
+      settings: { routeOverrides: { '2099-08-14': ['second', 'first'], '2099-09-01': ['other'] } },
+    } satisfies LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderDeliveries(onSave)
+
+    expect(screen.getByText('סדר ידני')).toBeTruthy()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'חזרה לסדר המוצע' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.settings).toEqual({
+      routeOverrides: { '2099-09-01': ['other'] },
+    })
+    expect(screen.getByText('חזרנו לסדר המוצע.')).toBeTruthy()
+    expect(screen.queryByText('סדר ידני')).toBeNull()
+    expect([...document.querySelectorAll('article h2')].map((heading) => heading.textContent))
+      .toEqual(['מלון ראשון', 'מלון שני'])
+  })
+
+  it('drops the whole routeOverrides object when the last override is removed', async () => {
+    const store = {
+      orders: [
+        { id: 'first', date: '2099-08-14', name: 'ראשונה בזמן', place: 'מלון ראשון', time: '10:00' },
+        { id: 'second', date: '2099-08-14', name: 'שנייה בזמן', place: 'מלון שני', time: '11:00' },
+      ],
+      settings: { keepMe: true, routeOverrides: { '2099-08-14': ['second', 'first'] } },
+    } satisfies LegacyStore
+    const onSave = successfulSave()
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderDeliveries(onSave)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'חזרה לסדר המוצע' }))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![0].nextStore.settings).toEqual({ keepMe: true })
   })
 
   it('shows the courier check-in badge and a validated delivery proof link', () => {

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, Routes, Route, useLocation } from 'react-router'
+import { ConciergeChat } from './components/concierge-chat'
 import { FloatingCartBar } from './components/floating-cart-bar'
 import { SiteBanner } from './components/site-banner'
 import { DeviceLocaleRedirect, LocaleLayout, canonicalPath, localizedHref, type Locale } from './locale-context'
@@ -204,6 +205,7 @@ function LocaleOutlet({ showFloatingCart }: { readonly showFloatingCart: boolean
     <>
       <Outlet />
       {showFloatingCart && <FloatingCartBar />}
+      <ConciergeChat />
     </>
   )
 }

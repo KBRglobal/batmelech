@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { z } = require('zod');
+const { checkSubmissionWindow } = require('./delivery-windows');
 
 const MAX_ATTEMPTS = 5;
 const CANONICAL_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -173,6 +174,14 @@ function createSiteOrderRouter({ repository, logger = console }) {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
       try {
         const current = await repository.loadState();
+        // Capacity is re-checked on every attempt against the freshly loaded
+        // state: two simultaneous checkouts race on saveState's revision
+        // check, and the loser re-validates against a state that already
+        // contains the winner's order — a full window can never oversell.
+        const windowCheck = checkSubmissionWindow(current.data, parsed.data.customer);
+        if (windowCheck && !windowCheck.ok) {
+          return response.status(409).json({ error: windowCheck.error });
+        }
         const localState = { ...current.data, orders: [...current.data.orders, legacyOrder] };
         const saved = await repository.saveState({
           baseState: current.data,

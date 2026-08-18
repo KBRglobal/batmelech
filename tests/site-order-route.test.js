@@ -185,3 +185,140 @@ test('a hotel cannot be attached to a pickup order', async () => {
     assert.equal(repository.saved.length, 0);
   });
 });
+
+// --- delivery window capacity -------------------------------------------------
+
+const WINDOWS = Object.freeze([
+  Object.freeze({ key: 'noon', start: '12:00', end: '14:00', capacity: 2 }),
+  Object.freeze({ key: 'evening', start: '18:00', end: '20:00', capacity: 1 }),
+]);
+
+function windowOrder(time) {
+  return {
+    id: `existing-${time}`,
+    date: '2026-08-20',
+    time,
+    name: 'לקוח קיים',
+    address: 'מרינה, בניין 7',
+    status: 'חדשה',
+  };
+}
+
+// Like fakeRepository, but with configurable state — and `states` may hold a
+// sequence: each loadState hands out the next snapshot, so a test can model
+// another checkout landing between two attempts.
+function statefulRepository(states, { failSaves = 0 } = {}) {
+  const snapshots = Array.isArray(states) ? [...states] : [states];
+  let remainingFailures = failSaves;
+  const saved = [];
+  return {
+    saved,
+    async loadState() {
+      const data = snapshots.length > 1 ? snapshots.shift() : snapshots[0];
+      return { data, revision: 1, hash: 'h' };
+    },
+    async saveState({ localState }) {
+      if (remainingFailures > 0) {
+        remainingFailures -= 1;
+        return { ok: false };
+      }
+      saved.push(localState);
+      return { ok: true };
+    },
+  };
+}
+
+test('a delivery inside a window with remaining capacity is accepted', async () => {
+  const repository = statefulRepository({
+    orders: [windowOrder('12:15')],
+    settings: { deliveryWindows: [...WINDOWS] },
+  });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '12:30' }));
+    assert.equal(response.status, 201);
+    assert.equal(repository.saved.at(-1).orders.length, 2);
+  });
+});
+
+test('a delivery into a full window is refused with window_full and never saved', async () => {
+  const repository = statefulRepository({
+    orders: [windowOrder('18:10')],
+    settings: { deliveryWindows: [...WINDOWS] },
+  });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '18:30' }));
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: 'window_full' });
+    assert.equal(repository.saved.length, 0);
+  });
+});
+
+test('a delivery time outside every window is refused with invalid_window', async () => {
+  const repository = statefulRepository({ orders: [], settings: { deliveryWindows: [...WINDOWS] } });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '16:00' }));
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: 'invalid_window' });
+    assert.equal(repository.saved.length, 0);
+  });
+});
+
+test('cancelled orders free their slot in the window', async () => {
+  const repository = statefulRepository({
+    orders: [{ ...windowOrder('18:10'), status: 'בוטלה' }],
+    settings: { deliveryWindows: [...WINDOWS] },
+  });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '18:30' }));
+    assert.equal(response.status, 201);
+  });
+});
+
+test('pickup orders ignore the windows entirely', async () => {
+  const repository = statefulRepository({
+    orders: [windowOrder('18:10')],
+    settings: { deliveryWindows: [...WINDOWS] },
+  });
+  await withServer(repository, async (origin) => {
+    // 18:30 sits in the full evening window — irrelevant for a pickup.
+    const response = await postOrder(origin, submission({ fulfillment: 'pickup', time: '18:30' }));
+    assert.equal(response.status, 201);
+  });
+});
+
+test('a delivery without a time passes through even when windows are configured', async () => {
+  const repository = statefulRepository({ orders: [], settings: { deliveryWindows: [...WINDOWS] } });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '' }));
+    assert.equal(response.status, 201);
+  });
+});
+
+test('no windows configured keeps intake behavior unchanged (feature off)', async () => {
+  const repository = statefulRepository({ orders: [], settings: {} });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '16:00' }));
+    assert.equal(response.status, 201);
+  });
+});
+
+test('two simultaneous checkouts cannot oversell the last slot', async () => {
+  // Attempt 1: the window still has its last slot, but the save loses the
+  // revision race (another checkout committed first). Attempt 2 loads the
+  // fresh state — which now holds the winner's order — and must 409, never
+  // append a second order into a window of capacity 1.
+  const settings = { deliveryWindows: [...WINDOWS] };
+  const repository = statefulRepository(
+    [
+      { orders: [], settings },
+      { orders: [windowOrder('18:10')], settings },
+    ],
+    { failSaves: 1 },
+  );
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה', time: '18:30' }));
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: 'window_full' });
+    assert.equal(repository.saved.length, 0);
+  });
+});

@@ -78,6 +78,10 @@ const HE = {
   hotelEmpty: 'לא מצאנו מלון בשם הזה. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.',
   hotelError: 'חיפוש המלונות לא זמין כרגע. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.',
   hotelClearAria: 'ביטול בחירת המלון',
+  // Delivery time windows: shown only when the kitchen configured windows for
+  // the chosen date; otherwise the free time field stays.
+  windowRemaining: (remaining: number) => (remaining === 1 ? 'נותר מקום אחרון' : `נותרו ${remaining}`),
+  windowFull: 'מלא',
   // WhatsApp handoff message. Hebrew keeps the original wording; en/fr are
   // written in the customer's language while each dish line carries the
   // canonical Hebrew name in parentheses so the kitchen always understands.
@@ -150,6 +154,8 @@ export const COPY: Record<Locale, typeof HE> = {
     hotelEmpty: 'We could not find a hotel by that name. You can switch to "Other address" and type the full address.',
     hotelError: 'Hotel search is unavailable right now. You can switch to "Other address" and type the full address.',
     hotelClearAria: 'Clear hotel selection',
+    windowRemaining: (remaining: number) => (remaining === 1 ? 'Last spot left' : `${remaining} left`),
+    windowFull: 'Full',
     waHeader: 'New order from the website — Bat Melech',
     waTotal: 'Total',
     waName: 'Name',
@@ -216,6 +222,8 @@ export const COPY: Record<Locale, typeof HE> = {
     hotelEmpty: 'Nous n\'avons pas trouvé d\'hôtel à ce nom. Vous pouvez passer à « Autre adresse » et saisir l\'adresse complète.',
     hotelError: 'La recherche d\'hôtels est indisponible pour le moment. Vous pouvez passer à « Autre adresse » et saisir l\'adresse complète.',
     hotelClearAria: 'Annuler la sélection de l\'hôtel',
+    windowRemaining: (remaining: number) => (remaining === 1 ? 'Dernière place restante' : `${remaining} restants`),
+    windowFull: 'Complet',
     waHeader: 'Nouvelle commande depuis le site — Bat Melech',
     waTotal: 'Total',
     waName: 'Nom',
@@ -232,6 +240,38 @@ export const COPY: Record<Locale, typeof HE> = {
 
 function dubaiToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date())
+}
+
+// --- delivery time windows ----------------------------------------------------
+// When the kitchen configured windows, the free time input becomes window
+// buttons with live remaining capacity. Any failure (fetch, malformed page)
+// falls back to the free time field — availability must never block a purchase.
+
+interface DeliveryWindow {
+  readonly key: string
+  readonly start: string
+  readonly end: string
+  readonly remaining: number
+}
+
+const WINDOW_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
+const MAX_WINDOWS = 20
+
+function parseDeliveryWindows(value: unknown): DeliveryWindow[] | null {
+  if (!value || typeof value !== 'object') return null
+  const windows = (value as { windows?: unknown }).windows
+  if (!Array.isArray(windows) || windows.length > MAX_WINDOWS) return null
+  const parsed: DeliveryWindow[] = []
+  for (const row of windows) {
+    if (!row || typeof row !== 'object') return null
+    const { key, start, end, remaining } = row as Record<string, unknown>
+    if (typeof key !== 'string' || key.length === 0 || key.length > 64) return null
+    if (typeof start !== 'string' || !WINDOW_TIME_PATTERN.test(start)) return null
+    if (typeof end !== 'string' || !WINDOW_TIME_PATTERN.test(end)) return null
+    if (typeof remaining !== 'number' || !Number.isInteger(remaining) || remaining < 0) return null
+    parsed.push({ key, start, end, remaining })
+  }
+  return parsed
 }
 
 // The en/fr WhatsApp handoff: written in the customer's language, but every
@@ -280,6 +320,44 @@ export function Checkout() {
   const isPickup = customer.fulfillment === 'pickup'
   const deliveryFee = DELIVERY_FEES_USD[customer.zone]
   const total = lines.length ? subtotal + (isPickup ? 0 : deliveryFee) : 0
+
+  // Empty = free time field (feature off, pickup, no date yet, or fetch
+  // failed — fail open, availability must never block a purchase).
+  const [deliveryWindows, setDeliveryWindows] = useState<DeliveryWindow[]>([])
+
+  useEffect(() => {
+    if (isPickup || !customer.date) {
+      setDeliveryWindows([])
+      return
+    }
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/site/delivery-windows/?${new URLSearchParams({ date: customer.date }).toString()}`,
+          { headers: { Accept: 'application/json' }, signal: controller.signal },
+        )
+        if (!response.ok) throw new Error('delivery windows fetch failed')
+        const parsed = parseDeliveryWindows(await response.json())
+        if (!parsed) throw new Error('delivery windows response was invalid')
+        if (controller.signal.aborted) return
+        setDeliveryWindows(parsed)
+      } catch {
+        if (controller.signal.aborted) return
+        setDeliveryWindows([])
+      }
+    })()
+    return () => controller.abort()
+  }, [isPickup, customer.date])
+
+  // Once windows apply, the time must be one of the offered starts: a time
+  // typed before the date changed (or a window that just filled up) is reset
+  // so the customer picks again instead of submitting into a refusal.
+  useEffect(() => {
+    if (isPickup || deliveryWindows.length === 0 || !customer.time) return
+    const match = deliveryWindows.find((window) => window.start === customer.time)
+    if (!match || match.remaining <= 0) setCustomer({ time: '' })
+  }, [deliveryWindows, isPickup, customer.time, setCustomer])
 
   if (lines.length === 0) {
     return (
@@ -496,12 +574,43 @@ export function Checkout() {
               />
             </Field>
             <Field label={isPickup ? t.pickupTimeLabel : t.deliveryTimeLabel}>
-              <input
-                type="time"
-                value={customer.time}
-                onChange={(e) => setCustomer({ time: e.target.value })}
-                className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
-              />
+              {!isPickup && deliveryWindows.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {deliveryWindows.map((window) => {
+                    const isFull = window.remaining <= 0
+                    const isSelected = customer.time === window.start
+                    return (
+                      <button
+                        key={window.key}
+                        type="button"
+                        disabled={isFull}
+                        onClick={() => setCustomer({ time: window.start })}
+                        className={`p-4 rounded-2xl border-2 font-black text-center transition-all ${
+                          isSelected
+                            ? 'border-[#F5A83A] bg-[#F5A83A]/5'
+                            : isFull
+                              ? 'border-[#EDB2C1]/30 bg-white opacity-40 cursor-not-allowed'
+                              : 'border-[#EDB2C1]/30 bg-white'
+                        }`}
+                      >
+                        <span className="block" dir="ltr">
+                          {window.start}–{window.end}
+                        </span>
+                        <span className={`block text-xs font-bold mt-1 ${isFull ? 'text-[#8D182C]' : 'text-[#3B151A]/50'}`}>
+                          {isFull ? t.windowFull : t.windowRemaining(window.remaining)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <input
+                  type="time"
+                  value={customer.time}
+                  onChange={(e) => setCustomer({ time: e.target.value })}
+                  className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
+                />
+              )}
             </Field>
             <div className="md:col-span-2">
               <Field label={t.emailLabel}>

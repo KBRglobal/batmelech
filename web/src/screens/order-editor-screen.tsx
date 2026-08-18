@@ -524,6 +524,48 @@ function ReplyDraftBox({
   )
 }
 
+// The customer's personal tracking link (signed server-side): one click
+// copies it, Lin pastes it into WhatsApp herself.
+function TrackingLinkButton({ orderId }: { readonly orderId: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'copied' | 'error'>('idle')
+  return (
+    <button
+      type="button"
+      disabled={state === 'busy'}
+      onClick={() => {
+        setState('busy')
+        void (async () => {
+          try {
+            const response = await fetch(`/api/tracking-link/${encodeURIComponent(orderId)}`, {
+              headers: { Accept: 'application/json' },
+              credentials: 'same-origin',
+              cache: 'no-store',
+            })
+            if (!response.ok) throw new Error('tracking link failed')
+            const data: unknown = await response.json()
+            const url = (data as { url?: unknown }).url
+            if (typeof url !== 'string' || !url.startsWith('/t/')) throw new Error('tracking link invalid')
+            await navigator.clipboard.writeText(`${window.location.origin}${url}`)
+            setState('copied')
+          } catch {
+            setState('error')
+          }
+        })()
+      }}
+      className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary disabled:cursor-wait disabled:opacity-60"
+    >
+      <LocalIcon name={state === 'copied' ? 'ph:check-circle-bold' : 'ph:map-pin-bold'} className="text-lg" />
+      <span>
+        {state === 'copied'
+          ? 'קישור המעקב הועתק — אפשר לשלוח ללקוח'
+          : state === 'error'
+            ? 'ההעתקה נכשלה — לנסות שוב'
+            : 'העתקת קישור מעקב ללקוח'}
+      </span>
+    </button>
+  )
+}
+
 function Section({
   id,
   title,
@@ -1178,21 +1220,24 @@ function OrderEditorContent({
               <h2 className="font-black">הלקוח שלח הודעת המשך?</h2>
             </div>
             <p className="mt-2 text-xs font-bold text-muted-foreground">מדביקים את ההודעה החדשה ("תוסיפי 2 חלות ותשני ל-15:00") — המערכת תציע רק את השינויים על ההזמנה הזאת, לאישור לפני שמירה.</p>
-            <button
-              type="button"
-              onClick={() => {
-                navigate(APP_ROUTES.orderImportReview, {
-                  state: {
-                    baseDraft: { ...draft, id: null },
-                    followUpOrderId: draft.id,
-                  },
-                })
-              }}
-              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary"
-            >
-              <LocalIcon name="ph:chat-dots-bold" className="text-lg" />
-              <span>פענוח הודעת המשך</span>
-            </button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate(APP_ROUTES.orderImportReview, {
+                    state: {
+                      baseDraft: { ...draft, id: null },
+                      followUpOrderId: draft.id,
+                    },
+                  })
+                }}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary"
+              >
+                <LocalIcon name="ph:chat-dots-bold" className="text-lg" />
+                <span>פענוח הודעת המשך</span>
+              </button>
+              <TrackingLinkButton orderId={draft.id} />
+            </div>
           </section>
         )}
 

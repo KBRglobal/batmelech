@@ -1,16 +1,297 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.batmelech.ae/site/</loc></url>
-  <url><loc>https://www.batmelech.ae/site/weekdays</loc></url>
-  <url><loc>https://www.batmelech.ae/site/shabbat-order</loc></url>
-  <url><loc>https://www.batmelech.ae/site/story</loc></url>
-  <url><loc>https://www.batmelech.ae/site/events</loc></url>
-  <url><loc>https://www.batmelech.ae/site/gallery</loc></url>
-  <url><loc>https://www.batmelech.ae/site/kashrut</loc></url>
-  <url><loc>https://www.batmelech.ae/site/legal</loc></url>
-  <url><loc>https://www.batmelech.ae/site/experiences/bbq</loc></url>
-  <url><loc>https://www.batmelech.ae/site/experiences/yacht</loc></url>
-  <url><loc>https://www.batmelech.ae/site/experiences/villa</loc></url>
-  <url><loc>https://www.batmelech.ae/site/experiences/suite</loc></url>
-  <url><loc>https://www.batmelech.ae/site/experiences/desert</loc></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://www.batmelech.ae/site/</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/weekdays</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/weekdays"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/weekdays</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/weekdays"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/weekdays</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/weekdays"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/weekdays"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/shabbat-order</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/shabbat-order"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/shabbat-order</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/shabbat-order"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/shabbat-order</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/shabbat-order"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/shabbat-order"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/shabbat-extras</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/shabbat-extras"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/shabbat-extras</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/shabbat-extras"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/shabbat-extras</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/shabbat-extras"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/shabbat-extras"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/story</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/story"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/story"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/story"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/story"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/story</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/story"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/story"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/story"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/story"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/story</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/story"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/story"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/story"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/story"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/events</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/events"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/events"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/events"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/events"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/events</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/events"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/events"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/events"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/events"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/events</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/events"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/events"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/events"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/events"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/gallery</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/gallery"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/gallery"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/gallery"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/gallery"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/gallery</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/gallery"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/gallery"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/gallery"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/gallery"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/gallery</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/gallery"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/gallery"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/gallery"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/gallery"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/kashrut</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/kashrut"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/kashrut</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/kashrut"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/kashrut</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/kashrut"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/kashrut"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/legal</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/legal"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/legal"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/legal"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/legal"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/legal</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/legal"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/legal"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/legal"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/legal"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/legal</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/legal"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/legal"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/legal"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/legal"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/experiences/bbq</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/bbq"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/experiences/bbq</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/bbq"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/experiences/bbq</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/bbq"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/bbq"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/experiences/yacht</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/yacht"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/experiences/yacht</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/yacht"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/experiences/yacht</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/yacht"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/yacht"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/experiences/villa</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/villa"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/experiences/villa</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/villa"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/experiences/villa</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/villa"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/villa"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/experiences/suite</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/suite"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/experiences/suite</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/suite"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/experiences/suite</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/suite"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/suite"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/experiences/desert</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/desert"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/experiences/desert</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/desert"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/experiences/desert</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/experiences/desert"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/experiences/desert"/>
+  </url>
 </urlset>

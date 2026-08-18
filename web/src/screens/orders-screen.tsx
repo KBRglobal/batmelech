@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { generatePath, Link } from 'react-router'
 import type { To } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
@@ -6,9 +7,11 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
+  applyOrderFieldEdit,
   applyOrderQuickFields,
   nextOrderStatus,
   QUICK_PAID_OPTIONS,
+  type OrderEditableField,
   type OrderQuickFields,
 } from '../domain/order-quick-actions.ts'
 import {
@@ -21,11 +24,19 @@ import {
   type OrdersWarning,
 } from '../domain/orders-dashboard.ts'
 import type { StoreSaveHandler } from '../domain/settings-catalog.ts'
+import type { LegacyOrder } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope } from '../services/state-api.ts'
+import { downloadTable } from '../services/table-export.ts'
 
 export interface OrderQuickActions {
   readonly update: (orderId: string, fields: OrderQuickFields) => void
+  /**
+   * Inline field edit from the card. Returns true when the value was accepted
+   * and a versioned save started; false when validation or the ID lookup
+   * failed, so the editor can stay open for a correction.
+   */
+  readonly editField: (orderId: string, field: OrderEditableField, value: string) => boolean
   readonly savingOrderId: string | null
 }
 
@@ -193,9 +204,121 @@ function OrderQuickBar({ order, quick }: { order: OrdersOrderView; quick?: Order
   )
 }
 
+const FIELD_INPUT_TYPES: Readonly<Record<OrderEditableField, 'text' | 'date' | 'time' | 'number'>> = {
+  name: 'text',
+  date: 'date',
+  time: 'time',
+  total: 'number',
+}
+
+const FIELD_INPUT_WIDTHS: Readonly<Record<OrderEditableField, string>> = {
+  name: 'w-44',
+  date: 'w-36',
+  time: 'w-24',
+  total: 'w-24',
+}
+
+function InlineField({ order, quick, field, label, initialValue, children }: {
+  readonly order: OrdersOrderView
+  readonly quick: OrderQuickActions
+  readonly field: OrderEditableField
+  readonly label: string
+  readonly initialValue: string
+  readonly children: ReactNode
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(initialValue)
+  const saving = quick.savingOrderId === order.orderId
+
+  const commit = () => {
+    if (draft === initialValue) {
+      setEditing(false)
+      return
+    }
+    if (quick.editField(order.orderId!, field, draft)) setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1">
+        {children}
+        <button
+          type="button"
+          disabled={saving}
+          aria-label={`עריכת ${label} — ${order.customerName}`}
+          onClick={() => {
+            setDraft(initialValue)
+            setEditing(true)
+          }}
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-primary disabled:opacity-40"
+        >
+          <LocalIcon name="ph:pencil-simple-bold" className="text-sm" />
+        </button>
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        // The field just switched from a static value to an input under the
+        // operator's pointer — focus follows the click.
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
+        type={FIELD_INPUT_TYPES[field]}
+        dir={field === 'name' ? undefined : 'ltr'}
+        min={field === 'total' ? 0 : undefined}
+        step={field === 'total' ? '0.01' : undefined}
+        value={draft}
+        aria-label={`${label} — ${order.customerName}`}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            commit()
+          } else if (event.key === 'Escape') {
+            event.preventDefault()
+            setEditing(false)
+          }
+        }}
+        onBlur={commit}
+        className={`min-h-8 ${FIELD_INPUT_WIDTHS[field]} rounded-lg border border-border bg-card px-2 text-xs font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20`}
+      />
+      <button
+        type="button"
+        aria-label={`אישור ${label} — ${order.customerName}`}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={commit}
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-emerald-700 transition-colors hover:bg-emerald-50"
+      >
+        <LocalIcon name="ph:check-circle-bold" className="text-base" />
+      </button>
+      <button
+        type="button"
+        aria-label={`ביטול ${label} — ${order.customerName}`}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setEditing(false)}
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary"
+      >
+        <LocalIcon name="ph:x-bold" className="text-base" />
+      </button>
+    </span>
+  )
+}
+
 function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuickActions }) {
   const labels = summaryLabels(order.summary)
   const hasInvalidSummary = Object.values(order.summary).some((value) => value === null)
+  const editable = quick !== undefined && order.orderId !== null && !order.cancelled
+  const saving = quick !== undefined && quick.savingOrderId === order.orderId
+  const totalDisplay =
+    order.totalState === 'valid' && order.totalMinorUnits !== null ? (
+      <strong className="text-xl font-black text-primary" dir="ltr">
+        {formatUsdMinorUnits(order.totalMinorUnits)}
+      </strong>
+    ) : order.totalState === 'invalid' ? (
+      <strong className="text-sm font-black text-destructive">סכום לא תקין</strong>
+    ) : null
 
   return (
     <article
@@ -205,18 +328,42 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-black text-primary">{order.customerName}</h3>
+            {editable ? (
+              <InlineField order={order} quick={quick} field="name" label="שם" initialValue={order.customerName}>
+                <h3 className="text-lg font-black text-primary">{order.customerName}</h3>
+              </InlineField>
+            ) : (
+              <h3 className="text-lg font-black text-primary">{order.customerName}</h3>
+            )}
             <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${statusClassName(order.status)}`}>
               {order.status}
             </span>
             <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${paidClassName(order.paidLabel)}`}>
               {order.paidLabel}
             </span>
+            {saving && (
+              <span className="text-[0.6875rem] font-black text-muted-foreground" role="status">
+                שומרת...
+              </span>
+            )}
           </div>
           <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold text-muted-foreground">
             <LocalIcon name={order.pickup ? 'ph:storefront-bold' : 'ph:map-pin-bold'} className="text-base text-primary" />
             <span>{order.destination}</span>
-            {order.time && <span>· {order.time}</span>}
+            {editable ? (
+              <InlineField order={order} quick={quick} field="time" label="שעה" initialValue={order.time}>
+                <span>· {order.time || 'ללא שעה'}</span>
+              </InlineField>
+            ) : (
+              order.time && <span>· {order.time}</span>
+            )}
+            {editable && (
+              <InlineField order={order} quick={quick} field="date" label="תאריך" initialValue={order.serviceDate ?? ''}>
+                <span>
+                  · {order.serviceDate === null ? 'ללא תאריך' : <span dir="ltr">{order.serviceDate}</span>}
+                </span>
+              </InlineField>
+            )}
             {order.telephoneHref && (
               <>
                 <span>·</span>
@@ -228,13 +375,19 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
           </p>
         </div>
 
-        {order.totalState === 'valid' && order.totalMinorUnits !== null ? (
-          <strong className="text-xl font-black text-primary" dir="ltr">
-            {formatUsdMinorUnits(order.totalMinorUnits)}
-          </strong>
-        ) : order.totalState === 'invalid' ? (
-          <strong className="text-sm font-black text-destructive">סכום לא תקין</strong>
-        ) : null}
+        {editable ? (
+          <InlineField
+            order={order}
+            quick={quick}
+            field="total"
+            label="סכום"
+            initialValue={order.totalMinorUnits !== null ? (order.totalMinorUnits / 100).toFixed(2) : ''}
+          >
+            {totalDisplay ?? <span className="text-sm font-black text-muted-foreground">ללא סכום</span>}
+          </InlineField>
+        ) : (
+          totalDisplay
+        )}
       </div>
 
       {(labels.length > 0 || hasInvalidSummary) && (
@@ -271,12 +424,12 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
 // Each group gets a stable, distinctive frame color (derived from its name)
 // so linked orders read as one colored block at a glance.
 const GROUP_FRAME_STYLES = [
-  { border: 'border-sky-400', header: 'bg-sky-50', text: 'text-sky-900' },
-  { border: 'border-amber-400', header: 'bg-amber-50', text: 'text-amber-900' },
-  { border: 'border-emerald-400', header: 'bg-emerald-50', text: 'text-emerald-900' },
-  { border: 'border-violet-400', header: 'bg-violet-50', text: 'text-violet-900' },
-  { border: 'border-rose-400', header: 'bg-rose-50', text: 'text-rose-900' },
-  { border: 'border-teal-400', header: 'bg-teal-50', text: 'text-teal-900' },
+  { border: 'border-sky-500', surface: 'bg-sky-50/70', header: 'bg-sky-100', text: 'text-sky-900', ribbon: 'bg-sky-500' },
+  { border: 'border-amber-500', surface: 'bg-amber-50/70', header: 'bg-amber-100', text: 'text-amber-900', ribbon: 'bg-amber-500' },
+  { border: 'border-emerald-500', surface: 'bg-emerald-50/70', header: 'bg-emerald-100', text: 'text-emerald-900', ribbon: 'bg-emerald-500' },
+  { border: 'border-violet-500', surface: 'bg-violet-50/70', header: 'bg-violet-100', text: 'text-violet-900', ribbon: 'bg-violet-500' },
+  { border: 'border-rose-500', surface: 'bg-rose-50/70', header: 'bg-rose-100', text: 'text-rose-900', ribbon: 'bg-rose-500' },
+  { border: 'border-teal-500', surface: 'bg-teal-50/70', header: 'bg-teal-100', text: 'text-teal-900', ribbon: 'bg-teal-500' },
 ] as const
 
 function groupFrameStyle(name: string) {
@@ -288,7 +441,8 @@ function groupFrameStyle(name: string) {
 function LinkedGroup({ group, quick }: { group: OrdersLinkedGroup; quick?: OrderQuickActions }) {
   const frame = groupFrameStyle(group.name)
   return (
-    <section className={`rounded-[2rem] border-2 ${frame.border} bg-card p-4 shadow-sm sm:p-5`}>
+    <section className={`relative overflow-hidden rounded-[2rem] border-4 ${frame.border} ${frame.surface} p-4 shadow-md sm:p-5`}>
+      <div className={`absolute inset-y-0 right-0 w-2 ${frame.ribbon}`} aria-hidden="true" />
       <div className={`mb-4 flex flex-col gap-3 rounded-2xl ${frame.header} p-4 sm:flex-row sm:items-start sm:justify-between`}>
         <div>
           <p className={`flex items-center gap-2 text-xs font-black ${frame.text}`}>
@@ -437,6 +591,70 @@ function Warnings({ warnings }: { warnings: readonly OrdersWarning[] }) {
 const STATUS_FILTERS = ['הכל', 'פעילות', 'חדשה', 'אושרה', 'מוכנה', 'במשלוח', 'נמסרה'] as const
 const PAYMENT_FILTERS = ['הכל', 'לא שולם', 'שולם'] as const
 
+const STALE_DATA_MESSAGE = 'השמירה המהירה אינה זמינה כרגע — הנתונים עדיין נטענים.'
+
+const FIELD_INVALID_MESSAGES: Readonly<Record<OrderEditableField, string>> = {
+  name: 'השם לא נשמר — צריך שם לא ריק, עד 200 תווים.',
+  date: 'התאריך לא נשמר — צריך תאריך אמיתי מהלוח.',
+  time: 'השעה לא נשמרה — צריך שעה תקינה או שדה ריק.',
+  total: 'הסכום לא נשמר — צריך מספר חיובי, עד שתי ספרות אחרי הנקודה.',
+}
+
+const EXPORT_HEADERS = [
+  'תאריך',
+  'שעה',
+  'שם',
+  'טלפון',
+  'יעד',
+  'סטטוס',
+  'שולם',
+  'סה"כ ($)',
+  'מקור',
+] as const
+
+/**
+ * Exactly the orders the screen is currently rendering: search results when a
+ * search is active, otherwise upcoming plus past, with the same block-level
+ * filter rule the display uses (a linked group stays whole when any member
+ * matches).
+ */
+function collectVisibleOrders(
+  groups: readonly OrdersDateGroup[],
+  blockFilter: ((order: OrdersOrderView) => boolean) | undefined,
+): OrdersOrderView[] {
+  const visible: OrdersOrderView[] = []
+  for (const group of groups) {
+    for (const block of group.blocks) {
+      if (block.kind === 'linked-group') {
+        if (blockFilter === undefined || block.orders.some((order) => blockFilter(order))) {
+          visible.push(...block.orders)
+        }
+      } else if (blockFilter === undefined || blockFilter(block.order)) {
+        visible.push(block.order)
+      }
+    }
+  }
+  return visible
+}
+
+function exportRow(
+  order: OrdersOrderView,
+  sourceOrders: readonly Readonly<LegacyOrder>[],
+): readonly string[] {
+  const source = sourceOrders[order.sourceIndex]?.source
+  return [
+    order.serviceDate ?? '',
+    order.time,
+    order.customerName,
+    order.phone,
+    order.destination,
+    order.status,
+    order.paidLabel,
+    order.totalMinorUnits === null ? '' : (order.totalMinorUnits / 100).toFixed(2),
+    typeof source === 'string' ? source : '',
+  ]
+}
+
 export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } = {}) {
   const storeQuery = useStore()
   const [searchQuery, setSearchQuery] = useState('')
@@ -450,11 +668,44 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
     ? undefined
     : {
         savingOrderId,
+        editField: (orderId, field, value) => {
+          const envelope = storeQuery.data
+          if (envelope === undefined || !isVersionedStateEnvelope(envelope)) {
+            setQuickError(STALE_DATA_MESSAGE)
+            return false
+          }
+          const result = applyOrderFieldEdit(envelope.data, orderId, field, value)
+          if (!result.ok) {
+            setQuickError(
+              result.error === 'invalid-value'
+                ? FIELD_INVALID_MESSAGES[field]
+                : 'אי אפשר לעדכן את ההזמנה — המזהה חסר או כפול.',
+            )
+            return false
+          }
+          setSavingOrderId(orderId)
+          setQuickError('')
+          void (async () => {
+            try {
+              await onSave({
+                reason: 'orders',
+                baseEnvelope: envelope,
+                baseStore: envelope.data,
+                nextStore: result.store,
+              })
+            } catch {
+              setQuickError('העדכון המהיר נכשל — ההזמנה לא שונתה. אפשר לנסות שוב.')
+            } finally {
+              setSavingOrderId(null)
+            }
+          })()
+          return true
+        },
         update: (orderId, fields) => {
           void (async () => {
             const envelope = storeQuery.data
             if (envelope === undefined || !isVersionedStateEnvelope(envelope)) {
-              setQuickError('השמירה המהירה אינה זמינה כרגע — הנתונים עדיין נטענים.')
+              setQuickError(STALE_DATA_MESSAGE)
               return
             }
             const nextStore = applyOrderQuickFields(envelope.data, orderId, fields)
@@ -535,10 +786,30 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
             כל ההזמנות, הקבוצות והתאריכים במקום אחד.
           </p>
         </div>
-        <Link to={APP_ROUTES.newOrder} className={primaryLinkClassName}>
-          <LocalIcon name="ph:plus-bold" className="text-lg" />
-          <span>הזמנה חדשה</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              const groups = dashboard.searchActive
+                ? dashboard.searchGroups
+                : [...dashboard.upcomingGroups, ...dashboard.pastGroups]
+              const sourceOrders = storeQuery.data.data?.orders ?? []
+              downloadTable(
+                'orders',
+                EXPORT_HEADERS,
+                collectVisibleOrders(groups, blockFilter).map((order) => exportRow(order, sourceOrders)),
+              )
+            }}
+            className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-5 text-sm font-black text-primary shadow-sm transition-colors hover:bg-secondary"
+          >
+            <LocalIcon name="ph:download-simple-bold" className="text-lg" />
+            <span>ייצוא לאקסל</span>
+          </button>
+          <Link to={APP_ROUTES.newOrder} className={primaryLinkClassName}>
+            <LocalIcon name="ph:plus-bold" className="text-lg" />
+            <span>הזמנה חדשה</span>
+          </Link>
+        </div>
       </header>
 
       <div className="mt-7 flex items-center gap-3 rounded-3xl border border-border bg-card p-3 shadow-sm">

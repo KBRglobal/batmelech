@@ -189,7 +189,13 @@ function updateCompletionMap(
   }
   const scope = existingScope ?? {}
   const existingValue = scope[itemKey]
-  if (existingValue !== undefined && typeof existingValue !== 'boolean') {
+  // Strings are the kitchen board's intermediate stages ('started'/'ready');
+  // the preparation screen may overwrite them with its boolean marks.
+  if (
+    existingValue !== undefined &&
+    typeof existingValue !== 'boolean' &&
+    typeof existingValue !== 'string'
+  ) {
     throw new OperationalStateError('INVALID_COMPLETION_VALUE')
   }
 

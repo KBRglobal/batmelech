@@ -73,11 +73,6 @@ function PreparationScreenWithSave() {
   return <PreparationScreen onSave={onSave} />
 }
 
-function KitchenScreenWithSave() {
-  const { onSave } = useVersionedScreenSave()
-  return <KitchenScreen onSave={onSave} />
-}
-
 function ShoppingListScreenWithSave() {
   const { onSave } = useVersionedScreenSave()
   return <ShoppingListScreen onSave={onSave} />
@@ -142,7 +137,7 @@ export function AppRoutes() {
         />
       </Route>
 
-      <Route path={APP_ROUTES.kitchen} element={<KitchenScreenWithSave />} />
+      <Route path={APP_ROUTES.kitchen} element={<KitchenScreen exitTo={APP_ROUTES.preparation} />} />
 
       <Route path={APP_ROUTES.customerOrder} element={<CustomerOrderScreen />} />
       {LEGACY_CUSTOMER_ORDER_ROUTE_ALIASES.map((alias) => (

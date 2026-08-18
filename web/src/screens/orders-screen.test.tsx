@@ -1,23 +1,29 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_ROUTES } from '../app/routes.ts'
 import { useStore } from '../data/use-store.ts'
+import type { StoreSaveHandler } from '../domain/settings-catalog.ts'
 import type { LegacyStore } from '../domain/store.ts'
+import { downloadTable } from '../services/table-export.ts'
 import { OrdersScreen } from './orders-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
+vi.mock('../services/table-export.ts', () => ({ downloadTable: vi.fn() }))
 
 const mockedUseStore = vi.mocked(useStore)
+const mockedDownloadTable = vi.mocked(downloadTable)
+const HASH = 'c'.repeat(64)
 
 function queryResult(
   options: {
     readonly pending?: boolean
     readonly error?: boolean
     readonly store?: LegacyStore | null
+    readonly versioned?: boolean
     readonly refetch?: ReturnType<typeof vi.fn>
   } = {},
 ): ReturnType<typeof useStore> {
@@ -27,15 +33,17 @@ function queryResult(
     data:
       options.pending === true || options.error === true
         ? undefined
-        : { ts: 1, data: options.store ?? { orders: [] } },
+        : options.versioned === true
+          ? { revision: 1, ts: 1, hash: HASH, data: options.store ?? { orders: [] } }
+          : { ts: 1, data: options.store ?? { orders: [] } },
     refetch: options.refetch ?? vi.fn(),
   } as unknown as ReturnType<typeof useStore>
 }
 
-function renderOrders() {
+function renderOrders(onSave?: StoreSaveHandler) {
   return render(
     <MemoryRouter initialEntries={[APP_ROUTES.orders]}>
-      <OrdersScreen />
+      <OrdersScreen onSave={onSave} />
     </MemoryRouter>,
   )
 }
@@ -47,6 +55,7 @@ afterEach(() => {
 
 beforeEach(() => {
   mockedUseStore.mockReset()
+  mockedDownloadTable.mockReset()
 })
 
 describe('OrdersScreen', () => {
@@ -287,5 +296,159 @@ describe('OrdersScreen', () => {
     expect(screen.queryByRole('link', { name: 'שכפול' })).toBeNull()
     expect(screen.getAllByRole('button', { name: 'שכפול לא זמין' })).toHaveLength(2)
     expect(screen.getByRole('alert').textContent).toContain('המזהה כפול')
+  })
+
+  function editableStore(): LegacyStore {
+    return {
+      orders: [
+        {
+          id: 'edit-1',
+          date: '2099-08-14',
+          name: 'לקוחה לעריכה',
+          time: '12:00',
+          total: '50.00',
+          status: 'חדשה',
+          paid: 'לא',
+          source: 'whatsapp',
+          meyToken: 'mey-token',
+          courierNote: 'courier note',
+          intakeConversation: 'thread',
+        },
+        {
+          id: 'edit-2',
+          date: '2099-08-15',
+          name: 'הזמנה שנמסרה',
+          status: 'נמסרה',
+          paid: 'כן',
+          total: '20.00',
+        },
+      ],
+    }
+  }
+
+  it('turns a card value into an in-place input with confirm and cancel controls', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: editableStore(), versioned: true }))
+    const user = userEvent.setup()
+    renderOrders(vi.fn())
+
+    expect(screen.queryByLabelText('שעה — לקוחה לעריכה')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'עריכת שעה — לקוחה לעריכה' }))
+
+    const input = screen.getByLabelText('שעה — לקוחה לעריכה') as HTMLInputElement
+    expect(input.value).toBe('12:00')
+    expect(screen.getByRole('button', { name: 'אישור שעה — לקוחה לעריכה' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'ביטול שעה — לקוחה לעריכה' })).toBeTruthy()
+  })
+
+  it('commits a time edit through the versioned save and leaves protected fields untouched', async () => {
+    const store = editableStore()
+    mockedUseStore.mockReturnValue(queryResult({ store, versioned: true }))
+    const saves: Parameters<StoreSaveHandler>[0][] = []
+    const onSave: StoreSaveHandler = async (request) => {
+      saves.push(request)
+    }
+    const user = userEvent.setup()
+    renderOrders(onSave)
+
+    await user.click(screen.getByRole('button', { name: 'עריכת שעה — לקוחה לעריכה' }))
+    const input = screen.getByLabelText('שעה — לקוחה לעריכה')
+    fireEvent.change(input, { target: { value: '13:45' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(saves).toHaveLength(1)
+    expect(saves[0]!.reason).toBe('orders')
+    expect(saves[0]!.baseStore).toEqual(store)
+    expect(saves[0]!.nextStore.orders[0]).toEqual({ ...store.orders[0], time: '13:45' })
+    expect(saves[0]!.nextStore.orders[0]).toMatchObject({
+      meyToken: 'mey-token',
+      courierNote: 'courier note',
+      intakeConversation: 'thread',
+    })
+    expect(saves[0]!.nextStore.orders[1]).toEqual(store.orders[1])
+    await screen.findByText('· 12:00') // editor closed; store mock unchanged so old value shows
+    expect(screen.queryByLabelText('שעה — לקוחה לעריכה')).toBeNull()
+  })
+
+  it('cancels an edit on escape without saving', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: editableStore(), versioned: true }))
+    const onSave = vi.fn()
+    const user = userEvent.setup()
+    renderOrders(onSave)
+
+    await user.click(screen.getByRole('button', { name: 'עריכת שם — לקוחה לעריכה' }))
+    const input = screen.getByLabelText('שם — לקוחה לעריכה')
+    fireEvent.change(input, { target: { value: 'שם אחר לגמרי' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('שם — לקוחה לעריכה')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'לקוחה לעריכה' })).toBeTruthy()
+  })
+
+  it('rejects an invalid inline value, keeps the editor open, and never saves', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: editableStore(), versioned: true }))
+    const onSave = vi.fn()
+    const user = userEvent.setup()
+    renderOrders(onSave)
+
+    await user.click(screen.getByRole('button', { name: 'עריכת שם — לקוחה לעריכה' }))
+    const input = screen.getByLabelText('שם — לקוחה לעריכה')
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('שם — לקוחה לעריכה')).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('השם לא נשמר')
+  })
+
+  it('exports exactly the currently filtered rows as a CSV table', async () => {
+    mockedUseStore.mockReturnValue(queryResult({ store: editableStore() }))
+    const user = userEvent.setup()
+    renderOrders()
+
+    await user.click(screen.getByRole('button', { name: 'חדשה' }))
+    await user.click(screen.getByRole('button', { name: 'ייצוא לאקסל' }))
+
+    expect(mockedDownloadTable).toHaveBeenCalledTimes(1)
+    const [filename, headers, rows] = mockedDownloadTable.mock.calls[0]!
+    expect(filename).toBe('orders')
+    expect(headers).toEqual(['תאריך', 'שעה', 'שם', 'טלפון', 'יעד', 'סטטוס', 'שולם', 'סה"כ ($)', 'מקור'])
+    expect(rows).toEqual([
+      ['2099-08-14', '12:00', 'לקוחה לעריכה', '', 'לא צוין יעד', 'חדשה', 'לא שולם', '50.00', 'whatsapp'],
+    ])
+
+    // Without the filter both displayed orders export.
+    mockedDownloadTable.mockClear()
+    await user.click(screen.getByRole('button', { name: 'הכל' }))
+    await user.click(screen.getByRole('button', { name: 'ייצוא לאקסל' }))
+    expect(mockedDownloadTable.mock.calls[0]![2]).toEqual([
+      ['2099-08-14', '12:00', 'לקוחה לעריכה', '', 'לא צוין יעד', 'חדשה', 'לא שולם', '50.00', 'whatsapp'],
+      ['2099-08-15', '', 'הזמנה שנמסרה', '', 'לא צוין יעד', 'נמסרה', 'שולם', '20.00', ''],
+    ])
+  })
+
+  it('keeps the per-group colored frames on linked groups', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'g1', date: '2099-08-14', name: 'משפחה א', group: 'קבוצת צבע' },
+            { id: 'g2', date: '2099-08-14', name: 'משפחה ב', group: 'קבוצת צבע' },
+          ],
+        },
+      }),
+    )
+
+    renderOrders()
+
+    const section = screen.getByText('הזמנה קבוצתית: קבוצת צבע').closest('section')
+    expect(section).toBeTruthy()
+    const borderMatch = /border-(sky|amber|emerald|violet|rose|teal)-500/.exec(section!.className)
+    expect(borderMatch).toBeTruthy()
+    const header = section!.querySelector('div')
+    const headerMatch = /bg-(sky|amber|emerald|violet|rose|teal)-50/.exec(header!.className)
+    expect(headerMatch).toBeTruthy()
+    // Border and header stay in the same color family — one coherent frame.
+    expect(headerMatch![1]).toBe(borderMatch![1])
   })
 })

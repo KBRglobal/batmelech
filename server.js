@@ -16,6 +16,9 @@ const { PUBLIC_SITE_SECURITY_HEADERS, createReactAppRouter } = require('./server
 const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
 const { createSiteCatalogRouter } = require('./server/site-catalog-route');
+const { createPublicWindowsRouter, createWindowsAdminRouter } = require('./server/delivery-windows');
+const { createPublicHolidaysRouter, createHolidaysAdminRouter } = require('./server/holidays/holidays-route');
+const { createConciergeRouter } = require('./server/ai/concierge-route');
 const { createStateHistoryRouter } = require('./server/state-history-route');
 const { createTelegramWebhookRouter } = require('./server/telegram/webhook-route');
 const { createMeyAgent } = require('./server/telegram/mey-agent');
@@ -49,6 +52,8 @@ const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
 const { startAfterStateInitialization } = require('./server/state/state-startup');
+const { createTrackingRouter } = require('./server/track/tracking-route');
+const { createTrackingAdminRouter } = require('./server/track/tracking-admin-route');
 
 const app = express();
 // Railway sits as a single reverse-proxy hop in front of this service — trust
@@ -134,6 +139,11 @@ if (stateRepository) {
   app.use('/api/site/orders', createSiteOrderRouter({ repository: stateRepository }));
   app.use('/api/site/status', createSiteStatusRouter({ repository: stateRepository }));
   app.use('/api/site/catalog', createSiteCatalogRouter({ repository: stateRepository }));
+  // Site concierge chat: public, strictly rate-limited, answers only from
+  // live catalog + fixed business facts, in the visitor's language.
+  app.use('/api/site/concierge', createConciergeRouter({ repository: stateRepository }));
+  app.use('/api/site/delivery-windows', createPublicWindowsRouter({ repository: stateRepository }));
+  app.use('/api/site/holidays', createPublicHolidaysRouter({ repository: stateRepository }));
 } else {
   app.use('/api/site/orders', (_request, response) => {
     response.set('Cache-Control', 'no-store');
@@ -146,6 +156,18 @@ if (stateRepository) {
   app.use('/api/site/catalog', (_request, response) => {
     response.set('Cache-Control', 'no-store');
     response.status(503).json({ error: 'catalog unavailable' });
+  });
+  app.use('/api/site/concierge', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: { code: 'ai_not_configured', message: 'The concierge is unavailable.' } });
+  });
+  app.use('/api/site/delivery-windows', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'windows unavailable' });
+  });
+  app.use('/api/site/holidays', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'holidays unavailable' });
   });
 }
 // מיי — Lin's Telegram assistant, now also Felix's delivery dispatcher.
@@ -241,6 +263,7 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /api',
     'Disallow: /legacy',
     'Disallow: /kitchen',
+    'Disallow: /t',
     'Sitemap: https://www.batmelech.ae/site/sitemap.xml',
   ].join('\n') + '\n');
 });
@@ -280,6 +303,12 @@ app.use('/order-form.html', createCustomerOrderRouter({ getContentRoot: () => co
 // router because it is reachable without a staff session. ---
 app.use('/api/hotels/search', createHotelSearchRouter());
 
+// --- Public customer tracking: signed per-order link, read-only, generic 404
+// for anything invalid. Must sit BEFORE the decoy gate. ---
+if (stateRepository) {
+  app.use('/t', createTrackingRouter({ repository: stateRepository, sessionSecret: SESSION_SECRET }));
+}
+
 // --- staff gate on everything else: no valid session -> looks like a 404 ---
 app.use(createDecoyGate(SESSION_SECRET));
 
@@ -290,6 +319,9 @@ app.post('/api/auth/logout', (_request, response) => {
   response.status(204).end();
 });
 
+// --- Staff-only: mint the signed customer tracking link for an order ---
+app.use('/api/tracking-link', createTrackingAdminRouter({ sessionSecret: SESSION_SECRET }));
+
 app.use(express.json({ limit: '15mb' }));
 
 // --- AI-assisted order interpretation (review-only; never persists state) ---
@@ -297,6 +329,26 @@ app.use('/api/ai/order-intake', createOrderIntakeRouter());
 
 // --- AI-drafted WhatsApp reply for Lin to copy (read-only; system never sends) ---
 app.use('/api/ai/order-reply', createOrderReplyRouter({ repository: stateRepository }));
+
+// --- Staff-only: Jewish holiday menus configuration ---
+if (stateRepository) {
+  app.use('/api/holidays', createHolidaysAdminRouter({ repository: stateRepository }));
+} else {
+  app.use('/api/holidays', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'holidays unavailable' });
+  });
+}
+
+// --- Staff-only: delivery time windows configuration ---
+if (stateRepository) {
+  app.use('/api/settings/delivery-windows', createWindowsAdminRouter({ repository: stateRepository }));
+} else {
+  app.use('/api/settings/delivery-windows', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    response.status(503).json({ error: 'windows unavailable' });
+  });
+}
 
 // --- מיי audit log: browse/undo her changes, emergency freeze control ---
 if (stateRepository) {
@@ -395,6 +447,10 @@ app.get(['/app/order-form.html', '/app/order.html'], (_request, response) => {
 
 // --- React operator application: authenticated, isolated below /app/ ---
 app.get(/^\/app$/, (req, res) => res.redirect(308, '/app/'));
+app.use('/app', (request, response, next) => {
+  response.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  next();
+});
 app.use('/app', createReactAppRouter({ reactRoot: REACT_ROOT }));
 
 // /admin is the real entry point Lin actually uses day to day. /app and

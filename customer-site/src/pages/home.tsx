@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
+import { HolidayMenuSection } from '../components/holiday-menu-section'
 import { useReveal } from '../components/reveal'
 import { useLocale, type Locale } from '../locale-context'
 
@@ -377,6 +378,7 @@ export function Home() {
       </PageHero>
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 pb-32">
+        <HolidayMenuSection />
         <section id="story" ref={storyReveal.ref} className={`mb-32 scroll-mt-24 pt-32 text-center ${storyReveal.className}`}>
           <div className="max-w-4xl mx-auto">
             <div className="mb-16 inline-block">

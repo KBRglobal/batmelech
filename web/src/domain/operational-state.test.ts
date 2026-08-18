@@ -136,10 +136,21 @@ describe('operational state', () => {
         ),
       ),
     ).toBe('INVALID_COMPLETION_MAP')
+    // Kitchen-board stage strings ('started'/'ready') may be overwritten by
+    // the preparation screen's boolean marks — no longer an error.
+    expect(
+      (applyPreparationCompletion(
+        { orders: [], prepDone: { '2099-08-14': { 'mains|מנה': 'started' } } },
+        '2099-08-14',
+        'mains',
+        'מנה',
+        true,
+      ) as { prepDone?: Record<string, Record<string, unknown>> }).prepDone?.['2099-08-14']?.['mains|מנה'],
+    ).toBe(true)
     expect(
       errorCode(() =>
         applyPreparationCompletion(
-          { orders: [], prepDone: { '2099-08-14': { 'mains|מנה': 'opaque' } } },
+          { orders: [], prepDone: { '2099-08-14': { 'mains|מנה': 42 } } },
           '2099-08-14',
           'mains',
           'מנה',

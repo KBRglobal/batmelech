@@ -136,6 +136,62 @@ export function suggestRouteOrder<T extends RouteStop>(orders: readonly T[]): re
   return sequenced
 }
 
+/**
+ * Reads the manual route override for one service date out of the raw
+ * `settings.routeOverrides` value, which is untyped passthrough data.
+ *
+ * Returns the stored order-id list, or null when there is no usable override for the
+ * date (missing, not an object, not an array, or an array with no string ids).
+ */
+export function readRouteOverride(
+  routeOverrides: unknown,
+  serviceDate: string,
+): readonly string[] | null {
+  if (typeof routeOverrides !== 'object' || routeOverrides === null || Array.isArray(routeOverrides)) {
+    return null
+  }
+  const value = (routeOverrides as Record<string, unknown>)[serviceDate]
+  if (!Array.isArray(value)) return null
+  const ids = value.filter((entry): entry is string => typeof entry === 'string')
+  return ids.length === 0 ? null : ids
+}
+
+/**
+ * Applies the operator's manual route override on top of the suggested order.
+ *
+ * Stops whose id appears in `overrideIds` come first, in the override's sequence.
+ * Stops that are not listed keep their suggested relative order and follow after them.
+ * Override ids that no longer match any stop are ignored, so a stale override can
+ * never drop or duplicate a stop. With no usable override the suggested order is
+ * returned untouched.
+ */
+export function applyRouteOverride<T extends { readonly id?: unknown }>(
+  suggested: readonly T[],
+  overrideIds: readonly string[] | null | undefined,
+): readonly T[] {
+  if (overrideIds == null || overrideIds.length === 0) return suggested
+  const remaining = suggested.map((stop) => ({ stop, taken: false }))
+  const overridden: T[] = []
+  for (const overrideId of overrideIds) {
+    const entry = remaining.find(
+      (candidate) => !candidate.taken && candidate.stop.id === overrideId,
+    )
+    if (entry === undefined) continue
+    entry.taken = true
+    overridden.push(entry.stop)
+  }
+  const rest = remaining.filter((entry) => !entry.taken).map((entry) => entry.stop)
+  return [...overridden, ...rest]
+}
+
+/**
+ * Exposes the validated coordinates of one stop, or null when the stop has no
+ * finite in-range hotel latitude/longitude. Same validation as the route ordering.
+ */
+export function stopCoordinates(stop: RouteStop): { latitude: number; longitude: number } | null {
+  return parseCoordinates(stop)
+}
+
 function stopQuery(stop: RouteStop): string {
   for (const value of [stop.hotelAddress, stop.hotelName, stop.address, stop.place]) {
     if (typeof value !== 'string' || value.length > MAX_STOP_TEXT_LENGTH) continue

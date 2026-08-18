@@ -14,6 +14,8 @@ const express = require('express');
 const path = require('node:path');
 const fs = require('node:fs');
 const { rateLimit } = require('express-rate-limit');
+const { hasValidSession } = require('./decoy-auth');
+const { setOrderStatus, KNOWN_ORDER_STATUSES } = require('../business-actions');
 
 const KITCHEN_COOKIE = 'bm_kitchen';
 const SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1000; // a wall tablet logs in once
@@ -28,6 +30,11 @@ const KITCHEN_ORDER_FIELDS = [
   'id',
   'date',
   'status',
+  'name',
+  'time',
+  'hotelName',
+  'place',
+  'pickup',
   'meals',
   'aricha',
   'challot',
@@ -210,9 +217,14 @@ function createKitchenApiRouter({ repository, sessionSecret, logger = console })
   }
   const router = express.Router();
   router.use(express.json({ limit: '16kb' }));
+  // The admin variant of the board (/admin/kitchen) calls the same API with
+  // a staff session — both credentials are accepted here.
   router.use((request, response, next) => {
     response.set('Cache-Control', 'no-store');
-    if (!hasValidKitchenSession(request, sessionSecret)) {
+    if (
+      !hasValidKitchenSession(request, sessionSecret) &&
+      !hasValidSession(request, sessionSecret)
+    ) {
       return response.status(401).json({ error: 'kitchen login required' });
     }
     next();
@@ -237,6 +249,72 @@ function createKitchenApiRouter({ repository, sessionSecret, logger = console })
     } catch (error) {
       logger.error('kitchen state read failed', error);
       return response.status(503).json({ error: 'state unavailable' });
+    }
+  });
+
+  // One-tap order status from the kitchen board (Moshe: "סטטוסים, הכל
+  // בהקשה"). Bounded to the five known statuses; nothing else is writable.
+  router.post('/order-status', async (request, response) => {
+    const orderId = typeof request.body?.orderId === 'string' ? request.body.orderId.trim() : '';
+    const status = request.body?.status;
+    if (orderId === '' || orderId.length > 128 || !KNOWN_ORDER_STATUSES.includes(status)) {
+      return response.status(400).json({ error: 'invalid status change' });
+    }
+    try {
+      const result = await setOrderStatus(repository, orderId, status);
+      if (!result.ok) return response.status(409).json({ error: result.error || 'status change failed' });
+      return response.status(200).json({ ok: true });
+    } catch (error) {
+      logger.error('kitchen order status failed', error);
+      return response.status(503).json({ error: 'status change failed' });
+    }
+  });
+
+  // The kitchen board's per-dish stages (Moshe: started → ready → packed,
+  // one tap advances). 'packed' is stored as boolean true so the admin
+  // preparation screen keeps seeing it as completed; the intermediate stages
+  // are strings in the same prepDone map.
+  router.post('/prep-stage', async (request, response) => {
+    const serviceDate = typeof request.body?.serviceDate === 'string' ? request.body.serviceDate.trim() : '';
+    const category = request.body?.category;
+    const itemName = typeof request.body?.itemName === 'string' ? request.body.itemName.trim() : '';
+    const stage = request.body?.stage;
+    if (
+      !DATE_PATTERN.test(serviceDate) ||
+      !PREP_CATEGORIES.includes(category) ||
+      itemName === '' ||
+      itemName.length > 300 ||
+      !['none', 'started', 'ready', 'packed'].includes(stage)
+    ) {
+      return response.status(400).json({ error: 'invalid prep stage' });
+    }
+    const itemKey = `${category}|${itemName}`;
+    try {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+        const current = await repository.loadState();
+        const root = current.data.prepDone && typeof current.data.prepDone === 'object' && !Array.isArray(current.data.prepDone)
+          ? current.data.prepDone
+          : {};
+        const scope = root[serviceDate] && typeof root[serviceDate] === 'object' && !Array.isArray(root[serviceDate])
+          ? { ...root[serviceDate] }
+          : {};
+        if (stage === 'none') delete scope[itemKey];
+        else if (stage === 'packed') scope[itemKey] = true;
+        else scope[itemKey] = stage;
+        const localState = { ...current.data, prepDone: { ...root, [serviceDate]: scope } };
+        const saved = await repository.saveState({
+          baseState: current.data,
+          localState,
+          baseRevision: current.revision,
+          baseHash: current.hash,
+          requestId: crypto.randomUUID(),
+        });
+        if (saved.ok) return response.status(200).json({ ok: true });
+      }
+      return response.status(503).json({ error: 'save failed' });
+    } catch (error) {
+      logger.error('kitchen prep stage failed', error);
+      return response.status(503).json({ error: 'save failed' });
     }
   });
 

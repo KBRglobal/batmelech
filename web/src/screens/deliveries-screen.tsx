@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { generatePath, Link } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
+import { DeliveriesMap, type DeliveryMapStop } from '../components/deliveries-map.tsx'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
@@ -19,7 +20,13 @@ import {
   applyNextDeliveryStatus,
   nextDeliveryStatus,
 } from '../domain/operational-state.ts'
-import { buildMultiStopMapsUrl, suggestRouteOrder } from '../domain/route-order.ts'
+import {
+  applyRouteOverride,
+  buildMultiStopMapsUrl,
+  readRouteOverride,
+  stopCoordinates,
+  suggestRouteOrder,
+} from '../domain/route-order.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
@@ -65,12 +72,31 @@ interface RoutePlan {
   readonly sequence: readonly DeliveryOrderView[]
   readonly rankByView: ReadonlyMap<DeliveryOrderView, number>
   readonly mapsUrls: readonly string[]
+  readonly mapStops: readonly DeliveryMapStop[]
+}
+
+// Screen-level plumbing for the manual route reorder controls (drag handle plus
+// up/down arrows, same pattern as the menu editor). Stops are identified by their
+// string order id because the view objects are rebuilt on every render.
+interface RouteReorder {
+  readonly draggedId: string | null
+  readonly count: number
+  readonly busy: boolean
+  readonly start: (view: DeliveryOrderView) => void
+  readonly cancel: () => void
+  readonly dropOn: (target: DeliveryOrderView) => void
+  readonly moveTo: (view: DeliveryOrderView, targetIndex: number) => void
 }
 
 // The suggested driving sequence needs the stored coordinates, which the dashboard view
 // intentionally does not carry, so the plan is derived from the original orders and mapped
-// back onto the views by their source index.
-function buildRoutePlan(store: Readonly<LegacyStore>, group: DeliveryDateGroup): RoutePlan {
+// back onto the views by their source index. A manual override saved by the operator is
+// applied on top of the suggested order.
+function buildRoutePlan(
+  store: Readonly<LegacyStore>,
+  group: DeliveryDateGroup,
+  overrideIds: readonly string[] | null,
+): RoutePlan {
   const viewByOrder = new Map<LegacyOrder, DeliveryOrderView>()
   const stops: LegacyOrder[] = []
   for (const destination of group.destinations) {
@@ -81,15 +107,29 @@ function buildRoutePlan(store: Readonly<LegacyStore>, group: DeliveryDateGroup):
       stops.push(order)
     }
   }
-  const routedStops = suggestRouteOrder(stops)
-  const sequence = routedStops.flatMap((order) => {
+  const routedStops = applyRouteOverride(suggestRouteOrder(stops), overrideIds)
+  const pairs = routedStops.flatMap((order) => {
     const view = viewByOrder.get(order)
-    return view === undefined ? [] : [view]
+    return view === undefined ? [] : [{ order, view }]
+  })
+  const sequence = pairs.map(({ view }) => view)
+  const mapStops = pairs.map(({ order, view }, index): DeliveryMapStop => {
+    const coordinates = stopCoordinates(order)
+    return {
+      key: view.orderId ?? `stop-${view.sourceIndex}`,
+      sequence: index + 1,
+      customerName: view.customerName,
+      destination: view.destination,
+      time: view.time,
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
+    }
   })
   return {
     sequence,
     rankByView: new Map(sequence.map((view, index) => [view, index + 1])),
     mapsUrls: buildMultiStopMapsUrl(routedStops),
+    mapStops,
   }
 }
 
@@ -225,18 +265,70 @@ function DeliveryOrder({
   onAdvance,
   saveState,
   saveBlocked,
+  reorder,
 }: {
   order: DeliveryOrderView
   sequence: number
   onAdvance?: (order: DeliveryOrderView) => void
   saveState?: DeliverySaveState
   saveBlocked: boolean
+  reorder?: RouteReorder
 }) {
+  const reorderable = reorder !== undefined && order.orderId !== null && reorder.count > 1
   return (
-    <li className="rounded-2xl bg-background/70 p-4">
+    <li
+      onDragOver={(event) => {
+        if (reorderable && reorder.draggedId !== null && reorder.draggedId !== order.orderId) {
+          event.preventDefault()
+        }
+      }}
+      onDrop={(event) => {
+        if (!reorderable) return
+        event.preventDefault()
+        reorder.dropOn(order)
+      }}
+      className={`rounded-2xl bg-background/70 p-4 ${reorderable && reorder.draggedId === order.orderId ? 'opacity-50' : ''}`}
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-black text-primary-foreground">{sequence}</span>
+          {reorderable && (
+            <>
+              <span
+                draggable
+                role="button"
+                aria-label={`גרירת ${order.customerName} לשינוי סדר המסלול`}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  reorder.start(order)
+                }}
+                onDragEnd={() => reorder.cancel()}
+                className="flex min-h-9 shrink-0 cursor-grab items-center text-muted-foreground active:cursor-grabbing"
+              >
+                <LocalIcon name="ph:dots-six-vertical-bold" className="text-xl" />
+              </span>
+              <div className="flex shrink-0 flex-col">
+                <button
+                  type="button"
+                  aria-label={`העברת ${order.customerName} מוקדם יותר במסלול`}
+                  disabled={sequence <= 1 || reorder.busy}
+                  onClick={() => reorder.moveTo(order, sequence - 2)}
+                  className="rounded p-0.5 text-muted-foreground hover:text-primary disabled:opacity-30"
+                >
+                  <LocalIcon name="ph:caret-up-bold" className="text-sm" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`העברת ${order.customerName} מאוחר יותר במסלול`}
+                  disabled={sequence >= reorder.count || reorder.busy}
+                  onClick={() => reorder.moveTo(order, sequence)}
+                  className="rounded p-0.5 text-muted-foreground hover:text-primary disabled:opacity-30"
+                >
+                  <LocalIcon name="ph:caret-down-bold" className="text-sm" />
+                </button>
+              </div>
+            </>
+          )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {order.time && <span className="text-xs font-black text-muted-foreground">{order.time}</span>}
@@ -280,12 +372,14 @@ function Destination({
   onAdvance,
   saveStates,
   saveBlocked,
+  reorder,
 }: {
   destination: DeliveryDestinationGroup
   routeRanks: ReadonlyMap<DeliveryOrderView, number>
   onAdvance?: (order: DeliveryOrderView) => void
   saveStates: Readonly<Record<string, DeliverySaveState>>
   saveBlocked: boolean
+  reorder?: RouteReorder
 }) {
   return (
     <article className="rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
@@ -321,6 +415,7 @@ function Destination({
             onAdvance={onAdvance}
             saveState={order.orderId === null ? undefined : saveStates[order.orderId]}
             saveBlocked={saveBlocked}
+            reorder={reorder}
           />
         ))}
       </ol>
@@ -473,6 +568,8 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
   const [selectedGroupKey, setSelectedGroupKey] = useState('')
   const [writeInFlight, setWriteInFlight] = useState(false)
   const [saveStates, setSaveStates] = useState<Readonly<Record<string, DeliverySaveState>>>({})
+  const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null)
+  const [routeSaveState, setRouteSaveState] = useState<DeliverySaveState | null>(null)
 
   if (initializationRef.current === null && storeQuery.data?.data != null) {
     initializationRef.current = {
@@ -538,7 +635,12 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
     dashboard.groups.find(({ key }) => key === selectedGroupKey)
     ?? datedGroups.find(({ serviceDate }) => serviceDate === defaultServiceDate)
     ?? dashboard.groups[0]!
-  const routePlan = buildRoutePlan(displayStore, selectedGroup)
+  const activeServiceDate = selectedGroup.serviceDate
+  const overrideIds = activeServiceDate === null
+    ? null
+    : readRouteOverride(displayStore.settings?.routeOverrides, activeServiceDate)
+  const overrideActive = overrideIds !== null
+  const routePlan = buildRoutePlan(displayStore, selectedGroup, overrideIds)
   const routedDestinations = [...selectedGroup.destinations].sort((left, right) => {
     const leftRank = routeRank(routePlan, left)
     const rightRank = routeRank(routePlan, right)
@@ -619,6 +721,111 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
         }
       }
 
+  // Persists the operator's manual route order for the selected date inside
+  // settings.routeOverrides, through the same guarded versioned save flow as the
+  // status updates. 'reset' removes the date's entry and returns to the suggestion.
+  const saveRouteOverride = onSave === undefined || activeServiceDate === null
+    ? undefined
+    : async (action: { readonly ids: readonly string[] } | 'reset') => {
+        const baseEnvelope = initialization.baseEnvelope
+        if (
+          baseEnvelope === null ||
+          acceptedEnvelopeRef.current !== null ||
+          writeInFlightRef.current ||
+          !isSameVersionedStateEnvelope(storeQuery.data, baseEnvelope)
+        ) {
+          setRouteSaveState({
+            kind: 'error',
+            message: 'הנתונים השתנו מאז פתיחת המסך. סדר המסלול לא נשמר; צריך לטעון מחדש.',
+          })
+          return
+        }
+
+        const baseStore = initialization.baseStore
+        const baseSettings = baseStore.settings ?? {}
+        const rawOverrides = baseSettings.routeOverrides
+        const currentOverrides: Readonly<Record<string, unknown>> =
+          typeof rawOverrides === 'object' && rawOverrides !== null && !Array.isArray(rawOverrides)
+            ? (rawOverrides as Record<string, unknown>)
+            : {}
+        const nextOverrides: Record<string, unknown> = action === 'reset'
+          ? Object.fromEntries(
+              Object.entries(currentOverrides).filter(([date]) => date !== activeServiceDate),
+            )
+          : { ...currentOverrides, [activeServiceDate]: [...action.ids] }
+        let nextSettings: NonNullable<LegacyStore['settings']>
+        if (action === 'reset' && Object.keys(nextOverrides).length === 0) {
+          nextSettings = { ...baseSettings }
+          delete nextSettings['routeOverrides']
+        } else {
+          nextSettings = { ...baseSettings, routeOverrides: nextOverrides }
+        }
+        const nextStore: LegacyStore = { ...baseStore, settings: nextSettings }
+
+        setRouteSaveState({ kind: 'saving', message: 'שומרת...' })
+        writeInFlightRef.current = true
+        setWriteInFlight(true)
+        try {
+          const confirmedEnvelope = await onSave({
+            reason: 'deliveries',
+            baseEnvelope,
+            baseStore,
+            nextStore,
+          })
+          acceptedEnvelopeRef.current = confirmedEnvelope
+          initializationRef.current = {
+            baseEnvelope: confirmedEnvelope,
+            baseStore: confirmedEnvelope.data,
+          }
+          setRouteSaveState({
+            kind: 'saved',
+            message: action === 'reset' ? 'חזרנו לסדר המוצע.' : 'סדר המסלול נשמר.',
+          })
+        } catch {
+          setRouteSaveState({
+            kind: 'error',
+            message: 'השמירה נכשלה או התנגשה בעדכון אחר. הסדר הקודם נשאר.',
+          })
+        } finally {
+          writeInFlightRef.current = false
+          setWriteInFlight(false)
+        }
+      }
+
+  const moveStop = saveRouteOverride === undefined
+    ? undefined
+    : (view: DeliveryOrderView, targetIndex: number) => {
+        const from = routePlan.sequence.indexOf(view)
+        if (from === -1 || targetIndex < 0 || targetIndex >= routePlan.sequence.length) return
+        if (from === targetIndex) return
+        const next = [...routePlan.sequence]
+        next.splice(from, 1)
+        next.splice(targetIndex, 0, view)
+        const ids = next.flatMap((stop) => (stop.orderId === null ? [] : [stop.orderId]))
+        if (ids.length === 0) return
+        void saveRouteOverride({ ids })
+      }
+
+  const reorder: RouteReorder | undefined = moveStop === undefined
+    ? undefined
+    : {
+        draggedId: draggedOrderId,
+        count: routePlan.sequence.length,
+        busy: writeInFlight || acceptedEnvelopeRef.current !== null,
+        start: (view) => setDraggedOrderId(view.orderId),
+        cancel: () => setDraggedOrderId(null),
+        dropOn: (target) => {
+          const draggedId = draggedOrderId
+          setDraggedOrderId(null)
+          if (draggedId === null || draggedId === target.orderId) return
+          const dragged = routePlan.sequence.find((stop) => stop.orderId === draggedId)
+          const targetIndex = routePlan.sequence.indexOf(target)
+          if (dragged === undefined || targetIndex === -1) return
+          moveStop(dragged, targetIndex)
+        },
+        moveTo: moveStop,
+      }
+
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -648,6 +855,41 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
           </h2>
           <ProgressStrip store={displayStore} group={selectedGroup} plan={routePlan} />
           <RouteLinks mapsUrls={routePlan.mapsUrls} />
+          {(overrideActive || routeSaveState !== null || (reorder !== undefined && routePlan.sequence.length > 1)) && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+              {overrideActive && (
+                <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[0.6875rem] font-black text-amber-800">סדר ידני</span>
+              )}
+              {reorder !== undefined && routePlan.sequence.length > 1 && (
+                <p className="text-xs font-bold text-muted-foreground">
+                  אפשר לגרור את הידית או להזיז עם החצים כדי לקבוע סדר ידני למסלול.
+                </p>
+              )}
+              {overrideActive && saveRouteOverride !== undefined && (
+                <button
+                  type="button"
+                  disabled={writeInFlight || acceptedEnvelopeRef.current !== null}
+                  onClick={() => void saveRouteOverride('reset')}
+                  className={actionClassName}
+                >
+                  <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-base" />
+                  <span>חזרה לסדר המוצע</span>
+                </button>
+              )}
+              {routeSaveState !== null && routeSaveState.kind !== 'saving' && (
+                <p
+                  className={`text-xs font-black ${routeSaveState.kind === 'error' ? 'text-destructive' : 'text-emerald-700'}`}
+                  role={routeSaveState.kind === 'error' ? 'alert' : 'status'}
+                >
+                  {routeSaveState.message}
+                </p>
+              )}
+              {routeSaveState?.kind === 'saving' && (
+                <p className="text-xs font-black text-muted-foreground">{routeSaveState.message}</p>
+              )}
+            </div>
+          )}
+          <DeliveriesMap stops={routePlan.mapStops} />
           <DateSummary group={selectedGroup} />
           {routedDestinations.map((destination) => (
             <Destination
@@ -657,6 +899,7 @@ export function DeliveriesScreen({ onSave }: { readonly onSave?: ConfirmedStoreS
               onAdvance={advanceStatus}
               saveStates={saveStates}
               saveBlocked={writeInFlight || acceptedEnvelopeRef.current !== null}
+              reorder={reorder}
             />
           ))}
           <Pickups
