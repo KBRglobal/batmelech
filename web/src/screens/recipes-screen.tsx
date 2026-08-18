@@ -5,6 +5,7 @@ import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
   applyRecipesToStore,
+  buildPreparationCatalog,
   createRecipeDraft,
   loadRecipeBook,
   loadSettingsCatalog,
@@ -38,12 +39,25 @@ const HEAVY_PRODUCTS_NOTE =
 
 const UNIT_PRESETS = ['ק״ג', 'גרם', 'יחידה'] as const
 
-interface RecipesInitialization {
-  readonly baseEnvelope: VersionedStateEnvelope | null
-  readonly baseStore: LegacyStore
-  readonly catalogResult: CatalogResult
-  readonly book: RecipeBook
+const CATEGORY_LABELS: Readonly<Record<string, string>> = {
+  salads: 'סלטים',
+  firsts: 'ראשונות',
+  mains: 'עיקריות',
+  sides: 'תוספות',
+  desserts: 'קינוחים',
+  extras: 'אקסטרות',
+  custom: 'מיוחדים',
+  lunch: 'צהריים',
 }
+
+interface RecipesInitialization {
+  baseEnvelope: VersionedStateEnvelope | null
+  baseStore: LegacyStore
+  catalogResult: CatalogResult
+  book: RecipeBook
+}
+
+type DraftIngredient = RecipeDraft['ingredients'][number]
 
 function toDraft(recipe: RecipeDefinition): RecipeDraft {
   return {
@@ -66,13 +80,14 @@ function recipeName(draft: RecipeDraft, targetsById: ReadonlyMap<string, string>
   return targetsById.get(draft.itemId) ?? draft.name?.trim() ?? draft.itemId
 }
 
-// Batch-sold dishes ("ל־4 אנשים", "זוגי", "מגש", "סיר"): the recipe always
-// describes the WHOLE batch, so we pre-suggest the matching yield and spell it
-// out in words. Quantities are never divided or multiplied — only the wording
-// makes the batch explicit.
+// Batch-sold products ("ל־4 אנשים", "זוגי", "מגש", "סיר"): one recipe always
+// describes ONE whole sold product, so the quantities cover the entire batch.
+// We pre-suggest the matching yield for empty recipes only and spell the batch
+// out in words. Quantities are never divided or multiplied automatically.
 interface BatchHint {
   readonly suggestedYield: string
   readonly note: string
+  readonly sizeLabel: string
 }
 
 function batchHintFromName(name: string): BatchHint | null {
@@ -84,6 +99,7 @@ function batchHintFromName(name: string): BatchHint | null {
       return {
         suggestedYield: String(count),
         note: `המנה הזאת נמכרת כיחידה של ${count} — הכמויות צריכות לכסות את כולה.`,
+        sizeLabel: `מוצר של ${count} מנות`,
       }
     }
   }
@@ -91,15 +107,38 @@ function batchHintFromName(name: string): BatchHint | null {
     return {
       suggestedYield: '2',
       note: 'המנה הזאת נמכרת כזוג — הכמויות צריכות לכסות את שתי המנות.',
+      sizeLabel: 'מוצר זוגי',
     }
   }
   if (/(?:^|[\s(])מגש/.test(normalized)) {
-    return { suggestedYield: '1', note: 'רושמים את הכמויות למגש כולו — כל מה שנכנס בו.' }
+    return {
+      suggestedYield: '1',
+      note: 'רושמים את הכמויות למגש כולו — כל מה שנכנס בו.',
+      sizeLabel: 'מגש שלם',
+    }
   }
   if (/(?:^|[\s(])סיר/.test(normalized)) {
-    return { suggestedYield: '1', note: 'רושמים את הכמויות לסיר כולו — כל מה שנכנס בו.' }
+    return {
+      suggestedYield: '1',
+      note: 'רושמים את הכמויות לסיר כולו — כל מה שנכנס בו.',
+      sizeLabel: 'סיר שלם',
+    }
   }
   return null
+}
+
+// Shared base name for grouping size variants of the same dish next to each
+// other in the list. Strips size markers only — never touches stored data.
+function baseDishName(name: string): string {
+  return name
+    .normalize('NFKC')
+    .replace(/\(([^)]*)\)/g, (match, inner: string) =>
+      /זוגי|תוספת|אנשים|מנות|יח|ל[־-]?\s?\d/.test(inner) ? ' ' : match,
+    )
+    .replace(/(?:^|\s)ל[־-]?\s?\d+(?:[־-]\d+)?(\s|$)/g, ' ')
+    .replace(/^(?:מגש|סיר|מנת)\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // Friendly wording over the exact same constraints the save path enforces
@@ -109,15 +148,15 @@ function yieldHint(value: string): string | null {
   return /^[1-9]\d*$/.test(value.trim()) ? null : 'צריך מספר שלם של מנות — למשל 4'
 }
 
-function wholeRecipeSentence(yieldValue: string): string | null {
+function wholeProductSentence(yieldValue: string): string | null {
   const trimmed = yieldValue.trim()
   if (!/^[1-9]\d*$/.test(trimmed)) return null
   return trimmed === '1'
-    ? 'המצרכים שלמטה הם לכל המתכון — מנה אחת.'
-    : `המצרכים שלמטה הם לכל המתכון — ${trimmed} מנות ביחד.`
+    ? 'הכמויות במתכון הן למוצר שלם אחד — מנה אחת.'
+    : `הכמויות במתכון הן למוצר שלם אחד — ${trimmed} מנות.`
 }
 
-function ingredientHints(ingredient: RecipeDraft['ingredients'][number]): readonly string[] {
+function ingredientHints(ingredient: DraftIngredient): readonly string[] {
   const hints: string[] = []
   if (ingredient.ingredientName.trim() === '') hints.push('חסר שם למצרך')
   const quantity = ingredient.quantity.trim()
@@ -131,6 +170,45 @@ function ingredientHints(ingredient: RecipeDraft['ingredients'][number]): readon
     hints.push('פחת הוא אחוז בין 0 ל־100')
   }
   return hints
+}
+
+// name -> unit -> how many ingredient rows across all drafts use it. Feeds the
+// autocomplete and the unit-consistency nudge.
+type IngredientUsage = ReadonlyMap<string, ReadonlyMap<string, number>>
+
+function buildIngredientUsage(drafts: readonly RecipeDraft[]): IngredientUsage {
+  const usage = new Map<string, Map<string, number>>()
+  for (const draft of drafts) {
+    for (const ingredient of draft.ingredients) {
+      const name = ingredient.ingredientName.trim()
+      const unit = ingredient.unit.trim()
+      if (name === '' || unit === '') continue
+      const units = usage.get(name) ?? new Map<string, number>()
+      units.set(unit, (units.get(unit) ?? 0) + 1)
+      usage.set(name, units)
+    }
+  }
+  return usage
+}
+
+function unitsUsedElsewhere(
+  usage: IngredientUsage,
+  ingredient: DraftIngredient,
+): readonly string[] {
+  const name = ingredient.ingredientName.trim()
+  const ownUnit = ingredient.unit.trim()
+  const units = usage.get(name)
+  if (units === undefined) return []
+  return [...units.entries()]
+    .filter(([unit, count]) => (unit === ownUnit ? count - 1 : count) > 0)
+    .sort((left, right) => right[1] - left[1])
+    .map(([unit]) => unit)
+}
+
+function mostCommonUnit(usage: IngredientUsage, name: string): string | null {
+  const units = usage.get(name.trim())
+  if (units === undefined || units.size === 0) return null
+  return [...units.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
 }
 
 function Status({ state }: { state: SaveState }) {
@@ -158,23 +236,21 @@ function chipClassName(active: boolean): string {
 
 function IngredientRows({
   draft,
+  usage,
   onChange,
 }: {
   readonly draft: RecipeDraft
+  readonly usage: IngredientUsage
   readonly onChange: (draft: RecipeDraft) => void
 }) {
   const [customUnitIds, setCustomUnitIds] = useState<ReadonlySet<string>>(new Set())
   const [wasteOpenIds, setWasteOpenIds] = useState<ReadonlySet<string>>(new Set())
 
-  const updateIngredient = (
-    index: number,
-    field: 'ingredientName' | 'quantity' | 'unit' | 'wastePercent',
-    value: string,
-  ) => {
+  const updateIngredient = (index: number, patch: Partial<DraftIngredient>) => {
     onChange({
       ...draft,
       ingredients: draft.ingredients.map((ingredient, ingredientIndex) =>
-        ingredientIndex === index ? { ...ingredient, [field]: value } : ingredient,
+        ingredientIndex === index ? { ...ingredient, ...patch } : ingredient,
       ),
     })
   }
@@ -184,6 +260,12 @@ function IngredientRows({
 
   return (
     <div className="space-y-3">
+      <datalist id="recipes-known-ingredients">
+        {[...usage.keys()].sort().map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+
       {draft.ingredients.length === 0 && (
         <div className="rounded-2xl border-2 border-dashed border-border bg-secondary/20 p-6 text-center">
           <p className="text-sm font-bold text-muted-foreground">עוד אין מתכון — מוסיפים מצרך ראשון</p>
@@ -197,7 +279,19 @@ function IngredientRows({
         const wasteOpen =
           wasteOpenIds.has(ingredient.ingredientId) ||
           (ingredient.wastePercent ?? '').trim() !== ''
-        const hints = ingredientHints(ingredient)
+        const otherUnits = unitsUsedElsewhere(usage, ingredient)
+        const unitMismatch =
+          ingredient.unit.trim() !== '' &&
+          otherUnits.length > 0 &&
+          !otherUnits.includes(ingredient.unit.trim())
+        const hints = [
+          ...ingredientHints(ingredient),
+          ...(unitMismatch
+            ? [
+                `המצרך הזה כבר רשום ב${otherUnits[0]} במתכונים אחרים — אותה יחידה תעזור לרשימת הקניות לחבר כמויות`,
+              ]
+            : []),
+        ]
         return (
           <div
             key={ingredient.ingredientId}
@@ -209,8 +303,18 @@ function IngredientRows({
                 מה המצרך?
                 <input
                   aria-label={`שם מצרך ${index + 1}`}
+                  list="recipes-known-ingredients"
                   value={ingredient.ingredientName}
-                  onChange={(event) => updateIngredient(index, 'ingredientName', event.currentTarget.value)}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value
+                    const knownUnit = mostCommonUnit(usage, value)
+                    updateIngredient(
+                      index,
+                      knownUnit !== null && ingredient.unit.trim() === ''
+                        ? { ingredientName: value, unit: knownUnit }
+                        : { ingredientName: value },
+                    )
+                  }}
                   placeholder="למשל: חזה עוף"
                   className={`mt-2 ${inputClassName}`}
                 />
@@ -221,7 +325,7 @@ function IngredientRows({
                   aria-label={`כמות מצרך ${index + 1}`}
                   inputMode="decimal"
                   value={ingredient.quantity}
-                  onChange={(event) => updateIngredient(index, 'quantity', event.currentTarget.value)}
+                  onChange={(event) => updateIngredient(index, { quantity: event.currentTarget.value })}
                   placeholder="למשל 2 או 0.5"
                   className={`mt-2 ${inputClassName}`}
                 />
@@ -244,7 +348,7 @@ function IngredientRows({
                           next.delete(ingredient.ingredientId)
                           return next
                         })
-                        updateIngredient(index, 'unit', preset)
+                        updateIngredient(index, { unit: preset })
                       }}
                       className={chipClassName(!customUnitOpen && ingredient.unit === preset)}
                     >
@@ -266,7 +370,7 @@ function IngredientRows({
                     <input
                       aria-label={`יחידת מצרך ${index + 1}`}
                       value={ingredient.unit}
-                      onChange={(event) => updateIngredient(index, 'unit', event.currentTarget.value)}
+                      onChange={(event) => updateIngredient(index, { unit: event.currentTarget.value })}
                       placeholder="למשל: כפות"
                       className={`${inputClassName} w-32`}
                     />
@@ -287,7 +391,7 @@ function IngredientRows({
                         next.delete(ingredient.ingredientId)
                         return next
                       })
-                      updateIngredient(index, 'wastePercent', '')
+                      updateIngredient(index, { wastePercent: '' })
                     } else {
                       setWasteOpenIds((previous) => new Set(previous).add(ingredient.ingredientId))
                     }
@@ -301,7 +405,7 @@ function IngredientRows({
                     aria-label={`פחת מצרך ${index + 1}`}
                     inputMode="decimal"
                     value={ingredient.wastePercent ?? ''}
-                    onChange={(event) => updateIngredient(index, 'wastePercent', event.currentTarget.value)}
+                    onChange={(event) => updateIngredient(index, { wastePercent: event.currentTarget.value })}
                     placeholder="אחוז שנזרק — למשל 10"
                     className={`${inputClassName} w-40`}
                   />
@@ -373,11 +477,11 @@ function YieldStepper({
   const trimmed = draft.yield.trim()
   const currentYield = /^[1-9]\d*$/.test(trimmed) ? Number(trimmed) : null
   const hint = yieldHint(draft.yield)
-  const sentence = wholeRecipeSentence(draft.yield)
+  const sentence = wholeProductSentence(draft.yield)
   return (
     <div>
-      <label className="block text-xs font-black text-muted-foreground">
-        לכמה מנות המתכון הזה?
+      <div className="block text-xs font-black text-muted-foreground">
+        <span>כמה מנות במוצר אחד?</span>
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
@@ -389,7 +493,7 @@ function YieldStepper({
             <LocalIcon name="ph:minus-bold" />
           </button>
           <input
-            aria-label="לכמה מנות המתכון הזה?"
+            aria-label="כמה מנות במוצר אחד?"
             inputMode="numeric"
             value={draft.yield}
             onChange={(event) => onChange({ ...draft, yield: event.currentTarget.value })}
@@ -404,7 +508,7 @@ function YieldStepper({
             <LocalIcon name="ph:plus-bold" />
           </button>
         </div>
-      </label>
+      </div>
       {sentence !== null && <p className="mt-2 text-xs font-bold text-muted-foreground">{sentence}</p>}
       {hint !== null && (
         <p className="mt-2 flex items-center gap-2 text-xs font-bold text-amber-800">
@@ -416,18 +520,44 @@ function YieldStepper({
   )
 }
 
+interface DuplicateSource {
+  readonly itemId: string
+  readonly label: string
+  readonly yield: string
+  readonly ingredients: readonly DraftIngredient[]
+}
+
 function RecipeEditor({
   draft,
   title,
+  usage,
+  duplicateSources,
   onChange,
   onClose,
 }: {
   readonly draft: RecipeDraft
   readonly title: string
+  readonly usage: IngredientUsage
+  readonly duplicateSources: readonly DuplicateSource[]
   readonly onChange: (draft: RecipeDraft) => void
   readonly onClose: () => void
 }) {
   const batchHint = batchHintFromName(title)
+
+  const duplicateFrom = (source: DuplicateSource) => {
+    const ingredients: DraftIngredient[] = []
+    for (const ingredient of source.ingredients) {
+      ingredients.push({
+        ingredientId: nextStableIngredientId(draft.itemId, ingredients),
+        ingredientName: ingredient.ingredientName,
+        quantity: ingredient.quantity,
+        unit: ingredient.unit,
+        ...(ingredient.wastePercent === undefined ? {} : { wastePercent: ingredient.wastePercent }),
+      })
+    }
+    onChange({ ...draft, yield: source.yield, ingredients })
+  }
+
   return (
     <section className="overflow-hidden rounded-[2.5rem] border border-border bg-card shadow-sm">
       <div className="flex items-center justify-between gap-4 border-b border-border bg-secondary/30 px-6 py-5 sm:px-8">
@@ -460,6 +590,28 @@ function RecipeEditor({
           </p>
         )}
 
+        {draft.ingredients.length === 0 && duplicateSources.length > 0 && (
+          <label className="block text-xs font-black text-muted-foreground">
+            אפשר להתחיל ממתכון דומה ולשנות רק מה שצריך:
+            <select
+              aria-label="שכפול מתכון מ..."
+              value=""
+              onChange={(event) => {
+                const source = duplicateSources.find((candidate) => candidate.itemId === event.currentTarget.value)
+                if (source !== undefined) duplicateFrom(source)
+              }}
+              className={`mt-2 ${inputClassName} max-w-md`}
+            >
+              <option value="">שכפול מתכון מ...</option>
+              {duplicateSources.map((source) => (
+                <option key={source.itemId} value={source.itemId}>
+                  {source.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <div>
           <div className="mb-3 flex items-end justify-between gap-3">
             <h3 className="font-black text-primary">מה נכנס פנימה</h3>
@@ -469,7 +621,7 @@ function RecipeEditor({
               </span>
             )}
           </div>
-          <IngredientRows draft={draft} onChange={onChange} />
+          <IngredientRows draft={draft} usage={usage} onChange={onChange} />
         </div>
       </div>
     </section>
@@ -482,10 +634,24 @@ function matchesSearch(target: Pick<CatalogItem, 'id' | 'name'>, query: string):
   return `${target.name} ${target.id}`.normalize('NFKC').toLocaleLowerCase('he-IL').includes(normalized)
 }
 
-export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }) {
+type DishRow =
+  | { readonly kind: 'configured'; readonly id: string; readonly name: string; readonly draft: RecipeDraft; readonly index: number }
+  | { readonly kind: 'missing'; readonly id: string; readonly name: string }
+
+export function RecipesScreen({
+  onSave,
+  autosaveDelayMs = 1500,
+}: {
+  readonly onSave?: StoreSaveHandler
+  readonly autosaveDelayMs?: number
+}) {
   const storeQuery = useStore()
   const initializationRef = useRef<RecipesInitialization | null>(null)
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const dirtyRef = useRef(false)
+  const fireAutosaveRef = useRef<() => void>(() => {})
+  const lastSavedRecipesJsonRef = useRef<string | null>(null)
+  const lastSavedDraftsJsonRef = useRef<string | null>(null)
   const [drafts, setDrafts] = useState<readonly RecipeDraft[] | null>(null)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [search, setSearch] = useState('')
@@ -498,6 +664,25 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
     }
   }, [selectedIndex])
 
+  // Warn before leaving the page while edits have not been saved yet.
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // Debounced autosave: every draft change re-arms the timer; the actual save
+  // decision (validity, staleness, no-op detection) happens inside save().
+  useEffect(() => {
+    if (drafts === null) return
+    const timer = setTimeout(() => fireAutosaveRef.current(), autosaveDelayMs)
+    return () => clearTimeout(timer)
+  }, [drafts, autosaveDelayMs])
+
   if (initializationRef.current === null && storeQuery.data?.data != null) {
     const baseStore = storeQuery.data.data
     const catalogResult = loadSettingsCatalog(baseStore)
@@ -506,6 +691,30 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
       baseStore,
       catalogResult,
       book: loadRecipeBook(baseStore, catalogResult.catalog),
+    }
+  }
+
+  // After our own save lands, the query cache holds the confirmed envelope
+  // (the routed onSave does not return it). Adopt it as the new base so the
+  // next save — manual or automatic — starts fresh instead of failing stale.
+  const queryEnvelope = storeQuery.data
+  if (
+    initializationRef.current !== null &&
+    queryEnvelope != null &&
+    isVersionedStateEnvelope(queryEnvelope) &&
+    lastSavedRecipesJsonRef.current !== null &&
+    (initializationRef.current.baseEnvelope === null ||
+      !isSameVersionedStateEnvelope(queryEnvelope, initializationRef.current.baseEnvelope)) &&
+    JSON.stringify((queryEnvelope.data as Record<string, unknown>).recipes ?? []) ===
+      lastSavedRecipesJsonRef.current
+  ) {
+    const nextBaseStore = queryEnvelope.data
+    const nextCatalogResult = loadSettingsCatalog(nextBaseStore)
+    initializationRef.current = {
+      baseEnvelope: queryEnvelope,
+      baseStore: nextBaseStore,
+      catalogResult: nextCatalogResult,
+      book: loadRecipeBook(nextBaseStore, nextCatalogResult.catalog),
     }
   }
 
@@ -521,21 +730,92 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
     )
   }
 
-  const { baseEnvelope, baseStore, catalogResult, book } = initializationRef.current
+  const initialization = initializationRef.current
+  const { baseEnvelope, baseStore, catalogResult, book } = initialization
   const currentDrafts = drafts ?? book.recipes.map(toDraft)
   const targets = recipeTargets(catalogResult.catalog, baseStore)
   const targetsById = new Map(targets.map((target) => [target.id, target.name]))
-  const configuredIds = new Set(currentDrafts.map((draft) => draft.itemId))
-  const missingTargets = targets.filter((target) => !configuredIds.has(target.id))
-  const doneCount = targets.length - missingTargets.length
-  const filteredConfigured = onlyMissing
-    ? []
-    : currentDrafts
-        .map((draft, index) => ({ draft, index, target: { id: draft.itemId, name: recipeName(draft, targetsById) } }))
-        .filter(({ target }) => matchesSearch(target, search))
-  const filteredMissing = missingTargets.filter((target) => matchesSearch(target, search))
-  const validation = validateRecipeDrafts(currentDrafts)
+  const preparation = buildPreparationCatalog(catalogResult.catalog, baseStore)
+  const categoryById = new Map<string, string>()
+  for (const item of preparation.items) categoryById.set(item.id, item.category)
+  for (const lunchItem of preparation.lunchItems) {
+    if (lunchItem.itemId !== undefined) categoryById.set(lunchItem.itemId, 'lunch')
+    for (const variant of lunchItem.variants ?? []) categoryById.set(variant.itemId, 'lunch')
+    if (lunchItem.addon !== undefined) categoryById.set(lunchItem.addon.itemId, 'lunch')
+  }
+  const configuredByItemId = new Map(currentDrafts.map((draft, index) => [draft.itemId, index]))
+  const missingCount = targets.filter((target) => !configuredByItemId.has(target.id)).length
+  const doneCount = targets.length - missingCount
+  const usage = buildIngredientUsage(currentDrafts)
+
+  const currentDraftsJson = JSON.stringify(currentDrafts)
+  const dirty =
+    drafts !== null &&
+    currentDraftsJson !== JSON.stringify(book.recipes.map(toDraft)) &&
+    currentDraftsJson !== lastSavedDraftsJsonRef.current
+  dirtyRef.current = dirty
+
+  // One flat dish list (configured + missing together) in catalog order, then
+  // grouped so size variants of the same dish sit next to each other.
+  const rows: DishRow[] = []
+  const seenDraftIndexes = new Set<number>()
+  for (const target of targets) {
+    const draftIndex = configuredByItemId.get(target.id)
+    if (draftIndex === undefined) {
+      rows.push({ kind: 'missing', id: target.id, name: target.name })
+    } else {
+      seenDraftIndexes.add(draftIndex)
+      rows.push({
+        kind: 'configured',
+        id: target.id,
+        name: target.name,
+        draft: currentDrafts[draftIndex]!,
+        index: draftIndex,
+      })
+    }
+  }
+  currentDrafts.forEach((draft, index) => {
+    if (!seenDraftIndexes.has(index)) {
+      rows.push({ kind: 'configured', id: draft.itemId, name: recipeName(draft, targetsById), draft, index })
+    }
+  })
+  const visibleRows = rows.filter(
+    (row) =>
+      matchesSearch({ id: row.id, name: row.name }, search) &&
+      (!onlyMissing || row.kind === 'missing'),
+  )
+  const groups: { readonly base: string; readonly rows: DishRow[] }[] = []
+  const groupByBase = new Map<string, DishRow[]>()
+  for (const row of visibleRows) {
+    const base = baseDishName(row.name) || row.name
+    const existing = groupByBase.get(base)
+    if (existing === undefined) {
+      const groupRows: DishRow[] = [row]
+      groupByBase.set(base, groupRows)
+      groups.push({ base, rows: groupRows })
+    } else {
+      existing.push(row)
+    }
+  }
+
   const selectedDraft = selectedIndex === null ? null : currentDrafts[selectedIndex] ?? null
+  const selectedBase = selectedDraft === null ? null : baseDishName(recipeName(selectedDraft, targetsById))
+  const duplicateSources: DuplicateSource[] =
+    selectedDraft === null
+      ? []
+      : currentDrafts
+          .map((draft) => ({
+            itemId: draft.itemId,
+            label: recipeName(draft, targetsById),
+            yield: draft.yield,
+            ingredients: draft.ingredients,
+          }))
+          .filter((source) => source.itemId !== selectedDraft.itemId && source.ingredients.length > 0)
+          .sort((left, right) => {
+            const leftSibling = baseDishName(left.label) === selectedBase ? 0 : 1
+            const rightSibling = baseDishName(right.label) === selectedBase ? 0 : 1
+            return leftSibling - rightSibling
+          })
 
   const updateDraft = (index: number, value: RecipeDraft) => {
     setDrafts(currentDrafts.map((draft, draftIndex) => (draftIndex === index ? value : draft)))
@@ -553,25 +833,59 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
     setSaveState(IDLE)
   }
 
-  const save = async () => {
+  // Autosave-safe payload: every valid draft is saved as edited; an invalid
+  // draft NEVER reaches the server — its previously stored version (if any)
+  // is kept untouched, and a brand-new incomplete recipe is simply left out.
+  const buildSaveableRecipes = (): { readonly recipes: readonly RecipeDefinition[]; readonly invalidCount: number } => {
+    const storedById = new Map(book.recipes.map((recipe) => [recipe.itemId, recipe]))
+    const recipes: RecipeDefinition[] = []
+    let invalidCount = 0
+    for (const draft of currentDrafts) {
+      const result = validateRecipeDrafts([draft])
+      if (result.valid && result.recipes.length === 1) {
+        recipes.push(result.recipes[0]!)
+      } else {
+        invalidCount += 1
+        const stored = storedById.get(draft.itemId)
+        if (stored !== undefined) recipes.push(stored)
+      }
+    }
+    return { recipes, invalidCount }
+  }
+
+  const save = async (auto: boolean) => {
+    if (saveState.kind === 'saving') return
     if (!book.saveable) {
       setSaveState({ kind: 'error', message: 'אי אפשר לשמור כרגע — יש בעיה במתכונים השמורים. שום מתכון קיים לא הוחלף.' })
       return
     }
-    if (!validation.valid) {
-      const firstInvalid = currentDrafts.findIndex((draft) => !validateRecipeDrafts([draft]).valid)
-      if (firstInvalid !== -1) setSelectedIndex(firstInvalid)
-      setSaveState({
-        kind: 'error',
-        message:
-          firstInvalid === -1
-            ? 'עוד אי אפשר לשמור — יש שתי גרסאות לאותה מנה. משאירים אחת.'
-            : 'עוד אי אפשר לשמור — חסר משהו במתכון שנפתח למטה. מה שחסר מסומן בפנים.',
-      })
+    const candidate = buildSaveableRecipes()
+    const candidateIds = new Set(candidate.recipes.map((recipe) => recipe.itemId))
+    if (candidateIds.size !== candidate.recipes.length) {
+      setSaveState({ kind: 'error', message: 'עוד אי אפשר לשמור — יש שתי גרסאות לאותה מנה. משאירים אחת.' })
+      return
+    }
+    const candidateJson = JSON.stringify(candidate.recipes)
+    const alreadyStored =
+      candidateJson === JSON.stringify(book.recipes) ||
+      candidateJson === lastSavedRecipesJsonRef.current
+    if (alreadyStored) {
+      if (!auto) {
+        if (candidate.invalidCount > 0) {
+          const firstInvalid = currentDrafts.findIndex((draft) => !validateRecipeDrafts([draft]).valid)
+          if (firstInvalid !== -1) setSelectedIndex(firstInvalid)
+          setSaveState({
+            kind: 'error',
+            message: 'עוד אי אפשר לשמור — חסר משהו במתכון שנפתח למטה. מה שחסר מסומן בפנים.',
+          })
+        } else {
+          setSaveState({ kind: 'saved', message: 'הכל כבר שמור.' })
+        }
+      }
       return
     }
     if (!onSave) {
-      setSaveState({ kind: 'error', message: 'השמירה עדיין לא מחוברת למסך הזה. שום דבר לא השתנה בשרת.' })
+      if (!auto) setSaveState({ kind: 'error', message: 'השמירה עדיין לא מחוברת למסך הזה. שום דבר לא השתנה בשרת.' })
       return
     }
     if (baseEnvelope === null || !isSameVersionedStateEnvelope(storeQuery.data, baseEnvelope)) {
@@ -583,16 +897,37 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
     }
     setSaveState({ kind: 'saving', message: 'שומרת...' })
     try {
-      await onSave({
+      const result = (await onSave({
         reason: 'recipes',
         baseEnvelope,
         baseStore,
-        nextStore: applyRecipesToStore(baseStore, validation.recipes, catalogResult.catalog),
+        nextStore: applyRecipesToStore(baseStore, candidate.recipes, catalogResult.catalog),
+      })) as VersionedStateEnvelope | undefined
+      lastSavedRecipesJsonRef.current = candidateJson
+      if (candidate.invalidCount === 0) lastSavedDraftsJsonRef.current = JSON.stringify(currentDrafts)
+      if (result != null && isVersionedStateEnvelope(result)) {
+        const nextBaseStore = result.data as LegacyStore
+        const nextCatalogResult = loadSettingsCatalog(nextBaseStore)
+        initialization.baseEnvelope = result
+        initialization.baseStore = nextBaseStore
+        initialization.catalogResult = nextCatalogResult
+        initialization.book = loadRecipeBook(nextBaseStore, nextCatalogResult.catalog)
+      }
+      setSaveState({
+        kind: 'saved',
+        message:
+          candidate.invalidCount > 0
+            ? `${auto ? 'נשמר אוטומטית.' : 'המתכונים נשמרו.'} מתכון שעוד חסר בו משהו נשאר כטיוטה עם סימון.`
+            : auto
+              ? 'נשמר אוטומטית.'
+              : 'המתכונים נשמרו.',
       })
-      setSaveState({ kind: 'saved', message: 'המתכונים נשמרו.' })
     } catch {
       setSaveState({ kind: 'error', message: 'השמירה נכשלה. הטיוטה נשארה כאן ואפשר לנסות שוב.' })
     }
+  }
+  fireAutosaveRef.current = () => {
+    if (onSave && dirtyRef.current) void save(true)
   }
 
   return (
@@ -600,7 +935,7 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-black text-primary sm:text-4xl">מתכונים ומצרכים</h1>
-          <p className="mt-2 text-sm font-bold text-muted-foreground">לכל מנה רושמים מה נכנס בה — ומזה נבנית רשימת הקניות.</p>
+          <p className="mt-2 text-sm font-bold text-muted-foreground">לכל מוצר רושמים מה נכנס בו — ומזה נבנית רשימת הקניות.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="relative">
@@ -625,7 +960,7 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
           <button
             type="button"
             disabled={saveState.kind === 'saving'}
-            onClick={() => void save()}
+            onClick={() => void save(false)}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground disabled:opacity-50"
           >
             <LocalIcon name="ph:check-circle-bold" />
@@ -653,13 +988,13 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
       <section className="mt-6 rounded-3xl border border-border bg-card p-5" role="status">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-black text-primary">יש מתכון ל־{doneCount} מתוך {targets.length} מנות</p>
-          {missingTargets.length > 0 && (
+          {missingCount > 0 && (
             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
-              {missingTargets.length} עוד בלי מתכון
+              {missingCount} עוד בלי מתכון
             </span>
           )}
         </div>
-        {missingTargets.length > 0 && (
+        {missingCount > 0 && (
           <p className="mt-1 text-xs font-bold text-muted-foreground">מנה בלי מתכון לא נכנסת לרשימת הקניות — הכמויות לא יומצאו.</p>
         )}
       </section>
@@ -670,6 +1005,8 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
             key={selectedDraft.itemId}
             draft={selectedDraft}
             title={recipeName(selectedDraft, targetsById)}
+            usage={usage}
+            duplicateSources={duplicateSources}
             onChange={(value) => updateDraft(selectedIndex, value)}
             onClose={() => setSelectedIndex(null)}
           />
@@ -679,67 +1016,98 @@ export function RecipesScreen({ onSave }: { readonly onSave?: StoreSaveHandler }
       <section className="mt-8 overflow-hidden rounded-[2.5rem] border border-border bg-card shadow-sm">
         <div className="border-b border-border px-6 py-5 sm:px-8">
           <h2 className="text-xl font-black text-primary">המנות</h2>
-          <p className="mt-1 text-xs font-bold text-muted-foreground">{doneCount} עם מתכון · {missingTargets.length} עוד בלי</p>
+          <p className="mt-1 text-xs font-bold text-muted-foreground">{doneCount} עם מתכון · {missingCount} עוד בלי</p>
         </div>
         <div className="divide-y divide-border">
-          {filteredConfigured.map(({ draft, index, target }) => {
-            const editing = selectedIndex === index
-            return (
-              <div
-                key={`${draft.itemId}-${index}`}
-                className={`flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 ${editing ? 'bg-secondary/40' : ''}`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                    <LocalIcon name="ph:check-circle-bold" className="text-xl" />
+          {groups.map((group) => (
+            <div key={group.base} className={group.rows.length > 1 ? 'bg-secondary/10' : undefined}>
+              {group.rows.length > 1 && (
+                <p className="px-6 pt-4 text-xs font-black text-muted-foreground sm:px-8">כמה גדלים של {group.base}:</p>
+              )}
+              {group.rows.map((row) => {
+                const categoryLabel = CATEGORY_LABELS[categoryById.get(row.id) ?? '']
+                const sizeLabel = batchHintFromName(row.name)?.sizeLabel
+                const metaChips = (
+                  <span className="mt-1 flex flex-wrap items-center gap-2">
+                    {categoryLabel !== undefined && (
+                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[0.625rem] font-black text-muted-foreground">{categoryLabel}</span>
+                    )}
+                    {sizeLabel !== undefined && (
+                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[0.625rem] font-black text-muted-foreground">{sizeLabel}</span>
+                    )}
                   </span>
-                  <div>
-                    <h3 className="text-sm font-black text-primary">{target.name}</h3>
-                    <p className="mt-1 text-xs font-bold text-muted-foreground">
-                      {draft.ingredients.length} מצרכים
-                      {/^[1-9]\d*$/.test(draft.yield.trim()) ? ` · ל־${draft.yield.trim()} מנות` : ''}
-                    </p>
+                )
+                if (row.kind === 'missing') {
+                  return (
+                    <div key={row.id} className="flex flex-col gap-4 bg-amber-50/30 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                      <div className="flex items-center gap-4">
+                        <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                          <LocalIcon name="ph:cooking-pot-bold" className="text-xl" />
+                        </span>
+                        <div>
+                          <h3 className="text-sm font-black text-primary">{row.name}</h3>
+                          <p className="mt-1 text-xs font-black text-amber-800">עוד אין מתכון</p>
+                          {metaChips}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`יצירת מתכון — ${row.name}`}
+                        onClick={() => createMissingRecipe({ id: row.id, name: row.name })}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-xs font-black text-primary-foreground"
+                      >
+                        <LocalIcon name="ph:plus-bold" />
+                        <span>יצירת מתכון</span>
+                      </button>
+                    </div>
+                  )
+                }
+                const editing = selectedIndex === row.index
+                return (
+                  <div
+                    key={`${row.id}-${row.index}`}
+                    onClick={() => setSelectedIndex(row.index)}
+                    className={`flex cursor-pointer flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 ${editing ? 'bg-secondary/40' : ''}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                        <LocalIcon name="ph:check-circle-bold" className="text-xl" />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-black text-primary">{row.name}</h3>
+                        <p className="mt-1 text-xs font-bold text-muted-foreground">
+                          {row.draft.ingredients.length} מצרכים
+                          {/^[1-9]\d*$/.test(row.draft.yield.trim())
+                            ? row.draft.yield.trim() === '1'
+                              ? ' · מוצר של מנה אחת'
+                              : ` · מוצר של ${row.draft.yield.trim()} מנות`
+                            : ''}
+                        </p>
+                        {metaChips}
+                      </div>
+                      {editing && (
+                        <span className="rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground">בעריכה עכשיו</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setSelectedIndex(row.index)
+                      }}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 text-xs font-black text-primary"
+                    >
+                      <LocalIcon name="ph:pencil-simple-bold" />
+                      <span>עריכת מתכון</span>
+                    </button>
                   </div>
-                  {editing && (
-                    <span className="rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground">בעריכה עכשיו</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIndex(index)}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-5 text-xs font-black text-primary"
-                >
-                  <LocalIcon name="ph:pencil-simple-bold" />
-                  <span>עריכת מתכון</span>
-                </button>
-              </div>
-            )
-          })}
-          {filteredMissing.map((target) => (
-            <div key={target.id} className="flex flex-col gap-4 bg-amber-50/30 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-              <div className="flex items-center gap-4">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
-                  <LocalIcon name="ph:cooking-pot-bold" className="text-xl" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-black text-primary">{target.name}</h3>
-                  <p className="mt-1 text-xs font-black text-amber-800">עוד אין מתכון</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={`יצירת מתכון — ${target.name}`}
-                onClick={() => createMissingRecipe(target)}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-xs font-black text-primary-foreground"
-              >
-                <LocalIcon name="ph:plus-bold" />
-                <span>יצירת מתכון</span>
-              </button>
+                )
+              })}
             </div>
           ))}
-          {filteredConfigured.length === 0 && filteredMissing.length === 0 && (
+          {visibleRows.length === 0 && (
             <div className="px-6 py-12 text-center text-sm font-bold text-muted-foreground">
-              {onlyMissing && missingTargets.length === 0
+              {onlyMissing && missingCount === 0
                 ? 'לכל המנות כבר יש מתכון.'
                 : 'לא נמצאה מנה בשם הזה.'}
             </div>

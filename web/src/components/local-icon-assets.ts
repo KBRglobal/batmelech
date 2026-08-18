@@ -53,6 +53,9 @@ export const LOCAL_ICON_PATHS = {
   'ph:note-pencil-bold': `${PUBLIC_BASE}icons/ph-note-pencil-bold.svg`,
   'ph:magnifying-glass-bold': `${PUBLIC_BASE}icons/ph-magnifying-glass-bold.svg`,
   'ph:clock-counter-clockwise-bold': `${PUBLIC_BASE}icons/ph-clock-counter-clockwise-bold.svg`,
+  'ph:funnel-bold': `${PUBLIC_BASE}icons/ph-funnel-bold.svg`,
+  'ph:info-bold': `${PUBLIC_BASE}icons/ph-info-bold.svg`,
+  'ph:trash-bold': `${PUBLIC_BASE}icons/ph-trash-bold.svg`,
 } as const
 
 export type LocalIconName = keyof typeof LOCAL_ICON_PATHS

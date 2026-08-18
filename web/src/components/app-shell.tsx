@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router'
 import type { NavLinkRenderProps } from 'react-router'
 import { APP_ROUTES } from '../app/routes'
 import { BrandLogo } from './brand-logo'
+import { GlobalSearch } from './global-search'
 import { LocalIcon, type LocalIconName } from './local-icon'
 import { NewOrderAlerts } from './new-order-alerts'
 
@@ -21,6 +22,7 @@ type PrimaryNavigationItem = {
     | typeof APP_ROUTES.deliveries
     | typeof APP_ROUTES.finance
     | typeof APP_ROUTES.insights
+    | typeof APP_ROUTES.activity
     | typeof APP_ROUTES.calendar
     | typeof APP_ROUTES.invoices
     | typeof APP_ROUTES.customers
@@ -53,6 +55,12 @@ const PRIMARY_NAVIGATION = [
     path: APP_ROUTES.preparation,
     icon: 'ph:cooking-pot-bold',
     end: false,
+  },
+  {
+    label: 'יומן פעילות',
+    path: APP_ROUTES.activity,
+    icon: 'ph:clock-counter-clockwise-bold',
+    end: true,
   },
   {
     label: 'לוח שנה',
@@ -136,6 +144,8 @@ function DesktopNavigation() {
         <BrandLogo alt="בת מלך" className="h-28 w-40" />
       </Link>
 
+      <GlobalSearch variant="desktop" />
+
       <nav aria-label="ניווט ראשי" className="flex flex-1 flex-col gap-1.5">
         {PRIMARY_NAVIGATION.map((item) => (
           <NavLink
@@ -181,6 +191,9 @@ function MobileHeader() {
       >
         <BrandLogo alt="בת מלך" className="h-16 w-24" />
       </Link>
+      <div className="absolute inset-y-0 start-4 flex items-center">
+        <GlobalSearch variant="mobile" />
+      </div>
     </header>
   )
 }

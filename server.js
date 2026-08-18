@@ -56,6 +56,7 @@ const { createStateSafetyService } = require('./server/state/state-service');
 const { startAfterStateInitialization } = require('./server/state/state-startup');
 const { createTrackingRouter } = require('./server/track/tracking-route');
 const { createTrackingAdminRouter } = require('./server/track/tracking-admin-route');
+const { createCalendarRouter } = require('./server/calendar/ics-route');
 
 const app = express();
 // Railway sits as a single reverse-proxy hop in front of this service — trust
@@ -284,6 +285,7 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /legacy',
     'Disallow: /kitchen',
     'Disallow: /t',
+    'Disallow: /calendar',
     'Sitemap: https://www.batmelech.ae/site/sitemap.xml',
   ].join('\n') + '\n');
 });
@@ -327,6 +329,8 @@ app.use('/api/hotels/search', createHotelSearchRouter());
 // for anything invalid. Must sit BEFORE the decoy gate. ---
 if (stateRepository) {
   app.use('/t', createTrackingRouter({ repository: stateRepository, sessionSecret: SESSION_SECRET }));
+  // Phone-calendar ICS feed of deliveries — the signed URL is the capability.
+  app.use('/calendar', createCalendarRouter({ repository: stateRepository, sessionSecret: SESSION_SECRET }));
 }
 
 // --- staff gate on everything else: no valid session -> looks like a 404 ---

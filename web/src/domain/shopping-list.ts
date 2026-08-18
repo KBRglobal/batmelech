@@ -478,6 +478,87 @@ function addIngredient(
   items.set(key, item)
 }
 
+// The one and only unit conversion in the system: גרם and ק"ג of the SAME
+// ingredient (by name) become a single shopping line, ×1000, well defined.
+// Every other unit (יחידה, free text, English "kg", ...) stays strictly
+// separate, and recipe rows themselves are never rewritten. The combined line
+// is displayed in ק"ג when it reaches a full kilogram, otherwise in grams.
+const KILOGRAM_UNITS: ReadonlySet<string> = new Set(['ק"ג', 'ק״ג'])
+const GRAM_UNITS: ReadonlySet<string> = new Set(['גרם'])
+const GRAMS_PER_KILOGRAM = 1000n
+
+function ceilDiv(numerator: bigint, denominator: bigint): bigint {
+  const quotient = numerator / denominator
+  return numerator % denominator === 0n ? quotient : quotient + 1n
+}
+
+function unifyGramAndKilogramLines(items: Map<string, MutableShoppingListItem>): void {
+  const byName = new Map<
+    string,
+    { kilogram: MutableShoppingListItem[]; gram: MutableShoppingListItem[] }
+  >()
+  for (const item of items.values()) {
+    const bucket = KILOGRAM_UNITS.has(item.unit)
+      ? 'kilogram'
+      : GRAM_UNITS.has(item.unit)
+        ? 'gram'
+        : null
+    if (bucket === null) continue
+    const group = byName.get(item.ingredientName) ?? { kilogram: [], gram: [] }
+    group[bucket].push(item)
+    byName.set(item.ingredientName, group)
+  }
+
+  for (const [ingredientName, group] of byName) {
+    if (group.kilogram.length === 0 || group.gram.length === 0) continue
+    const members = [...group.kilogram, ...group.gram]
+    const kilogramScaledTotal =
+      group.kilogram.reduce((sum, item) => sum + item.quantity, 0n) +
+      ceilDiv(
+        group.gram.reduce((sum, item) => sum + item.quantity, 0n),
+        GRAMS_PER_KILOGRAM,
+      )
+    const displayInKilograms = kilogramScaledTotal >= OUTPUT_SCALE_FACTOR
+    const displayUnit = displayInKilograms
+      ? [...new Set(group.kilogram.map((item) => item.unit))].sort(compareText)[0]!
+      : [...new Set(group.gram.map((item) => item.unit))].sort(compareText)[0]!
+    const convert = (value: bigint, sourceIsKilogram: boolean): bigint => {
+      if (sourceIsKilogram === displayInKilograms) return value
+      return displayInKilograms
+        ? ceilDiv(value, GRAMS_PER_KILOGRAM)
+        : value * GRAMS_PER_KILOGRAM
+    }
+
+    const merged: MutableShoppingListItem = {
+      ingredientId: members.map((item) => item.ingredientId).sort(compareText)[0]!,
+      ingredientName,
+      quantity: 0n,
+      unit: displayUnit,
+      sources: new Map(),
+    }
+    let overflowed = false
+    for (const item of members) {
+      const isKilogram = KILOGRAM_UNITS.has(item.unit)
+      for (const [key, source] of item.sources) {
+        const convertedQuantity = convert(source.ingredientQuantity, isKilogram)
+        const existing = merged.sources.get(key)
+        const nextQuantity = (existing?.ingredientQuantity ?? 0n) + convertedQuantity
+        merged.quantity += convertedQuantity
+        if (nextQuantity > MAX_OUTPUT_SCALED_UNITS || merged.quantity > MAX_OUTPUT_SCALED_UNITS) {
+          overflowed = true
+          break
+        }
+        merged.sources.set(key, { ...source, ingredientQuantity: nextQuantity })
+      }
+      if (overflowed) break
+    }
+    // On overflow, leave the original per-unit lines untouched.
+    if (overflowed) continue
+    for (const item of members) items.delete(ingredientKey(item.ingredientId, item.unit))
+    items.set(ingredientKey(merged.ingredientId, merged.unit), merged)
+  }
+}
+
 export function buildShoppingList(
   demands: readonly PreparationItemDemand[],
   recipes: readonly RecipeDefinition[],
@@ -569,6 +650,8 @@ export function buildShoppingList(
       }
     }
   }
+
+  unifyGramAndKilogramLines(items)
 
   for (const [key, names] of [...conflictedKeys.entries()].sort(([left], [right]) =>
     compareText(left, right),

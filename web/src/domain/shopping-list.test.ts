@@ -704,3 +704,97 @@ describe('recipe validation', () => {
     if (!result.valid) expect(result.issues.length).toBeGreaterThan(0)
   })
 })
+
+describe('unit handling in aggregation', () => {
+  it('never sums across different units — each unit keeps its own line, without conversion', () => {
+    const result = buildShoppingList(
+      [demand('item-a', 'Dish A', 1), demand('item-b', 'Dish B', 1)],
+      [
+        {
+          itemId: 'item-a',
+          yield: 1,
+          ingredients: [
+            { ingredientId: 'chicken-a', ingredientName: 'עוף', quantity: '2', unit: 'kg' },
+            { ingredientId: 'chicken-a2', ingredientName: 'עוף', quantity: '3', unit: 'יחידה' },
+          ],
+        },
+        {
+          itemId: 'item-b',
+          yield: 1,
+          ingredients: [
+            { ingredientId: 'chicken-b', ingredientName: 'עוף', quantity: '1.5', unit: 'kg' },
+          ],
+        },
+      ] as RecipeDefinition[],
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(
+      result.items.map((item) => [item.ingredientId, item.quantity, item.unit]),
+    ).toEqual([
+      ['chicken-a', '2', 'kg'],
+      ['chicken-a2', '3', 'יחידה'],
+      ['chicken-b', '1.5', 'kg'],
+    ])
+  })
+
+  it('unifies גרם and ק"ג of the same ingredient into one kilogram line (500 גרם + 0.8 ק"ג = 1.3 ק"ג)', () => {
+    const result = buildShoppingList(
+      [demand('item-a', 'Dish A', 1), demand('item-b', 'Dish B', 1)],
+      [
+        {
+          itemId: 'item-a',
+          yield: 1,
+          ingredients: [
+            { ingredientId: 'beef-gram', ingredientName: 'בשר טחון', quantity: '500', unit: 'גרם' },
+          ],
+        },
+        {
+          itemId: 'item-b',
+          yield: 1,
+          ingredients: [
+            { ingredientId: 'beef-kg', ingredientName: 'בשר טחון', quantity: '0.8', unit: 'ק"ג' },
+          ],
+        },
+      ] as RecipeDefinition[],
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(result.items).toHaveLength(1)
+    const merged = result.items[0]!
+    expect(merged.ingredientName).toBe('בשר טחון')
+    expect(merged.quantity).toBe('1.3')
+    expect(merged.unit).toBe('ק"ג')
+    expect(
+      merged.sources.map((source) => [source.itemId, source.ingredientQuantity]),
+    ).toEqual([
+      ['item-a', '0.5'],
+      ['item-b', '0.8'],
+    ])
+  })
+
+  it('displays a combined line below one kilogram in grams, and leaves יחידה strictly apart', () => {
+    const result = buildShoppingList(
+      [demand('item-a', 'Dish A', 1)],
+      [
+        {
+          itemId: 'item-a',
+          yield: 1,
+          ingredients: [
+            { ingredientId: 'cashew-gram', ingredientName: 'קשיו', quantity: '300', unit: 'גרם' },
+            { ingredientId: 'cashew-kg', ingredientName: 'קשיו', quantity: '0.5', unit: 'ק"ג' },
+            { ingredientId: 'cashew-unit', ingredientName: 'קשיו', quantity: '2', unit: 'יחידה' },
+          ],
+        },
+      ] as RecipeDefinition[],
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(
+      result.items.map((item) => [item.ingredientId, item.quantity, item.unit]),
+    ).toEqual([
+      ['cashew-gram', '800', 'גרם'],
+      ['cashew-unit', '2', 'יחידה'],
+    ])
+  })
+})
