@@ -1,31 +1,126 @@
-# STATE — batmelech (updated: 2026-08-18 03:30)
+# STATE — batmelech (updated: 2026-08-18 04:30)
 
 ## Now (start here in a new session)
-Collection phase is DONE; everything decided is persisted:
-- docs/product-roadmap-v3.md — full approved/rejected/pending idea list + the governing
-  philosophy Moshe chose: inline-edit everything (no edit screens) + drag-and-drop system-wide.
-- docs/whatsapp-intake-spec.md — deep approved spec for the flagship WhatsApp intake
-  (Export-Chat file is the whole-conversation path, NOT screenshots; phone-only via Mey).
-- Rule Moshe set explicitly: COLLECT first, build only when he says "בנה". When building:
-  verify green (web 638+ tests, server 397+), commit, push, deploy via
-  `railway up --service app --detach` (auto-deploy from GitHub is unreliable), verify the
-  LIVE bundle hash/content before reporting.
+Build session 2026-08-18: the three ordered flagships from roadmap v3 are BUILT,
+DEPLOYED and LIVE-VERIFIED, plus several mid-session asks from Moshe. Details below.
 
-## Shipped this session (2026-08-17→18, all deployed + live-verified)
-Delivery zones (Dubai $15/Abu Dhabi $55/free toggle) admin+site · manual total override
-unblocked + % discount · editable salad/fish/dessert surcharge prices · dessert overage now
-priced, not blocking · photos+descriptions for EVERY dish (R2 upload via
-/api/settings/menu-image) admin-editable · collapsible order-editor sections (mixed-order
-confirm checkbox moved OUT of collapsed section — regression fixed) · group-name click-to-pick
-dropdown (native datalist failed) · per-diner lunch plates (plates[] with legacy v/sides kept
-in sync, pooled sides pricing, stale plates fall back) · quick status-advance + paid stamp on
-order cards (Orders/Today/Deliveries) + status/payment filter chips · customers outstanding
-chips + wa.me/tel · finance KPIs + outstanding-balances list · insights screen (תובנות) ·
-month calendar screen (לוח שנה) · public /api/site/catalog (whitelisted projection, 60s cache)
-+ customer-site pages (weekdays/shabbat-order/shabbat-extras) consume live catalog with safe
-fallback · history & restore (bm_state_versions surfaced: /api/state/history + restore-as-new-
-version + Settings section) · bon cleanup (no nav-link lines) · apex batmelech.ae DNS fixed
-(A→69.46.46.44 at aeserver; SSL cert was still pending issue at last check — verify!).
+## Shipped this session (2026-08-18, build session — all deployed + live-verified)
+
+### 1. WhatsApp intake flagship (docs/whatsapp-intake-spec.md — fully built)
+- **Whole-conversation parsing**: `server/ai/whatsapp-chat.js` parses WhatsApp
+  "Export chat" .txt (iOS+Android formats), strips timestamps/media/system lines +
+  directional marks into a "Sender: text" transcript. All grounding runs against
+  that transcript. Message limit raised 6000→24000 end to end.
+- **Panel intake** (`/admin` → import review screen): paste text/whole thread,
+  upload the exported .txt, or upload a screenshot (vision transcription via
+  `server/ai/openai-chat-image.js`; the route returns the transcript it reviewed
+  and the UI shows/stores THAT). Prompt is conversation-aware + any language.
+- **Follow-up onto an existing order** (spec E): order editor (edit mode) has
+  "פענוח הודעת המשך" → import review with the order as baseDraft → returns to the
+  SAME order's edit screen with a delta list ("חלות: 3 ← 5") for approve-then-save.
+- **Drafted reply** (spec D): `/api/ai/order-reply` + ReplyDraftBox in the editor —
+  reply in the CUSTOMER's language, prices come only from the panel's own pricing
+  engine, numeric grounding guard rejects any invented number. Lin's voice stored
+  in `settings.waReplyStyle`, editable in Settings → Mey section.
+- **Phone-only via Mey** (spec F): forwarded text → Mey tool
+  `build_order_from_whatsapp`; exported .txt sent to the Telegram group → handled
+  deterministically (webhook document branch), never through agent.reply. Both run
+  `server/telegram/whatsapp-intake.js`: catalog projected server-side from live
+  state.menu, order saved status חדשה source `mey-whatsapp`, notes carry items/
+  unknowns/missing + original conversation; reply includes summary + copyable
+  customer reply + panel link. Weekday-lunch items intentionally NOT in the Mey
+  catalog (no reliable names in overrides) — they surface as unknownItems.
+- **Groups** (spec G): deterministic signal detection adds a warning suggesting
+  group-name + duplicate flow. **Memory** (spec H): `order.intakeConversation`
+  (same preservation rule as mey* fields — NEVER add to OrderDraft/serialize);
+  returning-customer autofill by phone fills name/hotel with an explicit warning.
+
+### 2. Mey wide permissions + audit/undo/freeze (Moshe mid-session: "שליטה כמעט על הכל")
+- `server/telegram/mey-audited-actions.js`: update_order_details (whitelisted
+  fields), delete_order, edit_menu_item (add/remove/rename, carries itemIds +
+  settings.out through renames), set_extra_price, set_base_prices. EVERY write
+  appends to `settings.meyAuditLog` (cap 30) with the exact previous value;
+  `undo_last_change` / panel undo revert any entry precisely. Creations from
+  WhatsApp intake are audited too (undo deletes them).
+- **Emergency freeze**: anyone in the chat (or Mey herself on "עצרי הכל"/suspicion)
+  can freeze via `freeze_writes`; ALL her writes are blocked while frozen; undo
+  still works; UNFREEZING IS PANEL-ONLY (`/api/mey/audit/freeze`) so a compromised
+  chat can't lift its own freeze. Mey tool count now 17 (mey-tools.test.js).
+- Panel: Settings → "מיי — יומן פעולות ובקרה" (`web/src/components/
+  mey-audit-section.tsx`): audit list w/ per-entry undo, freeze toggle, waReplyStyle.
+
+### 3. Kitchen mode (מצב מטבח)
+- `https://www.batmelech.ae/kitchen` — SEPARATE low-privilege login (user lin /
+  pass lin123; env BM_KITCHEN_USER/BM_KITCHEN_PASS on Railway, code default same).
+  Scoped cookie (derived secret — can never be replayed as a staff session, tested).
+  Kitchen session can ONLY: read a whitelisted prep projection (`/api/kitchen/state`
+  — no names/phones/payments/notes leave the server) and toggle prepDone
+  (`/api/kitchen/prep-toggle`). Asset bridge serves the bundle's static files to
+  kitchen sessions; extension-less /app paths stay decoy-gated (tested).
+- Board: huge type, tap-to-mark-done (same prepDone map as the preparation screen),
+  30s auto-refresh, screen wake lock, date chips, progress counter. Admin variant
+  at /admin/kitchen (linked from the preparation screen).
+
+### 4. Drag-to-order menu (first concrete case of the inline+drag philosophy)
+- Settings → מחירון ותפריט: drag handle + up/down arrows reorder dishes
+  (`moveCatalogItem` in settings-catalog.ts). Category array order IS the site
+  display order: site pages follow the live catalog order (`orderByCatalog` in
+  customer-site catalog-context; shabbat-order already followed live merge order).
+
+### 5. Order-editor pricing UX (Moshe mid-session)
+- **Manual price always wins**: MAIN_OVERAGE/SIDE_OVERAGE/DESSERT_UNCLASSIFIED/
+  PRICING_ERROR demote to warnings when a DELIBERATE manual total is typed
+  (`demotePriceAvailabilityIssues`; a total equal to the computed suggestion does
+  NOT count as manual and never unblocks an unpriced overage). Explicit manual-
+  price field added next to the % discount.
+- **Suggested price is the default**: the total auto-fills and follows the computed
+  price until the operator touches the field (then it's theirs; mismatch warning
+  asks for explicit confirmation). Footer shows the manual total as the charged
+  amount with the computed one secondary.
+
+### 6. Site localization he/en/fr (Moshe mid-session; roadmap deferral overridden by him)
+- Hebrew = source of truth at `/site`; native English for AMERICAN JEWS at
+  `/site/en`; native French for FRENCH JEWS at `/site/fr`. NOT translation —
+  Shabbat not Saturday, Chabbat not samedi (his explicit rule).
+- Infra: `customer-site/src/locale-context.tsx` (device-language auto-detect on
+  first visit, explicit choice remembered in localStorage `bm-locale`), language
+  switcher in nav (עב|EN|FR), per-locale meta + hreflang, `dish-names.ts`
+  dictionary keyed by CANONICAL HEBREW names (all catalog/stock/cart/order keys
+  stay Hebrew; `CartLine.displayName` is display-only; WhatsApp handoffs include
+  Hebrew names in parentheses so Lin always understands).
+- **בדיקת סף**: `customer-site/src/localization.test.ts` (vitest, `npm test` in
+  customer-site) bans translationese and Hebrew-script leaks per locale. The
+  english.zip/france.zip sketches were used as tone references only; facts they
+  invented (EAKC cert, Gush Katif) were REJECTED — Hebrew won.
+
+### 7. Security fix (found during live verification, fixed + verified same hour)
+- `/api/mey` and `/api/invoices` were missing from decoy-auth PROTECTED_PREFIXES →
+  reachable anonymously (invoice list was empty in prod; mey surface exposed <1h).
+  Fixed + regression test. **Lesson: every new /api/* mount behind the gate MUST be
+  added to PROTECTED_PREFIXES — the gate is allowlist-based.**
+
+### Test/deploy state at session end
+Server 435 tests, web 643, customer-site 5 (threshold) — all green. ~5 deploys via
+`railway up --service app --detach`, each live-verified (kitchen login flow, gate
+coverage, site locales verified in a real browser locally + bundle hash live).
+
+### Not real-world-tested yet
+- Mey's new tools + WhatsApp intake in the REAL Telegram group (no synthetic
+  message was posted to avoid group noise). First real use = first live test.
+- OTA/env unaffected (no mobile app in this project).
+
+## Deferred / open after this session
+- The rest of roadmap v3's approved 50-idea sweep — collected, NOT built (Moshe's
+  build order covered the three flagships only).
+- Other flagships not in the ordered list: Jewish holidays, customer tracking page,
+  AI recipes, concierge chat, delivery time windows.
+- Inline-edit-everywhere: menu ordering was the first concrete case; the rest of
+  the philosophy is a rollout, not done.
+- "Mega pricing validation" (Moshe): manual-price handling + tests done; a full
+  edge-case audit of every pricing path is still worth a dedicated pass.
+- Localization: admin-entered dish descriptions/banners render as typed (Hebrew)
+  in en/fr — flagged, acceptable; real photography still missing (placeholder
+  badge now localized).
 
 ## Older context below (2026-08-14)
 
