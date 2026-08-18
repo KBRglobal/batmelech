@@ -57,6 +57,7 @@ const FRESH_EXTRAS = [
 // Pantry staples priced by Moshe.
 const PANTRY_EXTRAS = [
   ['אורז', '20', 'ק"ג', 15000], // 20kg sack, 150 AED
+  ['סולת', '1', 'ק"ג', 1000],
 ];
 
 // Brought from Israel by friends (₪≈AED) — recorded under the Rimon/kosher channel.
