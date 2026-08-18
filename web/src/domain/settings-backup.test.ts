@@ -87,6 +87,8 @@ describe('settings backup domain', () => {
       orderingOpen: true,
       orderingClosedUntil: '',
       siteBanner: '',
+      paymentRequestDetails: '',
+      googleReviewUrl: '',
     }
     expect(validateSettingsDraft(nextDraft)).toMatchObject({ valid: true, maxMeals: 20 })
     const saved = applySettingsToStore(store, nextDraft, DEFAULT_SETTINGS_CATALOG)
@@ -103,6 +105,8 @@ describe('settings backup domain', () => {
       invoiceCurrency: 'AED',
       orderingOpen: true,
       siteBanner: null,
+      paymentRequestDetails: '',
+      googleReviewUrl: '',
     })
   })
 
@@ -136,6 +140,8 @@ describe('settings backup domain', () => {
         orderingOpen: true,
         orderingClosedUntil: '',
         siteBanner: '',
+        paymentRequestDetails: '',
+        googleReviewUrl: '',
       },
       DEFAULT_SETTINGS_CATALOG,
     )
@@ -160,6 +166,8 @@ describe('settings backup domain', () => {
       orderingOpen: true,
       orderingClosedUntil: '',
       siteBanner: '',
+      paymentRequestDetails: '',
+      googleReviewUrl: '',
     })
 
     expect(result.valid).toBe(false)
@@ -179,6 +187,8 @@ describe('settings backup domain', () => {
           orderingOpen: true,
           orderingClosedUntil: '',
           siteBanner: '',
+          paymentRequestDetails: '',
+          googleReviewUrl: '',
         },
         DEFAULT_SETTINGS_CATALOG,
       ),

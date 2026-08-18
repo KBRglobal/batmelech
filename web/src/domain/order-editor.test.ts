@@ -1167,6 +1167,12 @@ describe('delivery-confirmation fields through an admin edit', () => {
     deliveryProofBy: 'שליח',
     deliveredAt: 1_760_000_100_000,
     statusBeforeProof: 'במשלוח',
+    plataCount: 2,
+    plataDeposit: '50.00',
+    plataStatus: 'awaitingPickup',
+    plataPickupNote: 'בקבלה',
+    plataCollectedAt: 1_760_000_200_000,
+    plataDepositReturnedAt: 1_760_000_300_000,
   } satisfies LegacyOrder
 
   it('preserves every server-owned delivery field through the admin save round trip', () => {
@@ -1190,6 +1196,49 @@ describe('delivery-confirmation fields through an admin edit', () => {
       deliveryProofBy: 'שליח',
       deliveredAt: 1_760_000_100_000,
       statusBeforeProof: 'במשלוח',
+      plataCount: 2,
+      plataDeposit: '50.00',
+      plataStatus: 'awaitingPickup',
+      plataPickupNote: 'בקבלה',
+      plataCollectedAt: 1_760_000_200_000,
+      plataDepositReturnedAt: 1_760_000_300_000,
+    })
+  })
+
+  it('keeps every plata field out of the draft, so the editor cannot save one by accident', () => {
+    // The plata section is operator-editable, but through its own save. If a plata field ever
+    // reaches serializeOrderDraft, an admin edit starts overwriting whatever מיי wrote while
+    // the editor was open — which is exactly what this rule exists to prevent.
+    const menu = buildOrderEditorMenu(emptyStore)
+    const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
+
+    const serialized: Record<string, unknown> = serializeOrderDraft(draft, 'order-1')
+    expect(Object.keys(serialized).filter((key) => key.startsWith('plata'))).toEqual([])
+  })
+
+  it('lets a hotplate update that landed mid-edit survive the admin save', () => {
+    // Lin opens the order, מיי (or the plata section) then marks the plate collected. Saving
+    // the order afterwards must not write the draft's stale 'awaitingPickup' back over it.
+    const menu = buildOrderEditorMenu(emptyStore)
+    const draft = createOrderDraftFromLegacy(deliveryOwnedOrder, menu)
+    const movedOn: LegacyOrder = {
+      ...deliveryOwnedOrder,
+      plataStatus: 'collected',
+      plataPickupNote: 'נאספה מהקבלה',
+      plataCollectedAt: 1_760_000_900_000,
+    }
+
+    const nextState = applyOrderDraftToStore(
+      { orders: [movedOn] },
+      { ...draft, notes: 'הערה חדשה' },
+      { mode: 'edit', orderId: 'order-1' },
+    )
+
+    expect(nextState.orders[0]).toMatchObject({
+      notes: 'הערה חדשה',
+      plataStatus: 'collected',
+      plataPickupNote: 'נאספה מהקבלה',
+      plataCollectedAt: 1_760_000_900_000,
     })
   })
 
@@ -1234,6 +1283,9 @@ describe('delivery-confirmation fields through an admin edit', () => {
       deliveredAt: 1_760_000_100_000,
       meyToken: 'mey-token',
       statusBeforeProof: 'במשלוח',
+      plataCount: 2,
+      plataStatus: 'awaitingPickup',
+      plataPickupNote: 'בקבלה',
     })
   })
 })

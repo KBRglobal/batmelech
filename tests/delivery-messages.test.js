@@ -11,6 +11,7 @@ const {
   digest,
   lateEscalation,
   leadReminder,
+  plataPickupDigest,
   proofAmbiguous,
   proofRecorded,
 } = require('../server/telegram/delivery-messages');
@@ -235,4 +236,32 @@ test('delayAdvice advises Felix and only ever offers to draft, never to send', (
   const noEta = delayAdvice(order({}), null);
   assert.ok(noEta.text.includes('מתעכב'));
   assert.ok(!noEta.text.includes('NaN'));
+});
+
+// --- plata (hotplate) pickup digest --------------------------------------------
+
+test('plataPickupDigest lists every plate to collect, with the note when there is one', () => {
+  const message = plataPickupDigest([
+    order({ name: 'דנה', hotelName: 'Atlantis', plataCount: 2, plataPickupNote: 'בקבלה' }),
+    order({ name: 'רותי', hotelName: 'Hilton', plataCount: 1 }),
+  ]);
+
+  const lines = message.text.split('\n');
+  assert.equal(lines[0], 'פלטות לאיסוף:');
+  assert.equal(lines[2], '• דנה · Atlantis · 2 פלטות · בקבלה');
+  assert.equal(lines[3], '• רותי · Hilton · פלטה אחת');
+  assert.equal(message.reply_markup, undefined, 'v1 needs no buttons');
+});
+
+test('plataPickupDigest never prints a raw order id and survives a thin order', () => {
+  const message = plataPickupDigest([order({ name: '', hotelName: '', place: '', address: '', plataCount: 0 })]);
+  assert.ok(!message.text.includes(RAW_ID));
+  assert.ok(message.text.includes('ללא שם'));
+  assert.ok(message.text.includes('יעד לא צוין'));
+  assert.ok(!message.text.includes('NaN'));
+});
+
+test('plataPickupDigest says nothing when there is nothing to collect', () => {
+  assert.equal(plataPickupDigest([]).text, '');
+  assert.equal(plataPickupDigest(null).text, '');
 });

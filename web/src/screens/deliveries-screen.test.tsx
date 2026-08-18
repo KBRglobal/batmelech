@@ -593,4 +593,65 @@ describe('DeliveriesScreen', () => {
     expect(onSave).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toContain('הנתונים השתנו')
   })
+
+  it('badges the deliveries that carry a hotplate, in the state each one is in', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          {
+            id: 'with-customer', date: '2099-08-14', name: 'רותי', place: 'מלון', time: '11:00',
+            plataCount: 2, plataStatus: 'withCustomer', plataDeposit: '50.00',
+          },
+          {
+            id: 'awaiting', date: '2099-08-14', name: 'קטי', place: 'מלון', time: '12:00',
+            plataCount: 1, plataStatus: 'awaitingPickup', plataDeposit: '30.00',
+          },
+          { id: 'no-plata', date: '2099-08-14', name: 'שירה', place: 'מלון', time: '13:00' },
+        ],
+      },
+    }))
+    renderDeliveries()
+
+    expect(screen.getByText('פלטה ×2 · אצל הלקוח')).toBeTruthy()
+    expect(screen.getByText('פלטה · מוכנה לאיסוף')).toBeTruthy()
+    expect(screen.queryAllByText(/^פלטה/)).toHaveLength(2)
+  })
+
+  it('sums the hotplates still out and the deposits still held, across every date', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [
+          {
+            id: 'today', date: '2099-08-14', name: 'רותי', place: 'מלון', time: '11:00',
+            plataCount: 2, plataStatus: 'withCustomer', plataDeposit: '50.00',
+          },
+          // An older order nobody collected: it is not on the selected day, but its plate and
+          // its deposit are still out, so the strip has to keep counting it.
+          {
+            id: 'old', date: '2020-01-03', name: 'מיכל', place: 'מלון אחר', status: 'נמסרה',
+            plataCount: 1, plataStatus: 'awaitingPickup', plataDeposit: '30.00',
+          },
+          {
+            id: 'closed', date: '2020-01-03', name: 'דנה', place: 'מלון אחר', status: 'נמסרה',
+            plataCount: 1, plataStatus: 'depositReturned', plataDeposit: '90.00',
+          },
+        ],
+      },
+    }))
+    renderDeliveries()
+
+    expect(screen.getByText('פלטות בחוץ: 3')).toBeTruthy()
+    expect(screen.getByText('2 אצל לקוחות')).toBeTruthy()
+    expect(screen.getByText('1 ממתינות לאיסוף')).toBeTruthy()
+    expect(screen.getByText(/פיקדונות פתוחים/).textContent).toBe('פיקדונות פתוחים: $80.00')
+  })
+
+  it('says nothing about hotplates when none are out', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [{ id: 'plain', date: '2099-08-14', name: 'רותי', place: 'מלון', time: '11:00' }] },
+    }))
+    renderDeliveries()
+
+    expect(screen.queryByText(/פלטות בחוץ/)).toBeNull()
+  })
 })

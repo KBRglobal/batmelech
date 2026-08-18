@@ -11,9 +11,13 @@ function fakeRepository(data) {
   return { async loadState() { return { data, revision: 1, hash: 'h' }; } };
 }
 
-async function withServer(repository, run) {
+// Wednesday, 19 Aug 2026, noon in Dubai: an ordinary working day, so the
+// Shabbat gate stays out of the way of the tests that are about other things.
+const WEEKDAY = new Date(Date.UTC(2026, 7, 19, 8, 0));
+
+async function withServer(repository, run, clock = () => WEEKDAY) {
   const app = express();
-  app.use('/api/site/status', createSiteStatusRouter({ repository, logger: { error() {} } }));
+  app.use('/api/site/status', createSiteStatusRouter({ repository, logger: { error() {} }, clock }));
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
@@ -83,6 +87,50 @@ test('site status never caches', async () => {
     const response = await fetch(`${base}/api/site/status`);
     assert.match(response.headers.get('cache-control') || '', /no-store/);
   });
+});
+
+test('site status reports the Shabbat gate closed, with the greeting and havdalah', async () => {
+  const fridayNight = () => new Date(Date.UTC(2026, 7, 14, 15, 30)); // Fri 14 Aug 2026, 19:30 Dubai
+  await withServer(
+    fakeRepository({ orders: [] }),
+    async (base) => {
+      const body = await (await fetch(`${base}/api/site/status`)).json();
+      assert.equal(body.shabbatClosed, true);
+      assert.equal(body.shabbatLabel, 'שבת שלום');
+      assert.equal(body.shabbatOccasion, 'shabbat');
+      assert.equal(typeof body.shabbatReopensAt, 'number');
+      assert.ok(body.shabbatReopensAt > Date.UTC(2026, 7, 15));
+    },
+    fridayNight,
+  );
+});
+
+test('site status reports the Shabbat gate open on a working day', async () => {
+  await withServer(fakeRepository({ orders: [] }), async (base) => {
+    const body = await (await fetch(`${base}/api/site/status`)).json();
+    assert.equal(body.shabbatClosed, false);
+    assert.equal(body.shabbatLabel, null);
+    assert.equal(body.shabbatReopensAt, null);
+    assert.equal(body.shabbatOccasion, null);
+  });
+});
+
+// Manual closing and the calendar are separate gates; neither may mask the other.
+test('the Shabbat gate and the manual close are reported independently', async () => {
+  const repo = fakeRepository({ orders: [], settings: { orderingOpen: false, orderingClosedUntil: '2099-01-04' } });
+  const chag = () => new Date(Date.UTC(2027, 3, 22, 8, 0)); // Pesach I, noon Dubai
+  await withServer(
+    repo,
+    async (base) => {
+      const body = await (await fetch(`${base}/api/site/status`)).json();
+      assert.equal(body.orderingOpen, false);
+      assert.equal(body.reopensOn, '2099-01-04');
+      assert.equal(body.shabbatClosed, true);
+      assert.equal(body.shabbatLabel, 'חג שמח — פסח');
+      assert.equal(body.shabbatOccasion, 'chag');
+    },
+    chag,
+  );
 });
 
 test('site status responds 503 when the repository read fails', async () => {

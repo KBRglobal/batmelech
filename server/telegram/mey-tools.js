@@ -7,8 +7,10 @@ const {
   setItemStock,
   setOrderStatus,
   setDeliveryCheckin,
+  setPlataStatus,
   KNOWN_ORDER_STATUSES,
   KNOWN_CHECKIN_STATES,
+  KNOWN_PLATA_STATUSES,
 } = require('../business-actions');
 const {
   destinationLabel,
@@ -324,6 +326,40 @@ const TOOL_DEFINITIONS = [
     },
     strict: true,
   },
+  {
+    type: 'function',
+    name: 'get_plata_status',
+    description:
+      'מחזיר את כל הפלטות שיצאו ללקוחות ועדיין לא נסגרו - כלומר שהפיקדון עליהן עוד לא הוחזר. ' +
+      'לכל אחת: שם הלקוח/ה, המלון, כמה פלטות, גובה הפיקדון, באיזה שלב היא (אצל הלקוח / מוכנה לאיסוף / נאספה), ' +
+      'איפה הלקוח/ה השאיר/ה אותה ותאריך ההזמנה. זה הכלי לכל שאלה על פלטות ולתזכורת האיסוף במוצ״ש.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'set_plata_status',
+    description:
+      'לעדכן איפה הפלטה עומדת (אצל הלקוח / מוכנה לאיסוף / נאספה / הפיקדון הוחזר). ' +
+      'זה כל מה שהיא משנה - היא לא משנה כמה פלטות יצאו ולא את סכום הפיקדון. ' +
+      'תאתרי קודם את ההזמנה עם get_plata_status או search_orders, ורק אז תקראי לכלי הזה עם המזהה שמצאת.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'מזהה ההזמנה (id)' },
+        status: {
+          type: 'string',
+          enum: KNOWN_PLATA_STATUSES,
+          description:
+            'withCustomer = אצל הלקוח, awaitingPickup = מוכנה לאיסוף, collected = נאספה, depositReturned = הפיקדון הוחזר',
+        },
+        note: { type: ['string', 'null'], description: 'איפה הפלטה מחכה ("בקבלה", מספר חדר), או null' },
+      },
+      required: ['orderId', 'status', 'note'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 function normalizedQuery(value) {
@@ -371,6 +407,28 @@ function summarizeDelivery(order) {
     etaMinutes: Number.isFinite(order.courierEtaMinutes) ? order.courierEtaMinutes : null,
     awaitingReply: Boolean(order.meyAwaitingReplySince),
     deliveredAt: order.deliveredAt || null,
+  };
+}
+
+// A hotplate is closed only once its deposit is back, so everything else — still
+// at the hotel, waiting at reception, already in the van — is still open business.
+function isPlataOpen(order) {
+  if (!order || typeof order !== 'object') return false;
+  const count = Number(order.plataCount);
+  if (!Number.isFinite(count) || count <= 0) return false;
+  return order.plataStatus !== 'depositReturned';
+}
+
+function summarizePlata(order) {
+  return {
+    id: order.id,
+    name: orderName(order),
+    hotel: destinationLabel(order),
+    date: typeof order.date === 'string' ? order.date : null,
+    count: Number(order.plataCount),
+    deposit: order.plataDeposit ?? null,
+    status: order.plataStatus || 'withCustomer',
+    pickupNote: typeof order.plataPickupNote === 'string' ? order.plataPickupNote : null,
   };
 }
 
@@ -428,6 +486,16 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
 
     async set_delivery_checkin({ orderId, state, etaMinutes, note }) {
       return setDeliveryCheckin(repository, orderId, { state, etaMinutes, note });
+    },
+
+    async get_plata_status() {
+      const orders = await loadOrders();
+      const open = orders.filter(isPlataOpen).map(summarizePlata);
+      return { count: open.length, platas: open };
+    },
+
+    async set_plata_status({ orderId, status, note }) {
+      return setPlataStatus(repository, orderId, status, { note });
     },
 
     async build_order_from_whatsapp({ conversationText }) {
@@ -513,6 +581,7 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
     'set_ordering_open',
     'set_site_banner',
     'set_delivery_checkin',
+    'set_plata_status',
     'build_order_from_whatsapp',
     'update_order_details',
     'delete_order',

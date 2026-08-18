@@ -98,6 +98,61 @@ describe('CustomersScreen', () => {
       .toBe('/orders/new?duplicate=order%3A1')
   })
 
+  it('drafts a reorder invite from the newest live order and skips a cancelled one', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            {
+              id: 'older-live',
+              date: '2026-08-07',
+              name: 'מיכל',
+              phone: '0501234567',
+              meals: 2,
+              salads: { מטבוחה: { o: 1 } },
+            },
+            {
+              id: 'newest-cancelled',
+              date: '2026-08-14',
+              name: 'מיכל',
+              phone: '0501234567',
+              status: 'בוטלה',
+              meals: 9,
+            },
+          ],
+        },
+      }),
+    )
+
+    renderCustomers()
+
+    const invite = screen.getByRole('link', { name: 'הזמנה חוזרת בוואטסאפ למיכל' })
+    const message = new URL(invite.getAttribute('href')!).searchParams.get('text')!
+    expect(invite.getAttribute('href')!.startsWith('https://wa.me/972501234567?text=')).toBe(true)
+    expect(message).toContain('בפעם הקודמת, יום שישי 07.08, הזמנת:')
+    expect(message).toContain('· ארוחה זוגית ×2')
+    expect(message).toContain('· מטבוחה ×1')
+    expect(message).toContain('אפשר להזמין כאן: https://batmelech.ae/site/')
+    expect(message).not.toContain('×9')
+  })
+
+  it('offers no reorder invite when the phone is unusable or the last order has no items', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'bad-phone', date: '2026-08-07', name: 'ללא ואטסאפ', phone: '12', meals: 2 },
+            { id: 'no-items', date: '2026-08-07', name: 'בלי פריטים', phone: '0509999999' },
+          ],
+        },
+      }),
+    )
+
+    renderCustomers()
+
+    expect(screen.queryByRole('link', { name: /הזמנה חוזרת בוואטסאפ/ })).toBeNull()
+  })
+
   it('renders only injected customer history, metadata, exact spend, and navigation', () => {
     mockedUseStore.mockReturnValue(
       queryResult({

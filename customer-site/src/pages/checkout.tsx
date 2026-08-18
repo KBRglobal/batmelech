@@ -70,6 +70,7 @@ const HE = {
   infoPayment: 'אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.',
   submitCta: 'אישור ושליחת הזמנה',
   hintClosed: 'האתר לא מקבל הזמנות כרגע',
+  hintShabbatClosed: 'המטבח שלנו שומר שבת — לא מקבלים הזמנות כרגע',
   hintPickup: 'מלאו שם, טלפון, תאריך ושעה כדי לשלוח',
   hintHotel: 'מלאו שם, טלפון, תאריך ושעה, ובחרו מלון כדי לשלוח',
   hintAddress: 'מלאו שם, טלפון, תאריך, שעה וכתובת כדי לשלוח',
@@ -146,6 +147,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoPayment: 'No payment is taken on the site. Payment is arranged directly with Bat Melech on WhatsApp — cash on delivery, bank transfer, Bit, or PayBox.',
     submitCta: 'Confirm & Send Order',
     hintClosed: 'We are not taking orders right now',
+    hintShabbatClosed: 'We keep Shabbat — we are not taking orders right now',
     hintPickup: 'Fill in your name, phone, date, and time to send',
     hintHotel: 'Fill in your name, phone, date, and time, and choose a hotel to send',
     hintAddress: 'Fill in your name, phone, date, time, and address to send',
@@ -214,6 +216,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoPayment: 'Aucun paiement sur le site. Le règlement se fait directement avec Bat Melech sur WhatsApp — espèces à la livraison, virement bancaire, Bit ou PayBox.',
     submitCta: 'Confirmer et envoyer la commande',
     hintClosed: 'Le site ne prend pas de commandes pour le moment',
+    hintShabbatClosed: 'Nous gardons le Shabbat — le site ne prend pas de commandes pour le moment',
     hintPickup: 'Renseignez votre nom, téléphone, date et heure pour envoyer',
     hintHotel: 'Renseignez votre nom, téléphone, date et heure, et choisissez un hôtel pour envoyer',
     hintAddress: 'Renseignez votre nom, téléphone, date, heure et adresse pour envoyer',
@@ -314,7 +317,7 @@ function localizedOrderMessage(
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
-  const { orderingOpen } = useSiteStatus()
+  const { orderingOpen, shabbatClosed } = useSiteStatus()
   const { locale, dir, href } = useLocale()
   const t = COPY[locale]
   const isPickup = customer.fulfillment === 'pickup'
@@ -380,8 +383,11 @@ export function Checkout() {
   const hotel = selectedHotel(customer)
   const isHotelMode = !isPickup && customer.addressMode === 'hotel'
 
+  // The closure screen normally replaces this page outright; this gate is what
+  // catches a cart that was already open when candle lighting arrived.
   const canSubmit =
     orderingOpen &&
+    !shabbatClosed &&
     customer.name.trim() &&
     customer.phone.trim() &&
     customer.date.trim() &&
@@ -728,13 +734,15 @@ export function Checkout() {
           </a>
           {!canSubmit && (
             <p className="text-center text-xs font-bold text-[#8D182C] mt-3">
-              {!orderingOpen
-                ? t.hintClosed
-                : isPickup
-                  ? t.hintPickup
-                  : isHotelMode
-                    ? t.hintHotel
-                    : t.hintAddress}
+              {shabbatClosed
+                ? t.hintShabbatClosed
+                : !orderingOpen
+                  ? t.hintClosed
+                  : isPickup
+                    ? t.hintPickup
+                    : isHotelMode
+                      ? t.hintHotel
+                      : t.hintAddress}
             </p>
           )}
         </div>

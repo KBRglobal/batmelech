@@ -1384,4 +1384,92 @@ describe('OrderEditorScreen delivery proof section', () => {
     renderEditor()
     await waitFor(() => expect(screen.getByText('אין עדיין אישור מסירה')).toBeTruthy())
   })
+
+  it('saves the hotplate through its own write, touching nothing else on the order', async () => {
+    const order = {
+      id: 'plata-1',
+      date: '2099-08-14',
+      name: 'רותי',
+      place: 'Atlantis',
+      meals: 1,
+      total: '245.00',
+      meyToken: 'mey-token',
+    }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, request) => {
+      const command = JSON.parse(String(request?.body)) as { localState: LegacyStore }
+      return new Response(JSON.stringify({
+        ok: true,
+        idempotent: false,
+        revision: 2,
+        ts: 2,
+        hash: 'b'.repeat(64),
+        data: command.localState,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [order] } }))
+    const user = userEvent.setup()
+    renderEditor('/orders/plata-1/edit')
+
+    const saveButton = await screen.findByRole('button', { name: 'שמירת הפלטה' })
+    expect(saveButton.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('אין פלטה בהזמנה הזאת.')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'הוספה לפלטות' }))
+    await user.type(screen.getByLabelText('פיקדון פלטה'), '50')
+    await user.selectOptions(screen.getByLabelText('מצב הפלטה'), 'awaitingPickup')
+    await user.type(screen.getByLabelText('איפה הפלטה מחכה'), 'בקבלה')
+    await user.click(screen.getByRole('button', { name: 'שמירת הפלטה' }))
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+    const command = JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body)) as { localState: LegacyStore }
+    expect(command.localState.orders).toHaveLength(1)
+    expect(command.localState.orders[0]).toEqual({
+      ...order,
+      plataCount: 1,
+      plataDeposit: '50.00',
+      plataStatus: 'awaitingPickup' as const,
+      plataPickupNote: 'בקבלה',
+    })
+    expect(await screen.findByText('פרטי הפלטה נשמרו.')).toBeTruthy()
+  })
+
+  it('opens on the stored hotplate and blocks a save with an unreadable deposit', async () => {
+    const order = {
+      id: 'plata-2',
+      date: '2099-08-14',
+      name: 'קטי',
+      place: 'Hilton',
+      meals: 1,
+      plataCount: 2,
+      plataDeposit: '80.00',
+      plataStatus: 'collected' as const,
+      plataPickupNote: 'בקבלה',
+      plataCollectedAt: 1_760_000_000_000,
+    }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [order] } }))
+    const user = userEvent.setup()
+    renderEditor('/orders/plata-2/edit')
+
+    await waitFor(() => expect(screen.getByLabelText('כמות פלטות').textContent).toBe('2'))
+    expect((screen.getByLabelText('פיקדון פלטה') as HTMLInputElement).value).toBe('80.00')
+    expect((screen.getByLabelText('מצב הפלטה') as HTMLSelectElement).value).toBe('collected')
+    expect((screen.getByLabelText('איפה הפלטה מחכה') as HTMLInputElement).value).toBe('בקבלה')
+    expect(screen.getByText('מועד האיסוף')).toBeTruthy()
+
+    await user.clear(screen.getByLabelText('פיקדון פלטה'))
+    await user.type(screen.getByLabelText('פיקדון פלטה'), 'שמונים')
+
+    expect(screen.getByRole('button', { name: 'שמירת הפלטה' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('הפיקדון חייב להיות סכום תקין. לא נשמר שינוי.')).toBeTruthy()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('offers no hotplate form until the order exists', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    renderEditor()
+
+    await waitFor(() => expect(screen.getByText('אפשר לרשום פלטה אחרי ששומרים את ההזמנה.')).toBeTruthy())
+    expect(screen.queryByLabelText('פיקדון פלטה')).toBeNull()
+  })
 })

@@ -23,8 +23,24 @@ const {
   selectDeliveryDay,
   suggestRouteOrder,
 } = require('./delivery-day');
-const { checkinPrompt, digest, lateEscalation, leadReminder } = require('./delivery-messages');
-const { markDeliveryNudge, setDeliveryDigestSent, setPromptMessageId } = require('../business-actions');
+const { summarizeFridayPrep, summarizeWeek, weekdayOf } = require('./business-insights');
+const {
+  checkinPrompt,
+  digest,
+  lateEscalation,
+  leadReminder,
+  plataPickupDigest,
+  prepForecast,
+  weeklyBusinessDigest,
+} = require('./delivery-messages');
+const {
+  markDeliveryNudge,
+  setDeliveryDigestSent,
+  setPlataDigestSent,
+  setPrepForecastSent,
+  setPromptMessageId,
+  setWeeklyDigestSent,
+} = require('../business-actions');
 const { sendTelegramMessage } = require('./send-message');
 
 const TICK_MS = 60_000;
@@ -32,6 +48,30 @@ const DIGEST_AT_MINUTES = 8 * 60;
 const LEAD_MINUTES = 90;
 const CHECKIN_MINUTES = 40;
 const LATE_MINUTES = 15;
+
+// The two business messages ride the same once-a-minute tick as the delivery
+// day, but on their own weekday and hour. Sunday morning looks back at the week
+// that closed; Wednesday mid-morning looks forward to Friday's cooking, early
+// enough to still shop for it.
+const WEEKLY_DIGEST_WEEKDAY = 0; // Sunday
+const WEEKLY_DIGEST_AT_MINUTES = 9 * 60;
+const PREP_FORECAST_WEEKDAY = 3; // Wednesday
+const PREP_FORECAST_AT_MINUTES = 10 * 60;
+
+// --- plata pickup digest -----------------------------------------------------
+// Shabbat ends and the rented hotplates are still in the hotels. Felix collects
+// them on the way home, so the list goes out Saturday evening — late enough that
+// Shabbat is out in Dubai, and only while plates are actually still out there.
+const PLATA_DIGEST_WEEKDAY = 6; // Saturday
+const PLATA_DIGEST_AT_MINUTES = 20 * 60;
+
+function awaitsPlataPickup(order) {
+  if (!order || typeof order !== 'object') return false;
+  const count = Number(order.plataCount);
+  if (!Number.isFinite(count) || count <= 0) return false;
+  return order.plataStatus === 'withCustomer' || order.plataStatus === 'awaitingPickup';
+}
+// --- end plata pickup digest -------------------------------------------------
 
 // Orders whose time Lin never wrote (or wrote as free text we cannot read) ride
 // in the digest and nowhere else — there is no minute to hang a nudge on.
@@ -153,6 +193,69 @@ function createDeliveryScheduler({ repository, botToken, chatId, logger = consol
     }
   }
 
+  // --- weekly business digest + Friday prep forecast -------------------------
+  // Both follow the delivery digest's rule exactly: decide there is something
+  // worth saying, claim the marker, and only then send. The claimed day is the
+  // subject of the message (the window's Saturday, the Friday being cooked for),
+  // never "today", so the claim survives a restart at any hour.
+
+  async function runWeeklyBusinessDigest(state, today, nowMin) {
+    if (weekdayOf(today) !== WEEKLY_DIGEST_WEEKDAY) return;
+    if (nowMin < WEEKLY_DIGEST_AT_MINUTES) return;
+
+    const stats = summarizeWeek(state.data, today);
+    if (stats === null) return;
+    // A week with no orders at all has nothing to report; a week that had orders
+    // is worth sending even if the revenue could not be totalled, because that
+    // gap is itself the news.
+    if (stats.orderCount === 0) return;
+
+    const settings = state && state.data && state.data.settings;
+    if (settings && settings.meyWeeklyDigestSentFor === stats.to) return;
+
+    const claim = await setWeeklyDigestSent(repository, stats.to);
+    if (!claim.ok || !claim.claimed) return;
+    await send(() => weeklyBusinessDigest(stats), { step: 'weekly-digest', window: stats.to });
+  }
+
+  async function runPrepForecast(state, today, nowMin) {
+    if (weekdayOf(today) !== PREP_FORECAST_WEEKDAY) return;
+    if (nowMin < PREP_FORECAST_AT_MINUTES) return;
+
+    // Returns null when Friday is still empty — no orders, nothing to prep, so
+    // מיי says nothing rather than sending an empty list.
+    const forecast = summarizeFridayPrep(state.data, today);
+    if (forecast === null) return;
+
+    const settings = state && state.data && state.data.settings;
+    if (settings && settings.meyPrepForecastSentFor === forecast.date) return;
+
+    const claim = await setPrepForecastSent(repository, forecast.date);
+    if (!claim.ok || !claim.claimed) return;
+    await send(() => prepForecast(forecast), { step: 'prep-forecast', friday: forecast.date });
+  }
+  // --- end weekly business digest + Friday prep forecast ---------------------
+
+  // --- plata pickup digest ---------------------------------------------------
+  // Same claim-before-send rule, one digest per Saturday. Plates from earlier
+  // weeks that were never collected ride in it too — an open plate is open
+  // business until its deposit goes back, whatever date the order carried.
+  async function runPlataPickupDigest(state, today, nowMin) {
+    if (weekdayOf(today) !== PLATA_DIGEST_WEEKDAY) return;
+    if (nowMin < PLATA_DIGEST_AT_MINUTES) return;
+
+    const orders = Array.isArray(state.data.orders) ? state.data.orders.filter(awaitsPlataPickup) : [];
+    if (orders.length === 0) return;
+
+    const settings = state && state.data && state.data.settings;
+    if (settings && settings.meyPlataDigestSentFor === today) return;
+
+    const claim = await setPlataDigestSent(repository, today);
+    if (!claim.ok || !claim.claimed) return;
+    await send(() => plataPickupDigest(orders), { step: 'plata-digest', date: today });
+  }
+  // --- end plata pickup digest -----------------------------------------------
+
   // Runs every minute forever: it reports failures and returns, never rejects.
   async function tick() {
     try {
@@ -172,6 +275,9 @@ function createDeliveryScheduler({ repository, botToken, chatId, logger = consol
       await runLeadReminders(timed, nowMin);
       await runCheckins(timed, nowMin);
       await runLateEscalations(timed, nowMin);
+      await runWeeklyBusinessDigest(state, today, nowMin);
+      await runPrepForecast(state, today, nowMin);
+      await runPlataPickupDigest(state, today, nowMin);
     } catch (error) {
       logger.error('delivery-scheduler: tick failed', error);
     }
@@ -200,6 +306,12 @@ module.exports = {
   DIGEST_AT_MINUTES,
   LATE_MINUTES,
   LEAD_MINUTES,
+  PLATA_DIGEST_AT_MINUTES,
+  PLATA_DIGEST_WEEKDAY,
+  PREP_FORECAST_AT_MINUTES,
+  PREP_FORECAST_WEEKDAY,
   TICK_MS,
+  WEEKLY_DIGEST_AT_MINUTES,
+  WEEKLY_DIGEST_WEEKDAY,
   createDeliveryScheduler,
 };

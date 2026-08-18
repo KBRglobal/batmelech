@@ -6,6 +6,14 @@ type SiteStatus = {
   reopensOn: string | null
   siteBanner: string | null
   outOfStockNames: string[]
+  /** The calendar gate, independent of orderingOpen: Shabbat or a yom tov is in. */
+  shabbatClosed: boolean
+  /** The greeting for this occasion — 'שבת שלום', 'חג שמח — פסח'. */
+  shabbatLabel: string | null
+  /** Havdalah, in epoch milliseconds. */
+  shabbatReopensAt: number | null
+  /** Which of the two it is, so the copy can say מוצאי שבת or צאת החג. */
+  shabbatOccasion: 'shabbat' | 'chag' | null
 }
 
 type SiteStatusValue = SiteStatus & {
@@ -17,6 +25,10 @@ const DEFAULT_STATUS: SiteStatus = {
   reopensOn: null,
   siteBanner: null,
   outOfStockNames: [],
+  shabbatClosed: false,
+  shabbatLabel: null,
+  shabbatReopensAt: null,
+  shabbatOccasion: null,
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -63,6 +75,16 @@ export function SiteStatusProvider({ children }: { children: ReactNode }) {
           reopensOn: typeof data.reopensOn === 'string' && ISO_DATE.test(data.reopensOn) ? data.reopensOn : null,
           siteBanner: typeof data.siteBanner === 'string' ? data.siteBanner : null,
           outOfStockNames: Array.isArray(data.outOfStockNames) ? data.outOfStockNames : [],
+          // Opt in, never out: only an explicit `true` closes the site, so a
+          // stale server that has never heard of Shabbat keeps selling.
+          shabbatClosed: data.shabbatClosed === true,
+          shabbatLabel: typeof data.shabbatLabel === 'string' && data.shabbatLabel.trim() ? data.shabbatLabel : null,
+          shabbatReopensAt:
+            typeof data.shabbatReopensAt === 'number' && Number.isFinite(data.shabbatReopensAt)
+              ? data.shabbatReopensAt
+              : null,
+          shabbatOccasion:
+            data.shabbatOccasion === 'shabbat' || data.shabbatOccasion === 'chag' ? data.shabbatOccasion : null,
         })
       })
       .catch(() => {})

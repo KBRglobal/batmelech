@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { generatePath, Link } from 'react-router'
 import type { To } from 'react-router'
@@ -25,6 +25,12 @@ import {
   type OrdersWarning,
 } from '../domain/orders-dashboard.ts'
 import type { StoreSaveHandler } from '../domain/settings-catalog.ts'
+import {
+  depositRequestHref,
+  isAwaitingPayment,
+  isDelivered,
+  reviewRequestHref,
+} from '../domain/outreach-messages.ts'
 import type { LegacyOrder } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope } from '../services/state-api.ts'
@@ -46,6 +52,24 @@ const primaryLinkClassName =
 
 const compactLinkClassName =
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+
+// The message generators need the saved order itself (deposit, item lines) plus
+// two settings fields, none of which the dashboard view carries. Passing them
+// through five layers of presentational components would be noise, so the screen
+// publishes them once and OrderNavigation reads them where it builds the links.
+interface OutreachSource {
+  readonly orders: readonly LegacyOrder[]
+  readonly paymentRequestDetails: string
+  readonly googleReviewUrl: string
+}
+
+const EMPTY_OUTREACH: OutreachSource = {
+  orders: [],
+  paymentRequestDetails: '',
+  googleReviewUrl: '',
+}
+
+const OutreachContext = createContext<OutreachSource>(EMPTY_OUTREACH)
 
 function orderRoute(pattern: string, orderId: string): string {
   return generatePath(pattern, { orderId })
@@ -109,6 +133,53 @@ function summaryLabels(summary: OrdersSummaryChips): string[] {
   return labels
 }
 
+function OutreachActions({ order }: { order: OrdersOrderView }) {
+  const outreach = useContext(OutreachContext)
+  // A null whatsappHref is the dashboard's existing outbound gate: the phone, or
+  // one of the order's numbers, is not safe to put in front of a customer.
+  const source = order.whatsappHref === null ? undefined : outreach.orders[order.sourceIndex]
+  if (source === undefined) return null
+
+  const depositHref = isAwaitingPayment(source)
+    ? depositRequestHref(source, order.phone, outreach.paymentRequestDetails)
+    : null
+  const reviewHref = isDelivered(source)
+    ? reviewRequestHref(source, order.phone, outreach.googleReviewUrl)
+    : null
+
+  return (
+    <>
+      {depositHref !== null && (
+        <a
+          href={depositHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={
+            outreach.paymentRequestDetails === ''
+              ? 'ההודעה תיפתח בלי פרטי תשלום — כדאי למלא אותם בהגדרות'
+              : undefined
+          }
+          className={compactLinkClassName}
+        >
+          <LocalIcon name="ph:coins-bold" className="text-base" />
+          <span>בקשת תשלום</span>
+        </a>
+      )}
+      {reviewHref !== null && (
+        <a
+          href={reviewHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={compactLinkClassName}
+        >
+          <LocalIcon name="ph:check-circle-bold" className="text-base" />
+          <span>בקשת ביקורת</span>
+        </a>
+      )}
+    </>
+  )
+}
+
 function OrderNavigation({ order }: { order: OrdersOrderView }) {
   if (order.orderId === null) {
     return (
@@ -155,6 +226,7 @@ function OrderNavigation({ order }: { order: OrdersOrderView }) {
           <span>וואטסאפ</span>
         </a>
       )}
+      <OutreachActions order={order} />
       {order.phone && !order.whatsappHref && (
         <button
           type="button"
@@ -832,9 +904,13 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
     )
   }
 
-  const dashboard = buildOrdersDashboard(storeQuery.data.data ?? { orders: [] }, {
-    query: searchQuery,
-  })
+  const store = storeQuery.data.data ?? { orders: [] }
+  const dashboard = buildOrdersDashboard(store, { query: searchQuery })
+  const outreach: OutreachSource = {
+    orders: store.orders,
+    paymentRequestDetails: store.settings?.paymentRequestDetails ?? '',
+    googleReviewUrl: store.settings?.googleReviewUrl ?? '',
+  }
 
   if (dashboard.globallyEmpty) {
     return (
@@ -848,67 +924,68 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-black tracking-tight text-primary sm:text-4xl">
-            הזמנות
-          </h1>
-          <p className="mt-2 text-sm font-bold text-muted-foreground">
-            כל ההזמנות, הקבוצות והתאריכים במקום אחד.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+    <OutreachContext.Provider value={outreach}>
+      <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+        <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-black tracking-tight text-primary sm:text-4xl">
+              הזמנות
+            </h1>
+            <p className="mt-2 text-sm font-bold text-muted-foreground">
+              כל ההזמנות, הקבוצות והתאריכים במקום אחד.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const groups = dashboard.searchActive
+                  ? dashboard.searchGroups
+                  : [...dashboard.upcomingGroups, ...dashboard.pastGroups]
+                const sourceOrders = storeQuery.data.data?.orders ?? []
+                downloadTable(
+                  'orders',
+                  EXPORT_HEADERS,
+                  collectVisibleOrders(groups, blockFilter).map((order) => exportRow(order, sourceOrders)),
+                )
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-5 text-sm font-black text-primary shadow-sm transition-colors hover:bg-secondary"
+            >
+              <LocalIcon name="ph:download-simple-bold" className="text-lg" />
+              <span>ייצוא לאקסל</span>
+            </button>
+            <Link to={APP_ROUTES.newOrder} className={primaryLinkClassName}>
+              <LocalIcon name="ph:plus-bold" className="text-lg" />
+              <span>הזמנה חדשה</span>
+            </Link>
+          </div>
+        </header>
+
+        <div className="mt-7 flex items-center gap-3 rounded-3xl border border-border bg-card p-3 shadow-sm">
+          <label className="sr-only" htmlFor="orders-search">
+            חיפוש הזמנות
+          </label>
+          <input
+            ref={searchInput}
+            id="orders-search"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.currentTarget.value)}
+            placeholder="חיפוש: שם, מלון, טלפון, סלט, כל דבר..."
+            className="min-h-11 min-w-0 flex-1 rounded-full border-0 bg-secondary/60 px-5 text-sm font-bold text-primary outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20"
+          />
           <button
             type="button"
             onClick={() => {
-              const groups = dashboard.searchActive
-                ? dashboard.searchGroups
-                : [...dashboard.upcomingGroups, ...dashboard.pastGroups]
-              const sourceOrders = storeQuery.data.data?.orders ?? []
-              downloadTable(
-                'orders',
-                EXPORT_HEADERS,
-                collectVisibleOrders(groups, blockFilter).map((order) => exportRow(order, sourceOrders)),
-              )
+              setSearchQuery('')
+              searchInput.current?.focus()
             }}
-            className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-5 text-sm font-black text-primary shadow-sm transition-colors hover:bg-secondary"
+            disabled={searchQuery.length === 0}
+            className="min-h-11 rounded-full border border-border bg-card px-4 text-xs font-black text-primary transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <LocalIcon name="ph:download-simple-bold" className="text-lg" />
-            <span>ייצוא לאקסל</span>
+            ניקוי
           </button>
-          <Link to={APP_ROUTES.newOrder} className={primaryLinkClassName}>
-            <LocalIcon name="ph:plus-bold" className="text-lg" />
-            <span>הזמנה חדשה</span>
-          </Link>
         </div>
-      </header>
-
-      <div className="mt-7 flex items-center gap-3 rounded-3xl border border-border bg-card p-3 shadow-sm">
-        <label className="sr-only" htmlFor="orders-search">
-          חיפוש הזמנות
-        </label>
-        <input
-          ref={searchInput}
-          id="orders-search"
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.currentTarget.value)}
-          placeholder="חיפוש: שם, מלון, טלפון, סלט, כל דבר..."
-          className="min-h-11 min-w-0 flex-1 rounded-full border-0 bg-secondary/60 px-5 text-sm font-bold text-primary outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            setSearchQuery('')
-            searchInput.current?.focus()
-          }}
-          disabled={searchQuery.length === 0}
-          className="min-h-11 rounded-full border border-border bg-card px-4 text-xs font-black text-primary transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          ניקוי
-        </button>
-      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {STATUS_FILTERS.map((value) => (
@@ -1008,6 +1085,7 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
         )}
       </div>
     </div>
+  </OutreachContext.Provider>
   )
 }
 

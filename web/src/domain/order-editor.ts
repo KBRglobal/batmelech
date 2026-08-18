@@ -1707,6 +1707,18 @@ export function serializeOrderDraft(draft: OrderDraft, orderId: string): LegacyO
   delete raw.hotelProviderId
   delete raw.hotelLatitude
   delete raw.hotelLongitude
+  // The hotplate lifecycle has two other writers — מיי over Telegram and the editor's own
+  // plata section — and the draft only holds whatever they had said when it was opened.
+  // Dropping the fields here is what makes the merge in applyOrderDraftToStore keep the
+  // stored values instead of writing a stale copy back over them.
+  for (const field of [
+    'plataCount',
+    'plataDeposit',
+    'plataStatus',
+    'plataPickupNote',
+    'plataCollectedAt',
+    'plataDepositReturnedAt',
+  ]) delete raw[field]
   return {
     ...raw,
     id: orderId,

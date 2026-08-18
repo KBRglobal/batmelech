@@ -17,7 +17,8 @@ import {
   type CustomerOrderHistoryItem,
   parseLegacyUsdAmount,
 } from '../domain/customers-finance.ts'
-import type { LegacyStore } from '../domain/store.ts'
+import { reorderInviteHref } from '../domain/outreach-messages.ts'
+import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
@@ -151,9 +152,19 @@ function HistoryRow({ item, customerName }: { item: CustomerOrderHistoryItem; cu
   )
 }
 
+/** The saved order behind the newest live history row, for the reorder message. */
+function lastLiveOrder(
+  customer: CustomerDirectoryEntry,
+  store: Readonly<LegacyStore>,
+): LegacyOrder | null {
+  const item = customer.history.find((candidate) => !candidate.cancelled)
+  return item === undefined ? null : store.orders[item.sourceIndex] ?? null
+}
+
 function CustomerCard({
   customer,
   outstandingMinorUnits,
+  lastOrder,
   notes,
   saveState,
   onNotesChange,
@@ -162,6 +173,7 @@ function CustomerCard({
 }: {
   customer: CustomerDirectoryEntry
   outstandingMinorUnits: number | null
+  lastOrder: LegacyOrder | null
   notes: string
   saveState: CustomerSaveState
   onNotesChange: (notes: string) => void
@@ -169,6 +181,12 @@ function CustomerCard({
   onToggleVip: () => void
 }) {
   const saving = saveState.kind === 'saving'
+  // Reuse the directory's outbound gate: no whatsappHref means the phone is not
+  // usable, so there is nothing safe to hand Lin.
+  const inviteHref =
+    lastOrder === null || customer.whatsappHref === null
+      ? null
+      : reorderInviteHref(lastOrder, customer.phone)
   return (
     <article className="relative overflow-hidden rounded-[2.5rem] border border-border bg-card shadow-sm">
       {customer.vip && <div className="absolute inset-y-0 right-0 w-2.5 bg-accent" aria-hidden="true" />}
@@ -248,6 +266,18 @@ function CustomerCard({
                 <LocalIcon name="ph:plus-circle-bold" className="text-base" />
                 <span>הזמנה חדשה כמו הקודמת</span>
               </Link>
+            )}
+            {inviteHref !== null && (
+              <a
+                href={inviteHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`הזמנה חוזרת בוואטסאפ ל${customer.name}`}
+                className={`${compactLinkClassName} w-full`}
+              >
+                <LocalIcon name="ph:shopping-cart-bold" className="text-base" />
+                <span>הזמנה חוזרת בוואטסאפ</span>
+              </a>
             )}
             <button
               type="button"
@@ -600,6 +630,7 @@ export function CustomersScreen({ onSave }: { readonly onSave?: CustomerFinanceS
                 key={customer.key}
                 customer={customer}
                 outstandingMinorUnits={customerOutstandingMinorUnits(displayStore, customer)}
+                lastOrder={lastLiveOrder(customer, displayStore)}
                 notes={Object.prototype.hasOwnProperty.call(noteDrafts, customer.key)
                   ? noteDrafts[customer.key]!
                   : customer.notes}

@@ -190,10 +190,10 @@ test('set_delivery_checkin rejects an unknown state and an unknown order', async
   assert.equal(missing.error, 'order not found');
 });
 
-test('the tool surface exposes seventeen well-formed definitions', async () => {
+test('the tool surface exposes nineteen well-formed definitions', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
 
-  assert.equal(tools.definitions.length, 17);
+  assert.equal(tools.definitions.length, 19);
   for (const definition of tools.definitions) {
     assert.equal(definition.type, 'function', `${definition.name} must be a function tool`);
     assert.equal(typeof definition.name, 'string');
@@ -209,6 +209,8 @@ test('the tool surface exposes seventeen well-formed definitions', async () => {
   assert.ok(names.includes('get_delivery_day'));
   assert.ok(names.includes('set_delivery_checkin'));
   assert.ok(names.includes('build_order_from_whatsapp'));
+  assert.ok(names.includes('get_plata_status'));
+  assert.ok(names.includes('set_plata_status'));
 });
 
 test('get_menu_and_settings answers with the ordering state as it is right now', async () => {
@@ -250,4 +252,80 @@ test('unknown tools are reported rather than thrown', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
   const result = await tools.execute('set_price', { amount: 10 });
   assert.equal(result.error, 'unknown tool: set_price');
+});
+
+// --- plata (hotplate) rental ---------------------------------------------------
+
+function plataState() {
+  return {
+    orders: [
+      { id: 'p1', date: DAY, name: 'רותי', hotelName: 'Atlantis', plataCount: 2, plataDeposit: '50.00', plataStatus: 'withCustomer' },
+      { id: 'p2', date: DAY, name: 'קטי', place: 'Marina', plataCount: 1, plataDeposit: '30.00', plataStatus: 'awaitingPickup', plataPickupNote: 'בקבלה' },
+      { id: 'p3', date: DAY, name: 'דנה', hotelName: 'Hilton', plataCount: 1, plataStatus: 'depositReturned' },
+      { id: 'p4', date: DAY, name: 'שירה', hotelName: 'Rixos' },
+    ],
+    settings: {},
+  };
+}
+
+test('get_plata_status lists only the hotplates whose deposit is still open', async () => {
+  const tools = toolsFor(plataState());
+  const result = await tools.execute('get_plata_status', {});
+
+  assert.equal(result.count, 2);
+  assert.deepEqual(result.platas.map((plata) => plata.id), ['p1', 'p2']);
+  assert.deepEqual(result.platas[0], {
+    id: 'p1',
+    name: 'רותי',
+    hotel: 'Atlantis',
+    date: DAY,
+    count: 2,
+    deposit: '50.00',
+    status: 'withCustomer',
+    pickupNote: null,
+  });
+  assert.equal(result.platas[1].pickupNote, 'בקבלה');
+  assert.equal(result.platas[1].hotel, 'Marina');
+});
+
+test('get_plata_status keeps a hotplate that was collected but not yet paid back', async () => {
+  const tools = toolsFor({
+    orders: [{ id: 'p1', date: DAY, name: 'רותי', hotelName: 'Atlantis', plataCount: 1, plataStatus: 'collected' }],
+    settings: {},
+  });
+  const result = await tools.execute('get_plata_status', {});
+  assert.equal(result.count, 1);
+  assert.equal(result.platas[0].status, 'collected');
+});
+
+test('set_plata_status writes the state and the note through the business action', async () => {
+  const repository = fakeRepository(plataState());
+  const tools = createMeyTools({ repository, logger: silentLogger });
+
+  const result = await tools.execute('set_plata_status', {
+    orderId: 'p1',
+    status: 'awaitingPickup',
+    note: 'השאירה בקבלה',
+  });
+  assert.equal(result.ok, true);
+
+  const order = repository._current().orders.find((candidate) => candidate.id === 'p1');
+  assert.equal(order.plataStatus, 'awaitingPickup');
+  assert.equal(order.plataPickupNote, 'השאירה בקבלה');
+  assert.equal(order.plataCount, 2, 'the tool never touches how many went out');
+  assert.equal(order.plataDeposit, '50.00', 'the tool never touches the deposit');
+});
+
+test('set_plata_status refuses an unknown state and an unknown order', async () => {
+  const repository = fakeRepository(plataState());
+  const tools = createMeyTools({ repository, logger: silentLogger });
+
+  const badState = await tools.execute('set_plata_status', { orderId: 'p1', status: 'somewhere', note: null });
+  assert.equal(badState.ok, false);
+  assert.match(badState.error, /status must be one of/);
+  assert.equal(repository._current().orders[0].plataStatus, 'withCustomer');
+
+  const missing = await tools.execute('set_plata_status', { orderId: 'nope', status: 'collected', note: null });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.error, 'order not found');
 });

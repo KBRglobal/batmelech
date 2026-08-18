@@ -421,9 +421,15 @@ if (pool && process.env.BM_SECRETS_KEY) {
   }
 }
 
-// --- Staff-only invoice history: browse issued invoices and re-send one ---
+// --- Staff-only invoices: browse issued ones, re-send one, issue one by hand.
+// The state repository comes along because issuing by hand reads orders and
+// business settings out of the same versioned state the panel edits. ---
 if (pool) {
-  app.use('/api/invoices', createInvoiceBrowseRouter({ pool, resendApiKey: process.env.RESEND_API_KEY }));
+  app.use('/api/invoices', createInvoiceBrowseRouter({
+    pool,
+    resendApiKey: process.env.RESEND_API_KEY,
+    stateRepository,
+  }));
 } else {
   app.use('/api/invoices', (_request, response) => {
     response.set('Cache-Control', 'no-store');

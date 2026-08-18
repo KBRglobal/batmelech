@@ -9,6 +9,7 @@ const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { z } = require('zod');
 const { checkSubmissionWindow } = require('./delivery-windows');
+const { getShabbatOrChagStatus } = require('./shabbat-calendar');
 
 const MAX_ATTEMPTS = 5;
 const CANONICAL_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -132,12 +133,15 @@ function buildLegacyOrder(submission, now) {
   };
 }
 
-function createSiteOrderRouter({ repository, logger = console }) {
+function createSiteOrderRouter({ repository, logger = console, clock = () => new Date() }) {
   if (!repository || typeof repository.loadState !== 'function' || typeof repository.saveState !== 'function') {
     throw new TypeError('A state repository is required');
   }
   if (!logger || typeof logger.error !== 'function') {
     throw new TypeError('A logger with an error method is required');
+  }
+  if (typeof clock !== 'function') {
+    throw new TypeError('clock must be a function returning a Date');
   }
 
   const router = express.Router();
@@ -157,12 +161,31 @@ function createSiteOrderRouter({ repository, logger = console }) {
   });
 
   router.post('/', async (request, response) => {
+    // The site hides itself for Shabbat and yom tov, but a page left open
+    // before candle lighting can still POST, so the intake refuses here too.
+    // A thrown calendar is a code bug, not a reason to reject every order for
+    // the rest of the week: log it and let the order through, the same way a
+    // failed status read leaves the site open rather than shut.
+    let shabbat = { closed: false, label: null, occasion: null };
+    try {
+      shabbat = getShabbatOrChagStatus(clock());
+    } catch (error) {
+      logger.error('shabbat calendar check failed', error);
+    }
+    if (shabbat.closed) {
+      const returnWhen = shabbat.occasion === 'chag' ? 'בצאת החג' : 'במוצאי שבת';
+      return response.status(403).json({
+        error: `${shabbat.label} — המטבח שלנו שומר שבת, ואנחנו לא מקבלים הזמנות כרגע. נשמח לראותכם ${returnWhen}.`,
+        reason: 'shabbat',
+      });
+    }
+
     const parsed = OrderSubmissionSchema.safeParse(request.body);
     if (!parsed.success) {
       return response.status(400).json({ error: 'invalid order' });
     }
 
-    const now = new Date();
+    const now = clock();
     let legacyOrder;
     try {
       legacyOrder = buildLegacyOrder(parsed.data, now);

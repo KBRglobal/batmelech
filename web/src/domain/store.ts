@@ -65,6 +65,20 @@ export const LegacyOrderSchema = z
     // serializeOrderDraft — staying out of the draft is what preserves it
     // through admin edits. Read-only in the panel.
     intakeConversation: z.string().optional(),
+    // Hotplate (פלטה) rental lifecycle: a plate goes out with the order against a
+    // deposit, Felix collects it back after Shabbat, and only then is the deposit
+    // returned. Unlike the delivery fields above these ARE operator-editable, but
+    // the same HARD RULE applies: they must stay out of OrderDraft /
+    // createOrderDraftFromLegacy / serializeOrderDraft, because the admin save
+    // merges `{...existingOrder, ...serializeOrderDraft(draft)}` and anything the
+    // draft does not carry is what survives a Telegram write made mid-edit. The
+    // editor writes them through its own save (applyPlataToStore in plata.ts).
+    plataCount: z.number().optional(),
+    plataDeposit: NumberLikeSchema.optional(),
+    plataStatus: z.enum(['withCustomer', 'awaitingPickup', 'collected', 'depositReturned']).optional(),
+    plataPickupNote: z.string().optional(),
+    plataCollectedAt: z.number().optional(),
+    plataDepositReturnedAt: z.number().optional(),
   })
   .passthrough()
 
@@ -79,7 +93,10 @@ export const LegacySettingsSchema = z
     orderingOpen: z.boolean().optional(),
     orderingClosedUntil: z.string().optional(),
     siteBanner: z.string().nullable().optional(),
+    paymentRequestDetails: z.string().optional(),
+    googleReviewUrl: z.string().optional(),
     meyDigestSentFor: z.string().optional(),
+    meyPlataDigestSentFor: z.string().optional(),
     meyPendingProof: z
       .object({ url: z.string(), at: z.number(), by: z.string().optional() })
       .nullable()

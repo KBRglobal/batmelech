@@ -123,6 +123,34 @@ describe('SettingsBackupScreen', () => {
     expect(saved.siteBanner).toBe('חוזרים ביום ראשון')
   })
 
+  it('saves the payment details and the review link through the same settings save', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    mockedUseStore.mockReturnValue(queryResult({
+      store: { orders: [], settings: { paymentRequestDetails: 'ישן' } } as LegacyStore,
+    }))
+    renderSettings({ onSave })
+
+    expect(screen.getByRole('heading', { name: 'פרטי תשלום וביקורות' })).toBeTruthy()
+    await user.clear(screen.getByLabelText('איך משלמים לך'))
+    await user.type(screen.getByLabelText('איך משלמים לך'), 'ביט 050-1234567')
+    await user.type(screen.getByLabelText('קישור לביקורות בגוגל'), 'javascript:bad')
+    await user.click(screen.getByRole('button', { name: 'שמירת ההגדרות' }))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('קישור הביקורות בגוגל')
+
+    await user.clear(screen.getByLabelText('קישור לביקורות בגוגל'))
+    await user.type(screen.getByLabelText('קישור לביקורות בגוגל'), 'https://g.page/r/batmelech')
+    await user.click(screen.getByRole('button', { name: 'שמירת ההגדרות' }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(onSave.mock.calls[0]![0].nextStore.settings).toMatchObject({
+      paymentRequestDetails: 'ביט 050-1234567',
+      googleReviewUrl: 'https://g.page/r/batmelech',
+    })
+  })
+
   it('closes ordering for the coming Shabbat only and shows when it returns', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-12T08:00:00Z')) // Wednesday, midday in Dubai

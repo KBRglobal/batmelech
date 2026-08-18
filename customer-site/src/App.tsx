@@ -3,6 +3,8 @@ import { Outlet, Routes, Route, useLocation } from 'react-router'
 import { ConciergeChat } from './components/concierge-chat'
 import { FloatingCartBar } from './components/floating-cart-bar'
 import { SiteBanner } from './components/site-banner'
+import { ShabbatClosure } from './components/shabbat-closure'
+import { useSiteStatus } from './site-status-context'
 import { DeviceLocaleRedirect, LocaleLayout, canonicalPath, localizedHref, type Locale } from './locale-context'
 import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
@@ -127,6 +129,7 @@ function localeRoutes() {
 export default function App() {
   const { pathname, hash } = useLocation()
   const { locale, path } = canonicalPath(pathname)
+  const { shabbatClosed } = useSiteStatus()
 
   useEffect(() => {
     if (hash) {
@@ -163,6 +166,13 @@ export default function App() {
   }, [pathname, hash, locale, path])
 
   const showFloatingCart = path !== '/checkout' && path !== '/shabbat-extras'
+
+  // Every route at once, not a banner on top of a live menu: the site rests.
+  // The status fetch defaults to open, so a failed or slow call never hides
+  // the shop — only the server saying so does.
+  if (shabbatClosed) {
+    return <ShabbatClosure />
+  }
 
   return (
     <div key={pathname} className="page-transition">

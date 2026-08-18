@@ -292,3 +292,88 @@ test('start fires once immediately, keeps a unref-ed interval, and stop clears i
 
   assert.equal(fetchStub.sent.filter(isDigest).length, 1);
 });
+
+// --- plata pickup digest -------------------------------------------------------
+// TODAY (2026-08-14) is a Friday, so 08-15 is the Saturday the plates come back.
+const SATURDAY = '2026-08-15';
+
+const isPlataDigest = (message) => message.text.startsWith('פלטות לאיסוף:');
+
+function plataOrder(overrides) {
+  return {
+    id: 'p1',
+    date: TODAY,
+    name: 'רותי',
+    hotelName: 'Atlantis',
+    status: 'נמסרה',
+    plataCount: 1,
+    plataDeposit: '50.00',
+    plataStatus: 'withCustomer',
+    ...overrides,
+  };
+}
+
+test('the plata digest goes out once on Saturday evening and never twice', async (t) => {
+  const fetchStub = stubFetch();
+  t.after(() => fetchStub.restore());
+
+  const repo = fakeRepository(stateWith([
+    plataOrder({ id: 'p1' }),
+    plataOrder({ id: 'p2', name: 'קטי', hotelName: 'Hilton', plataStatus: 'awaitingPickup', plataPickupNote: 'בקבלה' }),
+  ]));
+  const clock = { at: dubaiClock(SATURDAY, 20, 30) };
+  const scheduler = schedulerAt(repo, clock);
+
+  for (let i = 0; i < 3; i += 1) await scheduler.tick();
+
+  const digests = fetchStub.sent.filter(isPlataDigest);
+  assert.equal(digests.length, 1);
+  assert.equal(repo._current().settings.meyPlataDigestSentFor, SATURDAY);
+  assert.match(digests[0].text, /רותי/u);
+  assert.match(digests[0].text, /קטי · Hilton · פלטה אחת · בקבלה/u);
+
+  // Process died mid-evening: a fresh scheduler over the same state stays quiet.
+  await schedulerAt(repo, clock).tick();
+  assert.equal(fetchStub.sent.filter(isPlataDigest).length, 1);
+});
+
+test('the plata digest waits for 20:00 Dubai and for Saturday', async (t) => {
+  const fetchStub = stubFetch();
+  t.after(() => fetchStub.restore());
+
+  const tooEarly = fakeRepository(stateWith([plataOrder({})]));
+  await schedulerAt(tooEarly, { at: dubaiClock(SATURDAY, 19, 59) }).tick();
+  assert.equal(fetchStub.sent.filter(isPlataDigest).length, 0);
+  assert.equal(tooEarly._current().settings.meyPlataDigestSentFor, undefined);
+
+  // Friday evening — same hour, wrong day. The plates are still in use.
+  const friday = fakeRepository(stateWith([plataOrder({})]));
+  await schedulerAt(friday, { at: dubaiClock(TODAY, 20, 30) }).tick();
+  assert.equal(fetchStub.sent.filter(isPlataDigest).length, 0);
+
+  const sunday = fakeRepository(stateWith([plataOrder({})]));
+  await schedulerAt(sunday, { at: dubaiClock('2026-08-16', 20, 30) }).tick();
+  assert.equal(fetchStub.sent.filter(isPlataDigest).length, 0);
+});
+
+test('the plata digest only counts plates that are still out', async (t) => {
+  const fetchStub = stubFetch();
+  t.after(() => fetchStub.restore());
+
+  const closed = fakeRepository(stateWith([
+    plataOrder({ id: 'p1', plataStatus: 'collected' }),
+    plataOrder({ id: 'p2', plataStatus: 'depositReturned' }),
+    plataOrder({ id: 'p3', plataCount: 0, plataStatus: undefined }),
+    { id: 'p4', date: TODAY, name: 'שירה', hotelName: 'Rixos', status: 'נמסרה' },
+  ]));
+  await schedulerAt(closed, { at: dubaiClock(SATURDAY, 20, 30) }).tick();
+  assert.equal(fetchStub.sent.filter(isPlataDigest).length, 0);
+  assert.equal(closed._current().settings.meyPlataDigestSentFor, undefined, 'nothing to say claims nothing');
+
+  // A plate from an earlier week that nobody collected still rides in the list.
+  const stale = fakeRepository(stateWith([plataOrder({ id: 'old', date: '2026-08-07', name: 'מיכל' })]));
+  await schedulerAt(stale, { at: dubaiClock(SATURDAY, 20, 30) }).tick();
+  const digests = fetchStub.sent.filter(isPlataDigest);
+  assert.equal(digests.length, 1);
+  assert.match(digests[0].text, /מיכל/u);
+});

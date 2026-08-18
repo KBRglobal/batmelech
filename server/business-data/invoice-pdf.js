@@ -36,6 +36,7 @@ async function renderInvoicePdf({
   currency,
   customerName,
   customerEmail,
+  customerPhone,
   lines,
   subtotalMinor,
   vatMinor,
@@ -93,6 +94,12 @@ async function renderInvoicePdf({
   y -= 14;
   if (trn) draw(`TRN: ${trn}`, MARGIN, y, 9, font, MUTED);
   draw(customerEmail || '—', MARGIN + colWidth + 24, y, 9, font, MUTED);
+  // A walk-in invoice may carry a phone instead of an email; it belongs on the
+  // document, under whichever contact line came first.
+  if (customerPhone) {
+    y -= 13;
+    draw(customerPhone, MARGIN + colWidth + 24, y, 9, font, MUTED);
+  }
 
   // --- Line items table ---
   y -= 34;

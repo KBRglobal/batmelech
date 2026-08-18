@@ -61,6 +61,7 @@ function createInvoiceDownloadRouter({ pool, logger = console }) {
         currency: invoice.currency,
         customerName: invoice.customer_name,
         customerEmail: invoice.customer_email,
+        customerPhone: invoice.customer_phone,
         lines: [{ name: invoice.description || `Invoice ${invoice.invoice_number}`, qty: 1, unitPriceMinor: invoice.total_minor }],
         subtotalMinor: invoice.subtotal_minor,
         vatMinor: invoice.vat_minor,

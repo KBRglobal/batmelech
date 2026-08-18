@@ -6,87 +6,15 @@
 // state-service / state-route files. Fires after the save has already
 // succeeded and never blocks or fails the caller's response.
 
-const crypto = require('node:crypto');
-const { renderInvoicePdf, computeVatInclusiveBreakdown } = require('./invoice-pdf');
-const { sendInvoiceEmail } = require('./send-invoice-email');
-const { nextInvoiceNumber, recordInvoice, hasInvoiceForOrder } = require('./repository');
+const { hasInvoiceForOrder } = require('./repository');
+const { issueInvoice } = require('./issue-invoice');
+const { invoiceSettings, orderInvoiceFields } = require('./invoice-inputs');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DOWNLOAD_BASE_URL = 'https://www.batmelech.ae/invoices';
 
-function dubaiDateString(now) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(now);
-}
-
-async function issueInvoice({ pool, resendApiKey, order, orderId, businessName, trn, businessAddress, currency, email, logger }) {
-  const totalNumber = Number(order.total);
-  const totalMinor = Number.isFinite(totalNumber) && totalNumber >= 0 ? Math.round(totalNumber * 100) : 0;
-  const { subtotalMinor, vatMinor } = computeVatInclusiveBreakdown(totalMinor, Boolean(trn));
-  const invoiceNumber = await nextInvoiceNumber(pool);
-  const accessToken = crypto.randomBytes(24).toString('hex');
-  const downloadUrl = `${DOWNLOAD_BASE_URL}/${invoiceNumber}/${accessToken}.pdf`;
-  const description =
-    order.source === 'site' && typeof order.notes === 'string' && order.notes.trim()
-      ? order.notes.split('\n\n')[0].slice(0, 300)
-      : `Order ${orderId}`;
-
-  const pdfBytes = await renderInvoicePdf({
-    invoiceNumber,
-    issueDate: dubaiDateString(new Date()),
-    businessName,
-    trn,
-    businessAddress,
-    currency,
-    customerName: order.name || 'Customer',
-    customerEmail: email,
-    lines: [{ name: description, qty: 1, unitPriceMinor: totalMinor }],
-    subtotalMinor,
-    vatMinor,
-    totalMinor,
-  });
-
-  const base = {
-    invoiceNumber,
-    orderId,
-    businessName,
-    trn,
-    businessAddress,
-    currency,
-    customerName: order.name || '',
-    customerEmail: email,
-    description,
-    subtotalMinor,
-    vatMinor,
-    totalMinor,
-    accessToken,
-  };
-
-  try {
-    await sendInvoiceEmail({
-      apiKey: resendApiKey,
-      toEmail: email,
-      invoiceNumber,
-      pdfBytes,
-      businessName,
-      customerName: order.name,
-      deliveryAddress: typeof order.address === 'string' ? order.address : undefined,
-      downloadUrl,
-    });
-    await recordInvoice(pool, { ...base, status: 'sent' });
-    logger.log(`invoice ${invoiceNumber} sent for order ${orderId}`);
-  } catch (error) {
-    await recordInvoice(pool, { ...base, status: 'failed', errorMessage: String(error?.message || error) });
-    throw error;
-  }
-}
-
-async function handlePotentialInvoices(previousData, newData, { pool, resendApiKey, logger }) {
-  const settings = newData?.settings ?? {};
-  const businessName = typeof settings.businessName === 'string' ? settings.businessName.trim() : '';
-  const currency = settings.invoiceCurrency === 'USD' || settings.invoiceCurrency === 'AED' ? settings.invoiceCurrency : null;
-  if (!businessName || !currency || !resendApiKey) return;
-  const trn = typeof settings.trn === 'string' ? settings.trn.trim() : '';
-  const businessAddress = typeof settings.businessAddress === 'string' ? settings.businessAddress.trim() : '';
+async function handlePotentialInvoices(previousData, newData, { pool, resendApiKey, sendInvoiceEmail, logger }) {
+  const settings = invoiceSettings(newData);
+  if (!settings || !resendApiKey) return;
 
   const previousById = new Map((previousData?.orders ?? []).map((order) => [String(order?.id), order]));
 
@@ -101,21 +29,34 @@ async function handlePotentialInvoices(previousData, newData, { pool, resendApiK
 
     try {
       if (await hasInvoiceForOrder(pool, orderId)) continue;
-      await issueInvoice({ pool, resendApiKey, order, orderId, businessName, trn, businessAddress, currency, email, logger });
+      await issueInvoice({
+        pool,
+        resendApiKey,
+        // Left undefined in production so issue-invoice.js uses the real
+        // sender; injected by tests so no invoice mail leaves the process.
+        ...(sendInvoiceEmail ? { sendInvoiceEmail } : {}),
+        orderId,
+        email,
+        logger,
+        ...settings,
+        ...orderInvoiceFields(order, orderId),
+      });
     } catch (error) {
       logger.error('invoice issue failed', { orderId, error });
     }
   }
 }
 
-function wrapRepositoryWithInvoiceTrigger(repository, { pool, resendApiKey, logger = console }) {
+function wrapRepositoryWithInvoiceTrigger(repository, { pool, resendApiKey, sendInvoiceEmail, logger = console }) {
   return Object.freeze({
     ...repository,
     async saveState(args) {
       const result = await repository.saveState(args);
       if (result.ok) {
         Promise.resolve()
-          .then(() => handlePotentialInvoices(args.baseState, result.data, { pool, resendApiKey, logger }))
+          .then(() =>
+            handlePotentialInvoices(args.baseState, result.data, { pool, resendApiKey, sendInvoiceEmail, logger })
+          )
           .catch((error) => logger.error('invoice trigger crashed', error));
       }
       return result;

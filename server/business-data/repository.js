@@ -47,6 +47,9 @@ const MIGRATION_SQL = Object.freeze([
   `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS access_token TEXT`,
   `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS resent_at TIMESTAMPTZ`,
+  // A manually issued invoice may be for a walk-in customer who left a phone
+  // number and no email, so the phone is part of who the invoice is billed to.
+  `ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS customer_phone TEXT NOT NULL DEFAULT ''`,
   `CREATE INDEX IF NOT EXISTS invoices_order_id_idx ON public.invoices (order_id)`,
   // Partial unique index (not a plain UNIQUE column) so this stays idempotent
   // regardless of any pre-existing rows with a null token.
@@ -108,13 +111,17 @@ async function nextInvoiceNumber(pool, now = new Date()) {
   return `BM-${year}-${sequenceNumber}`;
 }
 
+// issuedAt is normally left null so the row takes the database's own NOW().
+// Only the staff panel passes one, when Lin dates an invoice herself; the
+// stored value is what the PDF re-render and the invoice list both read, so a
+// dated invoice cannot end up printing one date and filing under another.
 async function recordInvoice(pool, record) {
   await pool.query(
     `INSERT INTO public.invoices (
       invoice_number, order_id, business_name, trn, business_address, currency,
       customer_name, customer_email, description, subtotal_minor, vat_minor, total_minor,
-      status, error_message, access_token
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      status, error_message, access_token, created_at, customer_phone
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,COALESCE($16::timestamptz, NOW()),$17)`,
     [
       record.invoiceNumber,
       record.orderId,
@@ -131,6 +138,8 @@ async function recordInvoice(pool, record) {
       record.status,
       record.errorMessage ?? null,
       record.accessToken ?? null,
+      record.issuedAt ?? null,
+      record.customerPhone ?? '',
     ]
   );
 }
@@ -143,10 +152,30 @@ async function hasInvoiceForOrder(pool, orderId) {
   return result.rows.length > 0;
 }
 
+// Any invoice at all, including one whose email failed. Manual issuing uses
+// this rather than hasInvoiceForOrder: a failed send is recovered by resending
+// the invoice that already exists, never by numbering a second one for the
+// same order. (The automatic trigger keeps the looser check so a genuinely
+// failed automatic attempt can still be retried.)
+async function hasAnyInvoiceForOrder(pool, orderId) {
+  const result = await pool.query(
+    'SELECT 1 FROM public.invoices WHERE order_id = $1 LIMIT 1',
+    [orderId]
+  );
+  return result.rows.length > 0;
+}
+
+// Which orders already carry an invoice — one query instead of asking per
+// order, so the staff panel can offer only the orders still missing one.
+async function listInvoicedOrderIds(pool) {
+  const result = await pool.query('SELECT DISTINCT order_id FROM public.invoices');
+  return result.rows.map((row) => row.order_id);
+}
+
 async function getInvoiceByNumberAndToken(pool, invoiceNumber, accessToken) {
   const result = await pool.query(
     `SELECT invoice_number, business_name, trn, business_address, currency, customer_name,
-       customer_email, description, subtotal_minor, vat_minor, total_minor, created_at
+       customer_email, customer_phone, description, subtotal_minor, vat_minor, total_minor, created_at
      FROM public.invoices
      WHERE invoice_number = $1 AND access_token = $2 AND status = 'sent'`,
     [invoiceNumber, accessToken]
@@ -179,7 +208,7 @@ async function listInvoices(pool, { query = '', limit = 50 } = {}) {
 async function getInvoiceByNumber(pool, invoiceNumber) {
   const result = await pool.query(
     `SELECT invoice_number, order_id, business_name, trn, business_address, currency,
-       customer_name, customer_email, description, subtotal_minor, vat_minor, total_minor,
+       customer_name, customer_email, customer_phone, description, subtotal_minor, vat_minor, total_minor,
        status, access_token, created_at
      FROM public.invoices
      WHERE invoice_number = $1`,
@@ -209,6 +238,8 @@ module.exports = {
   nextInvoiceNumber,
   recordInvoice,
   hasInvoiceForOrder,
+  hasAnyInvoiceForOrder,
+  listInvoicedOrderIds,
   getInvoiceByNumberAndToken,
   listInvoices,
   getInvoiceByNumber,
