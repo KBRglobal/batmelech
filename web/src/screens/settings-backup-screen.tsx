@@ -266,10 +266,6 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
               <LocalIcon name="ph:cooking-pot-bold" />
               <span>מתכונים ומצרכים</span>
             </Link>
-            <Link to={APP_ROUTES.productLibrary} className={actionClassName}>
-              <LocalIcon name="ph:package-bold" />
-              <span>ספריית מוצרים ורכש</span>
-            </Link>
           </div>
         </section>
 

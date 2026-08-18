@@ -21,7 +21,6 @@ import { OrderImportReviewScreen } from './screens/order-import-review-screen.ts
 import { OrdersScreen } from './screens/orders-screen.tsx'
 import { PendingScreen } from './screens/pending-screen.tsx'
 import { PreparationScreen } from './screens/preparation-screen.tsx'
-import { ProductLibraryScreen } from './screens/product-library-screen.tsx'
 import { RecipesScreen } from './screens/recipes-screen.tsx'
 import { SettingsBackupScreen } from './screens/settings-backup-screen.tsx'
 import { ShoppingListScreen } from './screens/shopping-list-screen.tsx'
@@ -54,11 +53,6 @@ function MenuScreenWithSave() {
 function RecipesScreenWithSave() {
   const { onSave } = useVersionedScreenSave()
   return <RecipesScreen onSave={async (request) => { await onSave(request) }} />
-}
-
-function ProductLibraryScreenWithSave() {
-  const { onSave } = useVersionedScreenSave()
-  return <ProductLibraryScreen onSave={async (request) => { await onSave(request) }} />
 }
 
 function CustomersScreenWithSave() {
@@ -139,7 +133,6 @@ export function AppRoutes() {
           path={APP_ROUTES.recipeSettings}
           element={<RecipesScreenWithSave />}
         />
-        <Route path={APP_ROUTES.productLibrary} element={<ProductLibraryScreenWithSave />} />
         <Route path={APP_ROUTES.shoppingList} element={<ShoppingListScreenWithSave />} />
         <Route
           path="*"

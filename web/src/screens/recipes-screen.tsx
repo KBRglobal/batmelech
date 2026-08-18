@@ -3,8 +3,6 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
-import { loadProductLibrary, minorUnitsToMoney, type ProductLibraryEntry } from '../domain/product-library.ts'
-import { costRecipe, saladSizeCosts } from '../domain/recipe-costing.ts'
 import {
   applyRecipesToStore,
   buildPreparationCatalog,
@@ -529,54 +527,11 @@ interface DuplicateSource {
   readonly ingredients: readonly DraftIngredient[]
 }
 
-function RecipeCosting({
-  draft,
-  productLibrary,
-}: {
-  readonly draft: RecipeDraft
-  readonly productLibrary: ReadonlyMap<string, ProductLibraryEntry>
-}) {
-  const validated = validateRecipeDrafts([draft])
-  if (!validated.valid || validated.recipes.length !== 1) {
-    return (
-      <p className="rounded-2xl border border-border bg-secondary/20 p-4 text-xs font-bold text-muted-foreground">
-        עלות תופיע אחרי שהמתכון שלם — תפוקה ולפחות מצרך אחד תקין.
-      </p>
-    )
-  }
-  const cost = costRecipe(validated.recipes[0]!, productLibrary)
-  return (
-    <div className="rounded-2xl border border-border bg-secondary/20 p-4">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <p className="text-sm font-black text-primary">עלות למנה: {minorUnitsToMoney(cost.perYieldUnitMinorUnits)} AED</p>
-        {cost.minorUnitsPer100g !== null && (
-          <p className="text-sm font-black text-primary">ל-100 גרם: {minorUnitsToMoney(cost.minorUnitsPer100g)} AED</p>
-        )}
-      </div>
-      {cost.minorUnitsPer100g !== null && (
-        <div className="mt-2 flex flex-wrap gap-3 text-xs font-bold text-muted-foreground">
-          {Object.entries(saladSizeCosts(cost.minorUnitsPer100g)).map(([grams, minorUnits]) => (
-            <span key={grams}>
-              {grams} גרם: {minorUnitsToMoney(minorUnits)} AED
-            </span>
-          ))}
-        </div>
-      )}
-      {!cost.complete && (
-        <p className="mt-3 text-xs font-black text-amber-700">
-          חסר מחיר ל-{cost.warnings.length} מצרכים — להשלים בהגדרות ← ספריית מוצרים ורכש.
-        </p>
-      )}
-    </div>
-  )
-}
-
 function RecipeEditor({
   draft,
   title,
   usage,
   duplicateSources,
-  productLibrary,
   onChange,
   onClose,
 }: {
@@ -584,7 +539,6 @@ function RecipeEditor({
   readonly title: string
   readonly usage: IngredientUsage
   readonly duplicateSources: readonly DuplicateSource[]
-  readonly productLibrary: ReadonlyMap<string, ProductLibraryEntry>
   readonly onChange: (draft: RecipeDraft) => void
   readonly onClose: () => void
 }) {
@@ -668,11 +622,6 @@ function RecipeEditor({
             )}
           </div>
           <IngredientRows draft={draft} usage={usage} onChange={onChange} />
-        </div>
-
-        <div>
-          <h3 className="mb-3 font-black text-primary">עלות</h3>
-          <RecipeCosting draft={draft} productLibrary={productLibrary} />
         </div>
       </div>
     </section>
@@ -798,7 +747,6 @@ export function RecipesScreen({
   const missingCount = targets.filter((target) => !configuredByItemId.has(target.id)).length
   const doneCount = targets.length - missingCount
   const usage = buildIngredientUsage(currentDrafts)
-  const productLibrary = new Map(loadProductLibrary(baseStore).entries.map((entry) => [entry.id, entry]))
 
   const currentDraftsJson = JSON.stringify(currentDrafts)
   const dirty =
@@ -1059,7 +1007,6 @@ export function RecipesScreen({
             title={recipeName(selectedDraft, targetsById)}
             usage={usage}
             duplicateSources={duplicateSources}
-            productLibrary={productLibrary}
             onChange={(value) => updateDraft(selectedIndex, value)}
             onClose={() => setSelectedIndex(null)}
           />

@@ -148,7 +148,6 @@ export interface StoreSaveRequest {
     | 'settings'
     | 'menu'
     | 'recipes'
-    | 'product-library'
     | 'customers'
     | 'finance'
     | 'deliveries'
