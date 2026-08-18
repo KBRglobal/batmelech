@@ -2,6 +2,7 @@ import { decimalParts, type RecipeDefinition, type RecipeIngredient } from './re
 import {
   effectivePriceRational,
   effectiveSupplier,
+  lookupProduct,
   ratAdd,
   ratDiv,
   ratFromDecimal,
@@ -85,7 +86,7 @@ export function costRecipe(
     if (grams !== null) totalWeight = totalWeight === null ? grams : ratAdd(totalWeight, grams)
     const weightGrams = grams === null ? null : Number(ratToRoundedInt(grams))
 
-    const product = productLibrary.get(ingredient.ingredientId)
+    const product = lookupProduct(productLibrary, ingredient.ingredientId, ingredient.ingredientName)
     if (product === undefined) {
       complete = false
       warnings.push({

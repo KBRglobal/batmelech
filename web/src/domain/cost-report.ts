@@ -5,6 +5,8 @@ import {
   effectivePriceRational,
   effectiveSupplier,
   loadProductLibrary,
+  lookupProduct,
+  productLibraryMap,
   ratFromDecimal,
   ratMul,
   ratToRoundedInt,
@@ -68,7 +70,7 @@ function costDemand(
   if (demand.procurement.kind === 'none') return { minorUnits: 0, complete: true }
 
   if (demand.procurement.kind === 'direct') {
-    const product = productLibrary.get(demand.procurement.ingredientId)
+    const product = lookupProduct(productLibrary, demand.procurement.ingredientId, demand.procurement.ingredientName)
     const supplier = product === undefined ? null : effectiveSupplier(product)
     const listing = product === undefined || supplier === null ? null : product.listings[supplier]!
     const comparable =
@@ -122,7 +124,7 @@ function salePricesById(catalog: SettingsCatalog): ReadonlyMap<string, number> {
 export function computeDishCosts(store: Readonly<LegacyStore>): readonly DishCostRow[] {
   const catalog = loadSettingsCatalog(store).catalog
   const book = loadRecipeBook(store, catalog)
-  const productLibrary = new Map(loadProductLibrary(store).entries.map((entry) => [entry.id, entry]))
+  const productLibrary = productLibraryMap(loadProductLibrary(store).entries)
   const namesById = new Map(recipeTargets(catalog, store).map((target) => [target.id, target.name]))
   const prices = salePricesById(catalog)
 
@@ -157,7 +159,7 @@ export function computeOrderCosts(store: Readonly<LegacyStore>): readonly OrderC
   const resolution = resolvePreparationCatalog(store)
   const recipeBook = loadRecipeBook(store, loadSettingsCatalog(store).catalog)
   const recipesById = new Map(recipeBook.recipes.map((recipe) => [recipe.itemId, recipe]))
-  const productLibrary = new Map(loadProductLibrary(store).entries.map((entry) => [entry.id, entry]))
+  const productLibrary = productLibraryMap(loadProductLibrary(store).entries)
 
   const rows: OrderCostRow[] = []
   for (const order of store.orders) {
@@ -296,7 +298,9 @@ export interface MissingDataReport {
 export function computeMissingData(store: Readonly<LegacyStore>, now: number): MissingDataReport {
   const catalog = loadSettingsCatalog(store).catalog
   const book = loadRecipeBook(store, catalog)
-  const productLibrary = new Map(loadProductLibrary(store).entries.map((entry) => [entry.id, entry]))
+  // The dual-key lookup map duplicates entries in .values() — keep the raw list too.
+  const entries = loadProductLibrary(store).entries
+  const productLibrary = productLibraryMap(entries)
 
   const unpriced = new Map<string, string>()
   for (const recipe of book.recipes) {
@@ -308,7 +312,7 @@ export function computeMissingData(store: Readonly<LegacyStore>, now: number): M
   }
 
   const staleBefore = now - STALE_PRICE_DAYS * DAY_MS
-  const staleProducts = [...productLibrary.values()].flatMap((product) => {
+  const staleProducts = entries.flatMap((product) => {
     const timestamps = Object.values(product.listings).map(
       (listing) => listing.manualPrice?.at ?? listing.updatedAt,
     )

@@ -1,5 +1,6 @@
 import {
   compareSuppliers,
+  lookupProduct,
   type ProductLibraryEntry,
   type SupplierComparison,
 } from './product-library.ts'
@@ -31,7 +32,7 @@ export function attachProcurement(
   const items: ProcurementShoppingListItem[] = []
 
   for (const item of shoppingList.items) {
-    const product = productLibrary.get(item.ingredientId)
+    const product = lookupProduct(productLibrary, item.ingredientId, item.ingredientName)
     if (product?.insignificant === true) {
       excludedInsignificant.push({ ingredientId: item.ingredientId, ingredientName: item.ingredientName })
       continue

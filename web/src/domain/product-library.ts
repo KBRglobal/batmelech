@@ -451,6 +451,33 @@ export function applyProductLibraryToStore(
   return { ...store, productLibrary: entries } as LegacyStore
 }
 
+/**
+ * Lookup map for costing: every entry is reachable by its id AND by its trimmed
+ * name. Recipe rows typed in the recipes screen carry generated ingredient ids
+ * that can never equal a product id — the NAME is what actually joins them.
+ * Ids never get overwritten; on duplicate names the first entry wins.
+ */
+export function productLibraryMap(
+  entries: readonly ProductLibraryEntry[],
+): ReadonlyMap<string, ProductLibraryEntry> {
+  const map = new Map<string, ProductLibraryEntry>()
+  for (const entry of entries) map.set(entry.id, entry)
+  for (const entry of entries) {
+    const name = entry.name.trim()
+    if (name !== '' && !map.has(name)) map.set(name, entry)
+  }
+  return map
+}
+
+/** Id match first (exact identity), then name match (what the operator typed). */
+export function lookupProduct(
+  productLibrary: ReadonlyMap<string, ProductLibraryEntry>,
+  ingredientId: string,
+  ingredientName: string,
+): ProductLibraryEntry | undefined {
+  return productLibrary.get(ingredientId) ?? productLibrary.get(ingredientName.trim())
+}
+
 export function nextStableProductId(name: string, existing: readonly { readonly id: string }[]): string {
   const trimmedName = name.trim()
   if (trimmedName === '') throw new RangeError('product name must be nonblank')

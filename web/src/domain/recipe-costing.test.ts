@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { costForPortionGrams, costRecipe, marginMinorUnits, saladSizeCosts } from './recipe-costing.ts'
-import type { ProductLibraryEntry } from './product-library.ts'
+import { productLibraryMap, type ProductLibraryEntry } from './product-library.ts'
 import type { RecipeDefinition } from './recipes.ts'
 
 function product(overrides: Partial<ProductLibraryEntry>): ProductLibraryEntry {
@@ -115,6 +115,28 @@ describe('costRecipe', () => {
     }
     // 1kg * 1.20 waste factor * 500 fils/kg = 600
     expect(costRecipe(recipe, library).totalMinorUnits).toBe(600)
+  })
+})
+
+describe('name-fallback product join', () => {
+  it('a recipe typed in the panel (generated ingredient ids) still finds prices by name', () => {
+    const library = productLibraryMap([
+      product({
+        id: 'product-cabbage-white',
+        name: 'כרוב לבן',
+        listings: {
+          nesto: { packSize: '1', packUnit: 'ק"ג', packPriceMinorUnits: 699, updatedAt: 1, manualPrice: null },
+        },
+      }),
+    ])
+    const recipe: Pick<RecipeDefinition, 'yield' | 'ingredients'> = {
+      yield: 1,
+      // ingredientId is a screen-generated hash — only the NAME matches the library
+      ingredients: [{ ingredientId: 'ingredient-ab12cd34', ingredientName: 'כרוב לבן', quantity: '2', unit: 'ק"ג' }],
+    }
+    const result = costRecipe(recipe, library)
+    expect(result.complete).toBe(true)
+    expect(result.totalMinorUnits).toBe(1398)
   })
 })
 

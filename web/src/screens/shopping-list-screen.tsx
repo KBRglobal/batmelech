@@ -24,8 +24,8 @@ import {
 import {
   loadProductLibrary,
   minorUnitsToMoney,
+  productLibraryMap,
   SUPPLIER_LABELS,
-  type ProductLibraryEntry,
 } from '../domain/product-library.ts'
 import type { RecipeDefinition } from '../domain/recipes.ts'
 import { resolvePreparationCatalog } from '../domain/settings-catalog.ts'
@@ -351,9 +351,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
     ? plan.itemDemands
     : plan.itemDemands.filter(({ serviceDate }) => serviceDate === requestedDate)
   const result = buildShoppingList(demands, recipeConfiguration.recipes)
-  const productLibrary = new Map<string, ProductLibraryEntry>(
-    loadProductLibrary(store).entries.map((entry) => [entry.id, entry]),
-  )
+  const productLibrary = productLibraryMap(loadProductLibrary(store).entries)
   const procurement = attachProcurement(result, productLibrary)
   const preparationGroups = requestedDate === ''
     ? plan.dates

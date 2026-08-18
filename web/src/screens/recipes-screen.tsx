@@ -3,7 +3,16 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
-import { loadProductLibrary, minorUnitsToMoney, type ProductLibraryEntry } from '../domain/product-library.ts'
+import {
+  applyProductLibraryToStore,
+  loadProductLibrary,
+  lookupProduct,
+  minorUnitsToMoney,
+  moneyToMinorUnits,
+  nextStableProductId,
+  productLibraryMap,
+  type ProductLibraryEntry,
+} from '../domain/product-library.ts'
 import { costRecipe, saladSizeCosts } from '../domain/recipe-costing.ts'
 import {
   applyRecipesToStore,
@@ -239,13 +248,95 @@ function chipClassName(active: boolean): string {
   }`
 }
 
+// Inline price definition for an ingredient that has no product yet: pack size,
+// unit and price typed right inside the recipe — the product lands in the
+// library through the same save, no navigation.
+function InlineProductForm({
+  name,
+  onDefine,
+}: {
+  readonly name: string
+  readonly onDefine: (packSize: string, packUnit: string, priceMinorUnits: number) => void
+}) {
+  const [packSize, setPackSize] = useState('1')
+  const [packUnit, setPackUnit] = useState('ק"ג')
+  const [price, setPrice] = useState('')
+  const submit = () => {
+    try {
+      const minorUnits = moneyToMinorUnits(price.trim())
+      if (packSize.trim() === '') return
+      onDefine(packSize.trim(), packUnit, minorUnits)
+    } catch {
+      // invalid price text — leave the form as typed
+    }
+  }
+  return (
+    <details className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-black text-amber-900">
+        אין מחיר ל"{name}" — קובעים כאן בלי לצאת מהמתכון
+      </summary>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <label className="text-[11px] font-black text-amber-900">
+          גודל אריזה
+          <input
+            aria-label={`גודל אריזה עבור ${name}`}
+            value={packSize}
+            onChange={(event) => setPackSize(event.currentTarget.value)}
+            className={`mt-1 ${inputClassName} max-w-24`}
+          />
+        </label>
+        <label className="text-[11px] font-black text-amber-900">
+          יחידה
+          <select
+            aria-label={`יחידת אריזה עבור ${name}`}
+            value={packUnit}
+            onChange={(event) => setPackUnit(event.currentTarget.value)}
+            className={`mt-1 ${inputClassName}`}
+          >
+            {['ק"ג', 'גרם', 'ליטר', 'מ"ל', 'יחידה'].map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-[11px] font-black text-amber-900">
+          מחיר (AED)
+          <input
+            aria-label={`מחיר אריזה עבור ${name}`}
+            inputMode="decimal"
+            value={price}
+            onChange={(event) => setPrice(event.currentTarget.value)}
+            placeholder="למשל 6.99"
+            className={`mt-1 ${inputClassName} max-w-24`}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={price.trim() === ''}
+          className="min-h-11 rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground disabled:opacity-50"
+        >
+          שמירת המחיר
+        </button>
+      </div>
+    </details>
+  )
+}
+
 function IngredientRows({
   draft,
   usage,
+  productLibrary,
+  productNames,
+  onDefineProduct,
   onChange,
 }: {
   readonly draft: RecipeDraft
   readonly usage: IngredientUsage
+  readonly productLibrary: ReadonlyMap<string, ProductLibraryEntry>
+  readonly productNames: readonly string[]
+  readonly onDefineProduct: (name: string, packSize: string, packUnit: string, priceMinorUnits: number) => void
   readonly onChange: (draft: RecipeDraft) => void
 }) {
   const [customUnitIds, setCustomUnitIds] = useState<ReadonlySet<string>>(new Set())
@@ -266,7 +357,7 @@ function IngredientRows({
   return (
     <div className="space-y-3">
       <datalist id="recipes-known-ingredients">
-        {[...usage.keys()].sort().map((name) => (
+        {[...new Set([...usage.keys(), ...productNames])].sort().map((name) => (
           <option key={name} value={name} />
         ))}
       </datalist>
@@ -442,6 +533,17 @@ function IngredientRows({
                 ))}
               </ul>
             )}
+
+            {ingredient.ingredientName.trim() !== '' &&
+              lookupProduct(productLibrary, ingredient.ingredientId, ingredient.ingredientName) === undefined && (
+                <InlineProductForm
+                  key={`inline-${ingredient.ingredientId}`}
+                  name={ingredient.ingredientName.trim()}
+                  onDefine={(packSize, packUnit, priceMinorUnits) =>
+                    onDefineProduct(ingredient.ingredientName.trim(), packSize, packUnit, priceMinorUnits)
+                  }
+                />
+              )}
           </div>
         )
       })}
@@ -580,6 +682,8 @@ function RecipeEditor({
   usage,
   duplicateSources,
   productLibrary,
+  productNames,
+  onDefineProduct,
   onChange,
   onClose,
 }: {
@@ -588,6 +692,8 @@ function RecipeEditor({
   readonly usage: IngredientUsage
   readonly duplicateSources: readonly DuplicateSource[]
   readonly productLibrary: ReadonlyMap<string, ProductLibraryEntry>
+  readonly productNames: readonly string[]
+  readonly onDefineProduct: (name: string, packSize: string, packUnit: string, priceMinorUnits: number) => void
   readonly onChange: (draft: RecipeDraft) => void
   readonly onClose: () => void
 }) {
@@ -690,7 +796,14 @@ function RecipeEditor({
               </span>
             )}
           </div>
-          <IngredientRows draft={draft} usage={usage} onChange={onChange} />
+          <IngredientRows
+            draft={draft}
+            usage={usage}
+            productLibrary={productLibrary}
+            productNames={productNames}
+            onDefineProduct={onDefineProduct}
+            onChange={onChange}
+          />
         </div>
 
         <div>
@@ -731,6 +844,9 @@ export function RecipesScreen({
   const [search, setSearch] = useState('')
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>(IDLE)
+  // Products defined inline from a recipe row — they ride along with the next
+  // recipes save into store.productLibrary.
+  const [pendingProducts, setPendingProducts] = useState<readonly ProductLibraryEntry[]>([])
 
   useEffect(() => {
     if (selectedIndex !== null) {
@@ -752,10 +868,10 @@ export function RecipesScreen({
   // Debounced autosave: every draft change re-arms the timer; the actual save
   // decision (validity, staleness, no-op detection) happens inside save().
   useEffect(() => {
-    if (drafts === null) return
+    if (drafts === null && pendingProducts.length === 0) return
     const timer = setTimeout(() => fireAutosaveRef.current(), autosaveDelayMs)
     return () => clearTimeout(timer)
-  }, [drafts, autosaveDelayMs])
+  }, [drafts, pendingProducts, autosaveDelayMs])
 
   if (initializationRef.current === null && storeQuery.data?.data != null) {
     const baseStore = storeQuery.data.data
@@ -821,13 +937,42 @@ export function RecipesScreen({
   const missingCount = targets.filter((target) => !configuredByItemId.has(target.id)).length
   const doneCount = targets.length - missingCount
   const usage = buildIngredientUsage(currentDrafts)
-  const productLibrary = new Map(loadProductLibrary(baseStore).entries.map((entry) => [entry.id, entry]))
+  const storedProducts = loadProductLibrary(baseStore).entries
+  const allProducts = [...storedProducts, ...pendingProducts]
+  const productLibrary = productLibraryMap(allProducts)
+  const productNames = allProducts.map((entry) => entry.name)
+
+  const defineProduct = (name: string, packSize: string, packUnit: string, priceMinorUnits: number) => {
+    if (lookupProduct(productLibrary, '', name) !== undefined) return
+    setPendingProducts([
+      ...pendingProducts,
+      {
+        id: nextStableProductId(name, allProducts),
+        name,
+        category: '',
+        kosherOnly: false,
+        supplierOverride: null,
+        insignificant: false,
+        listings: {
+          nesto: {
+            packSize,
+            packUnit,
+            packPriceMinorUnits: priceMinorUnits,
+            updatedAt: Date.now(),
+            manualPrice: null,
+          },
+        },
+      },
+    ])
+    setSaveState(IDLE)
+  }
 
   const currentDraftsJson = JSON.stringify(currentDrafts)
   const dirty =
-    drafts !== null &&
-    currentDraftsJson !== JSON.stringify(book.recipes.map(toDraft)) &&
-    currentDraftsJson !== lastSavedDraftsJsonRef.current
+    (drafts !== null &&
+      currentDraftsJson !== JSON.stringify(book.recipes.map(toDraft)) &&
+      currentDraftsJson !== lastSavedDraftsJsonRef.current) ||
+    pendingProducts.length > 0
   dirtyRef.current = dirty
 
   // One flat dish list (configured + missing together) in catalog order, then
@@ -942,8 +1087,9 @@ export function RecipesScreen({
     }
     const candidateJson = JSON.stringify(candidate.recipes)
     const alreadyStored =
-      candidateJson === JSON.stringify(book.recipes) ||
-      candidateJson === lastSavedRecipesJsonRef.current
+      pendingProducts.length === 0 &&
+      (candidateJson === JSON.stringify(book.recipes) ||
+        candidateJson === lastSavedRecipesJsonRef.current)
     if (alreadyStored) {
       if (!auto) {
         if (candidate.invalidCount > 0) {
@@ -972,12 +1118,18 @@ export function RecipesScreen({
     }
     setSaveState({ kind: 'saving', message: 'שומרת...' })
     try {
+      const withRecipes = applyRecipesToStore(baseStore, candidate.recipes, catalogResult.catalog)
+      const nextStore =
+        pendingProducts.length === 0
+          ? withRecipes
+          : applyProductLibraryToStore(withRecipes, [...storedProducts, ...pendingProducts])
       const result = (await onSave({
         reason: 'recipes',
         baseEnvelope,
         baseStore,
-        nextStore: applyRecipesToStore(baseStore, candidate.recipes, catalogResult.catalog),
+        nextStore,
       })) as VersionedStateEnvelope | undefined
+      setPendingProducts([])
       lastSavedRecipesJsonRef.current = candidateJson
       if (candidate.invalidCount === 0) lastSavedDraftsJsonRef.current = JSON.stringify(currentDrafts)
       if (result != null && isVersionedStateEnvelope(result)) {
@@ -1083,6 +1235,8 @@ export function RecipesScreen({
             usage={usage}
             duplicateSources={duplicateSources}
             productLibrary={productLibrary}
+            productNames={productNames}
+            onDefineProduct={defineProduct}
             onChange={(value) => updateDraft(selectedIndex, value)}
             onClose={() => setSelectedIndex(null)}
           />
