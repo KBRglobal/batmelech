@@ -1,8 +1,39 @@
-# STATE — batmelech (updated: 2026-08-18 17:40)
+# STATE — batmelech (updated: 2026-08-18 18:45)
 
 ## Now (start here in a new session)
-Delivery-photos gallery is BUILT, TESTED and ready to deploy. Next content-independent
-roadmap item is copy-last-year holiday menu, then multi-currency display.
+Recipes v2 food-costing module is BUILT, DEPLOYED and SEEDED with Lin's real
+invoice prices (53 products). Full plan: ~/.claude/plans/linked-growing-clover.md.
+
+## Shipped 2026-08-18 evening — food-costing module (Claude session, Kimi stopped)
+- **Product library** (`web/src/domain/product-library.ts`, screen at
+  /settings/product-library): Nesto/Lulu/Rimon pack listings, receipt price
+  always wins, kosher→Rimon lock, liter/מ"ל unit family (never converts to
+  weight), per-listing price HISTORY (cap 30) + visible last-updated date,
+  bulk JSON import section, quick quantity→cost + receipt→correction calculators.
+- **Recipe costing** (`recipe-costing.ts`): exact-rational math rounded once,
+  per-portion / per-100g / 100-250g salad ladder, optional finishedYieldGrams
+  on recipes (real batch weight wins). White-cabbage spec example is a test:
+  7.12/kg, 0.71/100g, 1.78/250g.
+- **Name-based join**: recipe ingredient ids are screen-generated — costing,
+  shopping-list procurement and the report match products by NAME as fallback
+  (id wins). `productLibraryMap`/`lookupProduct` in product-library.ts.
+  CAUTION: the dual-key map duplicates entries in .values() — iterate raw
+  `loadProductLibrary(store).entries` for enumeration.
+- **Inline price definition**: an unpriced ingredient row in the recipe editor
+  shows a pack/unit/price mini-form; the product rides into store.productLibrary
+  through the same recipes save (pendingProducts state).
+- **Cost report** (/cost-report, linked from insights+settings): per dish
+  (margin where a direct sale price exists), per order (single-order
+  buildPreparationPlan trick keeps attribution), per week, monthly expenses vs
+  revenue, missing-data panel. Partial data flagged חלקי, never invented.
+- **Seeded data**: 53 products from Lin's real Nesto invoices (verified against
+  10 receipt PDFs) via the import UI; water at 0 AED, meat/chicken kosher-only
+  on Rimon. Recipes guidance changed: record EVERY meaningful ingredient
+  (oil/sugar/mayo); shopping list stays clean via the insignificant flag.
+- Suites at ship: server 599, web 848, customer-site 5 — green.
+
+Next roadmap items (Kimi's list, not started): copy-last-year holiday menu,
+multi-currency display, image compression, dish of the week, capacity simulation.
 
 ## Merged this session — batch4 into main (2026-08-18)
 Claude's in-progress `origin/wip/batch4-2026-08-14` branch was merged directly to
