@@ -1,8 +1,27 @@
-# STATE — batmelech (updated: 2026-08-18 18:45)
+# STATE — batmelech (updated: 2026-08-18 21:00)
 
 ## Now (start here in a new session)
-Recipes v2 food-costing module is BUILT, DEPLOYED and SEEDED with Lin's real
-invoice prices (53 products). Full plan: ~/.claude/plans/linked-growing-clover.md.
+Recipes v2 food-costing module is COMPLETE and LIVE: 88 priced products,
+21 dishes with costed recipes (all salads, pastas, rice, couscous, potato
+tray), cost report, mobile fixes. Full plan: ~/.claude/plans/linked-growing-clover.md.
+
+## Session close 2026-08-18 evening (after the module shipped)
+- Seeded via `scripts/seed-recipes.js` / `seed-recipes-2.js` /
+  `seed-spice-prices.js` — idempotent, run INSIDE the app container
+  (`railway ssh --service app -- node scripts/...`) because Postgres has no
+  public URL. SSH key is added temporarily and REMOVED after every run.
+- Products: 53 invoice-based + 28 Rimon spices (rimon.ae/he/collections/spices)
+  + celery/OJ/bulgur/breadcrumbs/rice(20kg@150)/semolina. Israel-suitcase items
+  (₪≈AED) recorded under the rimon listing. Water = 0 AED, insignificant.
+- Recipes: 12 from Moshe's exact quantities + 9 more per Lin's ingredient
+  lists with standard internet proportions (Moshe: "היא מבשלת בעין, לך לפי
+  מתכון מהאינטרנט"). White-cabbage spec numbers verified live: 7.12/0.71/1.78.
+- Mobile: admin shell bottom-bar + עוד sheet; decoy 404 responsive (styling only).
+- OPEN: mains/fish/desserts recipes await Lin's quantities; Moshe undecided on
+  adding גזר מגורד / סלט ירוק / טאבולה as catalog dishes (customer-visible).
+- Kimi (second CLI agent) was stopped mid-session after it reverted/wiped
+  parallel work twice — see memory note; its roadmap leftovers (copy-last-year
+  holiday menu, multi-currency, image compression) remain unbuilt.
 
 ## Shipped 2026-08-18 evening — food-costing module (Claude session, Kimi stopped)
 - **Product library** (`web/src/domain/product-library.ts`, screen at
