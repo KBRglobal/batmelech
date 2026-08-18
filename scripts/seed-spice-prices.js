@@ -40,8 +40,24 @@ const SPICES = [
   ['כמון טחון', '90', 'גרם', 1990],
   ['כורכום טחון', '100', 'גרם', 1590],
   ['תבלין לדגים', '100', 'גרם', 1990],
-  ['פפריקה מתוקה', '90', 'גרם', 1590],
+  // Moshe's real purchase price (2026-08-18) beats the site's 90g listing.
+  ['פפריקה מתוקה', '1', 'ק"ג', 7500],
   ['תבלין שווארמה', '100', 'גרם', 2590],
+];
+
+// Fresh produce Moshe priced directly (2026-08-18) — Nesto side, not spices.
+// [name, packSize, packUnit, priceMinorUnits]
+const FRESH_EXTRAS = [
+  ['בצל ירוק', '1', 'יחידה', 100],
+  ['עגבניות שרי', '300', 'גרם', 1000],
+  ['סלרי', '1', 'ק"ג', 1490],
+  ['מיץ תפוזים', '1', 'ליטר', 990],
+];
+
+// Brought from Israel by friends (₪≈AED) — recorded under the Rimon/kosher channel.
+const ISRAEL_EXTRAS = [
+  ['בורגול', '1', 'ק"ג', 600],
+  ['פירורי לחם', '400', 'גרם', 990], // standard 400g bag; pack size editable in the panel
 ];
 
 function productId(name) {
@@ -73,36 +89,46 @@ async function main() {
     let created = 0;
     let listingAdded = 0;
     let untouchedManual = 0;
-    for (const [name, packSize, packUnit, priceMinorUnits] of SPICES) {
+    const upsert = (name, packSize, packUnit, priceMinorUnits, supplier, category) => {
       const listing = { packSize, packUnit, packPriceMinorUnits: priceMinorUnits, updatedAt: now, manualPrice: null };
       const existingIndex = indexByName.get(name);
       if (existingIndex === undefined) {
         const entry = {
           id: productId(name),
           name,
-          category: 'תבלינים',
+          category,
           kosherOnly: false,
           supplierOverride: null,
           insignificant: false,
-          listings: { rimon: listing },
+          listings: { [supplier]: listing },
         };
         indexByName.set(name, entries.length);
         entries.push(entry);
         created += 1;
-        continue;
+        return;
       }
       const existing = entries[existingIndex];
-      const existingRimon = existing.listings && existing.listings.rimon;
-      if (existingRimon && existingRimon.manualPrice) {
+      const existingListing = existing.listings && existing.listings[supplier];
+      if (existingListing && existingListing.manualPrice) {
         // A receipt price lives here — the internet price must never replace it.
         untouchedManual += 1;
-        continue;
+        return;
       }
       entries[existingIndex] = {
         ...existing,
-        listings: { ...existing.listings, rimon: listing },
+        listings: { ...existing.listings, [supplier]: listing },
       };
       listingAdded += 1;
+    };
+
+    for (const [name, packSize, packUnit, priceMinorUnits] of SPICES) {
+      upsert(name, packSize, packUnit, priceMinorUnits, 'rimon', 'תבלינים');
+    }
+    for (const [name, packSize, packUnit, priceMinorUnits] of FRESH_EXTRAS) {
+      upsert(name, packSize, packUnit, priceMinorUnits, 'nesto', 'ירקות');
+    }
+    for (const [name, packSize, packUnit, priceMinorUnits] of ISRAEL_EXTRAS) {
+      upsert(name, packSize, packUnit, priceMinorUnits, 'rimon', 'מזווה');
     }
 
     const localState = { ...data, productLibrary: entries };
