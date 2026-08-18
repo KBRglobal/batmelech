@@ -1797,6 +1797,25 @@ export function applyOrderDraftToStore(
   return localState
 }
 
+// Hard delete of one order. The versioned save history is the safety net: a
+// deleted order can always be brought back with a restore from Settings.
+export function deleteOrderFromStore(
+  baseState: Readonly<LegacyStore>,
+  orderId: string,
+): LegacyStore {
+  assertCanonicalStoredOrderIds(baseState.orders)
+  if (typeof orderId !== 'string' || orderId.trim() === '') {
+    throw new Error('The deleted order identity is unsafe.')
+  }
+  const localState = structuredClone(baseState)
+  const matchingIndexes = localState.orders.flatMap((order, index) =>
+    order.id === orderId ? [index] : [],
+  )
+  if (matchingIndexes.length !== 1) throw new Error('The deleted order is not unique in the base state.')
+  localState.orders.splice(matchingIndexes[0]!, 1)
+  return localState
+}
+
 const AIReviewTextSchema = z.string().trim().min(1).max(500)
 const AIReviewNullableTextSchema = AIReviewTextSchema.nullable()
 const AIReviewConfidenceSchema = z.number().min(0).max(1)

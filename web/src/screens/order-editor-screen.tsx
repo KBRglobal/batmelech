@@ -34,6 +34,7 @@ import {
   formatUsdInputMinorUnits,
   parseUsdInputMinorUnits,
   applyOrderDraftToStore,
+  deleteOrderFromStore,
   legacyOrderEditIssue,
   mergedLunchPlateSides,
   orderPricingFingerprint,
@@ -691,6 +692,63 @@ type PlataSaveState =
   | { readonly kind: 'saved' }
   | { readonly kind: 'error'; readonly message: string }
 
+type DeleteState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'deleting' }
+  | { readonly kind: 'error'; readonly message: string }
+
+// Deleting is a hard removal from the live data. It is still recoverable —
+// every save is snapshotted, so a restore from Settings brings the order back —
+// but the button stays behind an explicit two-step confirmation.
+function DeleteOrderSection({
+  state,
+  onDelete,
+}: {
+  readonly state: DeleteState
+  readonly onDelete: () => void
+}) {
+  const [armed, setArmed] = useState(false)
+  return (
+    <Section id="delete" title="מחיקת ההזמנה">
+      <p className="text-xs font-bold text-muted-foreground">
+        מחיקה מסירה את ההזמנה מכל המסכים, מהכמויות ומרשימת הקניות. אפשר לשחזר דרך היסטוריית השמירות בהגדרות.
+      </p>
+      {!armed ? (
+        <button
+          type="button"
+          disabled={state.kind === 'deleting'}
+          onClick={() => setArmed(true)}
+          className="mt-3 min-h-11 rounded-full border border-rose-200 px-5 text-sm font-black text-destructive hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          מחיקת ההזמנה
+        </button>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={state.kind === 'deleting'}
+            onClick={onDelete}
+            className="min-h-11 rounded-full bg-destructive px-5 text-sm font-black text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {state.kind === 'deleting' ? 'מוחקת בבטחה' : 'כן, למחוק את ההזמנה'}
+          </button>
+          <button
+            type="button"
+            disabled={state.kind === 'deleting'}
+            onClick={() => setArmed(false)}
+            className="min-h-11 rounded-full border border-border px-5 text-sm font-black text-primary hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            ביטול
+          </button>
+        </div>
+      )}
+      {state.kind === 'error' && (
+        <p role="alert" className="mt-2 text-xs font-black text-destructive">{state.message}</p>
+      )}
+    </Section>
+  )
+}
+
 /**
  * The one place a hotplate is edited. It saves itself, straight to the versioned state, and
  * never through OrderDraft: the draft save merges over the stored order, so a plata that
@@ -1046,6 +1104,8 @@ function OrderEditorContent({
   existingGroupNames,
   plataSaveState,
   onSavePlata,
+  deleteState,
+  onDelete,
 }: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
@@ -1064,6 +1124,8 @@ function OrderEditorContent({
   readonly existingGroupNames: readonly string[]
   readonly plataSaveState: PlataSaveState
   readonly onSavePlata: ((values: PlataFormValues) => void) | null
+  readonly deleteState: DeleteState
+  readonly onDelete: (() => void) | null
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
@@ -1878,6 +1940,10 @@ function OrderEditorContent({
         )}
 
         <PlataSection order={loadedOrder} saveState={plataSaveState} onSave={onSavePlata} />
+
+        {mode === 'edit' && onDelete !== null && (
+          <DeleteOrderSection state={deleteState} onDelete={onDelete} />
+        )}
       </div>
 
       <footer className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card/95 p-4 backdrop-blur md:right-64 md:bottom-0">
@@ -1939,6 +2005,8 @@ export function OrderEditorScreen() {
   // never be in flight at once, but its own pending state — saving a hotplate must not look
   // like saving the order.
   const plataMutation = useVersionedStateMutation()
+  // The delete writer. Same mutation scope, own pending state.
+  const deleteMutation = useVersionedStateMutation()
   const location = useLocation()
   const navigate = useNavigate()
   const [draft, setDraft] = useState<OrderDraft | null>(null)
@@ -1949,6 +2017,7 @@ export function OrderEditorScreen() {
   const [reviewLoadIssue, setReviewLoadIssue] = useState<{ readonly sourceMessage: string | null } | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>({ kind: 'idle' })
   const [plataSaveState, setPlataSaveState] = useState<PlataSaveState>({ kind: 'idle' })
+  const [deleteState, setDeleteState] = useState<DeleteState>({ kind: 'idle' })
   const initializedFor = useRef('')
   const baseEnvelope = useRef<VersionedStateEnvelope | null>(null)
   const retryAttempt = useRef<SaveAttempt | null>(null)
@@ -2290,6 +2359,60 @@ export function OrderEditorScreen() {
     }
   }
 
+  // Same shape as savePlata: refetch, prove the base is exactly what was loaded,
+  // then write the removal through the versioned pipeline (recoverable via restore).
+  const deleteOrder = async () => {
+    if (mode !== 'edit' || typeof orderId !== 'string') return
+    if (submissionLocked.current || saveMutation.isPending || plataMutation.isPending || deleteMutation.isPending) return
+    const loadedBase = baseEnvelope.current
+    if (!loadedBase) {
+      setDeleteState({ kind: 'error', message: 'אי אפשר למחוק בלי גרסת בסיס מאומתת. שום נתון לא שונה.' })
+      return
+    }
+
+    setDeleteState({ kind: 'deleting' })
+    let refreshedEnvelope: VersionedStateEnvelope | null = null
+    try {
+      const refreshed = await storeQuery.refetch()
+      const refreshedData = refreshed.data
+      refreshedEnvelope = refreshedData !== undefined && isVersionedStateEnvelope(refreshedData)
+        ? refreshedData
+        : null
+    } catch {
+      refreshedEnvelope = null
+    }
+    if (!refreshedEnvelope || !isExactEnvelopeSnapshot(refreshedEnvelope, loadedBase)) {
+      setDeleteState({
+        kind: 'error',
+        message: 'הנתונים השתנו מאז פתיחת ההזמנה. שום דבר לא נמחק; צריך לפתוח את ההזמנה מחדש.',
+      })
+      return
+    }
+
+    let change: PreparedVersionedStateChange
+    try {
+      change = prepareVersionedStateChange(
+        loadedBase,
+        createVersionedRequestId('order-delete'),
+        (baseStateCopy) => deleteOrderFromStore(baseStateCopy, orderId),
+      )
+    } catch {
+      setDeleteState({ kind: 'error', message: 'זהות ההזמנה אינה בטוחה למחיקה. שום נתון לא שונה.' })
+      return
+    }
+
+    try {
+      const result = await deleteMutation.mutateAsync(change)
+      if (!result.ok) {
+        setDeleteState({ kind: 'error', message: 'נמצאה התנגשות עם שינוי אחר. ההזמנה לא נמחקה.' })
+        return
+      }
+      navigate(APP_ROUTES.orders, { replace: true })
+    } catch {
+      setDeleteState({ kind: 'error', message: 'לא התקבל אישור מהשרת. ההזמנה לא נמחקה.' })
+    }
+  }
+
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את טופס ההזמנה" />
   if (storeQuery.isError) return <ScreenState kind="error" title="לא הצלחנו לטעון את ההזמנה" retry={() => { void storeQuery.refetch() }} />
   if (storedOrderIdStatus !== 'safe') {
@@ -2374,6 +2497,8 @@ export function OrderEditorScreen() {
       existingGroupNames={existingGroupNames}
       plataSaveState={plataSaveState}
       onSavePlata={loadedOrder === null ? null : (values) => { void savePlata(values) }}
+      deleteState={deleteState}
+      onDelete={loadedOrder === null ? null : () => { void deleteOrder() }}
     />
   )
 }

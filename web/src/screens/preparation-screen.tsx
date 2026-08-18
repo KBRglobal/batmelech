@@ -23,7 +23,7 @@ import {
   type PreparationPlan,
   type PreparationWarning,
 } from '../domain/preparation.ts'
-import { upcomingServiceDate } from '../domain/service-dates.ts'
+import { dubaiTodayIso, upcomingServiceDate } from '../domain/service-dates.ts'
 import { resolvePreparationCatalog } from '../domain/settings-catalog.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { formatUsdMinorUnits } from '../domain/today-dashboard.ts'
@@ -490,8 +490,12 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
     : requestedDate !== ''
       ? requestedDate
       : upcomingServiceDate(plan.dates.map(({ serviceDate }) => serviceDate)) ?? ''
+  // "All dates" means all the dates still ahead (Dubai time): cooking plans for
+  // a service date that already passed only add noise and wrong quantities. A
+  // past date stays reachable by picking it explicitly in the dropdown.
+  const today = dubaiTodayIso()
   const visibleDates = showAllDates
-    ? plan.dates
+    ? plan.dates.filter(({ serviceDate }) => serviceDate >= today)
     : plan.dates.filter(({ serviceDate }) => serviceDate === selectedDate)
   const operationsReview = buildPreparationOperationsReview(plan, selectedDate)
 
@@ -623,9 +627,11 @@ export function PreparationScreen({ onSave }: { readonly onSave?: ConfirmedStore
               }}
               className="min-h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value={ALL_DATES}>כל התאריכים</option>
+              <option value={ALL_DATES}>כל התאריכים הקרובים</option>
               {plan.dates.map(({ serviceDate }) => (
-                <option key={serviceDate} value={serviceDate}>{formatServiceDate(serviceDate)}</option>
+                <option key={serviceDate} value={serviceDate}>
+                  {serviceDate < today ? `${formatServiceDate(serviceDate)} (עבר)` : formatServiceDate(serviceDate)}
+                </option>
               ))}
             </select>
           </label>

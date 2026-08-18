@@ -20,6 +20,7 @@ import {
   createDuplicateOrderDraft,
   createOrderDraft,
   createOrderDraftFromLegacy,
+  deleteOrderFromStore,
   formatUsdInputMinorUnits,
   legacyOrderEditIssue,
   nextFridayIso,
@@ -336,6 +337,22 @@ describe('guarded order persistence projection', () => {
       draftWith({ name: 'לקוחה' }),
       { mode: 'edit', orderId: '7' },
     )).toThrow('duplicate order IDs')
+  })
+
+  it('deletes exactly one order, never mutates the base store, and fails closed otherwise', () => {
+    const store: LegacyStore = {
+      orders: [{ id: 'live-1', name: 'נשארת' }, { id: 'live-2', name: 'נמחקת' }],
+      futureTopLevel: { keep: true },
+    }
+    const original = structuredClone(store)
+    const next = deleteOrderFromStore(store, 'live-2')
+    expect(next.orders).toEqual([{ id: 'live-1', name: 'נשארת' }])
+    expect(next.futureTopLevel).toEqual({ keep: true })
+    expect(store).toEqual(original)
+
+    expect(() => deleteOrderFromStore(store, 'missing')).toThrow('not unique')
+    expect(() => deleteOrderFromStore(store, '')).toThrow('unsafe')
+    expect(() => deleteOrderFromStore({ orders: [{ id: '7' }, { id: '7' }] }, '7')).toThrow('duplicate order IDs')
   })
 
   it('keeps money as exact integer-minor-unit canonical input strings', () => {

@@ -121,6 +121,48 @@ describe('ShoppingListScreen', () => {
     expect(screen.queryByText('בצל אמיתי')).toBeNull()
   })
 
+  it('excludes past service dates from the default list but keeps them selectable', async () => {
+    const catalog: PreparationCatalog = {
+      items: [
+        { id: 'future-main', category: 'mains', name: 'מנה עתידית', procurement: { kind: 'recipe' } },
+        { id: 'past-main', category: 'mains', name: 'מנה שעברה', procurement: { kind: 'recipe' } },
+      ],
+      lunchItems: [],
+    }
+    const store = {
+      orders: [
+        { id: 'future', date: '2099-08-14', meals: 1, mains: { 'מנה עתידית': 1 } },
+        { id: 'past', date: '2020-01-03', meals: 1, mains: { 'מנה שעברה': 1 } },
+      ],
+      preparationCatalog: catalog,
+      recipes: [
+        {
+          itemId: 'future-main',
+          name: 'מנה עתידית',
+          yield: 1,
+          ingredients: [{ ingredientId: 'future-ing', ingredientName: 'מצרך עתידי', quantity: '1', unit: 'kg' }],
+        },
+        {
+          itemId: 'past-main',
+          name: 'מנה שעברה',
+          yield: 1,
+          ingredients: [{ ingredientId: 'past-ing', ingredientName: 'מצרך ישן', quantity: '1', unit: 'kg' }],
+        },
+      ],
+    } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    renderShopping()
+
+    // Default view: only the upcoming date's ingredients count.
+    expect(screen.getByText('מצרך עתידי')).toBeTruthy()
+    expect(screen.queryByText('מצרך ישן')).toBeNull()
+
+    // The past date is still there, marked, and shows its list when picked.
+    await userEvent.setup().selectOptions(screen.getByLabelText('תאריך רשימת קניות'), '2020-01-03')
+    expect(screen.getByText('מצרך ישן')).toBeTruthy()
+    expect(screen.queryByText('מצרך עתידי')).toBeNull()
+  })
+
   it('uses the effective menu catalog when none was persisted and performs no read-time write', () => {
     const onSave = successfulSave()
     mockedUseStore.mockReturnValue(queryResult({

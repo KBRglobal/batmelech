@@ -39,6 +39,7 @@ import {
   type ShoppingListResult,
   type ShoppingListWarning,
 } from '../domain/shopping-list.ts'
+import { dubaiTodayIso } from '../domain/service-dates.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
@@ -347,14 +348,18 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
   const { plan, catalogState } = safePreparation(store)
   const recipeConfiguration = storedRecipes(store)
   const requestedDate = searchParams.get('date')?.trim() ?? ''
+  // The default list buys only for today and forward (Dubai time): a service
+  // date that already passed must never add quantities to the basket. A past
+  // date stays reachable by picking it explicitly in the dropdown.
+  const today = dubaiTodayIso()
   const demands = requestedDate === ''
-    ? plan.itemDemands
+    ? plan.itemDemands.filter(({ serviceDate }) => serviceDate >= today)
     : plan.itemDemands.filter(({ serviceDate }) => serviceDate === requestedDate)
   const result = buildShoppingList(demands, recipeConfiguration.recipes)
   const productLibrary = productLibraryMap(loadProductLibrary(store).entries)
   const procurement = attachProcurement(result, productLibrary)
   const preparationGroups = requestedDate === ''
-    ? plan.dates
+    ? plan.dates.filter(({ serviceDate }) => serviceDate >= today)
     : plan.dates.filter(({ serviceDate }) => serviceDate === requestedDate)
   const orderCount = safeCountSum(preparationGroups.map(({ orderCount: count }) => count))
   const mealCount = safeCountSum(preparationGroups.map(({ meals }) => meals))
@@ -474,9 +479,11 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
               }}
               className="min-h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value="">כל התאריכים</option>
+              <option value="">כל התאריכים הקרובים</option>
               {plan.dates.map(({ serviceDate }) => (
-                <option key={serviceDate} value={serviceDate}>{formatServiceDate(serviceDate)}</option>
+                <option key={serviceDate} value={serviceDate}>
+                  {serviceDate < today ? `${formatServiceDate(serviceDate)} (עבר)` : formatServiceDate(serviceDate)}
+                </option>
               ))}
             </select>
           </label>
