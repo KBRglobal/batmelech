@@ -111,6 +111,46 @@ function isProtectedPath(pathname) {
   return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+
+// --- Host split: a public-only origin for customers ---------------------------
+// When BM_SITE_ONLY_HOSTS is set (comma-separated hostnames, e.g.
+// "batmelech.ae,www.batmelech.ae"), requests arriving on those hosts get NO
+// staff surface at all: every protected prefix and even the hidden login
+// endpoint return the generic decoy 404 (the login-incapable page). The
+// admin surfaces stay reachable only on the other hosts. Unset = no-op, so
+// deploying the mechanism changes nothing until the env var is set.
+const SITE_ONLY_BLOCKED_PREFIXES = [...PROTECTED_PREFIXES, '/api/site/access', '/api/auth'];
+
+function parseSiteOnlyHosts(value) {
+  return String(value || '')
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter((host) => host !== '');
+}
+
+// Both Host and X-Forwarded-Host are checked and the gate fails CLOSED: a
+// client cannot escape the public-only origin by spoofing either header,
+// because matching on ANY of them blocks.
+function requestHosts(request) {
+  return [request.headers['x-forwarded-host'], request.headers.host]
+    .filter((value) => typeof value === 'string' && value !== '')
+    .map((value) => String(value).split(',')[0].trim().split(':')[0].toLowerCase());
+}
+
+function createSiteOnlyHostGate(siteOnlyHostsValue) {
+  const hosts = new Set(parseSiteOnlyHosts(siteOnlyHostsValue));
+  return (request, response, next) => {
+    if (hosts.size === 0 || !requestHosts(request).some((host) => hosts.has(host))) return next();
+    const blocked = SITE_ONLY_BLOCKED_PREFIXES.some(
+      (prefix) => request.path === prefix || request.path.startsWith(`${prefix}/`)
+    );
+    if (!blocked) return next();
+    response.status(404);
+    response.set('Cache-Control', 'no-store');
+    response.type('html').send(genericDecoyPage);
+  };
+}
+
 function createDecoyGate(sessionSecret) {
   return (request, response, next) => {
     if (hasValidSession(request, sessionSecret)) return next();
@@ -134,6 +174,8 @@ function createGlobal404Handler() {
 
 module.exports = {
   PROTECTED_PREFIXES,
+  createSiteOnlyHostGate,
+  parseSiteOnlyHosts,
   SESSION_COOKIE,
   parseCookies,
   makeToken,

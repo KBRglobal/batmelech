@@ -1,0 +1,31 @@
+name: uptime
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+# Pings the live site every few minutes from outside our own infrastructure
+# and alerts the staff Telegram group when it is down. Two hosts are checked:
+# the Railway domain is the authoritative "is the service alive" signal; the
+# custom domain failing on its own means a DNS/certificate problem.
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check health
+        run: |
+          railway=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://app-production-e89e.up.railway.app/healthz" || echo 000)
+          apex=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://www.batmelech.ae/healthz" || echo 000)
+          alert() {
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d chat_id="${{ secrets.TELEGRAM_ORDERS_CHAT_ID }}" \
+              --data-urlencode "text=$1" > /dev/null || true
+          }
+          if [ "$railway" != "200" ]; then
+            alert "⚠️ האתר והמערכת לא מגיבים כרגע (בדיקה חיצונית). כדאי לבדוק את Railway."
+            exit 1
+          fi
+          if [ "$apex" != "200" ]; then
+            alert "⚠️ המערכת חיה, אבל הדומיין batmelech.ae לא מגיב — כנראה בעיית DNS או תעודה."
+            exit 1
+          fi

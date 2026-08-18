@@ -412,3 +412,44 @@ test('staff-only API prefixes are behind the decoy gate', () => {
     assert.ok(PROTECTED_PREFIXES.includes(prefix), `${prefix} must be decoy-gated`);
   }
 });
+
+test('site-only host gate blocks every staff surface including the hidden login', async () => {
+  const { createSiteOnlyHostGate } = require('../server/auth/decoy-auth');
+  const express = require('express');
+  const http = require('node:http');
+  const app = express();
+  app.use(createSiteOnlyHostGate('batmelech.ae, www.batmelech.ae'));
+  app.use((request, response) => response.status(200).send('through'));
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, resolve));
+  const { port } = server.address();
+  const get = async (path, host) => {
+    const response = await fetch(`http://127.0.0.1:${port}${path}`, { headers: { 'X-Forwarded-Host': host } });
+    return { status: response.status, body: await response.text() };
+  };
+  try {
+    for (const path of ['/admin/', '/app/today', '/api/state', '/api/site/access', '/api/mey/audit/', '/legacy/']) {
+      const blocked = await get(path, 'batmelech.ae');
+      assert.equal(blocked.status, 404, `${path} must be blocked on the public host`);
+      assert.doesNotMatch(blocked.body, /through/);
+    }
+    // Public + kitchen + tracking surfaces stay reachable on the public host.
+    for (const path of ['/site/', '/api/site/catalog', '/kitchen', '/api/kitchen/state', '/t/x/y']) {
+      assert.equal((await get(path, 'www.batmelech.ae')).status, 200, `${path} must pass on the public host`);
+    }
+    // Other hosts are untouched.
+    assert.equal((await get('/admin/', 'app-production.example')).status, 200);
+    // Unset env -> complete no-op.
+    const noop = express();
+    noop.use(createSiteOnlyHostGate(undefined));
+    noop.use((request, response) => response.status(200).send('open'));
+    const noopServer = http.createServer(noop);
+    await new Promise((resolve) => noopServer.listen(0, resolve));
+    const noopPort = noopServer.address().port;
+    const open = await fetch(`http://127.0.0.1:${noopPort}/admin/`, { headers: { 'X-Forwarded-Host': 'batmelech.ae' } });
+    assert.equal(open.status, 200);
+    noopServer.close();
+  } finally {
+    server.close();
+  }
+});

@@ -31,6 +31,13 @@ function createReactAppRouter(options = {}) {
     throw new TypeError('reactRoot must be an absolute path.');
   }
 
+  // Optional per-request HTML rewriting for the SPA shell (the public site
+  // uses it for server-side SEO meta). (html, requestPath) => html.
+  const transformIndexHtml = options.transformIndexHtml;
+  if (transformIndexHtml !== undefined && typeof transformIndexHtml !== 'function') {
+    throw new TypeError('transformIndexHtml must be a function when provided.');
+  }
+
   // Opt-in: only the public /site mount carries a policy. The authenticated
   // admin build has different needs and is deliberately left untouched.
   const securityHeaders = options.securityHeaders;
@@ -55,12 +62,32 @@ function createReactAppRouter(options = {}) {
     next();
   });
 
-  router.use(express.static(reactRoot, { fallthrough: true }));
+  // Extension-less requests (the SPA shell) are answered before the static
+  // layer so the optional HTML transform also covers the mount root, which
+  // express.static would otherwise serve as a plain directory index.
+  const sendIndex = (req, res, next) => {
+    if (!transformIndexHtml) {
+      return res.sendFile(indexPath, (error) => {
+        if (error) next(error);
+      });
+    }
+    fs.readFile(indexPath, 'utf8', (error, html) => {
+      if (error) return next(error);
+      try {
+        res.type('html').send(transformIndexHtml(html, req.path));
+      } catch {
+        res.type('html').send(html);
+      }
+    });
+  };
   router.get('*', (req, res, next) => {
     if (path.extname(req.path) !== '') return next();
-    res.sendFile(indexPath, (error) => {
-      if (error) next(error);
-    });
+    sendIndex(req, res, next);
+  });
+  router.use(express.static(reactRoot, { fallthrough: true, index: false }));
+  router.get('*', (req, res, next) => {
+    if (path.extname(req.path) !== '') return next();
+    sendIndex(req, res, next);
   });
 
   return router;

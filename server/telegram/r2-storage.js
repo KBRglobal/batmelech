@@ -86,6 +86,30 @@ function createR2Storage({ env = process.env, clientFactory = (options) => new S
       }
       return { url: `${env.R2_PUBLIC_URL.trim().replace(/\/$/u, '')}/${key}`, key };
     },
+    // Nightly off-site state backup. The bucket is PUBLIC, so the payload
+    // must arrive ALREADY ENCRYPTED (secret-box with BM_SECRETS_KEY) and the
+    // key carries a random suffix. Never accepts plaintext state.
+    async putStateBackup({ dateString, encryptedBody } = {}) {
+      if (typeof encryptedBody !== 'string' || encryptedBody.length === 0) {
+        logger.error('putStateBackup: empty encrypted body');
+        return null;
+      }
+      const day = typeof dateString === 'string' && dateString.trim() !== '' ? dateString.trim() : 'unknown';
+      const suffix = crypto.randomBytes(12).toString('hex');
+      const key = `backups/${day}-${suffix}.json.enc`;
+      try {
+        await resolveClient().send(new PutObjectCommand({
+          Bucket: env.R2_BUCKET_NAME.trim(),
+          Key: key,
+          Body: encryptedBody,
+          ContentType: 'application/octet-stream',
+        }));
+      } catch (error) {
+        logger.error('putStateBackup failed', error);
+        return null;
+      }
+      return { key };
+    },
     // Dish photos for the menu editor. Same bucket, its own prefix — public
     // by design, the whole point is showing the picture on the menu.
     async putMenuItemImage({ buffer, contentType = 'image/jpeg' } = {}) {

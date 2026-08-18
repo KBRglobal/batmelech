@@ -13,6 +13,7 @@ const { createPublicLandingRouter } = require('./server/public-landing-route');
 const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { PUBLIC_SITE_SECURITY_HEADERS, createReactAppRouter } = require('./server/react-app-route');
+const { transformSiteIndexHtml } = require('./server/site-meta');
 const { createSiteOrderRouter } = require('./server/site-order-route');
 const { createSiteStatusRouter } = require('./server/site-status-route');
 const { createSiteCatalogRouter } = require('./server/site-catalog-route');
@@ -31,8 +32,9 @@ const { createVoiceTranscriber } = require('./server/telegram/transcribe-voice')
 const { createProofHandler } = require('./server/telegram/proof-of-delivery');
 const { createCallbackHandler } = require('./server/telegram/callback-handler');
 const { createDeliveryScheduler } = require('./server/telegram/delivery-scheduler');
+const { createBusinessClock } = require('./server/telegram/business-clock');
 const { getFilePath, downloadFile } = require('./server/telegram/telegram-files');
-const { createDecoyGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
+const { createDecoyGate, createSiteOnlyHostGate, hasValidSession, clearSessionCookie, createGlobal404Handler } = require('./server/auth/decoy-auth');
 const {
   createKitchenApiRouter,
   createKitchenAppRouter,
@@ -114,6 +116,12 @@ if (process.env.DATABASE_URL) {
 // --- health check (no auth, used by Railway) ---
 app.get('/healthz', (req, res) => res.send('ok'));
 
+// Origin split: hosts listed in BM_SITE_ONLY_HOSTS carry ONLY the public
+// site (+ kitchen/tracking); every staff surface, including the hidden
+// login, answers with the generic decoy 404 there. No-op until the env is
+// set — activation is a config decision, not a deploy.
+app.use(createSiteOnlyHostGate(process.env.BM_SITE_ONLY_HOSTS));
+
 // Public marketing entry point and public order form. Neither route receives
 // Basic Auth, the state sync script, or any administrative state.
 app.use('/coming-soon', createPublicLandingRouter({ contentRoot }));
@@ -132,6 +140,7 @@ app.use('/assets', express.static(path.join(contentRoot, 'public', 'assets'), {
 app.use('/site', createReactAppRouter({
   reactRoot: path.join(contentRoot, 'site'),
   securityHeaders: PUBLIC_SITE_SECURITY_HEADERS,
+  transformIndexHtml: transformSiteIndexHtml,
 }));
 // Public order intake from the customer site's checkout — persists straight
 // into the same orders[] the admin app reads, no admin auth, no state sync.
@@ -223,6 +232,17 @@ if (stateRepository && process.env.TELEGRAM_WEBHOOK_SECRET && process.env.TELEGR
       chatId: telegramChatId,
     });
     deliveryScheduler.start();
+  }
+  // Wednesday digest, Saturday-night weekly summary, nightly encrypted
+  // off-site backup. Kill switch: BM_BUSINESS_CLOCK=off.
+  if (process.env.BM_BUSINESS_CLOCK !== 'off') {
+    const businessClock = createBusinessClock({
+      repository: stateRepository,
+      botToken: telegramBotToken,
+      chatId: telegramChatId,
+      storage: r2Storage,
+    });
+    businessClock.start();
   }
 }
 // Disguised staff login: only decoy-gate-page.html (served for /admin and

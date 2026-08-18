@@ -188,6 +188,19 @@ async function markDeliveryNudge(repository, orderId, kind) {
   return { ok: true, claimed: !result.skipped, token: result.order.meyToken || null };
 }
 
+// Generic once-per-day claim at the settings level: markerKey remembers the
+// last day the action ran; a second caller the same day gets claimed:false.
+async function claimDailyMarker(repository, markerKey, dateString) {
+  const key = typeof markerKey === 'string' ? markerKey.trim() : '';
+  const day = typeof dateString === 'string' ? dateString.trim() : '';
+  if (key === '' || day === '') throw new RangeError('marker key and date required');
+  const result = await withSettingsUpdate(repository, (settings) => (
+    settings[key] === day ? null : { ...settings, [key]: day }
+  ));
+  if (!result.ok) return { ok: false, error: 'save failed after retries' };
+  return { ok: true, claimed: !result.skipped };
+}
+
 // Same claim shape, one per calendar day, at the settings level.
 async function setDeliveryDigestSent(repository, dateString) {
   const day = typeof dateString === 'string' ? dateString.trim() : '';
@@ -298,6 +311,7 @@ async function setCourierLocation(repository, { lat, lon, at } = {}) {
 }
 
 module.exports = {
+  claimDailyMarker,
   effectiveOrderingOpen,
   orderingStatus,
   upcomingSundayDubai,
