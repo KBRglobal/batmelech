@@ -152,6 +152,45 @@ describe('ProductLibraryScreen', () => {
     expect(screen.getByDisplayValue('בשר טלה')).toBeTruthy()
   })
 
+  it('imports a pasted JSON list through the bulk-import section', async () => {
+    const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [] } }))
+    const user = userEvent.setup()
+    render(<ProductLibraryScreen onSave={onSave} autosaveDelayMs={NO_AUTOSAVE} />)
+
+    const payload = JSON.stringify([
+      {
+        id: 'product-import-a',
+        name: 'כרוב מיובא',
+        category: 'ירקות',
+        kosherOnly: false,
+        supplierOverride: null,
+        insignificant: false,
+        listings: {
+          nesto: { packSize: '1', packUnit: 'ק"ג', packPriceMinorUnits: 699, updatedAt: 5, manualPrice: null },
+        },
+      },
+      { broken: true },
+    ])
+    const textarea = screen.getByLabelText('רשימת מוצרים לייבוא') as HTMLTextAreaElement
+    // paste, not type: the JSON braces trip userEvent's keyboard parser
+    await user.click(textarea)
+    await user.paste(payload)
+    await user.click(screen.getByRole('button', { name: 'טעינת הרשימה' }))
+
+    expect(screen.getByDisplayValue('כרוב מיובא')).toBeTruthy()
+    expect(screen.getByText(/נטענו 1 מוצרים/)).toBeTruthy()
+    expect(screen.getByText(/1 לא תקינים/)).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'שמירה' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    const saved = (onSave.mock.calls[0]![0].nextStore as Record<string, unknown>).productLibrary as ReadonlyArray<
+      Record<string, unknown>
+    >
+    expect(saved).toHaveLength(1)
+    expect(saved[0]!.id).toBe('product-import-a')
+  })
+
   it('computes a quick cost estimate once a quantity is typed', async () => {
     mockedUseStore.mockReturnValue(
       queryResult({

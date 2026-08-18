@@ -353,6 +353,7 @@ export function ProductLibraryScreen({
   const lastSavedJsonRef = useRef<string | null>(null)
   const [drafts, setDrafts] = useState<readonly ProductDraft[] | null>(null)
   const [search, setSearch] = useState('')
+  const [importText, setImportText] = useState('')
   const [saveState, setSaveState] = useState<SaveState>(IDLE)
 
   useEffect(() => {
@@ -440,6 +441,53 @@ export function ProductLibraryScreen({
     }
     setDrafts([...currentDrafts, next])
     setSaveState(IDLE)
+  }
+
+  // Bulk import: paste a JSON array of product entries, each validated with the
+  // SAME schema the save path enforces. Nothing touches the server here — the
+  // loaded drafts still go through the regular שמירה button (preview-then-save).
+  const importProducts = () => {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(importText)
+    } catch {
+      setSaveState({ kind: 'error', message: 'הטקסט שהודבק אינו רשימה תקינה.' })
+      return
+    }
+    if (!Array.isArray(parsed)) {
+      setSaveState({ kind: 'error', message: 'הטקסט שהודבק אינו רשימה תקינה.' })
+      return
+    }
+    const existingIds = new Set(currentDrafts.map((draft) => draft.id))
+    const imported: ProductDraft[] = []
+    let invalid = 0
+    let skipped = 0
+    for (const value of parsed) {
+      const result = validateProductLibraryEntry(value)
+      if (!result.valid) {
+        invalid += 1
+        continue
+      }
+      if (existingIds.has(result.entry.id)) {
+        skipped += 1
+        continue
+      }
+      existingIds.add(result.entry.id)
+      imported.push(toDraft(result.entry))
+    }
+    if (imported.length === 0) {
+      setSaveState({
+        kind: 'error',
+        message: invalid > 0 ? 'אף מוצר לא נטען — הרשימה מכילה נתונים לא תקינים.' : 'אין מוצרים חדשים לטעון.',
+      })
+      return
+    }
+    setDrafts([...currentDrafts, ...imported])
+    setImportText('')
+    setSaveState({
+      kind: 'saved',
+      message: `נטענו ${imported.length} מוצרים והם יישמרו אוטומטית תוך רגע.${skipped > 0 ? ` ${skipped} דולגו (כבר קיימים).` : ''}${invalid > 0 ? ` ${invalid} לא תקינים.` : ''} אפשר תמיד לשחזר מהיסטוריית השמירות בהגדרות.`,
+    })
   }
 
   const save = async (auto: boolean) => {
@@ -533,6 +581,27 @@ export function ProductLibraryScreen({
           שמירה
         </button>
       </div>
+
+      <details className="mt-4 rounded-2xl border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-black text-primary">ייבוא רשימת מוצרים (הדבקת קובץ)</summary>
+        <textarea
+          aria-label="רשימת מוצרים לייבוא"
+          value={importText}
+          onChange={(event) => setImportText(event.currentTarget.value)}
+          dir="ltr"
+          rows={5}
+          placeholder='[{"id": "...", "name": "...", ...}]'
+          className="mt-3 w-full rounded-xl border border-border bg-secondary/20 p-3 font-mono text-xs outline-none focus:ring-2 focus:ring-primary/20"
+        />
+        <button
+          type="button"
+          onClick={importProducts}
+          disabled={importText.trim() === ''}
+          className="mt-2 min-h-11 rounded-xl bg-primary px-5 text-sm font-black text-primary-foreground disabled:opacity-50"
+        >
+          טעינת הרשימה
+        </button>
+      </details>
 
       <div className="mt-6 space-y-4">
         {visibleIds.size === 0 && <p className="text-sm font-bold text-muted-foreground">אין עדיין מוצרים בספרייה.</p>}
