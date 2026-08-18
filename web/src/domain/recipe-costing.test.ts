@@ -131,3 +131,90 @@ describe('marginMinorUnits', () => {
     expect(marginMinorUnits(1500, 600)).toBe(-900)
   })
 })
+
+describe("the spec's white-cabbage salad example", () => {
+  // White cabbage 6.99 AED/kg, canola oil 9.20 AED/L, sugar 5.00 AED/kg,
+  // citric acid (מלח לימון) 17.50 AED/kg — Lin's real invoice prices.
+  const library = new Map<string, ProductLibraryEntry>([
+    [
+      'cabbage',
+      product({
+        id: 'cabbage',
+        listings: { nesto: { packSize: '1', packUnit: 'ק"ג', packPriceMinorUnits: 699, updatedAt: 1, manualPrice: null } },
+      }),
+    ],
+    [
+      'canola-oil',
+      product({
+        id: 'canola-oil',
+        listings: { nesto: { packSize: '5', packUnit: 'ליטר', packPriceMinorUnits: 4599, updatedAt: 1, manualPrice: null } },
+      }),
+    ],
+    [
+      'sugar',
+      product({
+        id: 'sugar',
+        listings: { nesto: { packSize: '2', packUnit: 'ק"ג', packPriceMinorUnits: 999, updatedAt: 1, manualPrice: null } },
+      }),
+    ],
+    [
+      'citric-acid',
+      product({
+        id: 'citric-acid',
+        listings: { nesto: { packSize: '200', packUnit: 'גרם', packPriceMinorUnits: 350, updatedAt: 1, manualPrice: null } },
+      }),
+    ],
+    [
+      'water',
+      product({
+        id: 'water',
+        listings: { nesto: { packSize: '1', packUnit: 'ליטר', packPriceMinorUnits: 0, updatedAt: 1, manualPrice: null } },
+      }),
+    ],
+  ])
+
+  it('prices milliliter quantities against liter packs and honors the finished yield', () => {
+    const recipe: Pick<RecipeDefinition, 'yield' | 'ingredients' | 'finishedYieldGrams'> = {
+      yield: 10,
+      finishedYieldGrams: 1000,
+      ingredients: [
+        { ingredientId: 'cabbage', ingredientName: 'כרוב לבן', quantity: '940', unit: 'גרם' },
+        { ingredientId: 'canola-oil', ingredientName: 'שמן קנולה', quantity: '45', unit: 'מ"ל' },
+        { ingredientId: 'sugar', ingredientName: 'סוכר', quantity: '10', unit: 'גרם' },
+        { ingredientId: 'citric-acid', ingredientName: 'מלח לימון', quantity: '5', unit: 'גרם' },
+      ],
+    }
+    const result = costRecipe(recipe, library)
+    expect(result.complete).toBe(true)
+    // Exact rationals, rounded ONCE at the end: cabbage 0.94kg*699=657.06 +
+    // oil 0.045L*919.8=41.391 + sugar 0.01kg*499.5=4.995 + citric 5g*1.75=8.75
+    // = 712.196 → 712
+    expect(result.totalMinorUnits).toBe(712) // 7.12 AED, the spec's number
+    expect(result.totalWeightGrams).toBe(1000) // the stated finished yield, not the raw sum
+    expect(result.minorUnitsPer100g).toBe(71) // 0.71 AED per 100g
+    expect(costForPortionGrams(result.minorUnitsPer100g!, 250)).toBe(178) // 1.78 AED per 250g box
+  })
+
+  it('water priced at zero costs nothing but never blocks the recipe', () => {
+    const recipe: Pick<RecipeDefinition, 'yield' | 'ingredients'> = {
+      yield: 1,
+      ingredients: [
+        { ingredientId: 'cabbage', ingredientName: 'כרוב לבן', quantity: '1', unit: 'ק"ג' },
+        { ingredientId: 'water', ingredientName: 'מים', quantity: '500', unit: 'מ"ל' },
+      ],
+    }
+    const result = costRecipe(recipe, library)
+    expect(result.complete).toBe(true)
+    expect(result.totalMinorUnits).toBe(699)
+  })
+
+  it('never converts weight into volume silently', () => {
+    const recipe: Pick<RecipeDefinition, 'yield' | 'ingredients'> = {
+      yield: 1,
+      ingredients: [{ ingredientId: 'canola-oil', ingredientName: 'שמן קנולה', quantity: '45', unit: 'גרם' }],
+    }
+    const result = costRecipe(recipe, library)
+    expect(result.complete).toBe(false)
+    expect(result.warnings[0]!.code).toBe('INCOMPARABLE_UNIT')
+  })
+})

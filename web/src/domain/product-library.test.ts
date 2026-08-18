@@ -145,6 +145,42 @@ describe('store persistence', () => {
   })
 })
 
+describe('lulu supplier and volume units', () => {
+  it('lulu participates in the cheapest-supplier choice', () => {
+    const withLulu = entry({
+      listings: {
+        ...entry().listings,
+        lulu: { packSize: '5', packUnit: 'ק"ג', packPriceMinorUnits: 20000, updatedAt: 1, manualPrice: null },
+      },
+    })
+    // lulu 4000/kg beats nesto 5000/kg and rimon 5500/kg
+    expect(effectiveSupplier(withLulu)).toBe('lulu')
+  })
+
+  it('kosher-only still locks to Rimon even when lulu is cheapest', () => {
+    const withLulu = entry({
+      kosherOnly: true,
+      listings: {
+        ...entry().listings,
+        lulu: { packSize: '5', packUnit: 'ק"ג', packPriceMinorUnits: 20000, updatedAt: 1, manualPrice: null },
+      },
+    })
+    expect(effectiveSupplier(withLulu)).toBe('rimon')
+  })
+
+  it('prices milliliters against a liter pack and rejects weight-vs-volume', () => {
+    const oil = entry({
+      listings: {
+        nesto: { packSize: '5', packUnit: 'ליטר', packPriceMinorUnits: 4599, updatedAt: 1, manualPrice: null },
+      },
+    })
+    const estimate = quickCostEstimate(oil, '500', 'מ"ל')
+    // 0.5L * (4599/5 = 919.8 -> 920 rounded per liter) = 460
+    expect(estimate).toEqual({ minorUnits: 460, supplier: 'nesto' })
+    expect(quickCostEstimate(oil, '500', 'גרם')).toBeNull()
+  })
+})
+
 describe('nextStableProductId', () => {
   it('is deterministic for the same name and avoids existing ids', () => {
     const first = nextStableProductId('בשר בקר', [])

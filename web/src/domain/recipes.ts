@@ -71,6 +71,9 @@ export const RecipeDefinitionSchema = z
     itemId: StableCatalogIdSchema,
     name: z.string().trim().min(1).max(240).optional(),
     yield: z.number().int().safe().positive(),
+    // The batch's real finished weight in grams (after cooking loss / added water).
+    // Optional: when absent, costing falls back to summing the raw ingredient weights.
+    finishedYieldGrams: z.number().int().safe().positive().optional(),
     ingredients: z.array(RecipeIngredientSchema).min(1),
   })
   .strict()

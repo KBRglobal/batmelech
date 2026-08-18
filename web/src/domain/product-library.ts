@@ -19,11 +19,12 @@ import type { LegacyStore } from './store.ts'
  * problem, same shape of solution.
  */
 
-export const SUPPLIER_KEYS = ['nesto', 'rimon'] as const
+export const SUPPLIER_KEYS = ['nesto', 'lulu', 'rimon'] as const
 export type SupplierKey = (typeof SUPPLIER_KEYS)[number]
 
 export const SUPPLIER_LABELS: Readonly<Record<SupplierKey, string>> = {
   nesto: 'נסטו דובאי',
+  lulu: 'לולו',
   rimon: 'רימון כשר',
 }
 
@@ -49,11 +50,16 @@ export function minorUnitsToMoney(minorUnits: number): string {
   return `${Math.trunc(value / 100)}.${String(value % 100).padStart(2, '0')}`
 }
 
-// The only two units a pack can be priced by: weight (unified like the shopping list
-// unifies גרם/ק"ג) or a plain piece unit, which must match the recipe's unit exactly.
+// Unit families a pack can be priced by: weight (unified like the shopping list unifies
+// גרם/ק"ג), volume (ליטר/מ"ל, same ×1000 relation), or a plain piece unit that must match
+// the recipe's unit exactly. Families NEVER convert into each other — a recipe in גרם
+// against a pack priced per ליטר is flagged incomparable, not guessed.
 const KILOGRAM_UNITS: ReadonlySet<string> = new Set(['ק"ג', 'ק״ג'])
 const GRAM_UNITS: ReadonlySet<string> = new Set(['גרם'])
+const LITER_UNITS: ReadonlySet<string> = new Set(['ליטר'])
+const MILLILITER_UNITS: ReadonlySet<string> = new Set(['מ"ל', 'מ״ל'])
 const GRAMS_PER_KILOGRAM = 100n * 10n
+const THOUSAND: Rational = { num: 1000n, den: 1n }
 
 export interface Rational {
   readonly num: bigint
@@ -99,13 +105,17 @@ export function toComparableBaseRational(
 ): Rational | null {
   const isWeight = KILOGRAM_UNITS.has(unit) || GRAM_UNITS.has(unit)
   const packIsWeight = KILOGRAM_UNITS.has(packUnit) || GRAM_UNITS.has(packUnit)
-  if (isWeight !== packIsWeight) return null
-  if (!isWeight) return unit === packUnit ? quantity : null
+  const isVolume = LITER_UNITS.has(unit) || MILLILITER_UNITS.has(unit)
+  const packIsVolume = LITER_UNITS.has(packUnit) || MILLILITER_UNITS.has(packUnit)
+  if (isWeight !== packIsWeight || isVolume !== packIsVolume) return null
+  if (!isWeight && !isVolume) return unit === packUnit ? quantity : null
 
-  const asKilograms = KILOGRAM_UNITS.has(unit) ? quantity : ratDiv(quantity, { num: GRAMS_PER_KILOGRAM, den: 1n })
-  return packIsWeight && KILOGRAM_UNITS.has(packUnit)
-    ? asKilograms
-    : ratMul(asKilograms, { num: GRAMS_PER_KILOGRAM, den: 1n })
+  if (isWeight) {
+    const asKilograms = KILOGRAM_UNITS.has(unit) ? quantity : ratDiv(quantity, { num: GRAMS_PER_KILOGRAM, den: 1n })
+    return KILOGRAM_UNITS.has(packUnit) ? asKilograms : ratMul(asKilograms, { num: GRAMS_PER_KILOGRAM, den: 1n })
+  }
+  const asLiters = LITER_UNITS.has(unit) ? quantity : ratDiv(quantity, THOUSAND)
+  return LITER_UNITS.has(packUnit) ? asLiters : ratMul(asLiters, THOUSAND)
 }
 
 function toComparableBase(quantity: DecimalQuantity, unit: string, packUnit: string): Rational | null {
@@ -164,7 +174,11 @@ export const ProductLibraryEntrySchema = z
     supplierOverride: z.enum(SUPPLIER_KEYS).nullable(),
     insignificant: z.boolean(),
     listings: z
-      .object({ nesto: SupplierListingSchema.optional(), rimon: SupplierListingSchema.optional() })
+      .object({
+        nesto: SupplierListingSchema.optional(),
+        lulu: SupplierListingSchema.optional(),
+        rimon: SupplierListingSchema.optional(),
+      })
       .strict(),
   })
   .strict()
@@ -199,12 +213,20 @@ export function validateProductLibraryEntry(value: unknown): ProductLibraryValid
   }
 }
 
-/** "Manual price always wins" — same rule the order editor already applies to pricing. */
-export function effectivePricePerBaseUnit(listing: Readonly<SupplierListing>): number {
-  if (listing.manualPrice !== null) return listing.manualPrice.minorUnitsPerBaseUnit
+/**
+ * "Manual price always wins" — same rule the order editor already applies to pricing.
+ * Exact rational form: costing multiplies quantities by THIS and rounds once at the
+ * end, so a 1.75-fils-per-gram price never degrades to 2 mid-computation.
+ */
+export function effectivePriceRational(listing: Readonly<SupplierListing>): Rational {
+  if (listing.manualPrice !== null) return { num: BigInt(listing.manualPrice.minorUnitsPerBaseUnit), den: 1n }
   const packPrice: Rational = { num: BigInt(listing.packPriceMinorUnits), den: 1n }
-  const packSize = ratFromDecimal(listing.packSize)
-  return Number(ratToRoundedInt(ratDiv(packPrice, packSize)))
+  return ratDiv(packPrice, ratFromDecimal(listing.packSize))
+}
+
+/** The rounded display form of effectivePriceRational — for UI, never for math chains. */
+export function effectivePricePerBaseUnit(listing: Readonly<SupplierListing>): number {
+  return Number(ratToRoundedInt(effectivePriceRational(listing)))
 }
 
 /**
@@ -306,8 +328,7 @@ export function quickCostEstimate(
   const listing = entry.listings[supplier]!
   const comparableQuantity = toComparableBase(quantity, unit, listing.packUnit)
   if (comparableQuantity === null) return null
-  const pricePerBaseUnit = effectivePricePerBaseUnit(listing)
-  const minorUnits = Number(ratToRoundedInt(ratMul(comparableQuantity, { num: BigInt(pricePerBaseUnit), den: 1n })))
+  const minorUnits = Number(ratToRoundedInt(ratMul(comparableQuantity, effectivePriceRational(listing))))
   return { minorUnits, supplier }
 }
 

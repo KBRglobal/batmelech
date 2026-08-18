@@ -37,9 +37,9 @@ type SaveState =
 const IDLE: SaveState = { kind: 'idle', message: '' }
 
 const HEAVY_PRODUCTS_NOTE =
-  'רושמים רק מצרכים כבדים — בשר, עוף, דג, תפו״א, אורז… בלי מלח, סוכר, שמן ותבלינים.'
+  'רושמים כל מצרך משמעותי — גם שמן, סוכר, מיונז ומלח לימון. ככה העלות יוצאת אמיתית. מצרך קטן שלא רוצים ברשימת הקניות מסמנים כזניח בספריית המוצרים.'
 
-const UNIT_PRESETS = ['ק״ג', 'גרם', 'יחידה'] as const
+const UNIT_PRESETS = ['ק״ג', 'גרם', 'מ״ל', 'יחידה'] as const
 
 const CATEGORY_LABELS: Readonly<Record<string, string>> = {
   salads: 'סלטים',
@@ -66,6 +66,9 @@ function toDraft(recipe: RecipeDefinition): RecipeDraft {
     itemId: recipe.itemId,
     ...(recipe.name === undefined ? {} : { name: recipe.name }),
     yield: String(recipe.yield),
+    ...(recipe.finishedYieldGrams === undefined
+      ? {}
+      : { finishedYieldGrams: String(recipe.finishedYieldGrams) }),
     ingredients: recipe.ingredients.map((ingredient) => ({
       ingredientId: ingredient.ingredientId,
       ingredientName: ingredient.ingredientName,
@@ -628,6 +631,26 @@ function RecipeEditor({
         </p>
 
         <YieldStepper draft={draft} onChange={onChange} />
+
+        <label className="block max-w-md text-xs font-black text-muted-foreground">
+          משקל מוכן של כל המתכון בגרם (לא חובה — למשל 1000 לסלט של קילו)
+          <input
+            aria-label="משקל מוכן בגרם"
+            inputMode="numeric"
+            value={draft.finishedYieldGrams ?? ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value
+              const next = { ...draft }
+              if (value.trim() === '') delete next.finishedYieldGrams
+              else next.finishedYieldGrams = value
+              onChange(next)
+            }}
+            className={`mt-2 ${inputClassName} max-w-40`}
+          />
+          <span className="mt-1 block text-[11px] font-bold">
+            אם משאירים ריק — המשקל מחושב מסכום המצרכים. עדיף למלא: תבשיל מאבד נוזלים בבישול.
+          </span>
+        </label>
 
         {batchHint !== null && (
           <p className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">

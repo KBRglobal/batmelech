@@ -2374,6 +2374,7 @@ export const RecipeDraftSchema = z
     itemId: StableCatalogIdSchema,
     name: z.string().trim().min(1).max(240).optional(),
     yield: z.string().trim().regex(/^[1-9]\d*$/),
+    finishedYieldGrams: z.string().trim().regex(/^$|^[1-9]\d*$/).optional(),
     ingredients: z.array(
       z.object({
         ingredientId: StableCatalogIdSchema,
@@ -2428,6 +2429,9 @@ export function validateRecipeDrafts(drafts: readonly RecipeDraft[]): {
       itemId: draft.itemId.trim(),
       ...(draft.name?.trim() ? { name: draft.name.trim() } : {}),
       yield: Number(draft.yield),
+      ...(draft.finishedYieldGrams?.trim()
+        ? { finishedYieldGrams: Number(draft.finishedYieldGrams.trim()) }
+        : {}),
       ingredients: draft.ingredients.map((ingredient) => ({
         ingredientId: ingredient.ingredientId.trim(),
         ingredientName: ingredient.ingredientName.trim(),

@@ -29,7 +29,7 @@ type SaveState =
   | { readonly kind: 'error'; readonly message: string }
 
 const IDLE: SaveState = { kind: 'idle', message: '' }
-const UNIT_PRESETS = ['ק״ג', 'גרם', 'יחידה'] as const
+const UNIT_PRESETS = ['ק״ג', 'גרם', 'ליטר', 'מ״ל', 'יחידה'] as const
 const CATEGORY_PRESETS = Object.keys(DEFAULT_SUPPLIER_BY_CATEGORY)
 
 interface SupplierListingDraft {
@@ -49,6 +49,7 @@ interface ProductDraft {
   readonly supplierOverride: SupplierKey | ''
   readonly insignificant: boolean
   readonly nesto: SupplierListingDraft | null
+  readonly lulu: SupplierListingDraft | null
   readonly rimon: SupplierListingDraft | null
 }
 
@@ -77,6 +78,7 @@ function toDraft(entry: ProductLibraryEntry): ProductDraft {
     supplierOverride: entry.supplierOverride ?? '',
     insignificant: entry.insignificant,
     nesto: listingDraft('nesto'),
+    lulu: listingDraft('lulu'),
     rimon: listingDraft('rimon'),
   }
 }
@@ -106,6 +108,7 @@ function draftToEntry(
       }
     }
     const nesto = listing(draft.nesto)
+    const lulu = listing(draft.lulu)
     const rimon = listing(draft.rimon)
     const entry = {
       id: draft.id,
@@ -114,7 +117,11 @@ function draftToEntry(
       kosherOnly: draft.kosherOnly,
       supplierOverride: draft.supplierOverride === '' ? null : draft.supplierOverride,
       insignificant: draft.insignificant,
-      listings: { ...(nesto ? { nesto } : {}), ...(rimon ? { rimon } : {}) },
+      listings: {
+        ...(nesto ? { nesto } : {}),
+        ...(lulu ? { lulu } : {}),
+        ...(rimon ? { rimon } : {}),
+      },
     }
     const result = validateProductLibraryEntry(entry)
     return result.valid ? { entry: result.entry, issues: [] } : { entry: null, issues: result.issues }
@@ -401,6 +408,7 @@ export function ProductLibraryScreen({
       supplierOverride: '',
       insignificant: false,
       nesto: emptyListingDraft(now),
+      lulu: null,
       rimon: null,
     }
     setDrafts([...currentDrafts, next])
@@ -566,11 +574,16 @@ export function ProductLibraryScreen({
                 </button>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <SupplierListingCard
                   supplier="nesto"
                   draft={draft.nesto}
                   onChange={(next) => updateDraft(index, { ...draft, nesto: next })}
+                />
+                <SupplierListingCard
+                  supplier="lulu"
+                  draft={draft.lulu}
+                  onChange={(next) => updateDraft(index, { ...draft, lulu: next })}
                 />
                 <SupplierListingCard
                   supplier="rimon"

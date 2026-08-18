@@ -1,6 +1,6 @@
 import { decimalParts, type RecipeDefinition, type RecipeIngredient } from './recipes.ts'
 import {
-  effectivePricePerBaseUnit,
+  effectivePriceRational,
   effectiveSupplier,
   ratAdd,
   ratDiv,
@@ -70,7 +70,7 @@ function weightInGrams(quantity: Rational, unit: string): Rational | null {
 }
 
 export function costRecipe(
-  recipe: Pick<RecipeDefinition, 'yield' | 'ingredients'>,
+  recipe: Pick<RecipeDefinition, 'yield' | 'ingredients' | 'finishedYieldGrams'>,
   productLibrary: ReadonlyMap<string, ProductLibraryEntry>,
 ): RecipeCostResult {
   const warnings: RecipeCostWarning[] = []
@@ -127,8 +127,7 @@ export function costRecipe(
       continue
     }
 
-    const pricePerBaseUnit = effectivePricePerBaseUnit(listing)
-    const cost = ratMul(comparable, { num: BigInt(pricePerBaseUnit), den: 1n })
+    const cost = ratMul(comparable, effectivePriceRational(listing))
     totalCost = ratAdd(totalCost, cost)
     ingredientCosts.push({
       ingredientId: ingredient.ingredientId,
@@ -141,11 +140,17 @@ export function costRecipe(
 
   const totalMinorUnits = Number(ratToRoundedInt(totalCost))
   const perYieldUnitMinorUnits = Number(ratToRoundedInt(ratDiv(totalCost, { num: BigInt(recipe.yield), den: 1n })))
-  const totalWeightGrams = totalWeight === null ? null : Number(ratToRoundedInt(totalWeight))
+  // The stated finished weight wins over summed raw weights: cooked dishes lose
+  // water, salads gain dressing — the batch Lin actually boxes is what matters.
+  const effectiveWeight: Rational | null =
+    recipe.finishedYieldGrams !== undefined
+      ? { num: BigInt(recipe.finishedYieldGrams), den: 1n }
+      : totalWeight
+  const totalWeightGrams = effectiveWeight === null ? null : Number(ratToRoundedInt(effectiveWeight))
   const minorUnitsPer100g =
-    totalWeight === null || totalWeight.num === 0n
+    effectiveWeight === null || effectiveWeight.num === 0n
       ? null
-      : Number(ratToRoundedInt(ratDiv(ratMul(totalCost, { num: 100n, den: 1n }), totalWeight)))
+      : Number(ratToRoundedInt(ratDiv(ratMul(totalCost, { num: 100n, den: 1n }), effectiveWeight)))
 
   return {
     complete,

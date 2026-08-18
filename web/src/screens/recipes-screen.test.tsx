@@ -85,7 +85,7 @@ describe('RecipesScreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'יצירת מתכון — קוסקוס עננים' }))
     expect(screen.getByText('המתכון של קוסקוס עננים')).toBeTruthy()
-    expect(screen.getByText(/רושמים רק מצרכים כבדים/)).toBeTruthy()
+    expect(screen.getByText(/רושמים כל מצרך משמעותי/)).toBeTruthy()
     expect(screen.getByText('עוד אין מתכון — מוסיפים מצרך ראשון')).toBeTruthy()
 
     // Yield starts at one whole product and steps up without typing.
