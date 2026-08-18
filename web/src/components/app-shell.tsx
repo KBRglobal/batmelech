@@ -4,6 +4,7 @@ import type { NavLinkRenderProps } from 'react-router'
 import { APP_ROUTES } from '../app/routes'
 import { BrandLogo } from './brand-logo'
 import { LocalIcon, type LocalIconName } from './local-icon'
+import { NewOrderAlerts } from './new-order-alerts'
 
 type AppShellProps = {
   children: ReactNode
@@ -147,9 +148,12 @@ function DesktopNavigation() {
             <span>{item.label}</span>
           </NavLink>
         ))}
+        <div className="mt-auto">
+          <NewOrderAlerts />
+        </div>
         <a
           href="/legacy/"
-          className="group mt-auto flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="group flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
           <span>המערכת הישנה</span>
@@ -199,6 +203,9 @@ function MobileNavigation() {
             <span className="whitespace-nowrap">{item.label}</span>
           </NavLink>
         ))}
+        <div className="mt-auto">
+          <NewOrderAlerts />
+        </div>
         <a
           href="/legacy/"
           className="flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

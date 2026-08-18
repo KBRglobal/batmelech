@@ -5,6 +5,7 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
+import { downloadTable } from '../services/table-export.ts'
 import {
   applyDailyExpenseToStore,
   buildFinanceDashboard,
@@ -601,6 +602,26 @@ export function FinanceScreen({ onSave }: { readonly onSave?: CustomerFinanceSav
             הכנסות, מקדמות, יתרות, הוצאות ורווח לפי הנתונים השמורים.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            downloadTable(
+              `finance-${activeMonth}`,
+              ['לקוח', 'תאריך', 'סה"כ ($)', 'מקדמה ($)', 'נותר לגבייה ($)'],
+              overview.outstandingRows.map((row) => [
+                row.customerName,
+                row.serviceDate ?? row.localizedDate,
+                row.totalMinorUnits === null ? '' : (row.totalMinorUnits / 100).toFixed(2),
+                row.depositMinorUnits === null ? '' : (row.depositMinorUnits / 100).toFixed(2),
+                row.remainingMinorUnits === null ? '' : (row.remainingMinorUnits / 100).toFixed(2),
+              ]),
+            )
+          }}
+          className="inline-flex min-h-11 items-center gap-2 self-start rounded-2xl border border-border bg-card px-5 text-sm font-black text-primary shadow-sm hover:bg-secondary lg:self-end"
+        >
+          <LocalIcon name="ph:download-simple-bold" className="text-lg" />
+          <span>ייצוא יתרות לאקסל</span>
+        </button>
         <div className="flex min-w-52 flex-col gap-2">
           <label htmlFor="finance-month" className="text-xs font-black text-muted-foreground">
             חודש

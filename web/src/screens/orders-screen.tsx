@@ -268,12 +268,30 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
   )
 }
 
+// Each group gets a stable, distinctive frame color (derived from its name)
+// so linked orders read as one colored block at a glance.
+const GROUP_FRAME_STYLES = [
+  { border: 'border-sky-400', header: 'bg-sky-50', text: 'text-sky-900' },
+  { border: 'border-amber-400', header: 'bg-amber-50', text: 'text-amber-900' },
+  { border: 'border-emerald-400', header: 'bg-emerald-50', text: 'text-emerald-900' },
+  { border: 'border-violet-400', header: 'bg-violet-50', text: 'text-violet-900' },
+  { border: 'border-rose-400', header: 'bg-rose-50', text: 'text-rose-900' },
+  { border: 'border-teal-400', header: 'bg-teal-50', text: 'text-teal-900' },
+] as const
+
+function groupFrameStyle(name: string) {
+  let hash = 0
+  for (const character of name) hash = (hash * 31 + character.codePointAt(0)!) >>> 0
+  return GROUP_FRAME_STYLES[hash % GROUP_FRAME_STYLES.length]!
+}
+
 function LinkedGroup({ group, quick }: { group: OrdersLinkedGroup; quick?: OrderQuickActions }) {
+  const frame = groupFrameStyle(group.name)
   return (
-    <section className="rounded-[2rem] border-2 border-primary/10 bg-card p-4 shadow-sm sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-secondary/60 p-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className={`rounded-[2rem] border-2 ${frame.border} bg-card p-4 shadow-sm sm:p-5`}>
+      <div className={`mb-4 flex flex-col gap-3 rounded-2xl ${frame.header} p-4 sm:flex-row sm:items-start sm:justify-between`}>
         <div>
-          <p className="flex items-center gap-2 text-xs font-black text-primary">
+          <p className={`flex items-center gap-2 text-xs font-black ${frame.text}`}>
             <LocalIcon name="ph:users-bold" className="text-lg" />
             <span>הזמנה קבוצתית: {group.name}</span>
           </p>

@@ -6,6 +6,7 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
+import { downloadTable } from '../services/table-export.ts'
 import {
   applyCustomerMetadataToStore,
   buildCustomersDirectory,
@@ -528,6 +529,29 @@ export function CustomersScreen({ onSave }: { readonly onSave?: CustomerFinanceS
             ספר לקוחות, הערות והיסטוריית הזמנות מהנתונים השמורים.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            downloadTable(
+              'customers',
+              ['שם', 'טלפון', 'הזמנות', 'פעילות', 'סה"כ ($)', 'הזמנה אחרונה', 'VIP', 'הערות'],
+              directory.customers.map((customer) => [
+                customer.name,
+                customer.phone,
+                customer.orderCount,
+                customer.activeOrderCount,
+                customer.totalSpendMinorUnits === null ? '' : (customer.totalSpendMinorUnits / 100).toFixed(2),
+                customer.lastServiceDate ?? '',
+                customer.vip ? 'כן' : '',
+                customer.notes,
+              ]),
+            )
+          }}
+          className="inline-flex min-h-11 items-center gap-2 self-start rounded-2xl border border-border bg-card px-5 text-sm font-black text-primary shadow-sm hover:bg-secondary"
+        >
+          <LocalIcon name="ph:download-simple-bold" className="text-lg" />
+          <span>ייצוא לאקסל</span>
+        </button>
         <div className="flex w-full max-w-md items-center gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm">
           <label className="sr-only" htmlFor="customers-search">
             חיפוש לקוחות
