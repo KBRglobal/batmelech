@@ -8,6 +8,8 @@ import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
 import { useSiteCatalog, type CatalogDish } from '../catalog-context'
+import { useLocale, type Locale } from '../locale-context'
+import { dishName } from '../dish-names'
 
 const BASE_PRICE = 230
 const INCLUDED_SALADS = 4
@@ -17,9 +19,13 @@ const FIRST_EXTRA_PRICE = 25
 const INCLUDED_MAIN = 1
 const MAIN_EXTRA_PRICE = 45
 
+/** The canonical Hebrew name of the whole package — the cart/order key. */
+const PACKAGE_NAME_HE = 'מארז שבת זוגי יוקרתי'
+
 type Allergy = 'gluten' | 'gluten-free' | 'egg' | 'spicy'
 type Option = {
   id: string
+  /** Canonical HEBREW dish name — stock/catalog/order key. Never localized. */
   name: string
   img: string
   allergy?: Allergy
@@ -79,6 +85,162 @@ const ALLERGY_ICON: Record<string, string> = {
   gluten: 'ph:bread-bold',
 }
 
+// Display names for the few Hebrew keys on this page that are spelled
+// slightly differently from the canonical entries in dish-names.ts. Used
+// only when the central dishName() falls back to the Hebrew original —
+// the central map always wins when it knows the name.
+const LOCAL_DISH_NAMES: Readonly<Record<string, { en: string; fr: string }>> = {
+  'זוג פילה דג בר טרי (חריימה/מרוקאי)': {
+    en: 'Pair of Fresh Sea Bream Fillets (Chraime or Moroccan Sauce)',
+    fr: 'Duo de filets de daurade fraîche (chraïmé ou sauce marocaine)',
+  },
+  'אורז פרסי עם עשבי תיבול': { en: 'Persian Herbed Rice', fr: 'Riz persan aux herbes' },
+  'סוכריות בקלאווה': { en: 'Baklava Bites', fr: 'Bouchées de baklawa' },
+}
+
+function displayDish(hebrewName: string, locale: Locale): string {
+  const central = dishName(hebrewName, locale)
+  if (central !== hebrewName || locale === 'he') return central
+  return LOCAL_DISH_NAMES[hebrewName]?.[locale] ?? hebrewName
+}
+
+const HE = {
+  heroBadge: 'The Shabbat Experience',
+  heroTitle: ['מארז שבת', 'זוגי יוקרתי'] as [string, string],
+  heroSubtitle: 'הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם.',
+  heroImageAlt: 'מארז שבת זוגי יוקרתי כשר בדובאי - מטעמי בת מלך',
+  intro: 'ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.',
+  extrasLink: 'לא רוצים חבילה שלמה? לחיזוקים לסופ״ש — מנות בודדות בלי התחייבות',
+  infoTitle: 'שיטת הבחירה במארז',
+  infoBody: (basePrice: number) =>
+    `המחיר הבסיסי ($${basePrice} USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.`,
+  infoBody2: 'כל בחירה מעבר למכסה מתווספת אוטומטית למחיר למטה.',
+  saladsTitle: 'סלטים טריים',
+  saladsHint: `יש לבחור לפחות 4 (סלט חמישי ומעלה: $${SALAD_EXTRA_PRICE} ליחידה)`,
+  firstsTitle: 'מנות ראשונות',
+  firstsHint: `מנה שניה ומעלה: $${FIRST_EXTRA_PRICE} ליחידה`,
+  mainsTitle: 'עיקריות לשבת',
+  mainsHint: `מנה שניה ומעלה: $${MAIN_EXTRA_PRICE} ליחידה`,
+  sidesTitle: 'תוספות לעיקריות',
+  sidesHint: 'יש לבחור תוספת אחת',
+  dessertsTitle: 'סיום מתוק (פרווה)',
+  dessertsHint: 'יש לבחור מנה אחת',
+  extraSalads: (amount: string, count: number) => `+$${amount} עבור ${count} סלטים נוספים`,
+  extraFirsts: (amount: number, count: number) => `+$${amount} עבור ${count} מנות נוספות`,
+  extraMains: (amount: number, count: number) => `+$${amount} עבור ${count} מנות נוספות`,
+  missingSalads: (left: number) => (left === 1 ? 'עוד סלט אחד' : `עוד ${left} סלטים`),
+  missingFirst: 'מנה ראשונה',
+  missingMain: 'מנה עיקרית',
+  missingSide: 'תוספת',
+  missingDessert: 'קינוח',
+  soldOutLabel: (names: string) => `אזל מהמלאי: ${names}`,
+  missingLabel: (list: string) => `חסר: ${list}`,
+  summaryReady: 'סיכום הזמנה',
+  packageName: 'מארז שבת זוגי יוקרתי',
+  continueCta: 'המשך להזמנה',
+  noteLabels: {
+    salads: 'סלטים',
+    first: 'ראשונה',
+    main: 'עיקרית',
+    side: 'תוספת',
+    dessert: 'קינוח',
+  },
+}
+
+export const COPY: Record<Locale, typeof HE> = {
+  he: HE,
+  en: {
+    heroBadge: 'The Shabbat Experience',
+    heroTitle: ['Premium Shabbat', 'Box for Two'],
+    heroSubtitle: 'Build your perfect Shabbat table — kosher, freshly cooked, and delivered to your door.',
+    heroImageAlt: 'Premium kosher Shabbat box for two in Dubai — Bat Melech Delights',
+    intro: 'A complete kosher Shabbat dinner in Dubai, cooked fresh and delivered to you — salads, a first course, a main, a side, and dessert in one full box for two.',
+    extrasLink: 'Not looking for the full box? Weekend Boosters — individual dishes, no commitment',
+    infoTitle: 'How the Box Works',
+    infoBody: (basePrice: number) =>
+      `The base price ($${basePrice} USD) includes: 4 salads, 1 first course, 1 main course, 1 side, and 1 dessert.`,
+    infoBody2: 'Anything you choose beyond the included quota is automatically added to the total below.',
+    saladsTitle: 'Fresh Salads',
+    saladsHint: `Choose at least 4 (5th salad and up: $${SALAD_EXTRA_PRICE} each)`,
+    firstsTitle: 'First Courses',
+    firstsHint: `Second course and up: $${FIRST_EXTRA_PRICE} each`,
+    mainsTitle: 'Shabbat Mains',
+    mainsHint: `Second main and up: $${MAIN_EXTRA_PRICE} each`,
+    sidesTitle: 'Sides for the Mains',
+    sidesHint: 'Choose one side',
+    dessertsTitle: 'A Sweet Finish (Pareve)',
+    dessertsHint: 'Choose one dessert',
+    extraSalads: (amount: string, count: number) =>
+      `+$${amount} for ${count} extra salad${count === 1 ? '' : 's'}`,
+    extraFirsts: (amount: number, count: number) =>
+      `+$${amount} for ${count} extra course${count === 1 ? '' : 's'}`,
+    extraMains: (amount: number, count: number) =>
+      `+$${amount} for ${count} extra main${count === 1 ? '' : 's'}`,
+    missingSalads: (left: number) => (left === 1 ? '1 more salad' : `${left} more salads`),
+    missingFirst: 'a first course',
+    missingMain: 'a main course',
+    missingSide: 'a side',
+    missingDessert: 'a dessert',
+    soldOutLabel: (names: string) => `Sold out: ${names}`,
+    missingLabel: (list: string) => `Still needed: ${list}`,
+    summaryReady: 'Order Summary',
+    packageName: 'Premium Shabbat Box for Two',
+    continueCta: 'Continue to Order',
+    noteLabels: {
+      salads: 'Salads',
+      first: 'First course',
+      main: 'Main',
+      side: 'Side',
+      dessert: 'Dessert',
+    },
+  },
+  fr: {
+    heroBadge: "L'expérience Chabbat",
+    heroTitle: ['Coffret Chabbat', 'Prestige pour deux'],
+    heroSubtitle: 'Composez votre table de Chabbat idéale — casher, cuisinée le jour même et livrée jusque chez vous.',
+    heroImageAlt: 'Coffret Chabbat prestige casher pour deux à Dubaï — Bat Melech',
+    intro: "Un dîner de Chabbat casher complet à Dubaï, cuisiné frais et livré chez vous — salades, entrée, plat, accompagnement et dessert dans un coffret pour deux.",
+    extrasLink: "Vous ne souhaitez pas le coffret complet ? Nos extras du week-end — plats à l'unité, sans engagement",
+    infoTitle: 'Comment composer votre coffret',
+    infoBody: (basePrice: number) =>
+      `Le prix de base ($${basePrice} USD) comprend : 4 salades, 1 entrée, 1 plat, 1 accompagnement et 1 dessert.`,
+    infoBody2: "Toute sélection au-delà du quota inclus s'ajoute automatiquement au total ci-dessous.",
+    saladsTitle: 'Salades fraîches',
+    saladsHint: `Choisissez-en au moins 4 (à partir de la 5e : $${SALAD_EXTRA_PRICE} l'unité)`,
+    firstsTitle: 'Entrées',
+    firstsHint: `À partir de la 2e : $${FIRST_EXTRA_PRICE} l'unité`,
+    mainsTitle: 'Plats de Chabbat',
+    mainsHint: `À partir du 2e : $${MAIN_EXTRA_PRICE} l'unité`,
+    sidesTitle: 'Accompagnements',
+    sidesHint: 'Choisissez un accompagnement',
+    dessertsTitle: 'Douceur finale (parvé)',
+    dessertsHint: 'Choisissez un dessert',
+    extraSalads: (amount: string, count: number) =>
+      `+$${amount} pour ${count === 1 ? '1 salade supplémentaire' : `${count} salades supplémentaires`}`,
+    extraFirsts: (amount: number, count: number) =>
+      `+$${amount} pour ${count === 1 ? '1 entrée supplémentaire' : `${count} entrées supplémentaires`}`,
+    extraMains: (amount: number, count: number) =>
+      `+$${amount} pour ${count === 1 ? '1 plat supplémentaire' : `${count} plats supplémentaires`}`,
+    missingSalads: (left: number) => (left === 1 ? 'encore une salade' : `encore ${left} salades`),
+    missingFirst: 'une entrée',
+    missingMain: 'un plat',
+    missingSide: 'un accompagnement',
+    missingDessert: 'un dessert',
+    soldOutLabel: (names: string) => `Épuisé : ${names}`,
+    missingLabel: (list: string) => `Il manque : ${list}`,
+    summaryReady: 'Récapitulatif',
+    packageName: 'Coffret Chabbat Prestige pour deux',
+    continueCta: 'Continuer la commande',
+    noteLabels: {
+      salads: 'Salades',
+      first: 'Entrée',
+      main: 'Plat',
+      side: 'Accompagnement',
+      dessert: 'Dessert',
+    },
+  },
+}
+
 /**
  * Hardcoded lists stay the fallback; when the live catalog has dishes for a
  * category they replace the list, keeping local ids/photos/allergy badges for
@@ -103,6 +265,7 @@ function mergeOptions(
     })
   }
   return live.map((dish) => {
+    // Matching stays by the canonical Hebrew name; only rendering localizes.
     const match = local.find((item) => item.name === dish.name)
     return {
       id: match?.id ?? `${idPrefix}-${dish.name}`,
@@ -120,6 +283,8 @@ export function ShabbatOrder() {
   const { isOutOfStock } = useSiteStatus()
   const { catalog, dishByName } = useSiteCatalog()
   const navigate = useNavigate()
+  const { locale, dir, href } = useLocale()
+  const t = COPY[locale]
 
   const basePrice = catalog?.couplePriceUsd ?? BASE_PRICE
   const saladOptions = useMemo(() => mergeOptions(SALADS, catalog?.categories.salads, dishByName, 'catalog-salad'), [catalog, dishByName])
@@ -164,13 +329,12 @@ export function ShabbatOrder() {
 
   const missing: string[] = []
   if (salads.size < INCLUDED_SALADS) {
-    const left = INCLUDED_SALADS - salads.size
-    missing.push(left === 1 ? 'עוד סלט אחד' : `עוד ${left} סלטים`)
+    missing.push(t.missingSalads(INCLUDED_SALADS - salads.size))
   }
-  if (firstCount < INCLUDED_FIRST) missing.push('מנה ראשונה')
-  if (mainCount < INCLUDED_MAIN) missing.push('מנה עיקרית')
-  if (!side) missing.push('תוספת')
-  if (!dessert) missing.push('קינוח')
+  if (firstCount < INCLUDED_FIRST) missing.push(t.missingFirst)
+  if (mainCount < INCLUDED_MAIN) missing.push(t.missingMain)
+  if (!side) missing.push(t.missingSide)
+  if (!dessert) missing.push(t.missingDessert)
 
   // An item can sell out after it was picked (the status call lands late, or a
   // second tab marks it). The picks stay put — the builder just refuses to
@@ -187,62 +351,66 @@ export function ShabbatOrder() {
 
   const handleContinue = () => {
     if (!canContinue) return
-    const saladNames = saladOptions.filter((s) => salads.has(s.id)).map((s) => s.name)
-    const firstNames = firstOptions.filter((c) => (firstQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${firstQty[c.id]}`)
-    const mainNames = mainOptions.filter((c) => (mainQty[c.id] ?? 0) > 0).map((c) => `${c.name} x${mainQty[c.id]}`)
+    // The note travels to the kitchen: dish references always carry the
+    // canonical Hebrew name — localized display names go in parentheses-free
+    // form for Hebrew, and as "Display (עברית)" for other locales.
+    const noteDish = (name: string) => (locale === 'he' ? name : `${displayDish(name, locale)} (${name})`)
+    const saladNames = saladOptions.filter((s) => salads.has(s.id)).map((s) => noteDish(s.name))
+    const firstNames = firstOptions.filter((c) => (firstQty[c.id] ?? 0) > 0).map((c) => `${noteDish(c.name)} x${firstQty[c.id]}`)
+    const mainNames = mainOptions.filter((c) => (mainQty[c.id] ?? 0) > 0).map((c) => `${noteDish(c.name)} x${mainQty[c.id]}`)
     const sideName = sideOptions.find((s) => s.id === side)?.name
     const dessertName = dessertOptions.find((d) => d.id === dessert)?.name
     const note = [
-      `סלטים: ${saladNames.join(', ')}`,
-      `ראשונה: ${firstNames.join(', ')}`,
-      `עיקרית: ${mainNames.join(', ')}`,
-      `תוספת: ${sideName}`,
-      `קינוח: ${dessertName}`,
+      `${t.noteLabels.salads}: ${saladNames.join(', ')}`,
+      `${t.noteLabels.first}: ${firstNames.join(', ')}`,
+      `${t.noteLabels.main}: ${mainNames.join(', ')}`,
+      `${t.noteLabels.side}: ${sideName !== undefined ? noteDish(sideName) : sideName}`,
+      `${t.noteLabels.dessert}: ${dessertName !== undefined ? noteDish(dessertName) : dessertName}`,
     ]
       .filter(Boolean)
       .join(' | ')
-    addLine({ id: 'shabbat-package', name: 'מארז שבת זוגי יוקרתי', unitPrice: total, note })
-    navigate('/checkout')
+    addLine({ id: 'shabbat-package', name: PACKAGE_NAME_HE, displayName: t.packageName, unitPrice: total, note })
+    navigate(href('/checkout'))
   }
 
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-72" dir="rtl">
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-72" dir={dir}>
       <PageHero
         active="/shabbat-order"
         size="tall"
-        badge="The Shabbat Experience"
-        title={['מארז שבת', 'זוגי יוקרתי']}
-        subtitle="הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם."
+        badge={t.heroBadge}
+        title={t.heroTitle}
+        subtitle={t.heroSubtitle}
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
-        imageAlt="מארז שבת זוגי יוקרתי כשר בדובאי - מטעמי בת מלך"
+        imageAlt={t.heroImageAlt}
       />
 
       <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
         <div>
           <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
-            ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.
+            {t.intro}
           </p>
           <CurrencyNote className="mt-6" />
         </div>
         <Link
-          to="/shabbat-extras"
+          to={href('/shabbat-extras')}
           className="block max-w-2xl mx-auto text-center text-[#8D182C] font-black underline text-sm"
         >
-          לא רוצים חבילה שלמה? לחיזוקים לסופ״ש — מנות בודדות בלי התחייבות
+          {t.extrasLink}
         </Link>
         <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">
           <Icon icon="ph:info-fill" className="text-amber-600 text-4xl shrink-0" />
           <div>
-            <h5 className="font-black text-amber-900 text-xl mb-2">שיטת הבחירה במארז</h5>
+            <h5 className="font-black text-amber-900 text-xl mb-2">{t.infoTitle}</h5>
             <p className="text-amber-800 font-bold text-sm leading-relaxed">
-              {`המחיר הבסיסי ($${basePrice} USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.`}
+              {t.infoBody(basePrice)}
               <br />
-              כל בחירה מעבר למכסה מתווספת אוטומטית למחיר למטה.
+              {t.infoBody2}
             </p>
           </div>
         </div>
 
-        <SectionHeader n={1} title="סלטים טריים" hint={`יש לבחור לפחות 4 (סלט חמישי ומעלה: $${SALAD_EXTRA_PRICE} ליחידה)`} />
+        <SectionHeader n={1} title={t.saladsTitle} hint={t.saladsHint} />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 -mt-12">
           {saladOptions.map((s) => {
             const picked = salads.has(s.id)
@@ -255,7 +423,7 @@ export function ShabbatOrder() {
                 // can be removed — it just cannot be picked again.
                 disabled={soldOut && !picked}
                 onClick={() => toggleSalad(s.id)}
-                className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all text-right enabled:hover:shadow-xl disabled:cursor-not-allowed"
+                className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all text-start enabled:hover:shadow-xl disabled:cursor-not-allowed"
               >
                 <div className="aspect-square overflow-hidden relative">
                   {s.img === '' ? (
@@ -265,19 +433,19 @@ export function ShabbatOrder() {
                   ) : (
                     <Photo
                       src={s.img}
-                      alt={s.name}
+                      alt={displayDish(s.name, locale)}
                       className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`}
                       real={s.realPhoto}
                     />
                   )}
                   {s.allergy && (
-                    <span className="absolute top-2 left-2 bg-white/90 p-1.5 rounded-lg shadow-md">
+                    <span className="absolute top-2 end-2 bg-white/90 p-1.5 rounded-lg shadow-md">
                       <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
                     </span>
                   )}
-                  {soldOut && <OutOfStockBadge className="absolute bottom-3 left-3" />}
+                  {soldOut && <OutOfStockBadge className="absolute bottom-3 end-3" />}
                   <span
-                    className={`absolute bottom-3 right-3 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${
+                    className={`absolute bottom-3 start-3 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${
                       picked ? 'bg-[#3B151A] text-white' : 'bg-white text-[#3B151A]'
                     }`}
                   >
@@ -285,7 +453,7 @@ export function ShabbatOrder() {
                   </span>
                 </div>
                 <div className="p-4">
-                  <h4 className="text-sm font-black">{s.name}</h4>
+                  <h4 className="text-sm font-black">{displayDish(s.name, locale)}</h4>
                   {s.description !== undefined && (
                     <p className="text-xs font-bold text-[#3B151A]/50 mt-1 leading-snug">{s.description}</p>
                   )}
@@ -295,26 +463,26 @@ export function ShabbatOrder() {
           })}
         </div>
         {saladExtra > 0 && (
-          <p className="text-[#8D182C] font-black text-center -mt-12">+${saladExtra.toFixed(2)} עבור {salads.size - INCLUDED_SALADS} סלטים נוספים</p>
+          <p className="text-[#8D182C] font-black text-center -mt-12">{t.extraSalads(saladExtra.toFixed(2), salads.size - INCLUDED_SALADS)}</p>
         )}
 
-        <SectionHeader n={2} title="מנות ראשונות" hint={`מנה שניה ומעלה: $${FIRST_EXTRA_PRICE} ליחידה`} />
+        <SectionHeader n={2} title={t.firstsTitle} hint={t.firstsHint} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">
           {firstOptions.map((c) => (
-            <QtyCard key={c.id} choice={c} qty={firstQty[c.id] ?? 0} onBump={(d) => bumpFirst(c.id, d)} soldOut={isOutOfStock(c.name)} />
+            <QtyCard key={c.id} choice={c} displayName={displayDish(c.name, locale)} qty={firstQty[c.id] ?? 0} onBump={(d) => bumpFirst(c.id, d)} soldOut={isOutOfStock(c.name)} />
           ))}
         </div>
-        {firstExtra > 0 && <p className="text-[#8D182C] font-black text-center -mt-12">+${firstExtra} עבור {firstCount - INCLUDED_FIRST} מנות נוספות</p>}
+        {firstExtra > 0 && <p className="text-[#8D182C] font-black text-center -mt-12">{t.extraFirsts(firstExtra, firstCount - INCLUDED_FIRST)}</p>}
 
-        <SectionHeader n={3} title="עיקריות לשבת" hint={`מנה שניה ומעלה: $${MAIN_EXTRA_PRICE} ליחידה`} />
+        <SectionHeader n={3} title={t.mainsTitle} hint={t.mainsHint} />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 -mt-12">
           {mainOptions.map((c) => (
-            <QtyCard key={c.id} choice={c} qty={mainQty[c.id] ?? 0} onBump={(d) => bumpMain(c.id, d)} soldOut={isOutOfStock(c.name)} compact />
+            <QtyCard key={c.id} choice={c} displayName={displayDish(c.name, locale)} qty={mainQty[c.id] ?? 0} onBump={(d) => bumpMain(c.id, d)} soldOut={isOutOfStock(c.name)} compact />
           ))}
         </div>
-        {mainExtra > 0 && <p className="text-[#8D182C] font-black text-center -mt-12">+${mainExtra} עבור {mainCount - INCLUDED_MAIN} מנות נוספות</p>}
+        {mainExtra > 0 && <p className="text-[#8D182C] font-black text-center -mt-12">{t.extraMains(mainExtra, mainCount - INCLUDED_MAIN)}</p>}
 
-        <SectionHeader n={4} title="תוספות לעיקריות" hint="יש לבחור תוספת אחת" />
+        <SectionHeader n={4} title={t.sidesTitle} hint={t.sidesHint} />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 -mt-12">
           {sideOptions.map((s) => {
             const soldOut = isOutOfStock(s.name)
@@ -329,9 +497,9 @@ export function ShabbatOrder() {
                 }`}
               >
                 {s.img !== '' && (
-                  <img src={s.img} alt={s.name} loading="lazy" className="w-16 h-16 rounded-2xl object-cover shadow-md" />
+                  <img src={s.img} alt={displayDish(s.name, locale)} loading="lazy" className="w-16 h-16 rounded-2xl object-cover shadow-md" />
                 )}
-                {s.name}
+                {displayDish(s.name, locale)}
                 {s.description !== undefined && (
                   <span className="text-xs font-bold text-[#3B151A]/50 leading-snug">{s.description}</span>
                 )}
@@ -341,7 +509,7 @@ export function ShabbatOrder() {
           })}
         </div>
 
-        <SectionHeader n={5} title="סיום מתוק (פרווה)" hint="יש לבחור מנה אחת" />
+        <SectionHeader n={5} title={t.dessertsTitle} hint={t.dessertsHint} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">
           {dessertOptions.map((d) => {
             const soldOut = isOutOfStock(d.name)
@@ -351,7 +519,7 @@ export function ShabbatOrder() {
                 type="button"
                 disabled={soldOut && dessert !== d.id}
                 onClick={() => setDessert((prev) => (prev === d.id ? '' : d.id))}
-                className={`group relative rounded-[3.5rem] overflow-hidden border-4 transition-all shadow-lg text-right disabled:cursor-not-allowed ${
+                className={`group relative rounded-[3.5rem] overflow-hidden border-4 transition-all shadow-lg text-start disabled:cursor-not-allowed ${
                   dessert === d.id ? 'border-[#F5A83A]' : 'border-transparent'
                 }`}
               >
@@ -361,11 +529,11 @@ export function ShabbatOrder() {
                       <Icon icon="ph:fork-knife" className="text-6xl text-[#3B151A]/20" />
                     </div>
                   ) : (
-                    <Photo src={d.img} alt={d.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={d.realPhoto} />
+                    <Photo src={d.img} alt={displayDish(d.name, locale)} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={d.realPhoto} />
                   )}
-                  {soldOut && <OutOfStockBadge className="absolute top-4 left-4" />}
-                  <div className="absolute bottom-4 right-4 max-w-[75%] px-8 py-3 rounded-2xl bg-white shadow-2xl text-right">
-                    <span className="font-black block">{d.name}</span>
+                  {soldOut && <OutOfStockBadge className="absolute top-4 end-4" />}
+                  <div className="absolute bottom-4 start-4 max-w-[75%] px-8 py-3 rounded-2xl bg-white shadow-2xl text-start">
+                    <span className="font-black block">{displayDish(d.name, locale)}</span>
                     {d.description !== undefined && (
                       <span className="text-xs font-bold text-[#3B151A]/60 block">{d.description}</span>
                     )}
@@ -385,13 +553,13 @@ export function ShabbatOrder() {
               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest opacity-40">USD</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">מארז שבת זוגי יוקרתי</span>
+              <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">{t.packageName}</span>
               <span className="text-xl md:text-3xl font-black leading-tight">
                 {soldOutPicks.length > 0
-                  ? `אזל מהמלאי: ${soldOutPicks.map((item) => item.name).join(', ')}`
+                  ? t.soldOutLabel(soldOutPicks.map((item) => displayDish(item.name, locale)).join(', '))
                   : canContinue
-                    ? 'סיכום הזמנה'
-                    : `חסר: ${missing.join(', ')}`}
+                    ? t.summaryReady
+                    : t.missingLabel(missing.join(', '))}
               </span>
             </div>
           </div>
@@ -401,7 +569,11 @@ export function ShabbatOrder() {
             onClick={handleContinue}
             className="w-full sm:w-auto bg-[#3B151A] hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed text-white px-12 md:px-20 py-6 md:py-8 rounded-[2rem] md:rounded-[3rem] font-black text-xl md:text-3xl shadow-2xl transition-all flex items-center justify-center gap-4 md:gap-6 group"
           >
-            המשך להזמנה <Icon icon="ph:arrow-left-bold" className="text-2xl md:text-4xl group-hover:-translate-x-3 transition-transform" />
+            {t.continueCta}{' '}
+            <Icon
+              icon={dir === 'rtl' ? 'ph:arrow-left-bold' : 'ph:arrow-right-bold'}
+              className={`text-2xl md:text-4xl transition-transform ${dir === 'rtl' ? 'group-hover:-translate-x-3' : 'group-hover:translate-x-3'}`}
+            />
           </button>
         </div>
       </div>
@@ -418,19 +590,21 @@ function SectionHeader({ n, title, hint }: { n: number; title: string; hint: str
           <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight">{title}</h2>
         </div>
       </div>
-      <p className="text-[#3B151A]/60 font-bold mr-0 md:mr-16 text-base md:text-lg italic mb-8">{hint}</p>
+      <p className="text-[#3B151A]/60 font-bold ms-0 md:ms-16 text-base md:text-lg italic mb-8">{hint}</p>
     </div>
   )
 }
 
 function QtyCard({
   choice,
+  displayName,
   qty,
   onBump,
   soldOut = false,
   compact = false,
 }: {
   choice: Option
+  displayName: string
   qty: number
   onBump: (delta: number) => void
   soldOut?: boolean
@@ -444,15 +618,15 @@ function QtyCard({
             <Icon icon="ph:fork-knife" className="text-6xl text-[#3B151A]/20" />
           </div>
         ) : (
-          <Photo src={choice.img} alt={choice.name} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={choice.realPhoto} />
+          <Photo src={choice.img} alt={displayName} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={choice.realPhoto} />
         )}
         {choice.allergy && (
-          <span className="absolute top-4 left-4 bg-white/90 p-2 rounded-xl shadow-lg">
+          <span className="absolute top-4 end-4 bg-white/90 p-2 rounded-xl shadow-lg">
             <Icon icon={ALLERGY_ICON[choice.allergy]} className="text-lg" />
           </span>
         )}
-        {soldOut && <OutOfStockBadge className="absolute bottom-4 left-4" />}
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-white rounded-2xl shadow-2xl p-1">
+        {soldOut && <OutOfStockBadge className="absolute bottom-4 end-4" />}
+        <div className="absolute bottom-4 start-4 flex items-center gap-2 bg-white rounded-2xl shadow-2xl p-1">
           <button
             type="button"
             disabled={soldOut}
@@ -468,7 +642,7 @@ function QtyCard({
         </div>
       </div>
       <div className={compact ? 'p-6' : 'p-8 text-center'}>
-        <h4 className={compact ? 'text-lg font-black' : 'text-2xl font-black'}>{choice.name}</h4>
+        <h4 className={compact ? 'text-lg font-black' : 'text-2xl font-black'}>{displayName}</h4>
         {choice.description !== undefined && (
           <p className="text-sm font-bold text-[#3B151A]/50 mt-2 leading-relaxed">{choice.description}</p>
         )}

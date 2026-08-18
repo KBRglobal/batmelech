@@ -1483,11 +1483,21 @@ export function hasValidManualTotal(draft: OrderDraft): boolean {
   return draft.total.trim() !== '' && parseUsdInputMinorUnits(draft.total) !== null
 }
 
+// computedTotalMinorUnits distinguishes a DELIBERATE manual price from the
+// auto-filled default: a total equal to the engine's own suggestion is not a
+// manual pricing decision, so it never unblocks an unpriced overage.
 export function demotePriceAvailabilityIssues(
   issues: readonly DraftIssue[],
   draft: OrderDraft,
+  computedTotalMinorUnits: number | null = null,
 ): readonly DraftIssue[] {
   if (!hasValidManualTotal(draft)) return issues
+  if (
+    computedTotalMinorUnits !== null &&
+    parseUsdInputMinorUnits(draft.total) === computedTotalMinorUnits
+  ) {
+    return issues
+  }
   return issues.map((issue) =>
     issue.blocking && PRICE_AVAILABILITY_ISSUE_CODES.has(issue.code)
       ? {

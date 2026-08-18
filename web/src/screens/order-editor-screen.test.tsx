@@ -521,21 +521,23 @@ describe('OrderEditorScreen', () => {
 
     expect(screen.getAllByText('$282.00').length).toBeGreaterThan(0)
     expect(screen.getByText('$30.00')).toBeTruthy()
-    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('')
-    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
-
-    await user.click(screen.getByRole('button', { name: 'להשתמש במחיר המוצע' }))
+    // The suggested price IS the default: the total follows the computed
+    // price with no extra click, and saving opens immediately.
     expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.00')
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
 
-    await user.click(screen.getByRole('button', { name: 'הפחתה מסוכריות בקלוואה' }))
-    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
-
+    // As long as the operator never typed a price, changes keep following.
     await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))
     await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט אמיתי')
     await user.type(screen.getByLabelText('מחיר פריט חופשי 1'), '0.10')
     expect(screen.getAllByText('$282.10').length).toBeGreaterThan(0)
-    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.00')
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.10')
+    expect(screen.queryByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeNull()
+
+    // A typed manual price sticks and shows the mismatch note, still savable.
+    await user.clear(screen.getByLabelText('סך לתשלום'))
+    await user.type(screen.getByLabelText('סך לתשלום'), '200')
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('200')
     expect(screen.getByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
   })
@@ -547,6 +549,7 @@ describe('OrderEditorScreen', () => {
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
     const save = screen.getByRole('button', { name: 'שמירת ההזמנה' })
 
+    await user.clear(screen.getByLabelText('סך לתשלום'))
     await user.type(screen.getByLabelText('סך לתשלום'), '1.00')
     expect(save.hasAttribute('disabled')).toBe(false)
     expect(screen.getByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeTruthy()

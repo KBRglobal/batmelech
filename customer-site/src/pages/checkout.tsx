@@ -4,46 +4,294 @@ import { Link } from 'react-router'
 import { CurrencyNote } from '../components/currency-note'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
-import { DELIVERY_FEES_USD, DELIVERY_ZONE_LABELS, useCart, type DeliveryZone, type SelectedHotel } from '../cart-context'
+import { DELIVERY_FEES_USD, useCart, type CartLine, type CustomerDetails, type DeliveryZone, type SelectedHotel } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
-import { buildOrderMessage, selectedHotel, waLink } from '../whatsapp'
+import { buildOrderMessage, deliveryAddressText, selectedHotel, waLink } from '../whatsapp'
+import { useLocale, type Locale } from '../locale-context'
+import { dishName } from '../dish-names'
 
 const HOTEL_SEARCH_DEBOUNCE_MS = 300
 const HOTEL_QUERY_MIN_LENGTH = 2
 const HOTEL_QUERY_MAX_LENGTH = 100
 const INPUT_CLASS =
   'w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold'
-const PHONE_CODES = [
-  { code: '+971', label: 'איחוד האמירויות' },
-  { code: '+972', label: 'ישראל' },
-  { code: '+1', label: 'ארה"ב / קנדה' },
-  { code: '+44', label: 'בריטניה' },
-]
+// Submitted phone codes never change; only the country labels are localized.
+const PHONE_CODES = ['+971', '+972', '+1', '+44'] as const
 const CHECKOUT_HERO_IMAGE =
   'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg'
+
+// Localized copy. Hebrew is the source of truth; English is written for an
+// American Jewish audience and French for a French Jewish audience — native
+// copy, never word-by-word (always Shabbat/Chabbat, never weekday names). Submitted
+// values (zones, phone codes, order lines) are never localized.
+const HE = {
+  emptyTitle: ['הסל שלכם', 'ריק'] as [string, string],
+  heroImageAlt: 'מטעמי בת מלך - מטבח ביתי כשר בדובאי',
+  emptyWeekdaysCta: 'לתפריט יום חול',
+  emptyShabbatCta: 'או להרכבת מארז שבת',
+  heroTitle: ['סיכום', 'הזמנה'] as [string, string],
+  itemsTitle: 'פריטים בהזמנה',
+  remove: 'הסר',
+  itemsSubtotal: 'סיכום פריטים',
+  pickupLine: 'איסוף עצמי',
+  deliveryLine: 'משלוח',
+  freeOfCharge: 'ללא עלות',
+  totalDue: 'סה"כ לתשלום',
+  fulfillmentTitle: 'איך תרצו לקבל את ההזמנה',
+  delivery: 'משלוח',
+  pickupFree: 'איסוף עצמי (ללא עלות)',
+  zones: { dubai: 'דובאי', 'abu-dhabi': 'אבו דאבי' } as Record<DeliveryZone, string>,
+  fullNameLabel: 'שם מלא',
+  fullNamePlaceholder: 'ישראל ישראלי',
+  phoneLabel: 'מספר טלפון',
+  phonePlaceholder: '50 000 0000',
+  phoneCountries: {
+    '+971': 'איחוד האמירויות',
+    '+972': 'ישראל',
+    '+1': 'ארה"ב / קנדה',
+    '+44': 'בריטניה',
+  } as Record<(typeof PHONE_CODES)[number], string>,
+  pickupDateLabel: 'תאריך איסוף',
+  deliveryDateLabel: 'תאריך משלוח',
+  pickupTimeLabel: 'שעת איסוף',
+  deliveryTimeLabel: 'שעת משלוח',
+  emailLabel: 'אימייל (לקבלת חשבונית)',
+  destinationLabel: 'לאן מגיע המשלוח',
+  hotelOption: 'מלון',
+  otherAddressOption: 'כתובת אחרת',
+  hotelNameLabel: 'שם המלון',
+  roomLabel: 'מספר חדר, הערות לכתובת',
+  roomPlaceholder: 'חדר 402, לובי, קומה 12...',
+  fullAddressLabel: 'כתובת מלאה',
+  fullAddressPlaceholder: 'רחוב, בניין, מספר דירה, אזור...',
+  kitchenNotesLabel: 'הערות למטבח',
+  kitchenNotesPlaceholder: 'בלי חריף, אקסטרה מטבוחה...',
+  infoWhatsApp: 'לאחר לחיצה על "אישור ושליחה", ההזמנה תיפתח כהודעת וואטסאפ מוכנה אל בת מלך לאישור סופי.',
+  infoPayment: 'אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.',
+  submitCta: 'אישור ושליחת הזמנה',
+  hintClosed: 'האתר לא מקבל הזמנות כרגע',
+  hintPickup: 'מלאו שם, טלפון, תאריך ושעה כדי לשלוח',
+  hintHotel: 'מלאו שם, טלפון, תאריך ושעה, ובחרו מלון כדי לשלוח',
+  hintAddress: 'מלאו שם, טלפון, תאריך, שעה וכתובת כדי לשלוח',
+  hotelSearchPlaceholder: 'התחילו להקליד שם מלון...',
+  hotelSearching: 'מחפשים מלונות...',
+  hotelEmpty: 'לא מצאנו מלון בשם הזה. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.',
+  hotelError: 'חיפוש המלונות לא זמין כרגע. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.',
+  hotelClearAria: 'ביטול בחירת המלון',
+  // WhatsApp handoff message. Hebrew keeps the original wording; en/fr are
+  // written in the customer's language while each dish line carries the
+  // canonical Hebrew name in parentheses so the kitchen always understands.
+  waHeader: 'הזמנה חדשה מהאתר — מטעמי בת מלך',
+  waTotal: 'סה"כ',
+  waName: 'שם',
+  waPhone: 'טלפון',
+  waDate: 'תאריך מבוקש',
+  waTime: 'שעה מבוקשת',
+  waEmail: 'אימייל',
+  waPickup: 'איסוף עצמי',
+  waDeliveryAddress: 'כתובת למשלוח',
+  waHotelAddress: 'כתובת המלון',
+  waNotes: 'הערות',
+}
+
+export const COPY: Record<Locale, typeof HE> = {
+  he: HE,
+  en: {
+    emptyTitle: ['Your Basket', 'Is Empty'],
+    heroImageAlt: 'Bat Melech — kosher home kitchen in Dubai',
+    emptyWeekdaysCta: 'Browse the weekday menu',
+    emptyShabbatCta: 'or build your Shabbat package',
+    heroTitle: ['Order', 'Summary'],
+    itemsTitle: 'Items in your order',
+    remove: 'Remove',
+    itemsSubtotal: 'Subtotal',
+    pickupLine: 'Pickup',
+    deliveryLine: 'Delivery',
+    freeOfCharge: 'Free',
+    totalDue: 'Total due',
+    fulfillmentTitle: 'How would you like to receive your order?',
+    delivery: 'Delivery',
+    pickupFree: 'Pickup (free)',
+    zones: { dubai: 'Dubai', 'abu-dhabi': 'Abu Dhabi' },
+    fullNameLabel: 'Full name',
+    fullNamePlaceholder: 'Your name',
+    phoneLabel: 'Phone number',
+    phonePlaceholder: '50 000 0000',
+    phoneCountries: {
+      '+971': 'UAE',
+      '+972': 'Israel',
+      '+1': 'US / Canada',
+      '+44': 'UK',
+    },
+    pickupDateLabel: 'Pickup date',
+    deliveryDateLabel: 'Delivery date',
+    pickupTimeLabel: 'Pickup time',
+    deliveryTimeLabel: 'Delivery time',
+    emailLabel: 'Email (for your invoice)',
+    destinationLabel: 'Where should we deliver?',
+    hotelOption: 'Hotel',
+    otherAddressOption: 'Other address',
+    hotelNameLabel: 'Hotel name',
+    roomLabel: 'Room number, delivery notes',
+    roomPlaceholder: 'Room 402, lobby, 12th floor...',
+    fullAddressLabel: 'Full address',
+    fullAddressPlaceholder: 'Street, building, apartment, area...',
+    kitchenNotesLabel: 'Notes for the kitchen',
+    kitchenNotesPlaceholder: 'No spicy, extra matbucha...',
+    infoWhatsApp: 'When you tap "Confirm & Send", your order opens as a ready-made WhatsApp message to Bat Melech for final confirmation.',
+    infoPayment: 'No payment is taken on the site. Payment is arranged directly with Bat Melech on WhatsApp — cash on delivery, bank transfer, Bit, or PayBox.',
+    submitCta: 'Confirm & Send Order',
+    hintClosed: 'We are not taking orders right now',
+    hintPickup: 'Fill in your name, phone, date, and time to send',
+    hintHotel: 'Fill in your name, phone, date, and time, and choose a hotel to send',
+    hintAddress: 'Fill in your name, phone, date, time, and address to send',
+    hotelSearchPlaceholder: 'Start typing a hotel name...',
+    hotelSearching: 'Searching hotels...',
+    hotelEmpty: 'We could not find a hotel by that name. You can switch to "Other address" and type the full address.',
+    hotelError: 'Hotel search is unavailable right now. You can switch to "Other address" and type the full address.',
+    hotelClearAria: 'Clear hotel selection',
+    waHeader: 'New order from the website — Bat Melech',
+    waTotal: 'Total',
+    waName: 'Name',
+    waPhone: 'Phone',
+    waDate: 'Requested date',
+    waTime: 'Requested time',
+    waEmail: 'Email',
+    waPickup: 'Pickup',
+    waDeliveryAddress: 'Delivery address',
+    waHotelAddress: 'Hotel address',
+    waNotes: 'Notes',
+  },
+  fr: {
+    emptyTitle: ['Votre panier', 'est vide'],
+    heroImageAlt: 'Bat Melech — cuisine familiale casher à Dubaï',
+    emptyWeekdaysCta: 'Voir le menu de semaine',
+    emptyShabbatCta: 'ou composez votre coffret de Chabbat',
+    heroTitle: ['Récapitulatif', 'de commande'],
+    itemsTitle: 'Articles de votre commande',
+    remove: 'Retirer',
+    itemsSubtotal: 'Sous-total',
+    pickupLine: 'Retrait sur place',
+    deliveryLine: 'Livraison',
+    freeOfCharge: 'Gratuit',
+    totalDue: 'Total à payer',
+    fulfillmentTitle: 'Comment souhaitez-vous recevoir votre commande ?',
+    delivery: 'Livraison',
+    pickupFree: 'Retrait sur place (gratuit)',
+    zones: { dubai: 'Dubaï', 'abu-dhabi': 'Abou Dhabi' },
+    fullNameLabel: 'Nom complet',
+    fullNamePlaceholder: 'Votre nom',
+    phoneLabel: 'Numéro de téléphone',
+    phonePlaceholder: '50 000 0000',
+    phoneCountries: {
+      '+971': 'Émirats arabes unis',
+      '+972': 'Israël',
+      '+1': 'États-Unis / Canada',
+      '+44': 'Royaume-Uni',
+    },
+    pickupDateLabel: 'Date de retrait',
+    deliveryDateLabel: 'Date de livraison',
+    pickupTimeLabel: 'Heure de retrait',
+    deliveryTimeLabel: 'Heure de livraison',
+    emailLabel: 'E-mail (pour recevoir la facture)',
+    destinationLabel: 'Où livrons-nous ?',
+    hotelOption: 'Hôtel',
+    otherAddressOption: 'Autre adresse',
+    hotelNameLabel: 'Nom de l\'hôtel',
+    roomLabel: 'Numéro de chambre, précisions',
+    roomPlaceholder: 'Chambre 402, lobby, 12e étage...',
+    fullAddressLabel: 'Adresse complète',
+    fullAddressPlaceholder: 'Rue, immeuble, appartement, quartier...',
+    kitchenNotesLabel: 'Remarques pour la cuisine',
+    kitchenNotesPlaceholder: 'Sans piment, extra matboukha...',
+    infoWhatsApp: 'Après avoir appuyé sur « Confirmer et envoyer », votre commande s\'ouvrira sous forme de message WhatsApp prêt à envoyer à Bat Melech pour confirmation finale.',
+    infoPayment: 'Aucun paiement sur le site. Le règlement se fait directement avec Bat Melech sur WhatsApp — espèces à la livraison, virement bancaire, Bit ou PayBox.',
+    submitCta: 'Confirmer et envoyer la commande',
+    hintClosed: 'Le site ne prend pas de commandes pour le moment',
+    hintPickup: 'Renseignez votre nom, téléphone, date et heure pour envoyer',
+    hintHotel: 'Renseignez votre nom, téléphone, date et heure, et choisissez un hôtel pour envoyer',
+    hintAddress: 'Renseignez votre nom, téléphone, date, heure et adresse pour envoyer',
+    hotelSearchPlaceholder: 'Commencez à saisir le nom d\'un hôtel...',
+    hotelSearching: 'Recherche des hôtels...',
+    hotelEmpty: 'Nous n\'avons pas trouvé d\'hôtel à ce nom. Vous pouvez passer à « Autre adresse » et saisir l\'adresse complète.',
+    hotelError: 'La recherche d\'hôtels est indisponible pour le moment. Vous pouvez passer à « Autre adresse » et saisir l\'adresse complète.',
+    hotelClearAria: 'Annuler la sélection de l\'hôtel',
+    waHeader: 'Nouvelle commande depuis le site — Bat Melech',
+    waTotal: 'Total',
+    waName: 'Nom',
+    waPhone: 'Téléphone',
+    waDate: 'Date souhaitée',
+    waTime: 'Heure souhaitée',
+    waEmail: 'E-mail',
+    waPickup: 'Retrait sur place',
+    waDeliveryAddress: 'Adresse de livraison',
+    waHotelAddress: 'Adresse de l\'hôtel',
+    waNotes: 'Remarques',
+  },
+}
 
 function dubaiToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date())
 }
 
+// The en/fr WhatsApp handoff: written in the customer's language, but every
+// dish line keeps the canonical Hebrew name in parentheses so the kitchen
+// (which works off the Hebrew catalog) always recognizes the item. Hebrew
+// checkout keeps using buildOrderMessage untouched.
+function localizedOrderMessage(
+  lines: CartLine[],
+  customer: CustomerDetails,
+  total: number,
+  locale: Locale,
+  t: typeof HE,
+) {
+  const hotel = selectedHotel(customer)
+  const itemRows = lines.map((l) => {
+    const display = l.displayName ?? dishName(l.name, locale)
+    const label = display === l.name ? l.name : `${display} (${l.name})`
+    return `• ${label} x${l.qty} — $${l.unitPrice * l.qty}${l.note ? ` (${l.note})` : ''}`
+  })
+  const rows = [
+    t.waHeader,
+    '',
+    ...itemRows,
+    '',
+    `${t.waTotal}: $${total} USD`,
+    '',
+    `${t.waName}: ${customer.name || '-'}`,
+    `${t.waPhone}: ${customer.phone ? `${customer.phoneCode}${customer.phone}` : '-'}`,
+    `${t.waDate}: ${customer.date || '-'}`,
+    `${t.waTime}: ${customer.time || '-'}`,
+    customer.email ? `${t.waEmail}: ${customer.email}` : undefined,
+    customer.fulfillment === 'pickup'
+      ? t.waPickup
+      : `${t.waDeliveryAddress} (${t.zones[customer.zone]}): ${deliveryAddressText(customer)}`,
+    hotel ? `${t.waHotelAddress}: ${hotel.fullAddress}` : undefined,
+    customer.notes ? `${t.waNotes}: ${customer.notes}` : undefined,
+  ].filter(Boolean)
+  return rows.join('\n')
+}
+
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
   const { orderingOpen } = useSiteStatus()
+  const { locale, dir, href } = useLocale()
+  const t = COPY[locale]
   const isPickup = customer.fulfillment === 'pickup'
   const deliveryFee = DELIVERY_FEES_USD[customer.zone]
   const total = lines.length ? subtotal + (isPickup ? 0 : deliveryFee) : 0
 
   if (lines.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir="rtl">
-        <PageHero active="/checkout" size="compact" title={['הסל שלכם', 'ריק']} image={CHECKOUT_HERO_IMAGE} imageAlt="מטעמי בת מלך - מטבח ביתי כשר בדובאי" />
+      <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir={dir}>
+        <PageHero active="/checkout" size="compact" title={t.emptyTitle} image={CHECKOUT_HERO_IMAGE} imageAlt={t.heroImageAlt} />
         <div className="flex flex-col items-center gap-8 px-6 py-20 text-center">
           <Icon icon="ph:basket-bold" className="text-6xl text-[#EDB2C1]" />
-          <Link to="/weekdays" className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg">
-            לתפריט יום חול
+          <Link to={href('/weekdays')} className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg">
+            {t.emptyWeekdaysCta}
           </Link>
-          <Link to="/shabbat-order" className="text-[#8D182C] font-black underline">
-            או להרכבת מארז שבת
+          <Link to={href('/shabbat-order')} className="text-[#8D182C] font-black underline">
+            {t.emptyShabbatCta}
           </Link>
         </div>
         <Footer />
@@ -91,6 +339,11 @@ export function Checkout() {
     })
   }
 
+  const orderMessage =
+    locale === 'he'
+      ? buildOrderMessage(lines, customer, total)
+      : localizedOrderMessage(lines, customer, total, locale, t)
+
   // Address means different things per mode (free address vs room number), so
   // switching starts that field clean.
   const chooseAddressMode = (addressMode: 'hotel' | 'free') => {
@@ -99,20 +352,20 @@ export function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
-      <PageHero active="/checkout" size="compact" title={['סיכום', 'הזמנה']} image={CHECKOUT_HERO_IMAGE} imageAlt="מטעמי בת מלך - מטבח ביתי כשר בדובאי" />
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
+      <PageHero active="/checkout" size="compact" title={t.heroTitle} image={CHECKOUT_HERO_IMAGE} imageAlt={t.heroImageAlt} />
 
       <main className="max-w-3xl mx-auto px-6 py-12 space-y-12">
         <section className="bg-white rounded-[3rem] p-6 md:p-8 shadow-xl border border-[#EDB2C1]/20">
           <h2 className="text-2xl font-black font-heading mb-6 border-b border-[#EDB2C1]/10 pb-4 flex items-center gap-3">
             <Icon icon="ph:basket-fill" className="text-[#F5A83A]" />
-            פריטים בהזמנה
+            {t.itemsTitle}
           </h2>
           <div className="space-y-6">
             {lines.map((line) => (
               <div key={line.id} className="flex items-start justify-between gap-4">
                 <div className="flex-grow">
-                  <h4 className="font-black">{line.name}</h4>
+                  <h4 className="font-black">{line.displayName ?? line.name}</h4>
                   {line.note && <p className="text-xs text-[#3B151A]/50 font-bold mt-1 leading-relaxed">{line.note}</p>}
                   <div className="flex items-center gap-2 mt-3">
                     <button
@@ -133,9 +386,9 @@ export function Checkout() {
                     <button
                       type="button"
                       onClick={() => removeLine(line.id)}
-                      className="mr-2 text-[#8D182C] text-xs font-black underline"
+                      className="ms-2 text-[#8D182C] text-xs font-black underline"
                     >
-                      הסר
+                      {t.remove}
                     </button>
                   </div>
                 </div>
@@ -145,15 +398,15 @@ export function Checkout() {
           </div>
           <div className="mt-8 pt-8 border-t-2 border-dotted border-[#EDB2C1]/20 space-y-4">
             <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
-              <span>סיכום פריטים</span>
+              <span>{t.itemsSubtotal}</span>
               <span>${subtotal.toFixed(2).replace(/\.00$/, '')}</span>
             </div>
             <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
-              <span>{isPickup ? 'איסוף עצמי' : `משלוח (${DELIVERY_ZONE_LABELS[customer.zone]})`}</span>
-              <span>{isPickup ? 'ללא עלות' : `$${deliveryFee}`}</span>
+              <span>{isPickup ? t.pickupLine : `${t.deliveryLine} (${t.zones[customer.zone]})`}</span>
+              <span>{isPickup ? t.freeOfCharge : `$${deliveryFee}`}</span>
             </div>
             <div className="flex justify-between text-2xl font-black pt-4">
-              <span>סה"כ לתשלום</span>
+              <span>{t.totalDue}</span>
               <span>${total.toFixed(2).replace(/\.00$/, '')}</span>
             </div>
           </div>
@@ -163,7 +416,7 @@ export function Checkout() {
         <section className="space-y-8">
           <h2 className="text-2xl font-black font-heading flex items-center gap-3">
             <Icon icon="ph:map-pin-fill" className="text-[#F5A83A]" />
-            איך תרצו לקבל את ההזמנה
+            {t.fulfillmentTitle}
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <button
@@ -173,7 +426,7 @@ export function Checkout() {
                 !isPickup ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
               }`}
             >
-              משלוח
+              {t.delivery}
             </button>
             <button
               type="button"
@@ -182,12 +435,12 @@ export function Checkout() {
                 isPickup ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
               }`}
             >
-              איסוף עצמי (ללא עלות)
+              {t.pickupFree}
             </button>
           </div>
           {!isPickup && (
             <div className="grid grid-cols-2 gap-4">
-              {(Object.keys(DELIVERY_ZONE_LABELS) as DeliveryZone[]).map((zone) => (
+              {(Object.keys(t.zones) as DeliveryZone[]).map((zone) => (
                 <button
                   key={zone}
                   type="button"
@@ -196,31 +449,31 @@ export function Checkout() {
                     customer.zone === zone ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
                   }`}
                 >
-                  {DELIVERY_ZONE_LABELS[zone]} (${DELIVERY_FEES_USD[zone]})
+                  {t.zones[zone]} (${DELIVERY_FEES_USD[zone]})
                 </button>
               ))}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Field label="שם מלא">
+            <Field label={t.fullNameLabel}>
               <input
                 type="text"
                 value={customer.name}
                 onChange={(e) => setCustomer({ name: e.target.value })}
-                placeholder="ישראל ישראלי"
+                placeholder={t.fullNamePlaceholder}
                 className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
               />
             </Field>
-            <Field label="מספר טלפון">
+            <Field label={t.phoneLabel}>
               <div className="flex gap-2" dir="ltr">
                 <select
                   value={customer.phoneCode}
                   onChange={(e) => setCustomer({ phoneCode: e.target.value })}
                   className="p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold shrink-0"
                 >
-                  {PHONE_CODES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.code} {c.label}
+                  {PHONE_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {code} {t.phoneCountries[code]}
                     </option>
                   ))}
                 </select>
@@ -228,12 +481,12 @@ export function Checkout() {
                   type="tel"
                   value={customer.phone}
                   onChange={(e) => setCustomer({ phone: e.target.value })}
-                  placeholder="50 000 0000"
+                  placeholder={t.phonePlaceholder}
                   className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
                 />
               </div>
             </Field>
-            <Field label={isPickup ? 'תאריך איסוף' : 'תאריך משלוח'}>
+            <Field label={isPickup ? t.pickupDateLabel : t.deliveryDateLabel}>
               <input
                 type="date"
                 value={customer.date}
@@ -242,7 +495,7 @@ export function Checkout() {
                 className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
               />
             </Field>
-            <Field label={isPickup ? 'שעת איסוף' : 'שעת משלוח'}>
+            <Field label={isPickup ? t.pickupTimeLabel : t.deliveryTimeLabel}>
               <input
                 type="time"
                 value={customer.time}
@@ -251,7 +504,7 @@ export function Checkout() {
               />
             </Field>
             <div className="md:col-span-2">
-              <Field label="אימייל (לקבלת חשבונית)">
+              <Field label={t.emailLabel}>
                 <input
                   type="email"
                   value={customer.email}
@@ -264,7 +517,7 @@ export function Checkout() {
             </div>
             {!isPickup && (
               <div className="md:col-span-2 space-y-6">
-                <Field label="לאן מגיע המשלוח">
+                <Field label={t.destinationLabel}>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
@@ -273,7 +526,7 @@ export function Checkout() {
                         isHotelMode ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
                       }`}
                     >
-                      מלון
+                      {t.hotelOption}
                     </button>
                     <button
                       type="button"
@@ -282,13 +535,13 @@ export function Checkout() {
                         !isHotelMode ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
                       }`}
                     >
-                      כתובת אחרת
+                      {t.otherAddressOption}
                     </button>
                   </div>
                 </Field>
                 {isHotelMode ? (
                   <>
-                    <Field label="שם המלון">
+                    <Field label={t.hotelNameLabel}>
                       <HotelPicker
                         hotel={hotel}
                         onSelect={(selection) => setCustomer({ hotel: selection })}
@@ -296,24 +549,24 @@ export function Checkout() {
                       />
                     </Field>
                     {hotel && (
-                      <Field label="מספר חדר, הערות לכתובת">
+                      <Field label={t.roomLabel}>
                         <input
                           type="text"
                           value={customer.address}
                           onChange={(e) => setCustomer({ address: e.target.value })}
-                          placeholder="חדר 402, לובי, קומה 12..."
+                          placeholder={t.roomPlaceholder}
                           className={INPUT_CLASS}
                         />
                       </Field>
                     )}
                   </>
                 ) : (
-                  <Field label="כתובת מלאה">
+                  <Field label={t.fullAddressLabel}>
                     <input
                       type="text"
                       value={customer.address}
                       onChange={(e) => setCustomer({ address: e.target.value })}
-                      placeholder="רחוב, בניין, מספר דירה, אזור..."
+                      placeholder={t.fullAddressPlaceholder}
                       className={INPUT_CLASS}
                     />
                   </Field>
@@ -321,11 +574,11 @@ export function Checkout() {
               </div>
             )}
             <div className="md:col-span-2">
-              <Field label="הערות למטבח">
+              <Field label={t.kitchenNotesLabel}>
                 <textarea
                   value={customer.notes}
                   onChange={(e) => setCustomer({ notes: e.target.value })}
-                  placeholder="בלי חריף, אקסטרה מטבוחה..."
+                  placeholder={t.kitchenNotesPlaceholder}
                   className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold h-32"
                 />
               </Field>
@@ -336,10 +589,10 @@ export function Checkout() {
         <section className="bg-[#3B151A]/5 rounded-[3rem] p-8 border-2 border-dashed border-[#F5A83A]/30 text-center space-y-4">
           <Icon icon="ph:info-fill" className="text-3xl text-[#F5A83A]" />
           <p className="font-bold text-[#3B151A]/70">
-            לאחר לחיצה על "אישור ושליחה", ההזמנה תיפתח כהודעת וואטסאפ מוכנה אל בת מלך לאישור סופי.
+            {t.infoWhatsApp}
           </p>
           <p className="font-bold text-[#3B151A]/70">
-            אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.
+            {t.infoPayment}
           </p>
         </section>
       </main>
@@ -347,7 +600,7 @@ export function Checkout() {
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#F7ECE6]/90 backdrop-blur-xl border-t border-[#EDB2C1]/30 z-[100]">
         <div className="max-w-3xl mx-auto">
           <a
-            href={canSubmit ? waLink(buildOrderMessage(lines, customer, total)) : undefined}
+            href={canSubmit ? waLink(orderMessage) : undefined}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => {
@@ -362,17 +615,17 @@ export function Checkout() {
               canSubmit ? 'bg-[#3B151A] text-white hover:bg-black' : 'bg-[#3B151A]/30 text-white/60 cursor-not-allowed'
             }`}
           >
-            אישור ושליחת הזמנה <Icon icon="ph:check-circle-fill" className="text-3xl group-hover:scale-125 transition-transform" />
+            {t.submitCta} <Icon icon="ph:check-circle-fill" className="text-3xl group-hover:scale-125 transition-transform" />
           </a>
           {!canSubmit && (
             <p className="text-center text-xs font-bold text-[#8D182C] mt-3">
               {!orderingOpen
-                ? 'האתר לא מקבל הזמנות כרגע'
+                ? t.hintClosed
                 : isPickup
-                  ? 'מלאו שם, טלפון, תאריך ושעה כדי לשלוח'
+                  ? t.hintPickup
                   : isHotelMode
-                    ? 'מלאו שם, טלפון, תאריך ושעה, ובחרו מלון כדי לשלוח'
-                    : 'מלאו שם, טלפון, תאריך, שעה וכתובת כדי לשלוח'}
+                    ? t.hintHotel
+                    : t.hintAddress}
             </p>
           )}
         </div>
@@ -384,7 +637,7 @@ export function Checkout() {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-black mr-2">{label}</label>
+      <label className="text-sm font-black ms-2">{label}</label>
       {children}
     </div>
   )
@@ -436,6 +689,8 @@ function HotelPicker({
   onSelect: (hotel: SelectedHotel) => void
   onClear: () => void
 }) {
+  const { locale } = useLocale()
+  const t = COPY[locale]
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SelectedHotel[]>([])
   const [searchState, setSearchState] = useState<HotelSearchState>('idle')
@@ -493,7 +748,7 @@ function HotelPicker({
             setSearchState('idle')
             onClear()
           }}
-          aria-label="ביטול בחירת המלון"
+          aria-label={t.hotelClearAria}
           className="shrink-0 w-8 h-8 rounded-lg bg-[#F7ECE6] flex items-center justify-center"
         >
           <Icon icon="ph:x-bold" className="text-[#8D182C]" />
@@ -508,21 +763,21 @@ function HotelPicker({
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="התחילו להקליד שם מלון..."
+        placeholder={t.hotelSearchPlaceholder}
         autoComplete="off"
         className={INPUT_CLASS}
       />
       {searchState === 'loading' && (
-        <p className="text-xs font-bold text-[#3B151A]/50 mr-2">מחפשים מלונות...</p>
+        <p className="text-xs font-bold text-[#3B151A]/50 ms-2">{t.hotelSearching}</p>
       )}
       {searchState === 'empty' && (
-        <p className="text-xs font-bold text-[#3B151A]/50 mr-2">
-          לא מצאנו מלון בשם הזה. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.
+        <p className="text-xs font-bold text-[#3B151A]/50 ms-2">
+          {t.hotelEmpty}
         </p>
       )}
       {searchState === 'error' && (
-        <p className="text-xs font-bold text-[#8D182C] mr-2">
-          חיפוש המלונות לא זמין כרגע. אפשר לעבור ל"כתובת אחרת" ולכתוב את הכתובת המלאה.
+        <p className="text-xs font-bold text-[#8D182C] ms-2">
+          {t.hotelError}
         </p>
       )}
       {results.length > 0 && (
@@ -532,7 +787,7 @@ function HotelPicker({
               <button
                 type="button"
                 onClick={() => onSelect(result)}
-                className="w-full text-right p-4 hover:bg-[#F7ECE6] transition-colors"
+                className="w-full text-start p-4 hover:bg-[#F7ECE6] transition-colors"
               >
                 <span className="block font-black">{result.name}</span>
                 <span className="block text-xs font-bold text-[#3B151A]/50 mt-1 leading-relaxed">

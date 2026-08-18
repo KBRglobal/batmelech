@@ -1,10 +1,23 @@
 import { Icon } from '@iconify/react'
 import { useNavigate } from 'react-router'
 import { useCart } from '../cart-context'
+import { useLocale, type Locale } from '../locale-context'
+
+const HE = {
+  cartLabel: 'סל הקניות',
+}
+
+export const COPY: Record<Locale, typeof HE> = {
+  he: HE,
+  en: { cartLabel: 'Cart' },
+  fr: { cartLabel: 'Panier' },
+}
 
 export function FloatingCartBar() {
   const { lines, subtotal } = useCart()
   const navigate = useNavigate()
+  const { locale, href } = useLocale()
+  const t = COPY[locale]
   const count = lines.reduce((n, l) => n + l.qty, 0)
 
   if (count === 0) return null
@@ -12,7 +25,8 @@ export function FloatingCartBar() {
   return (
     <button
       type="button"
-      onClick={() => navigate('/checkout')}
+      aria-label={t.cartLabel}
+      onClick={() => navigate(href('/checkout'))}
       className="fixed bottom-6 left-6 md:bottom-10 md:left-10 z-[200] w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#3B151A] hover:bg-black text-white shadow-2xl flex items-center justify-center transition-all group"
     >
       <Icon icon="ph:basket-fill" className="text-2xl md:text-3xl group-hover:scale-110 transition-transform" />

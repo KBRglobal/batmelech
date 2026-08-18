@@ -1,5 +1,16 @@
 import type { ReactNode } from 'react'
 import { NavHeader } from './nav'
+import { useLocale, type Locale } from '../locale-context'
+
+const HE = {
+  logoAlt: 'מטעמי בת מלך',
+}
+
+export const COPY: Record<Locale, typeof HE> = {
+  he: HE,
+  en: { logoAlt: 'Bat Melech' },
+  fr: { logoAlt: 'Bat Melech' },
+}
 
 const SIZE_CLASS: Record<'screen' | 'tall' | 'compact', string> = {
   screen: 'min-h-screen',
@@ -26,6 +37,8 @@ export function PageHero({
   subtitle?: string
   children?: ReactNode
 }) {
+  const { locale } = useLocale()
+  const t = COPY[locale]
   return (
     <section className={`relative ${SIZE_CLASS[size]} flex flex-col overflow-hidden`}>
       <div className="absolute inset-0">
@@ -47,7 +60,7 @@ export function PageHero({
           <div className="w-40 h-40 md:w-56 md:h-56 mb-6 animate-float">
             <img
               src="/site/assets/logo-cream.png"
-              alt="מטעמי בת מלך"
+              alt={t.logoAlt}
               className="w-full h-full object-contain drop-shadow-[0_2px_18px_rgba(59,21,26,0.65)]"
             />
           </div>

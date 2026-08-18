@@ -896,7 +896,7 @@ function OrderEditorContent({
   // A typed manual total is the operator's explicit pricing decision: the
   // "engine can't price this" issues stop blocking (still shown), and a
   // missing computed result no longer freezes the save.
-  const allIssues = demotePriceAvailabilityIssues([...validationIssues, ...pricing.issues], draft)
+  const allIssues = demotePriceAvailabilityIssues([...validationIssues, ...pricing.issues], draft, pricing.result?.totalMinorUnits ?? null)
   const hasBlockingIssue = allIssues.some((issue) => issue.blocking)
   const manualTotalCoversPricing = hasValidManualTotal(draft)
   const unresolvedManagerFindings = managerReview === null
@@ -913,6 +913,29 @@ function OrderEditorContent({
   const orderedSalads = Object.values(draft.salads).reduce((total, item) => total + item.ordered, 0)
   const giftSalads = Object.values(draft.salads).reduce((total, item) => total + item.gift, 0)
   const patch = (next: Partial<OrderDraft>) => onDraftChange({ ...draft, ...next })
+
+  // The suggested price is the DEFAULT (Moshe, 2026-08-18): the total field
+  // follows the computed price on its own as long as the operator never
+  // typed a different value. A manual total (or an edited order's saved
+  // total) is left alone — only then does the mismatch warning ask for an
+  // explicit confirmation.
+  const autoTotalRef = useRef<string | null>(null)
+  // Once the operator touches the total field it belongs to them — the
+  // default stops refilling, even through a clear-and-retype.
+  const manualTotalEdited = useRef(false)
+  const suggestedTotalMinorUnits = pricing.result?.totalMinorUnits ?? null
+  useEffect(() => {
+    if (suggestedTotalMinorUnits === null || isSaving) return
+    const suggested = formatUsdInputMinorUnits(suggestedTotalMinorUnits)
+    if (
+      (draft.total.trim() === '' && !manualTotalEdited.current) ||
+      (draft.total === autoTotalRef.current && !manualTotalEdited.current)
+    ) {
+      autoTotalRef.current = suggested
+      if (draft.total !== suggested) onDraftChange({ ...draft, total: suggested })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedTotalMinorUnits, draft.total])
 
   const markShabbatSelectionChanged = () => {
     untouchedDefaultMeal.current = false
@@ -1576,7 +1599,7 @@ function OrderEditorContent({
                 </div>
               ))}
               <div className="flex justify-between border-t border-border pt-3 text-lg font-black text-primary"><span>מחיר מוצע</span><span dir="ltr">{formatUsdMinorUnits(pricing.result.totalMinorUnits)}</span></div>
-              <button type="button" onClick={() => patch({ total: formatUsdInputMinorUnits(pricing.result!.totalMinorUnits) })} className="min-h-11 w-full rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background">להשתמש במחיר המוצע</button>
+              <button type="button" onClick={() => { manualTotalEdited.current = false; autoTotalRef.current = formatUsdInputMinorUnits(pricing.result!.totalMinorUnits); patch({ total: formatUsdInputMinorUnits(pricing.result!.totalMinorUnits) }) }} className="min-h-11 w-full rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background">להשתמש במחיר המוצע</button>
               <div className="flex items-center gap-2">
                 <input
                   aria-label="הנחה באחוזים"
@@ -1592,6 +1615,7 @@ function OrderEditorContent({
                     const percent = Number.parseFloat(discountPercent)
                     if (!Number.isFinite(percent) || percent < 0 || percent > 100) return
                     const discounted = Math.round(pricing.result!.totalMinorUnits * (100 - percent) / 100)
+                    manualTotalEdited.current = true
                     patch({ total: formatUsdInputMinorUnits(discounted) })
                   }}
                   className="min-h-11 flex-1 rounded-xl border border-primary/20 bg-card text-xs font-black text-primary hover:bg-background"
@@ -1613,6 +1637,7 @@ function OrderEditorContent({
                   onClick={() => {
                     const minorUnits = parseUsdInputMinorUnits(manualPrice)
                     if (minorUnits === null) return
+                    manualTotalEdited.current = true
                     patch({ total: formatUsdInputMinorUnits(minorUnits) })
                     setManualPrice('')
                   }}
@@ -1629,7 +1654,7 @@ function OrderEditorContent({
             </ul>
           )}
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <Field label="סך לתשלום ($)"><input aria-label="סך לתשלום" inputMode="decimal" value={draft.total} onChange={(event) => patch({ total: event.currentTarget.value })} className={inputClassName} /></Field>
+            <Field label="סך לתשלום ($)"><input aria-label="סך לתשלום" inputMode="decimal" value={draft.total} onChange={(event) => { manualTotalEdited.current = true; patch({ total: event.currentTarget.value }) }} className={inputClassName} /></Field>
             <Field label="מקדמה ($)"><input aria-label="מקדמה" inputMode="decimal" value={draft.deposit} onChange={(event) => patch({ deposit: event.currentTarget.value })} className={inputClassName} /></Field>
             <Field label="דרך תשלום"><select aria-label="דרך תשלום" value={draft.payMethod} onChange={(event) => patch({ payMethod: event.currentTarget.value })} className={inputClassName}>{PAYMENT_METHODS.map((value) => <option key={value} value={value}>{value || '— לא נבחר —'}</option>)}</select></Field>
             <Field label="סטטוס תשלום"><select aria-label="סטטוס תשלום" value={draft.paid} onChange={(event) => patch({ paid: event.currentTarget.value })} className={inputClassName}>{PAID_OPTIONS.map((value) => <option key={value}>{value}</option>)}</select></Field>
@@ -1890,7 +1915,7 @@ export function OrderEditorScreen() {
           requiresCurrentPricing ? pricing.result?.totalMinorUnits : undefined,
         ),
         ...pricing.issues,
-      ], draft).filter((issue) => issue.blocking)
+      ], draft, pricing.result?.totalMinorUnits ?? null).filter((issue) => issue.blocking)
       if (blockingIssues.length > 0) return
 
       let refreshedEnvelope: VersionedStateEnvelope | null = null

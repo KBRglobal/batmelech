@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { PageHero } from './page-hero'
 import { Reveal } from './reveal'
 import { Footer } from './footer'
+import { useLocale, type Locale } from '../locale-context'
 
 export type ExperienceContent = {
   tag: string
@@ -17,10 +18,22 @@ export type ExperienceContent = {
   ctaBody: string
 }
 
+const HE = {
+  quoteCta: 'לקבלת הצעת מחיר לחצו כאן',
+}
+
+export const COPY: Record<Locale, typeof HE> = {
+  he: HE,
+  en: { quoteCta: 'Request a Quote on WhatsApp' },
+  fr: { quoteCta: 'Demander un devis sur WhatsApp' },
+}
+
 export function ExperienceLayout({ content }: { content: ExperienceContent }) {
+  const { locale, dir } = useLocale()
+  const t = COPY[locale]
   const pageTitle = content.title.join(' ')
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir="rtl">
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
       <PageHero
         active="/events"
         size="tall"
@@ -46,7 +59,7 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
               <div className="aspect-[4/5] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white">
                 <img src={content.heroImg} alt={pageTitle} className="w-full h-full object-cover" />
               </div>
-              <div className="absolute -bottom-10 -left-10 w-64 aspect-square rounded-[3rem] overflow-hidden border-8 border-white shadow-2xl">
+              <div className="absolute -bottom-10 -end-10 w-64 aspect-square rounded-[3rem] overflow-hidden border-8 border-white shadow-2xl">
                 <img src={content.cornerImg} alt={pageTitle} className="w-full h-full object-cover" />
               </div>
             </div>
@@ -75,7 +88,7 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
                 href="https://wa.me/971586288776"
                 className="inline-flex items-center gap-6 bg-[#F5A83A] text-[#3B151A] px-16 py-8 rounded-[3rem] font-black text-3xl shadow-2xl hover:bg-white transition-all transform hover:scale-105"
               >
-                לקבלת הצעת מחיר לחצו כאן <Icon icon="ph:whatsapp-logo-fill" className="text-4xl" />
+                {t.quoteCta} <Icon icon="ph:whatsapp-logo-fill" className="text-4xl" />
               </a>
             </div>
           </section>
