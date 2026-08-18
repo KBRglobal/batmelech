@@ -43,6 +43,16 @@ export const LOCAL_ICON_PATHS = {
   'ph:users-bold': `${PUBLIC_BASE}icons/ph-users-bold.svg`,
   'ph:warning-circle-bold': `${PUBLIC_BASE}icons/ph-warning-circle-bold.svg`,
   'ph:x-bold': `${PUBLIC_BASE}icons/ph-x-bold.svg`,
+  'ph:minus-bold': `${PUBLIC_BASE}icons/ph-minus-bold.svg`,
+  'ph:calculator-bold': `${PUBLIC_BASE}icons/ph-calculator-bold.svg`,
+  'ph:buildings-bold': `${PUBLIC_BASE}icons/ph-buildings-bold.svg`,
+  'ph:scales-bold': `${PUBLIC_BASE}icons/ph-scales-bold.svg`,
+  'ph:chart-bar-bold': `${PUBLIC_BASE}icons/ph-chart-bar-bold.svg`,
+  'ph:trophy-bold': `${PUBLIC_BASE}icons/ph-trophy-bold.svg`,
+  'ph:siren-bold': `${PUBLIC_BASE}icons/ph-siren-bold.svg`,
+  'ph:note-pencil-bold': `${PUBLIC_BASE}icons/ph-note-pencil-bold.svg`,
+  'ph:magnifying-glass-bold': `${PUBLIC_BASE}icons/ph-magnifying-glass-bold.svg`,
+  'ph:clock-counter-clockwise-bold': `${PUBLIC_BASE}icons/ph-clock-counter-clockwise-bold.svg`,
 } as const
 
 export type LocalIconName = keyof typeof LOCAL_ICON_PATHS

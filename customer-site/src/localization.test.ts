@@ -21,6 +21,7 @@ import { COPY as yacht } from './pages/experience-yacht'
 import { COPY as villa } from './pages/experience-villa'
 import { COPY as suite } from './pages/experience-suite'
 import { COPY as desert } from './pages/experience-desert'
+import { COPY as howItWorks } from './pages/how-it-works'
 import { COPY as notFound } from './pages/not-found'
 import { DISH_NAMES } from './dish-names'
 
@@ -28,7 +29,7 @@ type LocaleCopy = Record<'he' | 'en' | 'fr', unknown>
 
 const PAGES: Record<string, LocaleCopy> = {
   home, weekdays, story, shabbatOrder, shabbatExtras, checkout, legal,
-  kashrut, gallery, events, bbq, yacht, villa, suite, desert, notFound,
+  kashrut, gallery, events, bbq, yacht, villa, suite, desert, notFound, howItWorks,
 }
 
 function textOf(value: unknown): string {

@@ -21,12 +21,21 @@ export function nextOrderStatus(status: string): string | null {
 export interface OrderQuickFields {
   readonly status?: string
   readonly paid?: string
+  /** Operational "urgent" flag on the card — a plain boolean toggle. */
+  readonly urgent?: boolean
+  /** Draft marker: the order is penciled in, not a commitment yet. */
+  readonly draft?: boolean
 }
 
 /**
  * Returns a new store with the fields applied to exactly one order, or null
  * when the ID is missing or ambiguous — a quick action must never guess
  * which of two same-ID rows it is editing.
+ *
+ * Only defined values are merged: an `undefined` entry must never clobber an
+ * existing order field. Everything else on the order — including the
+ * server-owned mey/courier/deliveryProof/intakeConversation fields —
+ * passes through the single `{...order, ...fields}` merge untouched.
  */
 export function applyOrderQuickFields(
   store: Readonly<LegacyStore>,
@@ -35,10 +44,13 @@ export function applyOrderQuickFields(
 ): LegacyStore | null {
   const matches = store.orders.filter((order) => String(order.id) === orderId)
   if (matches.length !== 1) return null
+  const defined = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  )
   return {
     ...store,
     orders: store.orders.map((order) =>
-      String(order.id) === orderId ? { ...order, ...fields } : order,
+      String(order.id) === orderId ? { ...order, ...defined } : order,
     ),
   }
 }

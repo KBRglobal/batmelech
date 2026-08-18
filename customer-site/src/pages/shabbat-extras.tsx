@@ -6,7 +6,7 @@ import { CurrencyNote } from '../components/currency-note'
 import { OutOfStockBadge } from '../components/out-of-stock-badge'
 import { useCart } from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
-import { orderByCatalog, useSiteCatalog } from '../catalog-context'
+import { useSiteCatalog, type CatalogDish } from '../catalog-context'
 import { useLocale, type Locale } from '../locale-context'
 import { dishName } from '../dish-names'
 
@@ -14,12 +14,15 @@ const SALAD_PRICE = 6.25
 const FIRST_PRICE = 25
 const MAIN_PRICE = 45
 
-type Salad = { id: string; name: string; img: string }
-type Choice = { id: string; name: string; img: string; price: number }
+type Salad = { id: string; name: string; img: string | null }
+type Choice = { id: string; name: string; img: string | null; price: number }
 type Royal = { id: string; name: string; price: number; note?: string; dark?: boolean }
 
 // Canonical HEBREW dish names — the keys for stock, catalog and order lines.
 // Display names are resolved per-locale with dishName().
+// These hardcoded lists are ONLY the no-catalog fallback: when the live
+// catalog is present, the rendered lists ARE the catalog (photos, order,
+// admin-added dishes included) and these supply legacy ids/images by name.
 const SALADS: Salad[] = [
   { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/cVEz0yFtGoP.jpeg' },
   { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg' },
@@ -66,6 +69,27 @@ const DESSERTS = [
 ]
 
 const LOGO_URL = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/bat-removebg-preview1-jKe7guxvdXt.png'
+
+// Live category → renderable cards, in the admin's saved order. A live dish
+// reuses the matching hardcoded card's stable id and falls back to its image
+// when the admin has not uploaded a photo; an admin-added dish gets a derived
+// id and — without a photo — the placeholder look.
+function catalogCards(
+  liveDishes: readonly CatalogDish[] | undefined,
+  fallback: readonly Salad[],
+  idPrefix: string,
+): Salad[] {
+  if (!liveDishes || liveDishes.length === 0) return [...fallback]
+  const localByName = new Map(fallback.map((item) => [item.name, item]))
+  return liveDishes.map((dish) => {
+    const local = localByName.get(dish.name)
+    return {
+      id: local?.id ?? `${idPrefix}-${dish.name}`,
+      name: dish.name,
+      img: dish.imageUrl ?? local?.img ?? null,
+    }
+  })
+}
 
 // Localized copy. Hebrew is the source of truth; English is written for an
 // American Jewish audience and French for a French Jewish audience — native
@@ -217,16 +241,35 @@ export function ShabbatExtras() {
 
   const couplePrice = catalog?.couplePriceUsd ?? 230
 
-  // The admin's saved menu order (drag-to-order) drives the display order.
-  const orderedSalads = useMemo(() => orderByCatalog(SALADS, catalog?.categories.salads), [catalog])
-  const orderedFirstCourses = useMemo(() => orderByCatalog(FIRST_COURSES, catalog?.categories.firsts), [catalog])
+  // When the live catalog has a category, its dishes (and their admin order)
+  // ARE the rendered list — a dish added in the admin panel shows up here
+  // with its photo and description with zero code changes. Hardcoded lists
+  // survive only as the no-catalog fallback and as legacy id/image sources.
+  const orderedSalads = useMemo<Salad[]>(
+    () => catalogCards(catalog?.categories.salads, SALADS, 'catalog-salad'),
+    [catalog],
+  )
+  const orderedFirstCourses = useMemo<Choice[]>(
+    () =>
+      catalogCards(catalog?.categories.firsts, FIRST_COURSES, 'catalog-first').map((card) => ({
+        ...card,
+        price: FIRST_COURSES.find((c) => c.name === card.name)?.price ?? FIRST_PRICE,
+      })),
+    [catalog],
+  )
 
   // Live extras the page does not list yet, appended after the hardcoded
-  // royal items. Extras without a price cannot be sold and are skipped.
+  // royal items. Extras without a price cannot be sold and are skipped;
+  // dishes already rendered in a live category section are not repeated.
   const royalItems = useMemo<Royal[]>(() => {
     const knownNames = new Set<string>(
       [...SALADS, ...FIRST_COURSES, ...ROYAL, ...DESSERTS].map((item) => item.name),
     )
+    if (catalog !== null) {
+      for (const dishes of Object.values(catalog.categories)) {
+        for (const dish of dishes) knownNames.add(dish.name)
+      }
+    }
     const liveExtras = (catalog?.extras ?? []).flatMap((extra): Royal[] =>
       !knownNames.has(extra.name) && extra.priceUsd !== null
         ? [{ id: `catalog-extra-${extra.name}`, name: extra.name, price: extra.priceUsd }]
@@ -294,7 +337,13 @@ export function ShabbatExtras() {
                     onClick={() => addLine({ id: s.id, name: s.name, displayName, unitPrice: price })}
                     className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden mb-3 md:mb-4 ring-4 ring-[#F7ECE6] transition-all duration-500 relative enabled:group-hover:ring-[#F5A83A] disabled:cursor-not-allowed"
                   >
-                    <img src={img} alt={displayName} loading="lazy" className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-50' : ''}`} />
+                    {img !== null ? (
+                      <img src={img} alt={displayName} loading="lazy" className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-50' : ''}`} />
+                    ) : (
+                      <span className={`w-full h-full flex items-center justify-center bg-[#3B151A]/5 text-[#F5A83A] ${soldOut ? 'opacity-50' : ''}`}>
+                        <Icon icon="ph:bowl-food-fill" className="text-3xl md:text-4xl" />
+                      </span>
+                    )}
                     {qty > 0 && (
                       <span className="absolute inset-0 bg-[#3B151A]/50 flex items-center justify-center text-white font-black text-xl">
                         {qty}
@@ -356,12 +405,18 @@ export function ShabbatExtras() {
             return (
               <div key={c.id} className="bg-white rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-xl border border-[#3B151A]/5 group">
                 <div className="h-48 md:h-64 overflow-hidden relative">
-                  <img
-                    src={img}
-                    alt={displayName}
-                    loading="lazy"
-                    className={`w-full h-full object-cover transition-transform duration-700 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
-                  />
+                  {img !== null ? (
+                    <img
+                      src={img}
+                      alt={displayName}
+                      loading="lazy"
+                      className={`w-full h-full object-cover transition-transform duration-700 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
+                    />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center bg-[#F7ECE6] text-[#F5A83A] ${soldOut ? 'opacity-60' : ''}`}>
+                      <Icon icon="ph:fish-simple-fill" className="text-6xl md:text-8xl" />
+                    </div>
+                  )}
                   {soldOut && <OutOfStockBadge className="absolute bottom-4 end-4" />}
                 </div>
                 <div className="p-6 md:p-8 space-y-3 md:space-y-4 text-center">

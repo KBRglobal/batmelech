@@ -1,8 +1,11 @@
+import { useMemo } from 'react'
 import { Icon } from '@iconify/react'
 import { PageHero } from '../components/page-hero'
 import { Reveal } from '../components/reveal'
 import { Footer } from '../components/footer'
+import { useSiteCatalog, type CatalogDish } from '../catalog-context'
 import { useLocale, type Locale } from '../locale-context'
+import { dishName } from '../dish-names'
 
 const PHOTO_URLS = [
   'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Hgw2QN4Smv3.jpeg',
@@ -29,6 +32,8 @@ const HE = {
     'רגע מאירועי מטעמי בת מלך בדובאי',
     'הגשת מנות כשרות באירוע VIP בדובאי',
   ],
+  kitchenTitle: 'מהמטבח שלנו',
+  kitchenSubtitle: 'המנות עצמן, בתמונות אמיתיות — ישר מהתפריט החי שלנו.',
   ctaTitle: 'בואו להיות חלק מהתמונה',
   ctaBody: 'החופשה הבאה שלכם בדובאי יכולה להיראות ככה. צרו איתנו קשר עוד היום.',
   ctaButton: 'לשיחה אישית בוואטסאפ',
@@ -50,6 +55,8 @@ export const COPY: Record<Locale, typeof HE> = {
       'A moment from Bat Melech events in Dubai',
       'Kosher dishes served at a VIP event in Dubai',
     ],
+    kitchenTitle: 'From Our Kitchen',
+    kitchenSubtitle: 'The dishes themselves, in real photos — straight from our live menu.',
     ctaTitle: 'Come Be Part of the Picture',
     ctaBody: 'Your next Dubai vacation could look like this. Get in touch today.',
     ctaButton: 'Chat with Us on WhatsApp',
@@ -68,6 +75,8 @@ export const COPY: Record<Locale, typeof HE> = {
       "Un moment des événements Bat Melech à Dubaï",
       'Service de plats casher lors d\'un événement VIP à Dubaï',
     ],
+    kitchenTitle: 'De notre cuisine',
+    kitchenSubtitle: 'Les plats eux-mêmes, en photos réelles — directement de notre menu en direct.',
     ctaTitle: "Venez faire partie de l'image",
     ctaBody: 'Vos prochaines vacances à Dubaï pourraient ressembler à cela. Contactez-nous dès aujourd\'hui.',
     ctaButton: 'Échangez avec nous sur WhatsApp',
@@ -76,7 +85,25 @@ export const COPY: Record<Locale, typeof HE> = {
 
 export function Gallery() {
   const { locale, dir } = useLocale()
+  const { catalog } = useSiteCatalog()
   const t = COPY[locale]
+
+  // Every live-catalog dish that has a photo, in the admin's menu order,
+  // deduplicated by canonical name. No catalog (or no photos) — no section.
+  const kitchenDishes = useMemo<CatalogDish[]>(() => {
+    if (catalog === null) return []
+    const seen = new Set<string>()
+    const dishes: CatalogDish[] = []
+    for (const list of [...Object.values(catalog.categories), catalog.extras]) {
+      for (const dish of list) {
+        if (dish.imageUrl === null || seen.has(dish.name)) continue
+        seen.add(dish.name)
+        dishes.push(dish)
+      }
+    }
+    return dishes
+  }, [catalog])
+
   return (
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
       <PageHero
@@ -96,6 +123,36 @@ export function Gallery() {
             </Reveal>
           ))}
         </div>
+        {kitchenDishes.length > 0 && (
+          <section className="mt-32">
+            <Reveal>
+              <div className="text-center mb-16">
+                <h2 className="text-4xl md:text-5xl font-black font-heading mb-4">{t.kitchenTitle}</h2>
+                <p className="text-[#3B151A]/60 text-lg font-bold max-w-2xl mx-auto">{t.kitchenSubtitle}</p>
+              </div>
+            </Reveal>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              {kitchenDishes.map((dish, i) => (
+                <Reveal key={dish.name} delay={(i % 4) * 80}>
+                  <figure className="bg-white rounded-[2rem] overflow-hidden shadow-lg border-2 border-white transition-transform hover:scale-[1.02] h-full">
+                    <img
+                      src={dish.imageUrl ?? undefined}
+                      alt={dishName(dish.name, locale)}
+                      loading="lazy"
+                      className="w-full aspect-square object-cover"
+                    />
+                    <figcaption className="p-4 md:p-5">
+                      <h3 className="font-black text-sm md:text-base leading-tight" dir="auto">{dishName(dish.name, locale)}</h3>
+                      {dish.description !== '' && (
+                        <p className="text-[#3B151A]/50 font-bold text-xs md:text-sm mt-1 leading-snug" dir="auto">{dish.description}</p>
+                      )}
+                    </figcaption>
+                  </figure>
+                </Reveal>
+              ))}
+            </div>
+          </section>
+        )}
         <Reveal>
           <section className="mt-32 bg-white p-12 md:p-24 rounded-[5rem] text-center border-2 border-[#EDB2C1]/20 shadow-2xl">
             <h2 className="text-4xl md:text-5xl font-black font-heading mb-8">{t.ctaTitle}</h2>

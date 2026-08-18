@@ -19,6 +19,7 @@ import {
   type OrdersDateGroup,
   type OrdersDisplayBlock,
   type OrdersLinkedGroup,
+  type OrdersMissingField,
   type OrdersOrderView,
   type OrdersSummaryChips,
   type OrdersWarning,
@@ -78,6 +79,13 @@ function paidClassName(label: string): string {
   if (label === 'מקדמה') return 'border-amber-100 bg-amber-50 text-amber-800'
   if (label === 'שת"פ') return 'border-border bg-muted text-muted-foreground'
   return 'border-rose-100 bg-rose-50 text-rose-700'
+}
+
+const MISSING_FIELD_LABELS: Readonly<Record<OrdersMissingField, string>> = {
+  time: 'שעה',
+  destination: 'יעד',
+  price: 'מחיר',
+  phone: 'טלפון',
 }
 
 function summaryLabels(summary: OrdersSummaryChips): string[] {
@@ -182,6 +190,36 @@ function OrderQuickBar({ order, quick }: { order: OrdersOrderView; quick?: Order
           <span>{saving ? 'שומרת...' : `העברה ל"${next}"`}</span>
         </button>
       )}
+      <button
+        type="button"
+        disabled={saving}
+        aria-pressed={order.urgent}
+        aria-label={`דחוף — ${order.customerName}`}
+        onClick={() => quick.update(order.orderId!, { urgent: !order.urgent })}
+        className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black transition-colors disabled:opacity-50 ${
+          order.urgent
+            ? 'border-red-600 bg-red-600 text-white hover:bg-red-700'
+            : 'border-border bg-card text-primary hover:bg-secondary'
+        }`}
+      >
+        <LocalIcon name="ph:siren-bold" className="text-base" />
+        <span>דחוף</span>
+      </button>
+      <button
+        type="button"
+        disabled={saving}
+        aria-pressed={order.draft}
+        aria-label={`טיוטה — ${order.customerName}`}
+        onClick={() => quick.update(order.orderId!, { draft: !order.draft })}
+        className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black transition-colors disabled:opacity-50 ${
+          order.draft
+            ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
+            : 'border-border bg-card text-primary hover:bg-secondary'
+        }`}
+      >
+        <LocalIcon name="ph:note-pencil-bold" className="text-base" />
+        <span>טיוטה</span>
+      </button>
       <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-black text-primary">
         <span>תשלום:</span>
         <select
@@ -322,8 +360,14 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
 
   return (
     <article
-      className={`rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6 ${order.cancelled ? 'opacity-60' : ''}`}
+      className={`rounded-[2rem] ${
+        order.urgent ? 'border-2 border-red-600' : 'border border-border'
+      } bg-card p-5 shadow-sm sm:p-6 ${
+        order.cancelled ? 'opacity-60' : order.draft ? 'opacity-70' : ''
+      }`}
       data-cancelled={order.cancelled || undefined}
+      data-urgent={order.urgent || undefined}
+      data-draft={order.draft || undefined}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -341,6 +385,18 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
             <span className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-black ${paidClassName(order.paidLabel)}`}>
               {order.paidLabel}
             </span>
+            {order.urgent && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[0.6875rem] font-black text-red-700">
+                <LocalIcon name="ph:siren-bold" className="text-sm" />
+                <span>דחוף</span>
+              </span>
+            )}
+            {order.draft && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 text-[0.6875rem] font-black text-muted-foreground">
+                <LocalIcon name="ph:note-pencil-bold" className="text-sm" />
+                <span>טיוטה</span>
+              </span>
+            )}
             {saving && (
               <span className="text-[0.6875rem] font-black text-muted-foreground" role="status">
                 שומרת...
@@ -401,6 +457,33 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
             <span className="rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-destructive">
               כמות לא תקינה
             </span>
+          )}
+        </div>
+      )}
+
+      {(order.allergyAlert || order.duplicateOtherNames.length > 0 || order.missingFields.length > 0) && (
+        <div className="mt-4 flex flex-col items-start gap-2">
+          {order.allergyAlert && (
+            <p className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800">
+              <LocalIcon name="ph:warning-circle-bold" className="text-base" />
+              <span>אלרגיה בהערות</span>
+            </p>
+          )}
+          {order.duplicateOtherNames.length > 0 && (
+            <p className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">
+              <LocalIcon name="ph:copy-bold" className="text-base" />
+              <span>
+                כפילות אפשרית — אותו טלפון באותו יום ({order.duplicateOtherNames.join(', ')})
+              </span>
+            </p>
+          )}
+          {order.missingFields.length > 0 && (
+            <p className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">
+              <LocalIcon name="ph:list-checks-bold" className="text-base" />
+              <span>
+                חסר: {order.missingFields.map((field) => MISSING_FIELD_LABELS[field]).join(' · ')}
+              </span>
+            </p>
           )}
         </div>
       )}
@@ -646,6 +729,8 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('הכל')
   const [paymentFilter, setPaymentFilter] = useState<(typeof PAYMENT_FILTERS)[number]>('הכל')
+  // Drafts are shown by default; the chip hides them for a commitments-only view.
+  const [showDrafts, setShowDrafts] = useState(true)
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null)
   const [quickError, setQuickError] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
@@ -717,9 +802,10 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
         },
       }
 
-  const blockFilter = statusFilter === 'הכל' && paymentFilter === 'הכל'
+  const blockFilter = statusFilter === 'הכל' && paymentFilter === 'הכל' && showDrafts
     ? undefined
     : (order: OrdersOrderView): boolean => {
+        if (!showDrafts && order.draft) return false
         if (statusFilter === 'פעילות') {
           if (order.cancelled || order.status === 'נמסרה') return false
         } else if (statusFilter !== 'הכל' && order.status !== statusFilter) {
@@ -854,6 +940,20 @@ export function OrdersScreen({ onSave }: { readonly onSave?: StoreSaveHandler } 
             {value === 'הכל' ? 'כל תשלום' : value}
           </button>
         ))}
+        <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+        <button
+          type="button"
+          aria-pressed={showDrafts}
+          onClick={() => setShowDrafts((current) => !current)}
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-xs font-black transition-colors ${
+            showDrafts
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border bg-card text-primary hover:bg-secondary'
+          }`}
+        >
+          <LocalIcon name="ph:note-pencil-bold" className="text-sm" />
+          <span>טיוטות</span>
+        </button>
       </div>
 
       {quickError !== '' && (

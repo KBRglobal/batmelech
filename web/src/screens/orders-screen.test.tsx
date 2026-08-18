@@ -427,6 +427,187 @@ describe('OrdersScreen', () => {
     ])
   })
 
+  it('toggles the urgent flag through the versioned quick save and keeps protected fields', async () => {
+    const store = editableStore()
+    mockedUseStore.mockReturnValue(queryResult({ store, versioned: true }))
+    const saves: Parameters<StoreSaveHandler>[0][] = []
+    const onSave: StoreSaveHandler = async (request) => {
+      saves.push(request)
+    }
+    const user = userEvent.setup()
+    renderOrders(onSave)
+
+    await user.click(screen.getByRole('button', { name: 'דחוף — לקוחה לעריכה' }))
+
+    expect(saves).toHaveLength(1)
+    expect(saves[0]!.reason).toBe('orders')
+    expect(saves[0]!.nextStore.orders[0]).toEqual({ ...store.orders[0], urgent: true })
+    expect(saves[0]!.nextStore.orders[0]).toMatchObject({
+      meyToken: 'mey-token',
+      courierNote: 'courier note',
+      intakeConversation: 'thread',
+    })
+    expect(saves[0]!.nextStore.orders[1]).toEqual(store.orders[1])
+  })
+
+  it('toggles the draft flag on and existing flags off through the same quick save', async () => {
+    const store: LegacyStore = {
+      orders: [
+        {
+          id: 'f1',
+          date: '2099-08-14',
+          name: 'מסומנת',
+          status: 'חדשה',
+          urgent: true,
+          meyToken: 'mey-token',
+        },
+        { id: 'f2', date: '2099-08-14', name: 'נקייה', status: 'חדשה' },
+      ],
+    }
+    mockedUseStore.mockReturnValue(queryResult({ store, versioned: true }))
+    const saves: Parameters<StoreSaveHandler>[0][] = []
+    const onSave: StoreSaveHandler = async (request) => {
+      saves.push(request)
+    }
+    const user = userEvent.setup()
+    renderOrders(onSave)
+
+    // An already-urgent order toggles off.
+    await user.click(screen.getByRole('button', { name: 'דחוף — מסומנת' }))
+    expect(saves[0]!.nextStore.orders[0]).toEqual({ ...store.orders[0], urgent: false })
+
+    // A clean order becomes a draft with a single-field merge.
+    await user.click(screen.getByRole('button', { name: 'טיוטה — נקייה' }))
+    expect(saves[1]!.nextStore.orders[1]).toEqual({ ...store.orders[1], draft: true })
+    expect(saves[1]!.nextStore.orders[0]).toEqual(store.orders[0])
+  })
+
+  it('sorts urgent orders first in their date group with a red border accent', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'calm', date: '2099-08-14', name: 'רגילה', time: '09:00' },
+            { id: 'hot', date: '2099-08-14', name: 'דחופה', time: '15:00', urgent: true },
+          ],
+        },
+      }),
+    )
+
+    renderOrders()
+
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    expect(headings.indexOf('דחופה')).toBeLessThan(headings.indexOf('רגילה'))
+    const urgentCard = screen.getByText('דחופה').closest('article')
+    expect(urgentCard?.getAttribute('data-urgent')).toBe('true')
+    expect(urgentCard?.className).toContain('border-red-600')
+    expect(within(urgentCard!).getByText('דחוף')).toBeTruthy()
+    const calmCard = screen.getByText('רגילה').closest('article')
+    expect(calmCard?.hasAttribute('data-urgent')).toBe(false)
+    expect(within(calmCard!).queryByText('דחוף')).toBeNull()
+  })
+
+  it('marks drafts, excludes them from date totals, and the drafts chip hides them', async () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'real', date: '2099-08-14', name: 'הזמנה אמיתית', meals: 2, total: '100.00' },
+            { id: 'draft', date: '2099-08-14', name: 'טיוטת הזמנה', meals: 3, total: '50.00', draft: true },
+          ],
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    renderOrders()
+
+    // Counters count only the committed order: 2 meals, $100.00 — never $150.00.
+    expect(screen.getByText('2 זוגיות')).toBeTruthy()
+    expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('$150.00')).toBeNull()
+
+    // The draft is still rendered, muted, with its chip.
+    const draftCard = screen.getByText('טיוטת הזמנה').closest('article')
+    expect(draftCard?.getAttribute('data-draft')).toBe('true')
+    expect(within(draftCard!).getByText('טיוטה')).toBeTruthy()
+
+    // The filter chip (shown by default) hides drafts on demand.
+    await user.click(screen.getByRole('button', { name: 'טיוטות' }))
+    expect(screen.queryByText('טיוטת הזמנה')).toBeNull()
+    expect(screen.getByText('הזמנה אמיתית')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'טיוטות' }))
+    expect(screen.getByText('טיוטת הזמנה')).toBeTruthy()
+  })
+
+  it('flags possible duplicates sharing a phone and a date on both cards', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'd1', date: '2099-08-14', name: 'רות לוי', phone: '050-123-4567' },
+            { id: 'd2', date: '2099-08-14', name: 'רות כהן', phone: '+972 50-123-4567' },
+            { id: 'other', date: '2099-08-15', name: 'לא קשורה', phone: '050-123-4567' },
+          ],
+        },
+      }),
+    )
+
+    renderOrders()
+
+    const chips = screen.getAllByText(/כפילות אפשרית — אותו טלפון באותו יום/)
+    expect(chips).toHaveLength(2)
+    expect(chips.some((chip) => chip.textContent?.includes('רות כהן'))).toBe(true)
+    expect(chips.some((chip) => chip.textContent?.includes('רות לוי'))).toBe(true)
+    const otherCard = screen.getByText('לא קשורה').closest('article')
+    expect(within(otherCard!).queryByText(/כפילות אפשרית/)).toBeNull()
+  })
+
+  it('shows a compact checklist of missing fields only on incomplete active orders', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            {
+              id: 'complete',
+              date: '2099-08-14',
+              name: 'שלמה שלם',
+              phone: '0501234567',
+              time: '12:00',
+              place: 'מלון',
+              total: '80.00',
+            },
+            { id: 'partial', date: '2099-08-14', name: 'חסרה פרטים', phone: '0521111111', place: 'מלון' },
+          ],
+        },
+      }),
+    )
+
+    renderOrders()
+
+    expect(screen.getByText('חסר: שעה · מחיר')).toBeTruthy()
+    const completeCard = screen.getByText('שלמה שלם').closest('article')
+    expect(within(completeCard!).queryByText(/חסר:/)).toBeNull()
+  })
+
+  it('highlights allergy notes with a prominent chip', () => {
+    mockedUseStore.mockReturnValue(
+      queryResult({
+        store: {
+          orders: [
+            { id: 'al', date: '2099-08-14', name: 'עם אלרגיה', notes: 'אלרגיה לבוטנים' },
+            { id: 'no', date: '2099-08-14', name: 'בלי אלרגיה', notes: 'בלי חריף' },
+          ],
+        },
+      }),
+    )
+
+    renderOrders()
+
+    expect(screen.getAllByText('אלרגיה בהערות')).toHaveLength(1)
+    const cleanCard = screen.getByText('בלי אלרגיה').closest('article')
+    expect(within(cleanCard!).queryByText('אלרגיה בהערות')).toBeNull()
+  })
+
   it('gives linked groups the soft pink group frame', () => {
     mockedUseStore.mockReturnValue(
       queryResult({

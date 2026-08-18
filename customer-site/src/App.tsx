@@ -13,6 +13,7 @@ import { Checkout } from './pages/checkout'
 import { Legal } from './pages/legal'
 import { KashrutQuality } from './pages/kashrut-quality'
 import { Gallery } from './pages/gallery'
+import { HowItWorks } from './pages/how-it-works'
 import { Events } from './pages/events'
 import { PrivateBBQExperience } from './pages/experience-bbq'
 import { YachtPartyExperience } from './pages/experience-yacht'
@@ -39,6 +40,7 @@ const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
     '/legal': { title: 'תנאי שימוש ופרטיות | מטעמי בת מלך', description: 'תנאי שימוש, מדיניות פרטיות והצהרת אלרגיות.' },
     '/kashrut': { title: 'כשרות ואיכות | מטעמי בת מלך', description: 'הסטנדרטים המחמירים של הכשרות שלנו בדובאי.' },
     '/gallery': { title: 'גלריה | מטעמי בת מלך', description: 'תמונות מהאירועים והמנות של מטעמי בת מלך.' },
+    '/how-it-works': { title: 'איך זה עובד | מטעמי בת מלך', description: 'מהתפריט ועד דלת המלון — בוחרים, מזמינים באתר או בוואטסאפ, אנחנו מבשלים טרי ומגיעים חם. התשלום רק במסירה.' },
     '/events': { title: 'חוויות קולינריות VIP | מטעמי בת מלך', description: 'BBQ פרטי, אירועי יאכטה, מסיבות בוילה, ארוחות בסוויטה וסעודות מדבר.' },
     '/experiences/bbq': { title: 'שף מנגליסט VIP | מטעמי בת מלך', description: 'חוויית BBQ פרטית עם שף מנגליסט בדובאי.' },
     '/experiences/yacht': { title: 'אירועים על יאכטה | מטעמי בת מלך', description: 'קייטרינג כשר יוקרתי ליאכטות בדובאי.' },
@@ -56,6 +58,7 @@ const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
     '/legal': { title: 'Terms & Privacy | Bat Melech Kitchen', description: 'Terms of use, privacy policy and allergy notice.' },
     '/kashrut': { title: 'Kashrut & Quality | Bat Melech Kitchen', description: 'Our strict kashrut standards in Dubai.' },
     '/gallery': { title: 'Gallery | Bat Melech Kitchen', description: 'Photos from Bat Melech events and dishes.' },
+    '/how-it-works': { title: 'How It Works | Bat Melech Kitchen', description: 'From the menu to your hotel door — browse, order on the site or WhatsApp, we cook fresh that day and deliver hot. Pay on delivery.' },
     '/events': { title: 'VIP Culinary Experiences | Bat Melech Kitchen', description: 'Private BBQ, yacht events, villa parties, in-suite dining and desert feasts.' },
     '/experiences/bbq': { title: 'Private BBQ Chef | Bat Melech Kitchen', description: 'A private kosher BBQ experience with a grill chef in Dubai.' },
     '/experiences/yacht': { title: 'Yacht Events | Bat Melech Kitchen', description: 'Luxury kosher catering for yachts in Dubai.' },
@@ -73,6 +76,7 @@ const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
     '/legal': { title: 'Conditions et confidentialité | Bat Melech', description: "Conditions d'utilisation, politique de confidentialité et allergènes." },
     '/kashrut': { title: 'Cacherout et qualité | Bat Melech', description: 'Nos standards stricts de cacherout à Dubaï.' },
     '/gallery': { title: 'Galerie | Bat Melech', description: 'Photos des événements et des plats de Bat Melech.' },
+    '/how-it-works': { title: 'Comment ça marche | Bat Melech', description: 'Du menu à la porte de votre hôtel — choisissez, commandez sur le site ou par WhatsApp, nous cuisinons frais le jour même et livrons chaud. Paiement à la livraison.' },
     '/events': { title: 'Expériences culinaires VIP | Bat Melech', description: 'BBQ privé, événements sur yacht, soirées en villa, dîners en suite et festins dans le désert.' },
     '/experiences/bbq': { title: 'Chef BBQ privé | Bat Melech', description: 'Une expérience BBQ casher privée avec un chef grillades à Dubaï.' },
     '/experiences/yacht': { title: 'Événements sur yacht | Bat Melech', description: 'Traiteur casher de luxe pour yachts à Dubaï.' },
@@ -109,6 +113,7 @@ function localeRoutes() {
       <Route path="kashrut" element={<KashrutQuality />} />
       <Route path="gallery" element={<Gallery />} />
       <Route path="events" element={<Events />} />
+      <Route path="how-it-works" element={<HowItWorks />} />
       <Route path="experiences/bbq" element={<PrivateBBQExperience />} />
       <Route path="experiences/yacht" element={<YachtPartyExperience />} />
       <Route path="experiences/villa" element={<VillaPartyExperience />} />

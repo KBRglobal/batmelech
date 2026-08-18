@@ -34,6 +34,51 @@ describe('order quick actions', () => {
     const duplicated: LegacyStore = { orders: [{ id: 'x' }, { id: 'x' }] }
     expect(applyOrderQuickFields(duplicated, 'x', { status: 'אושרה' })).toBeNull()
   })
+
+  it('toggles the urgent and draft flags without touching any other field', () => {
+    const store: LegacyStore = {
+      orders: [
+        {
+          id: 'a',
+          status: 'חדשה',
+          notes: 'keep',
+          meyToken: 'mey-token',
+          courierNote: 'courier note',
+          deliveryProofUrl: 'https://example.com/proof.jpg',
+          intakeConversation: 'thread',
+        },
+        { id: 'b', status: 'חדשה' },
+      ],
+    }
+
+    const urgentOn = applyOrderQuickFields(store, 'a', { urgent: true })
+    expect(urgentOn?.orders[0]).toEqual({ ...store.orders[0], urgent: true })
+    expect(urgentOn?.orders[1]).toBe(store.orders[1])
+
+    const urgentOff = applyOrderQuickFields(urgentOn!, 'a', { urgent: false })
+    expect(urgentOff?.orders[0]).toEqual({ ...store.orders[0], urgent: false })
+
+    const draftOn = applyOrderQuickFields(store, 'a', { draft: true })
+    expect(draftOn?.orders[0]).toEqual({ ...store.orders[0], draft: true })
+    // The server-owned fields survive every toggle verbatim.
+    expect(draftOn?.orders[0]).toMatchObject({
+      meyToken: 'mey-token',
+      courierNote: 'courier note',
+      deliveryProofUrl: 'https://example.com/proof.jpg',
+      intakeConversation: 'thread',
+    })
+    // The input store itself is never mutated.
+    expect(store.orders[0]).not.toHaveProperty('urgent')
+    expect(store.orders[0]).not.toHaveProperty('draft')
+  })
+
+  it('never lets an undefined quick field clobber an existing value', () => {
+    const store: LegacyStore = { orders: [{ id: 'a', status: 'חדשה', paid: 'כן' }] }
+
+    const updated = applyOrderQuickFields(store, 'a', { status: 'אושרה', paid: undefined })
+
+    expect(updated?.orders[0]).toEqual({ id: 'a', status: 'אושרה', paid: 'כן' })
+  })
 })
 
 describe('applyOrderFieldEdit', () => {

@@ -190,6 +190,27 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/legal"/>
   </url>
   <url>
+    <loc>https://www.batmelech.ae/site/how-it-works</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/how-it-works"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/en/how-it-works</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/how-it-works"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/site/fr/how-it-works</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/site/fr/how-it-works"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/site/how-it-works"/>
+  </url>
+  <url>
     <loc>https://www.batmelech.ae/site/experiences/bbq</loc>
     <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/site/experiences/bbq"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/site/en/experiences/bbq"/>

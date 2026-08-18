@@ -13,12 +13,18 @@ import {
   loadRecipeBook,
   loadSettingsCatalog,
   nextStableIngredientId,
+  orderKitchenNotes,
   removeCatalogItem,
   renameCatalogExtra,
   renameCatalogItem,
   resolvePreparationCatalog,
   recipeTargets,
+  splitAllergens,
+  updateCatalogExtraAllergens,
+  updateCatalogExtraHeatingInstructions,
+  updateCatalogItemAllergens,
   updateCatalogItemDescription,
+  updateCatalogItemHeatingInstructions,
   updateCatalogItemImage,
   updateLunchPrice,
   validateRecipeDrafts,
@@ -69,7 +75,13 @@ describe('settings catalog', () => {
     expect(result.catalog.extras.map((item) => item.name)).not.toEqual(expect.arrayContaining([...SUPERSEDED_MANUAL_EXTRAS]))
     expect(result.catalog.extras.map((item) => item.name)).not.toContain('משלוח')
     expect(result.catalog.categories.firsts).toEqual(
-      AUTHORITATIVE_FIRST_COURSE_ITEMS.map((item) => ({ ...item, description: '', imageUrl: null })),
+      AUTHORITATIVE_FIRST_COURSE_ITEMS.map((item) => ({
+        ...item,
+        description: '',
+        imageUrl: null,
+        allergens: '',
+        heatingInstructions: '',
+      })),
     )
   })
 
@@ -129,7 +141,15 @@ describe('settings catalog', () => {
     const result = loadSettingsCatalog(store)
 
     expect(result.catalog.extras).toEqual([
-      { id: 'extra-safe', name: 'אקסטרה בטוחה', priceMinorUnits: 1_234, description: '', imageUrl: null },
+      {
+        id: 'extra-safe',
+        name: 'אקסטרה בטוחה',
+        priceMinorUnits: 1_234,
+        description: '',
+        imageUrl: null,
+        allergens: '',
+        heatingInstructions: '',
+      },
     ])
     expect(result.warnings.filter((warning) => warning.code === 'SUPERSEDED_EXTRA_REMOVED')).toHaveLength(4)
   })
@@ -156,6 +176,8 @@ describe('settings catalog', () => {
         priceMinorUnits: 1_200,
         description: '',
         imageUrl: null,
+        allergens: '',
+        heatingInstructions: '',
       },
     ])
     expect(loaded.warnings.filter((warning) => warning.code === 'SUPERSEDED_EXTRA_REMOVED')).toHaveLength(3)
@@ -181,6 +203,8 @@ describe('settings catalog', () => {
       priceMinorUnits: 1_500,
       description: '',
       imageUrl: null,
+      allergens: '',
+      heatingInstructions: '',
     })
     expect(validateSettingsCatalog(unsafe)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'SUPERSEDED_EXTRA_REMOVED' }),
@@ -297,6 +321,109 @@ describe('settings catalog', () => {
       description: '',
       imageUrl: null,
     })
+  })
+
+  it('round-trips dish allergens and heating instructions through menu.itemMeta and clears them cleanly', () => {
+    const withMeta = updateCatalogItemHeatingInstructions(
+      updateCatalogItemAllergens(DEFAULT_SETTINGS_CATALOG, 'mains', 'shabbat-mains-01', '  אגוזים, גלוטן  '),
+      'mains',
+      'shabbat-mains-01',
+      'לחמם 20 דקות בתנור על 180 מעלות',
+    )
+    const saved = applyCatalogToStore(EMPTY_STORE, withMeta)
+    const meta = ((saved as Record<string, unknown>).menu as { itemMeta: Record<string, unknown> }).itemMeta
+    expect(meta['shabbat-mains-01']).toEqual({
+      allergens: 'אגוזים, גלוטן',
+      heatingInstructions: 'לחמם 20 דקות בתנור על 180 מעלות',
+    })
+
+    const reloaded = loadSettingsCatalog(saved)
+    expect(reloaded.warnings).toEqual([])
+    expect(reloaded.catalog.categories.mains.find((item) => item.id === 'shabbat-mains-01')).toMatchObject({
+      allergens: 'אגוזים, גלוטן',
+      heatingInstructions: 'לחמם 20 דקות בתנור על 180 מעלות',
+    })
+
+    const cleared = updateCatalogItemHeatingInstructions(
+      updateCatalogItemAllergens(reloaded.catalog, 'mains', 'shabbat-mains-01', ''),
+      'mains',
+      'shabbat-mains-01',
+      '',
+    )
+    const resaved = applyCatalogToStore(saved, cleared)
+    const clearedMeta = ((resaved as Record<string, unknown>).menu as { itemMeta: Record<string, unknown> }).itemMeta
+    expect(clearedMeta['shabbat-mains-01']).toBeUndefined()
+  })
+
+  it('round-trips extra allergens and heating instructions inline on the persisted extras rows', () => {
+    const target = DEFAULT_SETTINGS_CATALOG.extras[0]!
+    const withMeta = updateCatalogExtraHeatingInstructions(
+      updateCatalogExtraAllergens(DEFAULT_SETTINGS_CATALOG, target.id, 'סומסום'),
+      target.id,
+      'לחמם מכוסה ברוטב',
+    )
+    const saved = applyCatalogToStore(EMPTY_STORE, withMeta) as Record<string, unknown>
+    expect((saved.menu as { extras: Array<Record<string, unknown>> }).extras).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: target.id,
+          allergens: 'סומסום',
+          heatingInstructions: 'לחמם מכוסה ברוטב',
+        }),
+      ]),
+    )
+
+    const reloaded = loadSettingsCatalog(saved as LegacyStore)
+    expect(reloaded.warnings).toEqual([])
+    expect(reloaded.catalog.extras.find((item) => item.id === target.id)).toMatchObject({
+      allergens: 'סומסום',
+      heatingInstructions: 'לחמם מכוסה ברוטב',
+    })
+  })
+
+  it('collects the deduplicated allergen union and heating instructions for an order, or nothing when unset', () => {
+    const configured = updateCatalogExtraAllergens(
+      updateCatalogItemHeatingInstructions(
+        updateCatalogItemAllergens(
+          updateCatalogItemAllergens(DEFAULT_SETTINGS_CATALOG, 'salads', 'shabbat-salads-08', 'סומסום'),
+          'mains',
+          'shabbat-mains-01',
+          'גלוטן, סומסום',
+        ),
+        'mains',
+        'shabbat-mains-01',
+        'לחמם 20 דקות',
+      ),
+      DEFAULT_SETTINGS_CATALOG.extras.find((item) => item.name === 'אורז')!.id,
+      'אגוזים',
+    )
+
+    const notes = orderKitchenNotes(
+      {
+        id: 'order-1',
+        salads: { טחינה: { o: 1 } },
+        mains: { 'קציצות בשר ברוטב אדום עשיר': 2 },
+        extras: { אורז: { q: 1 }, קוסקוס: { q: 0 } },
+        custom: [{ name: 'מנה מיוחדת', qty: 1 }],
+      },
+      configured,
+    )
+
+    expect(notes.allergens).toEqual(['סומסום', 'גלוטן', 'אגוזים'])
+    expect(notes.heating).toEqual([
+      { name: 'קציצות בשר ברוטב אדום עשיר', heatingInstructions: 'לחמם 20 דקות' },
+    ])
+
+    // A zero-quantity extra, an unknown custom dish, and an untouched catalog
+    // contribute nothing.
+    const empty = orderKitchenNotes(
+      { id: 'order-2', salads: { טחינה: { o: 1 } }, mains: { 'קציצות בשר ברוטב אדום עשיר': 1 } },
+      DEFAULT_SETTINGS_CATALOG,
+    )
+    expect(empty).toEqual({ allergens: [], heating: [] })
+
+    expect(splitAllergens(' אגוזים , גלוטן,, אגוזים ')).toEqual(['אגוזים', 'גלוטן'])
+    expect(splitAllergens('')).toEqual([])
   })
 
   it('preserves intentional empty lists and blocks malformed rows instead of silently restoring defaults', () => {

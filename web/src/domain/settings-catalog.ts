@@ -65,6 +65,10 @@ export interface CatalogItem {
   readonly name: string
   readonly description: string
   readonly imageUrl: string | null
+  /** Free comma-separated text, e.g. "אגוזים, גלוטן, סומסום". Empty when unset. */
+  readonly allergens: string
+  /** Free text printed on the kitchen bon. Empty when unset. */
+  readonly heatingInstructions: string
 }
 
 export interface PricedCatalogItem extends CatalogItem {
@@ -321,6 +325,8 @@ const DEFAULT_LUNCH: readonly LunchItem[] = [
       priceMinorUnits: 2_000,
       description: '',
       imageUrl: null,
+      allergens: '',
+      heatingInstructions: '',
     },
   },
 ]
@@ -417,6 +423,8 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
         name,
         description: '',
         imageUrl: null,
+        allergens: '',
+        heatingInstructions: '',
       })),
     ]),
   ) as Record<MenuCategoryKey, CatalogItem[]>,
@@ -426,6 +434,8 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
     priceMinorUnits,
     description: '',
     imageUrl: null,
+    allergens: '',
+    heatingInstructions: '',
   })),
   lunch: DEFAULT_LUNCH,
   lunchSides: DEFAULT_LUNCH_SIDES.map((name) => ({
@@ -433,6 +443,8 @@ export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
     name,
     description: '',
     imageUrl: null,
+    allergens: '',
+    heatingInstructions: '',
   })),
 }
 
@@ -821,13 +833,22 @@ function itemMetaOverrides(menu: Readonly<Record<string, unknown>>): Readonly<Re
 function itemMetaFor(
   meta: Readonly<Record<string, unknown>>,
   itemId: string,
-): { readonly description: string; readonly imageUrl: string | null } {
+): {
+  readonly description: string
+  readonly imageUrl: string | null
+  readonly allergens: string
+  readonly heatingInstructions: string
+} {
   const entry = meta[itemId]
-  if (!isRecord(entry)) return { description: '', imageUrl: null }
+  if (!isRecord(entry)) {
+    return { description: '', imageUrl: null, allergens: '', heatingInstructions: '' }
+  }
   return {
     description: text(entry.description),
     imageUrl:
       typeof entry.imageUrl === 'string' && entry.imageUrl.trim() !== '' ? entry.imageUrl.trim() : null,
+    allergens: text(entry.allergens),
+    heatingInstructions: text(entry.heatingInstructions),
   }
 }
 
@@ -959,6 +980,8 @@ function normalizeExtras(source: unknown, warnings: CatalogWarning[]): PricedCat
       priceMinorUnits: parsePrice(value.price, fallback, `extras.${index}.price`, warnings),
       description: text(value.description),
       imageUrl: typeof value.imageUrl === 'string' && value.imageUrl.trim() !== '' ? value.imageUrl.trim() : null,
+      allergens: text(value.allergens),
+      heatingInstructions: text(value.heatingInstructions),
     })
   })
   return items
@@ -1129,6 +1152,8 @@ function normalizeLunchSides(source: unknown, warnings: CatalogWarning[]): Catal
     name,
     description: '',
     imageUrl: null,
+    allergens: '',
+    heatingInstructions: '',
   }))
 }
 
@@ -1685,6 +1710,8 @@ export function applyCatalogToStore(
         price: _price,
         description: _description,
         imageUrl: _imageUrl,
+        allergens: _allergens,
+        heatingInstructions: _heatingInstructions,
         ...unknown
       } = isRecord(previous) ? previous : {}
       return {
@@ -1694,6 +1721,8 @@ export function applyCatalogToStore(
         price: decimalFromMinorUnits(item.priceMinorUnits),
         ...(item.description === '' ? {} : { description: item.description }),
         ...(item.imageUrl === null ? {} : { imageUrl: item.imageUrl }),
+        ...(item.allergens === '' ? {} : { allergens: item.allergens }),
+        ...(item.heatingInstructions === '' ? {} : { heatingInstructions: item.heatingInstructions }),
       }
     }),
     lunch: catalog.lunch.map((item) => {
@@ -1766,12 +1795,19 @@ export function applyCatalogToStore(
       const nextMeta: Record<string, unknown> = { ...itemMetaOverrides(previousMenu) }
       for (const category of MENU_CATEGORY_KEYS) {
         for (const item of catalog.categories[category]) {
-          if (item.description === '' && item.imageUrl === null) {
+          if (
+            item.description === '' &&
+            item.imageUrl === null &&
+            item.allergens === '' &&
+            item.heatingInstructions === ''
+          ) {
             delete nextMeta[item.id]
           } else {
             nextMeta[item.id] = {
               ...(item.description === '' ? {} : { description: item.description }),
               ...(item.imageUrl === null ? {} : { imageUrl: item.imageUrl }),
+              ...(item.allergens === '' ? {} : { allergens: item.allergens }),
+              ...(item.heatingInstructions === '' ? {} : { heatingInstructions: item.heatingInstructions }),
             }
           }
         }
@@ -1848,7 +1884,20 @@ export function addCatalogItem(
   if (items.some((item) => canonicalCatalogName(item.name) === canonicalCatalogName(name))) {
     throw new RangeError('item name already exists in this category')
   }
-  const categories = { ...catalog.categories, [category]: [...items, { id: nextStableItemId(category, name, catalog), name }] }
+  const categories = {
+    ...catalog.categories,
+    [category]: [
+      ...items,
+      {
+        id: nextStableItemId(category, name, catalog),
+        name,
+        description: '',
+        imageUrl: null,
+        allergens: '',
+        heatingInstructions: '',
+      },
+    ],
+  }
   return withCatalogUpdate(catalog, { categories })
 }
 
@@ -1931,7 +1980,15 @@ export function addCatalogExtra(
   return withCatalogUpdate(catalog, {
     extras: [
       ...catalog.extras,
-      { id: nextStableItemId('extra', name, catalog), name, priceMinorUnits, description: '', imageUrl: null },
+      {
+        id: nextStableItemId('extra', name, catalog),
+        name,
+        priceMinorUnits,
+        description: '',
+        imageUrl: null,
+        allergens: '',
+        heatingInstructions: '',
+      },
     ],
   })
 }
@@ -1998,6 +2055,38 @@ export function updateCatalogItemImage(
   return withCatalogUpdate(catalog, { categories })
 }
 
+export function updateCatalogItemAllergens(
+  catalog: SettingsCatalog,
+  category: MenuCategoryKey,
+  itemId: string,
+  rawAllergens: string,
+): SettingsCatalog {
+  const allergens = text(rawAllergens)
+  const categories = {
+    ...catalog.categories,
+    [category]: catalog.categories[category].map((item) =>
+      item.id === itemId ? { ...item, allergens } : item,
+    ),
+  }
+  return withCatalogUpdate(catalog, { categories })
+}
+
+export function updateCatalogItemHeatingInstructions(
+  catalog: SettingsCatalog,
+  category: MenuCategoryKey,
+  itemId: string,
+  rawInstructions: string,
+): SettingsCatalog {
+  const heatingInstructions = text(rawInstructions)
+  const categories = {
+    ...catalog.categories,
+    [category]: catalog.categories[category].map((item) =>
+      item.id === itemId ? { ...item, heatingInstructions } : item,
+    ),
+  }
+  return withCatalogUpdate(catalog, { categories })
+}
+
 export function updateCatalogExtraDescription(
   catalog: SettingsCatalog,
   itemId: string,
@@ -2016,6 +2105,30 @@ export function updateCatalogExtraImage(
 ): SettingsCatalog {
   return withCatalogUpdate(catalog, {
     extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, imageUrl } : item)),
+  })
+}
+
+export function updateCatalogExtraAllergens(
+  catalog: SettingsCatalog,
+  itemId: string,
+  rawAllergens: string,
+): SettingsCatalog {
+  const allergens = text(rawAllergens)
+  return withCatalogUpdate(catalog, {
+    extras: catalog.extras.map((item) => (item.id === itemId ? { ...item, allergens } : item)),
+  })
+}
+
+export function updateCatalogExtraHeatingInstructions(
+  catalog: SettingsCatalog,
+  itemId: string,
+  rawInstructions: string,
+): SettingsCatalog {
+  const heatingInstructions = text(rawInstructions)
+  return withCatalogUpdate(catalog, {
+    extras: catalog.extras.map((item) =>
+      item.id === itemId ? { ...item, heatingInstructions } : item,
+    ),
   })
 }
 
@@ -2068,6 +2181,80 @@ export function updateLunchPrice(
   return withCatalogUpdate(catalog, {
     lunch,
   })
+}
+
+export interface OrderKitchenNotes {
+  /** Union of allergens across the order's dishes, deduplicated, in menu order. */
+  readonly allergens: readonly string[]
+  /** One entry per ordered dish that has heating instructions configured. */
+  readonly heating: readonly {
+    readonly name: string
+    readonly heatingInstructions: string
+  }[]
+}
+
+export function splitAllergens(value: string): readonly string[] {
+  return [
+    ...new Set(
+      value
+        .split(/[,،;؛]/)
+        .map((part) => part.trim())
+        .filter((part) => part !== ''),
+    ),
+  ]
+}
+
+/**
+ * Collects the kitchen-facing metadata for one order's printed bon: the union
+ * of allergens across the ordered dishes and the heating instructions of every
+ * ordered dish that has them. Dishes are matched to the catalog by canonical
+ * name within their own section, and only positive quantities count — an order
+ * with no configured metadata yields two empty lists so the bon prints nothing.
+ */
+export function orderKitchenNotes(
+  order: Readonly<LegacyStore['orders'][number]>,
+  catalog: SettingsCatalog,
+): OrderKitchenNotes {
+  const record = order as Readonly<Record<string, unknown>>
+  const allergens: string[] = []
+  const seenAllergens = new Set<string>()
+  const heating: { name: string; heatingInstructions: string }[] = []
+  const visit = (orderedName: string, item: CatalogItem | undefined): void => {
+    if (item === undefined) return
+    for (const allergen of splitAllergens(item.allergens)) {
+      if (!seenAllergens.has(allergen)) {
+        seenAllergens.add(allergen)
+        allergens.push(allergen)
+      }
+    }
+    if (item.heatingInstructions !== '') {
+      heating.push({ name: orderedName, heatingInstructions: item.heatingInstructions })
+    }
+  }
+  const sections: readonly {
+    readonly key: string
+    readonly items: readonly CatalogItem[]
+    readonly salads: boolean
+  }[] = [
+    ...MENU_CATEGORY_KEYS.map((category) => ({
+      key: category,
+      items: catalog.categories[category],
+      salads: category === 'salads',
+    })),
+    { key: 'extras', items: catalog.extras, salads: false },
+  ]
+  for (const section of sections) {
+    const source = record[section.key]
+    if (!isRecord(source)) continue
+    const byName = new Map(section.items.map((item) => [canonicalCatalogName(item.name), item]))
+    for (const [rawName, value] of Object.entries(source)) {
+      const name = text(rawName)
+      if (name === '') continue
+      const positive = section.salads ? positiveSaladCount(value) : positiveLegacyCount(value)
+      if (positive) visit(name, byName.get(canonicalCatalogName(name)))
+    }
+  }
+  return { allergens, heating }
 }
 
 export interface RecipeBookRecord {

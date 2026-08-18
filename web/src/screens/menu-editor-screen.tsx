@@ -16,10 +16,14 @@ import {
   renameCatalogExtra,
   renameCatalogItem,
   updateCatalogCorePrice,
+  updateCatalogExtraAllergens,
   updateCatalogExtraDescription,
+  updateCatalogExtraHeatingInstructions,
   updateCatalogExtraImage,
   updateCatalogExtraPrice,
+  updateCatalogItemAllergens,
   updateCatalogItemDescription,
+  updateCatalogItemHeatingInstructions,
   updateCatalogItemImage,
   updateLunchPrice,
   validateSettingsCatalog,
@@ -127,6 +131,47 @@ function FixedValue({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-border bg-card p-4">
       <p className="text-xs font-black text-muted-foreground">{label}</p>
       <p className="mt-3 text-lg font-black text-primary">{value}</p>
+    </div>
+  )
+}
+
+function KitchenMetaFields({
+  name,
+  allergens,
+  heatingInstructions,
+  onAllergens,
+  onHeatingInstructions,
+}: {
+  name: string
+  allergens: string
+  heatingInstructions: string
+  onAllergens: (next: string) => void
+  onHeatingInstructions: (next: string) => void
+}) {
+  const inputClass =
+    'w-full rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary outline-none'
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <input
+        aria-label={`אלרגנים — ${name}`}
+        defaultValue={allergens}
+        placeholder="אלרגנים (למשל: אגוזים, גלוטן)"
+        onBlur={(event) => {
+          const next = event.currentTarget.value
+          if (next !== allergens) onAllergens(next)
+        }}
+        className={inputClass}
+      />
+      <input
+        aria-label={`הוראות חימום — ${name}`}
+        defaultValue={heatingInstructions}
+        placeholder="הוראות חימום (יודפסו על הבון)"
+        onBlur={(event) => {
+          const next = event.currentTarget.value
+          if (next !== heatingInstructions) onHeatingInstructions(next)
+        }}
+        className={inputClass}
+      />
     </div>
   )
 }
@@ -242,6 +287,17 @@ function CategoryEditor({
                 }
               }}
               className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary outline-none"
+            />
+            <KitchenMetaFields
+              name={item.name}
+              allergens={item.allergens}
+              heatingInstructions={item.heatingInstructions}
+              onAllergens={(next) =>
+                onUpdate((current) => updateCatalogItemAllergens(current, category, item.id, next))
+              }
+              onHeatingInstructions={(next) =>
+                onUpdate((current) => updateCatalogItemHeatingInstructions(current, category, item.id, next))
+              }
             />
           </div>
         ))}
@@ -411,6 +467,17 @@ function ExtrasEditor({
                 }
               }}
               className="w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary outline-none"
+            />
+            <KitchenMetaFields
+              name={item.name}
+              allergens={item.allergens}
+              heatingInstructions={item.heatingInstructions}
+              onAllergens={(next) =>
+                onUpdate((current) => updateCatalogExtraAllergens(current, item.id, next))
+              }
+              onHeatingInstructions={(next) =>
+                onUpdate((current) => updateCatalogExtraHeatingInstructions(current, item.id, next))
+              }
             />
           </div>
         ))}

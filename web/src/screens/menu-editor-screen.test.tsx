@@ -148,6 +148,50 @@ describe('MenuEditorScreen', () => {
     ]))
   })
 
+  it('edits dish allergens and heating instructions and persists them through menu.itemMeta', async () => {
+    const store = { orders: [] } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<MenuEditorScreen onSave={onSave} />)
+
+    await user.type(screen.getByLabelText('אלרגנים — סלט ביצים'), 'ביצים, חרדל')
+    await user.tab()
+    await user.type(screen.getByLabelText('הוראות חימום — סלט ביצים'), 'להגיש קר, לא לחמם')
+    await user.tab()
+
+    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const nextMenu = onSave.mock.calls[0]![0].nextStore as unknown as {
+      menu: { itemMeta: Record<string, { allergens?: string; heatingInstructions?: string }> }
+    }
+    expect(Object.values(nextMenu.menu.itemMeta)).toEqual(expect.arrayContaining([
+      { allergens: 'ביצים, חרדל', heatingInstructions: 'להגיש קר, לא לחמם' },
+    ]))
+  })
+
+  it('edits extra allergens and heating instructions and persists them on the extras rows', async () => {
+    const store = { orders: [] } as LegacyStore
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const onSave = vi.fn<StoreSaveHandler>().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<MenuEditorScreen onSave={onSave} />)
+
+    await user.type(screen.getByLabelText('אלרגנים — מארז הבדלה'), 'גלוטן')
+    await user.tab()
+    await user.type(screen.getByLabelText('הוראות חימום — מארז הבדלה'), 'ללא חימום')
+    await user.tab()
+
+    await user.click(screen.getByRole('button', { name: 'שמירת התפריט' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const nextMenu = onSave.mock.calls[0]![0].nextStore as unknown as {
+      menu: { extras: Array<{ name: string; allergens?: string; heatingInstructions?: string }> }
+    }
+    expect(nextMenu.menu.extras).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'מארז הבדלה', allergens: 'גלוטן', heatingInstructions: 'ללא חימום' }),
+    ]))
+  })
+
   it('edits a lunch variant price and saves it', async () => {
     const store = { orders: [] } as LegacyStore
     mockedUseStore.mockReturnValue(queryResult({ store }))

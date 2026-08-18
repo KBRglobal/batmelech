@@ -381,6 +381,140 @@ describe('buildOrdersDashboard', () => {
   })
 })
 
+describe('orders operations pack', () => {
+  it('flags urgent orders and sorts them first inside their date group', () => {
+    const result = buildOrdersDashboard(
+      store({
+        orders: [
+          { id: 'calm', date: '2026-08-14', time: '09:00' },
+          { id: 'hot', date: '2026-08-14', time: '15:00', urgent: true },
+          { id: 'not-really', date: '2026-08-14', time: '10:00', urgent: 'yes' },
+          { id: 'other-day', date: '2026-08-13', time: '20:00' },
+        ],
+      }),
+      UTC_OPTIONS,
+    )
+
+    // Urgency never leaks across date groups.
+    expect(result.upcomingGroups.map((group) => group.key)).toEqual([
+      'dated:2026-08-13',
+      'dated:2026-08-14',
+    ])
+    const orders = groupOrders(result.upcomingGroups[1]!)
+    expect(orders.map((order) => order.orderId)).toEqual(['hot', 'calm', 'not-really'])
+    expect(orders[0]?.urgent).toBe(true)
+    // Only a literal boolean true counts — hostile string values stay off.
+    expect(orders[2]?.urgent).toBe(false)
+  })
+
+  it('keeps drafts visible but out of date and linked-group totals', () => {
+    const result = buildOrdersDashboard(
+      store({
+        orders: [
+          { id: 'real', date: '2026-08-14', name: 'A', group: 'קבוצה', meals: 2, total: '100.00' },
+          { id: 'draft', date: '2026-08-14', name: 'B', group: 'קבוצה', meals: 3, total: '50.00', draft: true },
+        ],
+      }),
+      UTC_OPTIONS,
+    )
+    const date = result.upcomingGroups[0]!
+
+    expect(date.activeMeals).toBe(2)
+    expect(date.activeRevenueMinorUnits).toBe(10_000)
+    expect(date.orderCount).toBe(2)
+
+    const linked = date.blocks[0]
+    expect(linked?.kind).toBe('linked-group')
+    if (linked?.kind !== 'linked-group') throw new Error('expected linked group')
+    expect(linked.memberCount).toBe(2)
+    expect(linked.activeTotalMinorUnits).toBe(10_000)
+
+    const draft = linked.orders.find((order) => order.orderId === 'draft')
+    expect(draft?.draft).toBe(true)
+    // A draft is not a commitment — the checklist never nags about it.
+    expect(draft?.missingFields).toEqual([])
+    expect(linked.orders.find((order) => order.orderId === 'real')?.draft).toBe(false)
+  })
+
+  it('pairs only active same-phone same-date orders as possible duplicates', () => {
+    const result = buildOrdersDashboard(
+      store({
+        orders: [
+          { id: 'a', date: '2026-08-14', name: 'רות לוי', phone: '050-123-4567' },
+          { id: 'b', date: '2026-08-14', name: 'רות כהן', phone: '+972 50-123-4567' },
+          { id: 'other-date', date: '2026-08-15', name: 'לא קשורה', phone: '050-123-4567' },
+          { id: 'cancelled', date: '2026-08-14', name: 'מבוטלת', phone: '0501234567', status: 'בוטלה' },
+          { id: 'draft', date: '2026-08-14', name: 'טיוטה', phone: '0501234567', draft: true },
+          { id: 'no-phone', date: '2026-08-14', name: 'בלי טלפון' },
+        ],
+      }),
+      UTC_OPTIONS,
+    )
+    const byId = new Map(
+      result.upcomingGroups
+        .flatMap((group) => groupOrders(group))
+        .map((order) => [order.orderId, order]),
+    )
+
+    // The two active entries pair via the normalized last 9 digits.
+    expect(byId.get('a')?.duplicateOtherNames).toEqual(['רות כהן'])
+    expect(byId.get('b')?.duplicateOtherNames).toEqual(['רות לוי'])
+    // Different date, cancelled, draft, and phoneless orders never pair.
+    expect(byId.get('other-date')?.duplicateOtherNames).toEqual([])
+    expect(byId.get('cancelled')?.duplicateOtherNames).toEqual([])
+    expect(byId.get('draft')?.duplicateOtherNames).toEqual([])
+    expect(byId.get('no-phone')?.duplicateOtherNames).toEqual([])
+  })
+
+  it('computes the missing-fields checklist per active order and stays silent when complete', () => {
+    const result = buildOrdersDashboard(
+      store({
+        orders: [
+          { id: 'complete', date: '2026-08-14', time: '12:00', place: 'מלון', phone: '0501234567', total: '80.00' },
+          { id: 'pickup-ok', date: '2026-08-14', time: '9:30', pickup: true, phone: '0521111111', total: '5.00' },
+          { id: 'empty', date: '2026-08-14' },
+          { id: 'partial', date: '2026-08-14', time: 'צהריים', place: 'מלון', phone: '0522222222', total: '0' },
+          { id: 'cancelled', date: '2026-08-14', status: 'בוטלה' },
+        ],
+      }),
+      UTC_OPTIONS,
+    )
+    const byId = new Map(
+      groupOrders(result.upcomingGroups[0]!).map((order) => [order.orderId, order]),
+    )
+
+    expect(byId.get('complete')?.missingFields).toEqual([])
+    // Pickup satisfies the destination; H:MM parses.
+    expect(byId.get('pickup-ok')?.missingFields).toEqual([])
+    expect(byId.get('empty')?.missingFields).toEqual(['time', 'destination', 'price', 'phone'])
+    // Unparsable time and a non-positive total are both flagged.
+    expect(byId.get('partial')?.missingFields).toEqual(['time', 'price'])
+    expect(byId.get('cancelled')?.missingFields).toEqual([])
+  })
+
+  it('raises the allergy alert from Hebrew or English notes, case-insensitively', () => {
+    const result = buildOrdersDashboard(
+      store({
+        orders: [
+          { id: 'hebrew', date: '2026-08-14', notes: 'יש אלרגיה לאגוזים' },
+          { id: 'english', date: '2026-08-14', notes: 'ALLERGIC to nuts' },
+          { id: 'clean', date: '2026-08-14', notes: 'בלי חריף' },
+          { id: 'no-notes', date: '2026-08-14' },
+        ],
+      }),
+      UTC_OPTIONS,
+    )
+    const byId = new Map(
+      groupOrders(result.upcomingGroups[0]!).map((order) => [order.orderId, order]),
+    )
+
+    expect(byId.get('hebrew')?.allergyAlert).toBe(true)
+    expect(byId.get('english')?.allergyAlert).toBe(true)
+    expect(byId.get('clean')?.allergyAlert).toBe(false)
+    expect(byId.get('no-notes')?.allergyAlert).toBe(false)
+  })
+})
+
 describe('order communication helpers', () => {
   it.each([
     ['+971 58 123 4567', '971581234567'],

@@ -107,6 +107,62 @@ describe('OrderBonScreen', () => {
     expect(container.querySelector('script')).toBeNull()
   })
 
+  it('prints a kitchen strip with the allergen union and per-dish heating instructions', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{
+          id: 'live-1', name: 'לקוחה',
+          salads: { טחינה: { o: 1 } },
+          mains: { 'קציצות בשר ברוטב אדום עשיר': 1 },
+          extras: { 'אקסטרה עם אגוזים': { q: 2 } },
+        }],
+        menu: {
+          salads: ['טחינה'],
+          mains: ['קציצות בשר ברוטב אדום עשיר'],
+          itemMeta: {
+            'shabbat-salads-08': { allergens: 'סומסום' },
+            'shabbat-mains-01': { allergens: 'גלוטן, סומסום', heatingInstructions: 'לחמם 20 דקות בתנור' },
+          },
+          extras: [{ name: 'אקסטרה עם אגוזים', price: 10, allergens: 'אגוזים', heatingInstructions: 'לחמם קלות' }],
+        },
+      } as LegacyStore,
+    }))
+    const { container } = renderBon()
+
+    // The kitchen strip is part of the printable sheet and carries the roll
+    // sizing hooks, so it prints exactly like the customer bon.
+    const kitchen = container.querySelector('.bm-bon-sheet .bm-order-bon.bm-kitchen-bon')
+    expect(kitchen).not.toBeNull()
+    expect(kitchen?.querySelector('.bm-bon-allergens')?.textContent).toBe(
+      'אלרגנים בהזמנה: סומסום, גלוטן, אגוזים',
+    )
+    const heatingRows = [...(kitchen?.querySelectorAll('.bm-bon-row') ?? [])].map((row) => ({
+      label: row.querySelector('dt')?.textContent ?? '',
+      value: row.querySelector('dd')?.textContent ?? '',
+    }))
+    expect(heatingRows).toEqual([
+      { label: 'קציצות בשר ברוטב אדום עשיר:', value: 'חימום: לחמם 20 דקות בתנור' },
+      { label: 'אקסטרה עם אגוזים:', value: 'חימום: לחמם קלות' },
+    ])
+  })
+
+  it('prints no kitchen strip when no ordered dish has allergens or heating instructions', () => {
+    mockedUseStore.mockReturnValue(queryResult({
+      store: {
+        orders: [{
+          id: 'live-1', name: 'לקוחה',
+          salads: { טחינה: { o: 1 } },
+          mains: { 'קציצות בשר ברוטב אדום עשיר': 1 },
+        }],
+      },
+    }))
+    const { container } = renderBon()
+
+    expect(container.querySelector('.bm-kitchen-bon')).toBeNull()
+    expect(container.querySelector('.bm-bon-allergens')).toBeNull()
+    expect(container.querySelector('.bm-order-bon')).not.toBeNull()
+  })
+
   it('prints a stored amount it cannot parse verbatim rather than dropping it', () => {
     mockedUseStore.mockReturnValue(queryResult({
       store: { orders: [{ id: 'live-1', name: 'לקוחה', total: 'בערך 500 דולר' }] },

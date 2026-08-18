@@ -48,6 +48,9 @@ export interface OrdersSummaryChips {
   readonly challahs: number | null
 }
 
+/** An operational field the checklist flags as missing on an active order. */
+export type OrdersMissingField = 'time' | 'destination' | 'price' | 'phone'
+
 export interface OrdersOrderView {
   readonly sourceIndex: number
   readonly orderId: string | null
@@ -63,6 +66,16 @@ export interface OrdersOrderView {
   readonly status: string
   readonly paidLabel: string
   readonly cancelled: boolean
+  readonly urgent: boolean
+  readonly draft: boolean
+  readonly allergyAlert: boolean
+  /** Empty for cancelled orders and drafts — the checklist tracks commitments. */
+  readonly missingFields: readonly OrdersMissingField[]
+  /**
+   * Customer names of other ACTIVE orders sharing this order's normalized
+   * phone (last 9 digits) on the same date — a possible double booking.
+   */
+  readonly duplicateOtherNames: readonly string[]
   readonly totalState: 'absent' | 'valid' | 'invalid'
   readonly totalMinorUnits: number | null
   readonly formattedText: string
@@ -180,6 +193,39 @@ function pushOrderWarning(
 
 function isCancelled(order: Readonly<LegacyOrder>): boolean {
   return CANCELLED_STATUS_ALIASES.has(text(order.status).toLocaleLowerCase('en-US'))
+}
+
+// Allergy safety flag: the kitchen must never miss an allergy buried in the
+// free-text notes, in either language.
+const ALLERGY_NOTE_TOKENS = ['אלרגי', 'allerg'] as const
+
+function hasAllergyNote(order: Readonly<LegacyOrder>): boolean {
+  const notes = text(order.notes).toLocaleLowerCase('en-US')
+  return ALLERGY_NOTE_TOKENS.some((token) => notes.includes(token))
+}
+
+// A time the kitchen can actually schedule against: H:MM or HH:MM, 24h.
+const PARSABLE_TIME_PATTERN = /^(?:[01]?\d|2[0-3]):[0-5]\d$/u
+
+function missingOrderFields(
+  order: Readonly<LegacyOrder>,
+  total: ParsedMoney,
+  phone: string,
+  cancelled: boolean,
+  draft: boolean,
+): readonly OrdersMissingField[] {
+  // Cancelled orders and drafts are not commitments; nothing to chase there.
+  if (cancelled || draft) return []
+  const missing: OrdersMissingField[] = []
+  if (!PARSABLE_TIME_PATTERN.test(text(order.time))) missing.push('time')
+  if (order.pickup !== true && text(order.place) === '' && text(order.address) === '') {
+    missing.push('destination')
+  }
+  if (total.state !== 'valid' || total.minorUnits === null || total.minorUnits <= 0) {
+    missing.push('price')
+  }
+  if (phone.replace(/\D/g, '') === '') missing.push('phone')
+  return missing
 }
 
 function isRealIsoDate(value: string): boolean {
@@ -956,6 +1002,11 @@ function buildContext(
       ? 'איסוף עצמי'
       : text(order.place) || text(order.address) || 'לא צוין יעד'
   const formattedText = formatLegacyOrderText(order, locale)
+  const cancelled = isCancelled(order)
+  // urgent/draft live outside the schema on purpose (passthrough keeps them);
+  // anything but a literal true is treated as off.
+  const urgent = order.urgent === true
+  const draft = order.draft === true
   const view: OrdersOrderView = {
     sourceIndex,
     orderId: id !== null && !ambiguousOrderIds.has(String(id)) ? routeOrderId(id) : null,
@@ -970,7 +1021,12 @@ function buildContext(
     destination,
     status: text(order.status) || 'חדשה',
     paidLabel: paidLabel(order.paid),
-    cancelled: isCancelled(order),
+    cancelled,
+    urgent,
+    draft,
+    allergyAlert: hasAllergyNote(order),
+    missingFields: missingOrderFields(order, total, phone, cancelled, draft),
+    duplicateOtherNames: [],
     totalState: total.state,
     totalMinorUnits: total.minorUnits,
     formattedText,
@@ -1045,6 +1101,39 @@ function readCapacity(store: Readonly<LegacyStore>, warnings: OrdersWarning[]): 
   return { kind: 'configured', maximumMeals: parsed }
 }
 
+function duplicatePhoneDateKey(context: OrderContext): string | null {
+  // Only ACTIVE orders can collide: cancelled orders and drafts are not
+  // commitments, and an order without a date or a phone has nothing to match.
+  if (context.view.cancelled || context.view.draft || context.rawDate === '') return null
+  const digits = context.view.phone.replace(/\D/g, '')
+  if (digits === '') return null
+  return `${digits.slice(-9)}|${context.rawDate}`
+}
+
+/**
+ * Marks every pair of active orders sharing a normalized phone (last 9
+ * digits) and a service date — the classic double-entry of the same booking.
+ */
+function annotateDuplicates(contexts: readonly OrderContext[]): OrderContext[] {
+  const byKey = new Map<string, OrderContext[]>()
+  for (const context of contexts) {
+    const key = duplicatePhoneDateKey(context)
+    if (key === null) continue
+    const existing = byKey.get(key)
+    if (existing === undefined) byKey.set(key, [context])
+    else existing.push(context)
+  }
+  return contexts.map((context) => {
+    const key = duplicatePhoneDateKey(context)
+    const peers = key === null ? [] : (byKey.get(key) ?? [])
+    if (peers.length < 2) return context
+    const duplicateOtherNames = peers
+      .filter((peer) => peer.sourceIndex !== context.sourceIndex)
+      .map((peer) => peer.view.customerName)
+    return { ...context, view: { ...context.view, duplicateOtherNames } }
+  })
+}
+
 function dateGroupKey(context: OrderContext): string {
   if (context.rawDate === '') return 'undated'
   return context.view.serviceDateValid ? `dated:${context.rawDate}` : `invalid:${context.rawDate}`
@@ -1057,6 +1146,9 @@ function compareContexts(left: OrderContext, right: OrderContext): number {
   if (rankDifference !== 0) return rankDifference
   const dateDifference = left.rawDate.localeCompare(right.rawDate)
   if (dateDifference !== 0) return dateDifference
+  // Urgent orders lead their date group.
+  const urgentDifference = Number(right.view.urgent) - Number(left.view.urgent)
+  if (urgentDifference !== 0) return urgentDifference
   const timeDifference = (left.view.time || '99:99').localeCompare(right.view.time || '99:99')
   return timeDifference || left.sourceIndex - right.sourceIndex
 }
@@ -1085,7 +1177,9 @@ function buildDisplayBlocks(
 
   const groupBlocks: OrdersLinkedGroup[] = groupOrder.map((name) => {
     const members = grouped.get(name) ?? []
-    const active = members.filter((context) => !context.view.cancelled)
+    // Drafts are visible members but not commitments — like cancelled orders,
+    // they stay out of the group's destinations and money total.
+    const active = members.filter((context) => !context.view.cancelled && !context.view.draft)
     const destinations = [...new Set(active.map((context) => context.view.destination).filter(Boolean))]
     let total: number | null = 0
     for (const context of active) {
@@ -1151,7 +1245,9 @@ function buildDateGroups(
     let activeRevenue: number | null = 0
 
     for (const context of members) {
-      if (context.view.cancelled) continue
+      // Drafts are not commitments yet: they render, but the date group's
+      // meal and revenue counters ignore them exactly like cancelled orders.
+      if (context.view.cancelled || context.view.draft) continue
       if (context.meals === null) activeMeals = null
       else if (activeMeals !== null) {
         try {
@@ -1235,8 +1331,10 @@ export function buildOrdersDashboard(
   const ambiguousOrderIds = new Set(
     [...idCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id),
   )
-  const contexts = store.orders.map((order, index) =>
-    buildContext(order, index, locale, warnings, ambiguousOrderIds),
+  const contexts = annotateDuplicates(
+    store.orders.map((order, index) =>
+      buildContext(order, index, locale, warnings, ambiguousOrderIds),
+    ),
   )
   const terms = queryTerms(query, locale)
   const matches =
