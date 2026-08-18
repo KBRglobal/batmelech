@@ -1,5 +1,6 @@
 import { LegacyStoreSchema, type LegacyStore } from './store.ts'
 import type { SettingsCatalog } from './settings-catalog.ts'
+import { parseLegacyUsdAmount } from './customers-finance.ts'
 
 const MAX_BACKUP_BYTES = 10_000_000
 const MAX_BACKUP_DEPTH = 64
@@ -57,6 +58,8 @@ export interface SettingsDraft {
   readonly paymentRequestDetails: string
   /** The business's Google review link, pasted into the thank-you message. */
   readonly googleReviewUrl: string
+  /** Minimum order total in USD for Abu Dhabi deliveries; empty means no minimum. */
+  readonly minOrderAbuDhabi: string
 }
 
 export type SettingsDraftValidation =
@@ -74,6 +77,7 @@ export type SettingsDraftValidation =
       readonly siteBanner: string
       readonly paymentRequestDetails: string
       readonly googleReviewUrl: string
+      readonly minOrderAbuDhabiMinorUnits?: number
     }
   | { readonly valid: false; readonly issues: readonly string[] }
 
@@ -264,6 +268,16 @@ function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function optionalPositiveDollarsText(value: unknown): string {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
+    const amount = BigInt(value)
+    const dollars = amount / 100n
+    const cents = String(amount % 100n).padStart(2, '0')
+    return `${dollars}.${cents}`
+  }
+  return ''
+}
+
 function nonNegativeIntegerText(value: unknown): string {
   if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value)
   if (typeof value === 'string' && /^\d+$/.test(value.trim())) return value.trim()
@@ -299,6 +313,7 @@ export function readSettingsDraft(
     siteBanner: stringValue(settings.siteBanner),
     paymentRequestDetails: stringValue(settings.paymentRequestDetails),
     googleReviewUrl: stringValue(settings.googleReviewUrl),
+    minOrderAbuDhabi: optionalPositiveDollarsText(settings.minOrderAbuDhabiMinorUnits),
   }
 }
 
@@ -340,6 +355,12 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
   if (!validOptionalUrl(googleReviewUrl)) {
     issues.push('קישור הביקורות בגוגל חייב להיות כתובת HTTP או HTTPS תקינה.')
   }
+  const minOrderParsed = parseLegacyUsdAmount(draft.minOrderAbuDhabi)
+  if (minOrderParsed.state === 'invalid') {
+    issues.push('מינימום הזמנה לאבו דאבי חייב להיות סכום בדולרים חיובי עם עד שתי ספרות אחרי הנקודה.')
+  } else if (minOrderParsed.state === 'valid' && minOrderParsed.minorUnits <= 0) {
+    issues.push('מינימום הזמנה לאבו דאבי חייב להיות גדול מ-0.')
+  }
   return issues.length > 0
     ? { valid: false, issues }
     : {
@@ -356,6 +377,10 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
         siteBanner,
         paymentRequestDetails,
         googleReviewUrl,
+        minOrderAbuDhabiMinorUnits:
+          minOrderParsed.state === 'valid' && minOrderParsed.minorUnits > 0
+            ? minOrderParsed.minorUnits
+            : undefined,
       }
 }
 
@@ -391,6 +416,11 @@ export function applySettingsToStore(
     siteBanner: result.siteBanner === '' ? null : result.siteBanner,
     paymentRequestDetails: result.paymentRequestDetails,
     googleReviewUrl: result.googleReviewUrl,
+  }
+  if (result.minOrderAbuDhabiMinorUnits !== undefined) {
+    settings.minOrderAbuDhabiMinorUnits = result.minOrderAbuDhabiMinorUnits
+  } else {
+    delete settings.minOrderAbuDhabiMinorUnits
   }
   if (result.orderingOpen) {
     delete settings.orderingClosedUntil

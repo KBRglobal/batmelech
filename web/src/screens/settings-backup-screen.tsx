@@ -382,6 +382,25 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
           </div>
         </section>
 
+        <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
+          <h2 className="text-xl font-black text-primary">משלוחים</h2>
+          <p className="mt-2 text-xs font-bold text-muted-foreground">הגבלות מינימום לפי אזור.</p>
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="text-xs font-black text-muted-foreground">
+              מינימום הזמנה לאבו דאבי (USD)
+              <input
+                aria-label="מינימום הזמנה לאבו דאבי"
+                dir="ltr"
+                inputMode="decimal"
+                value={currentDraft.minOrderAbuDhabi}
+                onChange={(event) => setDraft({ ...currentDraft, minOrderAbuDhabi: event.currentTarget.value })}
+                placeholder="120.00"
+                className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-left text-sm font-bold outline-none"
+              />
+            </label>
+          </div>
+        </section>
+
         <StaffLoginSection />
 
         <StateHistorySection />

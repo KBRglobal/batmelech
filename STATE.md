@@ -28,7 +28,7 @@ The items below are approved/pending in `docs/product-roadmap-v3.md` and do NOT
 require real content from Moshe/Lin. Build next, in priority order:
 1. ~~Block-a-customer flag~~ — DONE (panel toggle + site checkout rejection + tests).
 2. ~~Closed-day calendar toggle~~ — DONE (panel per-day toggle + site checkout block + tests).
-3. Minimum order amount for Abu Dhabi.
+3. ~~Minimum order amount for Abu Dhabi~~ — DONE (settings USD input + site checkout block + tests).
 4. Weekly automatic backup to email.
 5. Delivery-photos gallery.
 6. Copy-last-year holiday menu.
