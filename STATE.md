@@ -26,7 +26,7 @@ verified `/healthz`, `/api/site/status`, `/site`, `/kitchen`.
 ## Now — next wave (remaining approved roadmap v3 items, content-independent)
 The items below are approved/pending in `docs/product-roadmap-v3.md` and do NOT
 require real content from Moshe/Lin. Build next, in priority order:
-1. Block-a-customer flag.
+1. ~~Block-a-customer flag~~ — DONE (panel toggle + site checkout rejection + tests).
 2. Closed-day calendar toggle (site orders blocked for that date).
 3. Minimum order amount for Abu Dhabi.
 4. Weekly automatic backup to email.
