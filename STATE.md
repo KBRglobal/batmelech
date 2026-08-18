@@ -29,7 +29,7 @@ require real content from Moshe/Lin. Build next, in priority order:
 1. ~~Block-a-customer flag~~ — DONE (panel toggle + site checkout rejection + tests).
 2. ~~Closed-day calendar toggle~~ — DONE (panel per-day toggle + site checkout block + tests).
 3. ~~Minimum order amount for Abu Dhabi~~ — DONE (settings USD input + site checkout block + tests).
-4. Weekly automatic backup to email.
+4. ~~Weekly automatic backup to email~~ — DONE (settings email + Sunday 08:00 Dubai scheduler + Resend attachment + tests).
 5. Delivery-photos gallery.
 6. Copy-last-year holiday menu.
 7. Multi-currency display USD/EUR/AED.
