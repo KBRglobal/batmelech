@@ -127,12 +127,36 @@ export interface ManualPriceCorrection {
   readonly at: number
 }
 
+export interface PriceHistoryEntry {
+  readonly at: number
+  readonly minorUnitsPerBaseUnit: number
+  readonly source: 'pack' | 'receipt'
+}
+
+export const MAX_PRICE_HISTORY_ENTRIES = 30
+
 export interface SupplierListing {
   readonly packSize: DecimalQuantity
   readonly packUnit: string
   readonly packPriceMinorUnits: number
   readonly updatedAt: number
   readonly manualPrice: ManualPriceCorrection | null
+  /** Newest first, capped. Absent on entries saved before the field existed. */
+  readonly history?: readonly PriceHistoryEntry[]
+}
+
+/** Prepend a price change; drops nothing else, keeps the newest MAX entries. */
+export function appendPriceHistory(
+  listing: Readonly<SupplierListing>,
+  entry: PriceHistoryEntry,
+): SupplierListing {
+  const previous = listing.history ?? []
+  const latest = previous[0]
+  // A re-save with the same effective price is not a change worth recording.
+  if (latest !== undefined && latest.minorUnitsPerBaseUnit === entry.minorUnitsPerBaseUnit && latest.source === entry.source) {
+    return listing
+  }
+  return { ...listing, history: [entry, ...previous].slice(0, MAX_PRICE_HISTORY_ENTRIES) }
 }
 
 export interface ProductLibraryEntry {
@@ -162,6 +186,18 @@ const SupplierListingSchema = z
     manualPrice: z
       .object({ minorUnitsPerBaseUnit: z.number().int().nonnegative(), at: z.number().int().positive() })
       .nullable(),
+    history: z
+      .array(
+        z
+          .object({
+            at: z.number().int().positive(),
+            minorUnitsPerBaseUnit: z.number().int().nonnegative(),
+            source: z.enum(['pack', 'receipt']),
+          })
+          .strict(),
+      )
+      .max(MAX_PRICE_HISTORY_ENTRIES)
+      .optional(),
   })
   .strict()
 

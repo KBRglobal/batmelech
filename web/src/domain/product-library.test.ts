@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appendPriceHistory,
   applyManualPriceCorrection,
   applyProductLibraryToStore,
   compareSuppliers,
@@ -178,6 +179,39 @@ describe('lulu supplier and volume units', () => {
     // 0.5L * (4599/5 = 919.8 -> 920 rounded per liter) = 460
     expect(estimate).toEqual({ minorUnits: 460, supplier: 'nesto' })
     expect(quickCostEstimate(oil, '500', 'גרם')).toBeNull()
+  })
+})
+
+describe('price history', () => {
+  const listing = entry().listings.nesto!
+
+  it('prepends changes newest-first and caps the length', () => {
+    let current = listing
+    for (let step = 1; step <= 40; step += 1) {
+      current = appendPriceHistory(current, { at: step, minorUnitsPerBaseUnit: step * 100, source: 'pack' })
+    }
+    expect(current.history).toHaveLength(30)
+    expect(current.history![0]!.minorUnitsPerBaseUnit).toBe(4000)
+  })
+
+  it('does not record a re-save with an unchanged price', () => {
+    const once = appendPriceHistory(listing, { at: 1, minorUnitsPerBaseUnit: 5000, source: 'pack' })
+    const twice = appendPriceHistory(once, { at: 2, minorUnitsPerBaseUnit: 5000, source: 'pack' })
+    expect(twice.history).toHaveLength(1)
+  })
+
+  it('a pack-price edit never clears an existing receipt price', () => {
+    const withReceipt = applyManualPriceCorrection(entry(), 'nesto', 6100, 1000)
+    const packEdited = {
+      ...withReceipt,
+      listings: {
+        ...withReceipt.listings,
+        nesto: { ...withReceipt.listings.nesto!, packPriceMinorUnits: 99999 },
+      },
+    }
+    // The receipt price still wins after the pack price moved.
+    expect(effectivePricePerBaseUnit(packEdited.listings.nesto!)).toBe(6100)
+    expect(packEdited.listings.nesto!.manualPrice).not.toBeNull()
   })
 })
 

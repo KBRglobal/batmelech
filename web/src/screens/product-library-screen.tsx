@@ -8,7 +8,9 @@ import {
   DEFAULT_SUPPLIER_BY_CATEGORY,
   SUPPLIER_KEYS,
   SUPPLIER_LABELS,
+  appendPriceHistory,
   applyProductLibraryToStore,
+  effectivePricePerBaseUnit,
   loadProductLibrary,
   minorUnitsToMoney,
   moneyToMinorUnits,
@@ -16,6 +18,7 @@ import {
   priceCorrectionFromReceipt,
   quickCostEstimate,
   validateProductLibraryEntry,
+  type PriceHistoryEntry,
   type ProductLibraryEntry,
   type SupplierKey,
 } from '../domain/product-library.ts'
@@ -39,6 +42,8 @@ interface SupplierListingDraft {
   readonly manualPrice: string
   readonly updatedAt: number
   readonly manualAt: number | null
+  /** Carried opaque through the round-trip; appended to by draftToEntry on price changes. */
+  readonly history: readonly PriceHistoryEntry[]
 }
 
 interface ProductDraft {
@@ -54,7 +59,7 @@ interface ProductDraft {
 }
 
 function emptyListingDraft(now: number): SupplierListingDraft {
-  return { packSize: '', packUnit: 'ק״ג', packPrice: '', manualPrice: '', updatedAt: now, manualAt: null }
+  return { packSize: '', packUnit: 'ק״ג', packPrice: '', manualPrice: '', updatedAt: now, manualAt: null, history: [] }
 }
 
 function toDraft(entry: ProductLibraryEntry): ProductDraft {
@@ -68,6 +73,7 @@ function toDraft(entry: ProductLibraryEntry): ProductDraft {
       manualPrice: listing.manualPrice === null ? '' : minorUnitsToMoney(listing.manualPrice.minorUnitsPerBaseUnit),
       updatedAt: listing.updatedAt,
       manualAt: listing.manualPrice?.at ?? null,
+      history: listing.history ?? [],
     }
   }
   return {
@@ -99,13 +105,19 @@ function draftToEntry(
               minorUnitsPerBaseUnit: moneyToMinorUnits(supplierDraft.manualPrice.trim()),
               at: supplierDraft.manualAt ?? now,
             }
-      return {
+      const base = {
         packSize: supplierDraft.packSize.trim(),
         packUnit: supplierDraft.packUnit.trim(),
         packPriceMinorUnits,
         updatedAt: supplierDraft.updatedAt,
         manualPrice,
+        history: [...supplierDraft.history],
       }
+      return appendPriceHistory(base, {
+        at: now,
+        minorUnitsPerBaseUnit: effectivePricePerBaseUnit(base),
+        source: manualPrice === null ? 'pack' : 'receipt',
+      })
     }
     const nesto = listing(draft.nesto)
     const lulu = listing(draft.lulu)
@@ -255,6 +267,21 @@ function SupplierListingCard({
         </label>
       </div>
       {quickEstimate !== null && <p className="mt-2 text-[11px] font-bold text-muted-foreground">{quickEstimate}</p>}
+      <p className="mt-1 text-[11px] font-bold text-muted-foreground">
+        מחיר עודכן: {new Date(draft.manualAt ?? draft.updatedAt).toLocaleDateString('he-IL')}
+      </p>
+      {draft.history.length > 0 && (
+        <details className="mt-2 rounded-xl bg-secondary/30 px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-black text-primary">היסטוריית מחירים ({draft.history.length})</summary>
+          <ul className="mt-2 space-y-1 text-[11px] font-bold text-muted-foreground">
+            {draft.history.map((entry) => (
+              <li key={`${entry.at}-${entry.minorUnitsPerBaseUnit}`}>
+                {new Date(entry.at).toLocaleDateString('he-IL')} · {minorUnitsToMoney(entry.minorUnitsPerBaseUnit)} AED ל{draft.packUnit} · {entry.source === 'receipt' ? 'לפי קבלה' : 'מחיר אריזה'}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <label className="mt-3 block text-[11px] font-black text-muted-foreground">
         מחיר ידני לפי קבלה (גובר על מחיר האריזה)
         <input
