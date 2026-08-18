@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../data/use-store.ts'
+import useVersionedScreenSave from '../data/versioned-screen-save.tsx'
 import type { LegacyStore } from '../domain/store.ts'
 import {
   buildCalendarMonth,
@@ -13,7 +14,9 @@ import {
 } from './calendar-screen.tsx'
 
 vi.mock('../data/use-store.ts', () => ({ useStore: vi.fn() }))
+vi.mock('../data/versioned-screen-save.tsx', () => ({ default: vi.fn() }))
 const mockedUseStore = vi.mocked(useStore)
+const mockedUseVersionedScreenSave = vi.mocked(useVersionedScreenSave)
 const HASH = 'a'.repeat(64)
 
 function queryResult(options: {
@@ -35,7 +38,11 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
 })
-beforeEach(() => mockedUseStore.mockReset())
+beforeEach(() => {
+  mockedUseStore.mockReset()
+  mockedUseVersionedScreenSave.mockReset()
+  mockedUseVersionedScreenSave.mockReturnValue({ onSave: vi.fn() })
+})
 
 describe('calendar domain helpers', () => {
   it('sums orders and couple meals per valid date, skipping cancelled and invalid rows', () => {

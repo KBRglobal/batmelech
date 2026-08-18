@@ -69,6 +69,7 @@ const HE = {
   infoWhatsApp: 'לאחר לחיצה על "אישור ושליחה", ההזמנה תיפתח כהודעת וואטסאפ מוכנה אל בת מלך לאישור סופי.',
   infoPayment: 'אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.',
   phoneBlockedError: 'מספר הטלפון הזה אינו יכול לבצע הזמנות כרגע. נשמח לעזור בוואטסאפ.',
+  dateClosedError: 'התאריך הזה סגור להזמנות. בחרו תאריך אחר או פנו אלינו בוואטסאפ.',
   submitCta: 'אישור ושליחת הזמנה',
   hintClosed: 'האתר לא מקבל הזמנות כרגע',
   hintShabbatClosed: 'המטבח שלנו שומר שבת — לא מקבלים הזמנות כרגע',
@@ -147,6 +148,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoWhatsApp: 'When you tap "Confirm & Send", your order opens as a ready-made WhatsApp message to Bat Melech for final confirmation.',
     infoPayment: 'No payment is taken on the site. Payment is arranged directly with Bat Melech on WhatsApp — cash on delivery, bank transfer, Bit, or PayBox.',
     phoneBlockedError: 'This phone number cannot place orders right now. We would be happy to help on WhatsApp.',
+    dateClosedError: 'This date is closed for orders. Please choose another date or reach out on WhatsApp.',
     submitCta: 'Confirm & Send Order',
     hintClosed: 'We are not taking orders right now',
     hintShabbatClosed: 'We keep Shabbat — we are not taking orders right now',
@@ -217,6 +219,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoWhatsApp: 'Après avoir appuyé sur « Confirmer et envoyer », votre commande s\'ouvrira sous forme de message WhatsApp prêt à envoyer à Bat Melech pour confirmation finale.',
     infoPayment: 'Aucun paiement sur le site. Le règlement se fait directement avec Bat Melech sur WhatsApp — espèces à la livraison, virement bancaire, Bit ou PayBox.',
     phoneBlockedError: 'Ce numéro de téléphone ne peut pas passer de commande pour le moment. Nous serons ravis de vous aider sur WhatsApp.',
+    dateClosedError: 'Cette date est fermée aux commandes. Veuillez choisir une autre date ou nous contacter sur WhatsApp.',
     submitCta: 'Confirmer et envoyer la commande',
     hintClosed: 'Le site ne prend pas de commandes pour le moment',
     hintShabbatClosed: 'Nous gardons le Shabbat — le site ne prend pas de commandes pour le moment',
@@ -320,10 +323,11 @@ function localizedOrderMessage(
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
-  const { orderingOpen, shabbatClosed } = useSiteStatus()
+  const { orderingOpen, shabbatClosed, closedDates } = useSiteStatus()
   const { locale, dir, href } = useLocale()
   const t = COPY[locale]
   const isPickup = customer.fulfillment === 'pickup'
+  const isSelectedDateClosed = closedDates.includes(customer.date)
   const deliveryFee = DELIVERY_FEES_USD[customer.zone]
   const total = lines.length ? subtotal + (isPickup ? 0 : deliveryFee) : 0
 
@@ -392,6 +396,7 @@ export function Checkout() {
   const canSubmit =
     orderingOpen &&
     !shabbatClosed &&
+    !isSelectedDateClosed &&
     customer.name.trim() &&
     customer.phone.trim() &&
     customer.date.trim() &&
@@ -429,6 +434,8 @@ export function Checkout() {
         const body = await response.json().catch(() => ({}))
         if (response.status === 403 && body.error === 'phone_blocked') {
           setOrderError(t.phoneBlockedError)
+        } else if (response.status === 403 && body.error === 'date_closed') {
+          setOrderError(t.dateClosedError)
         }
         return false
       }
@@ -594,6 +601,11 @@ export function Checkout() {
                 onChange={(e) => setCustomer({ date: e.target.value })}
                 className="w-full p-5 rounded-2xl bg-white border border-[#EDB2C1]/30 focus:ring-2 focus:ring-[#F5A83A] outline-none font-bold"
               />
+              {isSelectedDateClosed && (
+                <p className="text-xs font-black text-[#8D182C] mt-2" role="alert">
+                  {t.dateClosedError}
+                </p>
+              )}
             </Field>
             <Field label={isPickup ? t.pickupTimeLabel : t.deliveryTimeLabel}>
               {!isPickup && deliveryWindows.length > 0 ? (
@@ -758,11 +770,13 @@ export function Checkout() {
                 ? t.hintShabbatClosed
                 : !orderingOpen
                   ? t.hintClosed
-                  : isPickup
-                    ? t.hintPickup
-                    : isHotelMode
-                      ? t.hintHotel
-                      : t.hintAddress}
+                  : isSelectedDateClosed
+                    ? t.dateClosedError
+                    : isPickup
+                      ? t.hintPickup
+                      : isHotelMode
+                        ? t.hintHotel
+                        : t.hintAddress}
             </p>
           )}
         </div>

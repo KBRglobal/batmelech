@@ -405,6 +405,46 @@ test('intake refuses an order from a blocked phone', async () => {
   });
 });
 
+test('intake refuses an order for a manually closed date', async () => {
+  const repository = {
+    saved: [],
+    async loadState() {
+      return { data: { orders: [], settings: { closedDates: ['2026-08-20'] } }, revision: 1, hash: 'h' };
+    },
+    async saveState({ localState }) {
+      this.saved.push(localState);
+      return { ok: true };
+    },
+  };
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'date_closed');
+    assert.match(body.message, /סגור/u);
+    assert.equal(repository.saved.length, 0);
+  });
+});
+
+test('intake accepts an order when the date is not in the closed list', async () => {
+  const repository = {
+    saved: [],
+    async loadState() {
+      return { data: { orders: [], settings: { closedDates: ['2026-08-21'] } }, revision: 1, hash: 'h' };
+    },
+    async saveState({ localState }) {
+      this.saved.push(localState);
+      return { ok: true };
+    },
+  };
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+    assert.equal(response.status, 201);
+    assert.equal(repository.saved.length, 1);
+  });
+});
+
 test('intake accepts orders on Chanukah and on chol hamoed Sukkot', async () => {
   for (const [name, at] of [
     ['Chanukah', Date.UTC(2026, 11, 7, 8, 0)],

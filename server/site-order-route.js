@@ -87,6 +87,12 @@ function isPhoneBlocked(phone, settings) {
   return list.some((entry) => typeof entry === 'string' && digitsOnlyPhone(entry) === normalized);
 }
 
+function isDateClosed(dateString, settings) {
+  if (typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(dateString)) return false;
+  const list = settings && Array.isArray(settings.closedDates) ? settings.closedDates : [];
+  return list.some((entry) => typeof entry === 'string' && entry === dateString);
+}
+
 function orderId(now) {
   return `site-${now.getTime()}-${crypto.randomBytes(4).toString('hex')}`;
 }
@@ -208,6 +214,13 @@ function createSiteOrderRouter({ repository, logger = console, clock = () => new
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
       try {
         const current = await repository.loadState();
+        if (isDateClosed(legacyOrder.date, current.data.settings)) {
+          return response.status(403).json({
+            ok: false,
+            error: 'date_closed',
+            message: 'התאריך הזה סגור להזמנות. בחרו תאריך אחר או פנו אלינו בוואטסאפ.',
+          });
+        }
         if (isPhoneBlocked(parsed.data.customer.phone, current.data.settings)) {
           return response.status(403).json({
             ok: false,

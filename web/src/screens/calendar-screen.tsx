@@ -5,6 +5,9 @@ import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
+import useVersionedScreenSave from '../data/versioned-screen-save.tsx'
+import { isVersionedStateEnvelope } from '../services/state-api.ts'
+import { isDateClosed } from '../domain/calendar.ts'
 import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
 
 /**
@@ -99,13 +102,20 @@ function loadClassName(meals: number, capacity: number | null): string {
   return 'bg-emerald-50 border-emerald-100'
 }
 
+function closedDateList(store: Readonly<LegacyStore>): string[] {
+  const raw = store.settings?.closedDates
+  return Array.isArray(raw) ? raw.filter((value): value is string => typeof value === 'string') : []
+}
+
 export function CalendarScreen() {
   const storeQuery = useStore()
+  const { onSave } = useVersionedScreenSave()
   const todayIso = todayIsoInDubai()
   const [cursor, setCursor] = useState(() => ({
     year: Number(todayIso.slice(0, 4)),
     month: Number(todayIso.slice(5, 7)),
   }))
+  const [togglingIso, setTogglingIso] = useState<string | null>(null)
 
   if (storeQuery.isPending) return <ScreenState kind="loading" title="טוענת את לוח השנה" />
   if (storeQuery.isError) {
@@ -121,6 +131,7 @@ export function CalendarScreen() {
   const store = storeQuery.data.data ?? { orders: [] }
   const days = summarizeCalendarDays(store)
   const capacity = calendarCapacity(store)
+  const closedDates = closedDateList(store)
   const view = buildCalendarMonth(cursor.year, cursor.month)
 
   const shiftMonth = (delta: number) => {
@@ -128,6 +139,31 @@ export function CalendarScreen() {
       const index = current.year * 12 + (current.month - 1) + delta
       return { year: Math.floor(index / 12), month: (index % 12) + 1 }
     })
+  }
+
+  async function toggleClosed(iso: string) {
+    if (!storeQuery.data || togglingIso === iso) return
+    const envelope = storeQuery.data
+    if (!isVersionedStateEnvelope(envelope)) return
+    const baseStore = envelope.data
+    if (!baseStore) return
+    const current = new Set(closedDateList(baseStore))
+    const nextClosed = current.has(iso)
+      ? [...current].filter((date) => date !== iso).sort()
+      : [...current, iso].sort()
+    const nextStore = structuredClone(baseStore)
+    nextStore.settings = { ...nextStore.settings, closedDates: nextClosed }
+    setTogglingIso(iso)
+    try {
+      await onSave({
+        reason: 'settings',
+        baseEnvelope: envelope,
+        baseStore,
+        nextStore,
+      })
+    } finally {
+      setTogglingIso(null)
+    }
   }
 
   return (
@@ -171,11 +207,17 @@ export function CalendarScreen() {
                 if (iso === null) return <span key={`blank-${dayIndex}`} aria-hidden="true" />
                 const summary = days.get(iso)
                 const isToday = iso === todayIso
+                const closed = isDateClosed(iso, closedDates)
                 const body = (
                   <>
                     <span className={`text-sm font-black ${isToday ? 'text-primary-foreground' : 'text-primary'}`}>
                       {Number(iso.slice(8, 10))}
                     </span>
+                    {closed && (
+                      <span className={`block text-[0.65rem] font-black leading-4 ${isToday ? 'text-primary-foreground' : 'text-rose-600'}`}>
+                        סגור
+                      </span>
+                    )}
                     {summary !== undefined && (
                       <span className={`mt-1 block text-[0.65rem] font-black leading-4 ${isToday ? 'text-primary-foreground' : 'text-primary'}`}>
                         {summary.orderCount} הזמנות
@@ -187,9 +229,13 @@ export function CalendarScreen() {
                   </>
                 )
                 const cellClassName = `block min-h-20 rounded-2xl border p-2 text-right transition-colors ${
-                  isToday ? 'border-primary bg-primary' : `border-border ${loadClassName(summary?.meals ?? 0, capacity)}`
+                  isToday
+                    ? 'border-primary bg-primary'
+                    : closed
+                      ? 'border-rose-200 bg-rose-50'
+                      : `border-border ${loadClassName(summary?.meals ?? 0, capacity)}`
                 }`
-                return summary !== undefined ? (
+                const cellContent = summary !== undefined ? (
                   <Link
                     key={iso}
                     to={preparationRoute(iso)}
@@ -200,6 +246,28 @@ export function CalendarScreen() {
                   </Link>
                 ) : (
                   <span key={iso} className={cellClassName}>{body}</span>
+                )
+                return (
+                  <div key={iso} className="relative">
+                    {cellContent}
+                    <button
+                      type="button"
+                      aria-label={closed ? `פתיחת יום ${iso}` : `סגירת יום ${iso}`}
+                      disabled={togglingIso === iso}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        void toggleClosed(iso)
+                      }}
+                      className={`absolute top-1 start-1 rounded-full px-1.5 py-0.5 text-[0.6rem] font-black transition-colors ${
+                        closed
+                          ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                          : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                      } ${togglingIso === iso ? 'opacity-50 cursor-wait' : ''}`}
+                    >
+                      {closed ? 'פתיחה' : 'סגירה'}
+                    </button>
+                  </div>
                 )
               })}
             </div>

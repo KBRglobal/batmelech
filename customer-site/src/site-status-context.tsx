@@ -6,6 +6,8 @@ type SiteStatus = {
   reopensOn: string | null
   siteBanner: string | null
   outOfStockNames: string[]
+  /** Dates (YYYY-MM-DD Dubai) that the kitchen has marked as closed. */
+  closedDates: string[]
   /** The calendar gate, independent of orderingOpen: Shabbat or a yom tov is in. */
   shabbatClosed: boolean
   /** The greeting for this occasion — 'שבת שלום', 'חג שמח — פסח'. */
@@ -25,6 +27,7 @@ const DEFAULT_STATUS: SiteStatus = {
   reopensOn: null,
   siteBanner: null,
   outOfStockNames: [],
+  closedDates: [],
   shabbatClosed: false,
   shabbatLabel: null,
   shabbatReopensAt: null,
@@ -75,6 +78,9 @@ export function SiteStatusProvider({ children }: { children: ReactNode }) {
           reopensOn: typeof data.reopensOn === 'string' && ISO_DATE.test(data.reopensOn) ? data.reopensOn : null,
           siteBanner: typeof data.siteBanner === 'string' ? data.siteBanner : null,
           outOfStockNames: Array.isArray(data.outOfStockNames) ? data.outOfStockNames : [],
+          closedDates: Array.isArray(data.closedDates)
+            ? data.closedDates.filter((value: unknown) => typeof value === 'string')
+            : [],
           // Opt in, never out: only an explicit `true` closes the site, so a
           // stale server that has never heard of Shabbat keeps selling.
           shabbatClosed: data.shabbatClosed === true,

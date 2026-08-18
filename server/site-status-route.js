@@ -44,6 +44,9 @@ function createSiteStatusRouter({ repository, logger = console, clock = () => ne
       const outOfStockNames = Array.isArray(settings.out)
         ? settings.out.filter((value) => typeof value === 'string')
         : [];
+      const closedDates = Array.isArray(settings.closedDates)
+        ? settings.closedDates.filter((value) => typeof value === 'string')
+        : [];
       // Closed is closed only until the reopen day; the value is computed per
       // request, so Sunday morning opens the site with nobody touching it.
       const ordering = orderingStatus(settings);
@@ -60,6 +63,7 @@ function createSiteStatusRouter({ repository, logger = console, clock = () => ne
         shabbatLabel: shabbat.label,
         shabbatReopensAt: shabbat.reopensAt,
         shabbatOccasion: shabbat.occasion,
+        closedDates,
       });
     } catch (error) {
       logger.error('site status read failed', error);
