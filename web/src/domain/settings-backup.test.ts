@@ -89,6 +89,7 @@ describe('settings backup domain', () => {
       siteBanner: '',
       paymentRequestDetails: '',
       googleReviewUrl: '',
+      minOrderAbuDhabi: '',
     }
     expect(validateSettingsDraft(nextDraft)).toMatchObject({ valid: true, maxMeals: 20 })
     const saved = applySettingsToStore(store, nextDraft, DEFAULT_SETTINGS_CATALOG)
@@ -142,6 +143,7 @@ describe('settings backup domain', () => {
         siteBanner: '',
         paymentRequestDetails: '',
         googleReviewUrl: '',
+        minOrderAbuDhabi: '',
       },
       DEFAULT_SETTINGS_CATALOG,
     )
@@ -168,6 +170,7 @@ describe('settings backup domain', () => {
       siteBanner: '',
       paymentRequestDetails: '',
       googleReviewUrl: '',
+      minOrderAbuDhabi: '',
     })
 
     expect(result.valid).toBe(false)
@@ -189,10 +192,41 @@ describe('settings backup domain', () => {
           siteBanner: '',
           paymentRequestDetails: '',
           googleReviewUrl: '',
+          minOrderAbuDhabi: '',
         },
         DEFAULT_SETTINGS_CATALOG,
       ),
     ).toThrow()
+  })
+
+  it('reads and saves the Abu Dhabi minimum order amount in USD minor units', () => {
+    const store = {
+      orders: [],
+      settings: { minOrderAbuDhabiMinorUnits: 12_500 },
+    } as LegacyStore
+    const draft = readSettingsDraft(store, DEFAULT_SETTINGS_CATALOG)
+    expect(draft.minOrderAbuDhabi).toBe('125.00')
+
+    const empty = validateSettingsDraft({ ...draft, minOrderAbuDhabi: '' })
+    expect(empty.valid).toBe(true)
+    if (empty.valid) expect(empty.minOrderAbuDhabiMinorUnits).toBeUndefined()
+
+    const invalid = validateSettingsDraft({ ...draft, minOrderAbuDhabi: '-5.00' })
+    expect(invalid.valid).toBe(false)
+
+    const saved = applySettingsToStore(
+      { orders: [] },
+      { ...draft, minOrderAbuDhabi: '120.50' },
+      DEFAULT_SETTINGS_CATALOG,
+    )
+    expect(saved.settings?.minOrderAbuDhabiMinorUnits).toBe(12_050)
+
+    const cleared = applySettingsToStore(
+      saved,
+      { ...draft, minOrderAbuDhabi: '' },
+      DEFAULT_SETTINGS_CATALOG,
+    )
+    expect('minOrderAbuDhabiMinorUnits' in (cleared.settings as object)).toBe(false)
   })
 })
 

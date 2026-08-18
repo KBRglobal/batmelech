@@ -16,6 +16,8 @@ type SiteStatus = {
   shabbatReopensAt: number | null
   /** Which of the two it is, so the copy can say מוצאי שבת or צאת החג. */
   shabbatOccasion: 'shabbat' | 'chag' | null
+  /** Minimum order total in minor units for Abu Dhabi deliveries, if configured. */
+  minOrderAbuDhabiMinorUnits: number | null
 }
 
 type SiteStatusValue = SiteStatus & {
@@ -32,6 +34,7 @@ const DEFAULT_STATUS: SiteStatus = {
   shabbatLabel: null,
   shabbatReopensAt: null,
   shabbatOccasion: null,
+  minOrderAbuDhabiMinorUnits: null,
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -91,6 +94,10 @@ export function SiteStatusProvider({ children }: { children: ReactNode }) {
               : null,
           shabbatOccasion:
             data.shabbatOccasion === 'shabbat' || data.shabbatOccasion === 'chag' ? data.shabbatOccasion : null,
+          minOrderAbuDhabiMinorUnits:
+            typeof data.minOrderAbuDhabiMinorUnits === 'number' && Number.isSafeInteger(data.minOrderAbuDhabiMinorUnits) && data.minOrderAbuDhabiMinorUnits > 0
+              ? data.minOrderAbuDhabiMinorUnits
+              : null,
         })
       })
       .catch(() => {})

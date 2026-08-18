@@ -64,6 +64,10 @@ function createSiteStatusRouter({ repository, logger = console, clock = () => ne
         shabbatReopensAt: shabbat.reopensAt,
         shabbatOccasion: shabbat.occasion,
         closedDates,
+        minOrderAbuDhabiMinorUnits:
+          Number.isSafeInteger(settings.minOrderAbuDhabiMinorUnits) && settings.minOrderAbuDhabiMinorUnits > 0
+            ? settings.minOrderAbuDhabiMinorUnits
+            : null,
       });
     } catch (error) {
       logger.error('site status read failed', error);

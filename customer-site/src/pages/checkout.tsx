@@ -70,6 +70,7 @@ const HE = {
   infoPayment: 'אין תשלום באתר. התשלום מסתדר ישירות מול בת מלך בוואטסאפ — מזומן במסירה, העברה בנקאית, ביט או פייבוקס.',
   phoneBlockedError: 'מספר הטלפון הזה אינו יכול לבצע הזמנות כרגע. נשמח לעזור בוואטסאפ.',
   dateClosedError: 'התאריך הזה סגור להזמנות. בחרו תאריך אחר או פנו אלינו בוואטסאפ.',
+  abuDhabiMinError: (min: number) => `ההזמנה המינימלית לאבו דאבי היא $${formatUsdMinorUnits(min)}.`,
   submitCta: 'אישור ושליחת הזמנה',
   hintClosed: 'האתר לא מקבל הזמנות כרגע',
   hintShabbatClosed: 'המטבח שלנו שומר שבת — לא מקבלים הזמנות כרגע',
@@ -99,6 +100,12 @@ const HE = {
   waDeliveryAddress: 'כתובת למשלוח',
   waHotelAddress: 'כתובת המלון',
   waNotes: 'הערות',
+}
+
+function formatUsdMinorUnits(minorUnits: number): string {
+  const dollars = Math.floor(minorUnits / 100)
+  const cents = String(minorUnits % 100).padStart(2, '0')
+  return `${dollars}.${cents}`
 }
 
 export const COPY: Record<Locale, typeof HE> = {
@@ -149,6 +156,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoPayment: 'No payment is taken on the site. Payment is arranged directly with Bat Melech on WhatsApp — cash on delivery, bank transfer, Bit, or PayBox.',
     phoneBlockedError: 'This phone number cannot place orders right now. We would be happy to help on WhatsApp.',
     dateClosedError: 'This date is closed for orders. Please choose another date or reach out on WhatsApp.',
+    abuDhabiMinError: (min: number) => `The minimum order for Abu Dhabi is $${formatUsdMinorUnits(min)}.`,
     submitCta: 'Confirm & Send Order',
     hintClosed: 'We are not taking orders right now',
     hintShabbatClosed: 'We keep Shabbat — we are not taking orders right now',
@@ -220,6 +228,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoPayment: 'Aucun paiement sur le site. Le règlement se fait directement avec Bat Melech sur WhatsApp — espèces à la livraison, virement bancaire, Bit ou PayBox.',
     phoneBlockedError: 'Ce numéro de téléphone ne peut pas passer de commande pour le moment. Nous serons ravis de vous aider sur WhatsApp.',
     dateClosedError: 'Cette date est fermée aux commandes. Veuillez choisir une autre date ou nous contacter sur WhatsApp.',
+    abuDhabiMinError: (min: number) => `Le minimum de commande pour Abou Dhabi est de $${formatUsdMinorUnits(min)}.`,
     submitCta: 'Confirmer et envoyer la commande',
     hintClosed: 'Le site ne prend pas de commandes pour le moment',
     hintShabbatClosed: 'Nous gardons le Shabbat — le site ne prend pas de commandes pour le moment',
@@ -323,13 +332,20 @@ function localizedOrderMessage(
 
 export function Checkout() {
   const { lines, subtotal, setQty, removeLine, customer, setCustomer, clear } = useCart()
-  const { orderingOpen, shabbatClosed, closedDates } = useSiteStatus()
+  const { orderingOpen, shabbatClosed, closedDates, minOrderAbuDhabiMinorUnits } = useSiteStatus()
   const { locale, dir, href } = useLocale()
   const t = COPY[locale]
   const isPickup = customer.fulfillment === 'pickup'
   const isSelectedDateClosed = closedDates.includes(customer.date)
   const deliveryFee = DELIVERY_FEES_USD[customer.zone]
   const total = lines.length ? subtotal + (isPickup ? 0 : deliveryFee) : 0
+  const totalMinorUnits = Math.round(total * 100)
+  const minAbuDhabi = minOrderAbuDhabiMinorUnits
+  const belowMin =
+    !isPickup &&
+    customer.zone === 'abu-dhabi' &&
+    minAbuDhabi !== null &&
+    totalMinorUnits < minAbuDhabi
 
   // Empty = free time field (feature off, pickup, no date yet, or fetch
   // failed — fail open, availability must never block a purchase).
@@ -397,6 +413,7 @@ export function Checkout() {
     orderingOpen &&
     !shabbatClosed &&
     !isSelectedDateClosed &&
+    !belowMin &&
     customer.name.trim() &&
     customer.phone.trim() &&
     customer.date.trim() &&
@@ -436,6 +453,12 @@ export function Checkout() {
           setOrderError(t.phoneBlockedError)
         } else if (response.status === 403 && body.error === 'date_closed') {
           setOrderError(t.dateClosedError)
+        } else if (
+          response.status === 403 &&
+          body.error === 'below_min_abu_dhabi' &&
+          typeof body.minRequiredMinorUnits === 'number'
+        ) {
+          setOrderError(t.abuDhabiMinError(body.minRequiredMinorUnits))
         }
         return false
       }
@@ -517,6 +540,11 @@ export function Checkout() {
               <span>${total.toFixed(2).replace(/\.00$/, '')}</span>
             </div>
           </div>
+          {belowMin && minAbuDhabi !== null && (
+            <p className="text-sm font-black text-[#8D182C] mt-6" role="alert">
+              {t.abuDhabiMinError(minAbuDhabi)}
+            </p>
+          )}
           <CurrencyNote className="mt-6" />
         </section>
 
@@ -772,11 +800,13 @@ export function Checkout() {
                   ? t.hintClosed
                   : isSelectedDateClosed
                     ? t.dateClosedError
-                    : isPickup
-                      ? t.hintPickup
-                      : isHotelMode
-                        ? t.hintHotel
-                        : t.hintAddress}
+                    : belowMin && minAbuDhabi !== null
+                      ? t.abuDhabiMinError(minAbuDhabi)
+                      : isPickup
+                        ? t.hintPickup
+                        : isHotelMode
+                          ? t.hintHotel
+                          : t.hintAddress}
             </p>
           )}
         </div>

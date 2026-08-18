@@ -64,6 +64,10 @@ function submission(customer) {
   };
 }
 
+function abuDhabiOrder(total) {
+  return { ...submission({ zone: 'abu-dhabi', address: 'בניין באבו דאבי' }), total };
+}
+
 function postOrder(origin, body) {
   return fetch(`${origin}/api/site/orders`, {
     method: 'POST',
@@ -440,6 +444,34 @@ test('intake accepts an order when the date is not in the closed list', async ()
   };
   await withServer(repository, async (origin) => {
     const response = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+    assert.equal(response.status, 201);
+    assert.equal(repository.saved.length, 1);
+  });
+});
+
+test('intake rejects an Abu Dhabi order below the configured minimum', async () => {
+  const repository = statefulRepository({
+    orders: [],
+    settings: { minOrderAbuDhabiMinorUnits: 12_000 },
+  });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, abuDhabiOrder(39));
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'below_min_abu_dhabi');
+    assert.equal(body.minRequiredMinorUnits, 12_000);
+    assert.equal(repository.saved.length, 0);
+  });
+});
+
+test('intake accepts an Abu Dhabi order at or above the configured minimum', async () => {
+  const repository = statefulRepository({
+    orders: [],
+    settings: { minOrderAbuDhabiMinorUnits: 12_000 },
+  });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, abuDhabiOrder(150));
     assert.equal(response.status, 201);
     assert.equal(repository.saved.length, 1);
   });

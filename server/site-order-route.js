@@ -228,6 +228,23 @@ function createSiteOrderRouter({ repository, logger = console, clock = () => new
             message: 'מספר הטלפון הזה אינו יכול לבצע הזמנות כרגע. נשמח לעזור בוואטסאפ.',
           });
         }
+        const totalMinorUnits = Math.round(parsed.data.total * 100);
+        const settings = current.data.settings && typeof current.data.settings === 'object' ? current.data.settings : {};
+        const minAbuDhabi = Number.isSafeInteger(settings.minOrderAbuDhabiMinorUnits)
+          ? settings.minOrderAbuDhabiMinorUnits
+          : null;
+        if (
+          legacyOrder.deliveryZone === 'abu-dhabi' &&
+          minAbuDhabi !== null &&
+          minAbuDhabi > 0 &&
+          totalMinorUnits < minAbuDhabi
+        ) {
+          return response.status(403).json({
+            ok: false,
+            error: 'below_min_abu_dhabi',
+            minRequiredMinorUnits: minAbuDhabi,
+          });
+        }
         // Capacity is re-checked on every attempt against the freshly loaded
         // state: two simultaneous checkouts race on saveState's revision
         // check, and the loser re-validates against a state that already
