@@ -2,7 +2,11 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 export type CartLine = {
   id: string
+  /** Canonical HEBREW dish name — the key the admin catalog, stock list and
+   *  order lines use. Never localized. */
   name: string
+  /** Localized name for display in the cart/checkout UI only. */
+  displayName?: string
   unitPrice: number
   qty: number
   note?: string

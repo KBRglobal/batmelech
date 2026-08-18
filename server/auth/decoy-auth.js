@@ -94,6 +94,8 @@ function clearSessionCookie(response) {
 const PROTECTED_PREFIXES = [
   '/api/ai',
   '/api/hotels/search',
+  '/api/invoices',
+  '/api/mey',
   '/api/settings',
   '/api/state',
   '/legacy',
@@ -129,6 +131,7 @@ function createGlobal404Handler() {
 }
 
 module.exports = {
+  PROTECTED_PREFIXES,
   SESSION_COOKIE,
   parseCookies,
   makeToken,

@@ -405,3 +405,10 @@ test('an unauthenticated request never gets repo source files as static content'
     server.kill();
   }
 });
+
+test('staff-only API prefixes are behind the decoy gate', () => {
+  const { PROTECTED_PREFIXES } = require('../server/auth/decoy-auth');
+  for (const prefix of ['/api/mey', '/api/invoices', '/api/ai', '/api/state', '/api/settings']) {
+    assert.ok(PROTECTED_PREFIXES.includes(prefix), `${prefix} must be decoy-gated`);
+  }
+});
