@@ -24,6 +24,7 @@ export const APP_ROUTES = {
   menuSettings: '/settings/menu',
   recipeSettings: '/settings/recipes',
   productLibrary: '/settings/product-library',
+  costReport: '/cost-report',
   shoppingList: '/shopping-list',
   customerOrder: '/customer-order',
   legacyCustomerOrder: '/order-form.html',

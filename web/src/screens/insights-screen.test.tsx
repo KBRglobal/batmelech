@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../data/use-store.ts'
 import type { LegacyOrder, LegacyStore } from '../domain/store.ts'
@@ -36,7 +37,11 @@ function queryResult(
 }
 
 function renderInsights() {
-  return render(<InsightsScreen />)
+  return render(
+    <MemoryRouter>
+      <InsightsScreen />
+    </MemoryRouter>,
+  )
 }
 
 afterEach(() => {

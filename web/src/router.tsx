@@ -9,6 +9,7 @@ import { DeliveryPhotosScreen } from './screens/delivery-photos-screen.tsx'
 import { FinanceScreen } from './screens/finance-screen.tsx'
 import { ActivityScreen } from './screens/activity-screen.tsx'
 import { CalendarScreen } from './screens/calendar-screen.tsx'
+import { CostReportScreen } from './screens/cost-report-screen.tsx'
 import { InsightsScreen } from './screens/insights-screen.tsx'
 import { InvoicesScreen } from './screens/invoices-screen.tsx'
 import { KitchenScreen, KitchenStandaloneScreen } from './screens/kitchen-screen.tsx'
@@ -140,6 +141,7 @@ export function AppRoutes() {
           element={<RecipesScreenWithSave />}
         />
         <Route path={APP_ROUTES.productLibrary} element={<ProductLibraryScreenWithSave />} />
+        <Route path={APP_ROUTES.costReport} element={<CostReportScreen />} />
         <Route path={APP_ROUTES.shoppingList} element={<ShoppingListScreenWithSave />} />
         <Route
           path="*"

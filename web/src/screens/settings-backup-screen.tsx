@@ -270,6 +270,10 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
               <LocalIcon name="ph:package-bold" />
               <span>ספריית מוצרים ורכש</span>
             </Link>
+            <Link to={APP_ROUTES.costReport} className={actionClassName}>
+              <LocalIcon name="ph:calculator-bold" />
+              <span>דוח עלויות ורווחיות</span>
+            </Link>
           </div>
         </section>
 

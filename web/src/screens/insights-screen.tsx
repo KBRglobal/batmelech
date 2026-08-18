@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
+import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon, type LocalIconName } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
@@ -961,13 +963,22 @@ export function InsightsScreen() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
-      <header>
-        <h1 className="font-heading text-3xl font-black tracking-tight text-primary sm:text-4xl">
-          תובנות
-        </h1>
-        <p className="mt-2 text-sm font-bold text-muted-foreground">
-          מבט שבועי על ההזמנות, ההכנסות והמנות המבוקשות.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-black tracking-tight text-primary sm:text-4xl">
+            תובנות
+          </h1>
+          <p className="mt-2 text-sm font-bold text-muted-foreground">
+            מבט שבועי על ההזמנות, ההכנסות והמנות המבוקשות.
+          </p>
+        </div>
+        <Link
+          to={APP_ROUTES.costReport}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-5 text-sm font-black text-primary transition-colors hover:bg-secondary"
+        >
+          <LocalIcon name="ph:calculator-bold" />
+          <span>דוח עלויות ורווחיות</span>
+        </Link>
       </header>
 
       {orders.length === 0 ? (
