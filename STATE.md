@@ -1,11 +1,37 @@
-# STATE — batmelech (updated: 2026-08-18 21:00)
+# STATE — batmelech (updated: 2026-08-19, PROJECT HANDED TO LIN)
 
 ## Now (start here in a new session)
-Recipes v2 food-costing module is COMPLETE and LIVE: 88 priced products,
-21 dishes with costed recipes (all salads, pastas, rice, couscous, potato
-tray), cost report, mobile fixes. Full plan: ~/.claude/plans/linked-growing-clover.md.
+PROJECT CLOSED AND HANDED OVER (2026-08-19). Everything Moshe ordered is built,
+tested, deployed, live-verified. No open engineering tasks. Lin operates the
+panel using her illustrated PDF manual (המדריך-של-לין.pdf — 15 pages, real
+panel screenshots; source: scratchpad lin-guide-v2.html of session
+fa280757-3b5a-4fbd-abdd-e76934527089, regenerate via headless Chrome).
 
-## Session close 2026-08-18 evening (after the module shipped)
+Open items are CONTENT/DECISIONS on Moshe & Lin's side, not code:
+- Mains/fish/desserts recipes await Lin's quantities (or ask for
+  internet-standard proportions like the salads got).
+- Delivery windows + holiday menus are mechanisms — they fill real windows,
+  dishes and prices in Settings.
+- Real dish photography + kashrut certificate — Moshe's explicit hold.
+- Moshe undecided: add גזר מגורד / סלט ירוק / טאבולה as customer-visible
+  catalog dishes.
+- KNOWN WEAKNESS (approved, deferred): מיי can't take an order properly —
+  doesn't ask date/pickup, froze once on a delete request. Orders go in
+  through the panel until fixed.
+- Nice-to-have roadmap leftovers (NOT ordered, don't start unprompted):
+  copy-last-year holiday menu, multi-currency display, image compression,
+  dish of the week, capacity simulation, inline-edit-everywhere rollout.
+
+## Session close 2026-08-19 (final)
+- **Order deletion** shipped: edit screen bottom section, two-step confirm,
+  versioned save (`deleteOrderFromStore` in order-editor.ts, requestId
+  `web-order-delete`), recoverable via Settings restore. Verified live on the
+  מיי test order — server history showed exactly 13→12 orders.
+- **Past service dates excluded** from default shopping list + preparation
+  views (`dubaiTodayIso` filter); past dates stay selectable, labeled "(עבר)".
+- Lin's PDF manual delivered (also in ~/Downloads/המדריך-של-לין.pdf).
+
+## Session close 2026-08-18 evening (food-costing module shipped)
 - Seeded via `scripts/seed-recipes.js` / `seed-recipes-2.js` /
   `seed-spice-prices.js` — idempotent, run INSIDE the app container
   (`railway ssh --service app -- node scripts/...`) because Postgres has no
@@ -17,11 +43,8 @@ tray), cost report, mobile fixes. Full plan: ~/.claude/plans/linked-growing-clov
   lists with standard internet proportions (Moshe: "היא מבשלת בעין, לך לפי
   מתכון מהאינטרנט"). White-cabbage spec numbers verified live: 7.12/0.71/1.78.
 - Mobile: admin shell bottom-bar + עוד sheet; decoy 404 responsive (styling only).
-- OPEN: mains/fish/desserts recipes await Lin's quantities; Moshe undecided on
-  adding גזר מגורד / סלט ירוק / טאבולה as catalog dishes (customer-visible).
 - Kimi (second CLI agent) was stopped mid-session after it reverted/wiped
-  parallel work twice — see memory note; its roadmap leftovers (copy-last-year
-  holiday menu, multi-currency, image compression) remain unbuilt.
+  parallel work twice — see memory note.
 
 ## Shipped 2026-08-18 evening — food-costing module (Claude session, Kimi stopped)
 - **Product library** (`web/src/domain/product-library.ts`, screen at
@@ -50,9 +73,6 @@ tray), cost report, mobile fixes. Full plan: ~/.claude/plans/linked-growing-clov
   on Rimon. Recipes guidance changed: record EVERY meaningful ingredient
   (oil/sugar/mayo); shopping list stays clean via the insignificant flag.
 - Suites at ship: server 599, web 848, customer-site 5 — green.
-
-Next roadmap items (Kimi's list, not started): copy-last-year holiday menu,
-multi-currency display, image compression, dish of the week, capacity simulation.
 
 ## Merged this session — batch4 into main (2026-08-18)
 Claude's in-progress `origin/wip/batch4-2026-08-14` branch was merged directly to
@@ -200,18 +220,9 @@ coverage, site locales verified in a real browser locally + bundle hash live).
   message was posted to avoid group noise). First real use = first live test.
 - OTA/env unaffected (no mobile app in this project).
 
-## Deferred / open after this session
-- The rest of roadmap v3's approved 50-idea sweep — collected, NOT built (Moshe's
-  build order covered the three flagships only).
-- Other flagships not in the ordered list: Jewish holidays, customer tracking page,
-  AI recipes, concierge chat, delivery time windows.
-- Inline-edit-everywhere: menu ordering was the first concrete case; the rest of
-  the philosophy is a rollout, not done.
-- "Mega pricing validation" (Moshe): manual-price handling + tests done; a full
-  edge-case audit of every pricing path is still worth a dedicated pass.
-- Localization: admin-entered dish descriptions/banners render as typed (Hebrew)
-  in en/fr — flagged, acceptable; real photography still missing (placeholder
-  badge now localized).
+## Deferred / open after this session (SUPERSEDED — see "Now" at the top;
+## flagships listed here were later built in wave 2; the rest folded into the
+## nice-to-have leftovers list)
 
 ## Shipped in the second wave (2026-08-18 ~05:00, all deployed + live-verified)
 Moshe: "everything is for now except real photos." Built, tested, deployed, verified:
@@ -255,12 +266,7 @@ Moshe: "everything is for now except real photos." Built, tested, deployed, veri
   REMEMBER: every new gated /api/* mount must be added there).
 - Suites at ship: server 495, web 673, customer-site 5; all builds green.
 
-### Open after wave 2
-- Mey live test in the real Telegram group — waiting for Moshe to message her
-  (sandbox cannot POST to the live webhook: permission classifier).
-- Real photography + kashrut certification — waiting on Moshe (his explicit hold).
-- Delivery windows + holiday menus are MECHANISMS — Lin/Moshe fill actual windows,
-  holiday dishes and prices in Settings; nothing invented.
+### Open after wave 2 (SUPERSEDED — consolidated into "Now" at the top)
 
 ## Older context below (2026-08-14)
 
