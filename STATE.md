@@ -1,8 +1,45 @@
-# STATE — batmelech (updated: 2026-08-18 05:10)
+# STATE — batmelech (updated: 2026-08-18 16:35)
 
 ## Now (start here in a new session)
-Build session 2026-08-18: the three ordered flagships from roadmap v3 are BUILT,
-DEPLOYED and LIVE-VERIFIED, plus several mid-session asks from Moshe. Details below.
+Batch4 (where Claude stopped) is MERGED, TESTED and DEPLOYED. The remaining approved
+roadmap v3 items that do not depend on Moshe/Lin content are the next wave.
+
+## Merged this session — batch4 into main (2026-08-18)
+Claude's in-progress `origin/wip/batch4-2026-08-14` branch was merged directly to
+`main`, conflicts resolved, full suites green, and deployed live:
+- **Shabbat/yom tov site closure** — `server/shabbat-calendar.js`,
+  `customer-site/src/components/shabbat-closure.tsx`, blocks checkout during Shabbat/chag.
+- **Manual invoice issuing** — `server/business-data/issue-invoice.js`,
+  `web/src/screens/new-invoice-form.tsx`; staff can issue an invoice tied to an order
+  or free-form.
+- **Business digests for Mey** — `server/telegram/business-insights.js`; Sunday weekly
+  digest + Wednesday prep forecast, integrated into `delivery-scheduler.js`.
+- **Plata (פלטה) rental lifecycle** — `web/src/domain/plata.ts`; count, deposit, status,
+  pickup/collection tracking in the order editor and deliveries screen.
+- **Customer outreach messages** — `web/src/domain/outreach-messages.ts`; deposit request,
+  Google review request, and reorder-invite WhatsApp drafts for Lin.
+
+**Test/deploy state:** server 586 pass / 0 fail, web 780 pass / 0 fail,
+customer-site 5 pass. Deployed with `railway up --service app --detach`;
+verified `/healthz`, `/api/site/status`, `/site`, `/kitchen`.
+
+## Now — next wave (remaining approved roadmap v3 items, content-independent)
+The items below are approved/pending in `docs/product-roadmap-v3.md` and do NOT
+require real content from Moshe/Lin. Build next, in priority order:
+1. Block-a-customer flag.
+2. Closed-day calendar toggle (site orders blocked for that date).
+3. Minimum order amount for Abu Dhabi.
+4. Weekly automatic backup to email.
+5. Delivery-photos gallery.
+6. Copy-last-year holiday menu.
+7. Multi-currency display USD/EUR/AED.
+8. Auto image compression on upload.
+9. Dish of the week spotlight.
+10. Capacity simulation "can I take 3 more?".
+
+## Previously — build session 2026-08-18
+The three ordered flagships from roadmap v3 are BUILT, DEPLOYED and LIVE-VERIFIED,
+plus several mid-session asks from Moshe. Details below.
 
 ## Shipped this session (2026-08-18, build session — all deployed + live-verified)
 
