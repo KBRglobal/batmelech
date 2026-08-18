@@ -50,14 +50,14 @@ const SPICES = [
 const FRESH_EXTRAS = [
   ['בצל ירוק', '1', 'יחידה', 100],
   ['עגבניות שרי', '300', 'גרם', 1000],
-  ['סלרי', '1', 'ק"ג', 1490],
-  ['מיץ תפוזים', '1', 'ליטר', 990],
+  ['סלרי', '1', 'יחידה', 1490], // leaves, per bunch
+  ['מיץ תפוזים', '1.4', 'ליטר', 990],
 ];
 
 // Brought from Israel by friends (₪≈AED) — recorded under the Rimon/kosher channel.
 const ISRAEL_EXTRAS = [
   ['בורגול', '1', 'ק"ג', 600],
-  ['פירורי לחם', '400', 'גרם', 990], // standard 400g bag; pack size editable in the panel
+  ['פירורי לחם', '900', 'גרם', 990],
 ];
 
 function productId(name) {
