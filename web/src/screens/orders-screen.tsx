@@ -423,29 +423,15 @@ function OrderCard({ order, quick }: { order: OrdersOrderView; quick?: OrderQuic
 
 // Each group gets a stable, distinctive frame color (derived from its name)
 // so linked orders read as one colored block at a glance.
-const GROUP_FRAME_STYLES = [
-  { border: 'border-sky-500', surface: 'bg-sky-50/70', header: 'bg-sky-100', text: 'text-sky-900', ribbon: 'bg-sky-500' },
-  { border: 'border-amber-500', surface: 'bg-amber-50/70', header: 'bg-amber-100', text: 'text-amber-900', ribbon: 'bg-amber-500' },
-  { border: 'border-emerald-500', surface: 'bg-emerald-50/70', header: 'bg-emerald-100', text: 'text-emerald-900', ribbon: 'bg-emerald-500' },
-  { border: 'border-violet-500', surface: 'bg-violet-50/70', header: 'bg-violet-100', text: 'text-violet-900', ribbon: 'bg-violet-500' },
-  { border: 'border-rose-500', surface: 'bg-rose-50/70', header: 'bg-rose-100', text: 'text-rose-900', ribbon: 'bg-rose-500' },
-  { border: 'border-teal-500', surface: 'bg-teal-50/70', header: 'bg-teal-100', text: 'text-teal-900', ribbon: 'bg-teal-500' },
-] as const
-
-function groupFrameStyle(name: string) {
-  let hash = 0
-  for (const character of name) hash = (hash * 31 + character.codePointAt(0)!) >>> 0
-  return GROUP_FRAME_STYLES[hash % GROUP_FRAME_STYLES.length]!
-}
-
+// One soft pink frame for every linked group (Moshe, 2026-08-18: no rotating
+// colors — a simple light frame in the brand's pink that clearly separates a
+// group from the day's other orders).
 function LinkedGroup({ group, quick }: { group: OrdersLinkedGroup; quick?: OrderQuickActions }) {
-  const frame = groupFrameStyle(group.name)
   return (
-    <section className={`relative overflow-hidden rounded-[2rem] border-4 ${frame.border} ${frame.surface} p-4 shadow-md sm:p-5`}>
-      <div className={`absolute inset-y-0 right-0 w-2 ${frame.ribbon}`} aria-hidden="true" />
-      <div className={`mb-4 flex flex-col gap-3 rounded-2xl ${frame.header} p-4 sm:flex-row sm:items-start sm:justify-between`}>
+    <section className="rounded-[2rem] border-2 border-rose-200 bg-rose-50/50 p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-rose-100/70 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className={`flex items-center gap-2 text-xs font-black ${frame.text}`}>
+          <p className="flex items-center gap-2 text-xs font-black text-rose-900">
             <LocalIcon name="ph:users-bold" className="text-lg" />
             <span>הזמנה קבוצתית: {group.name}</span>
           </p>

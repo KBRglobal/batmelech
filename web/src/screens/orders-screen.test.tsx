@@ -427,7 +427,7 @@ describe('OrdersScreen', () => {
     ])
   })
 
-  it('keeps the per-group colored frames on linked groups', () => {
+  it('gives linked groups the soft pink group frame', () => {
     mockedUseStore.mockReturnValue(
       queryResult({
         store: {
@@ -443,12 +443,10 @@ describe('OrdersScreen', () => {
 
     const section = screen.getByText('הזמנה קבוצתית: קבוצת צבע').closest('section')
     expect(section).toBeTruthy()
-    const borderMatch = /border-(sky|amber|emerald|violet|rose|teal)-500/.exec(section!.className)
-    expect(borderMatch).toBeTruthy()
+    // One simple light pink frame — clearly separated from regular cards.
+    expect(section!.className).toContain('border-rose-200')
+    expect(section!.className).toContain('bg-rose-50')
     const header = section!.querySelector('div')
-    const headerMatch = /bg-(sky|amber|emerald|violet|rose|teal)-50/.exec(header!.className)
-    expect(headerMatch).toBeTruthy()
-    // Border and header stay in the same color family — one coherent frame.
-    expect(headerMatch![1]).toBe(borderMatch![1])
+    expect(header!.className).toContain('bg-rose-100')
   })
 })
