@@ -60,6 +60,8 @@ export interface SettingsDraft {
   readonly googleReviewUrl: string
   /** Minimum order total in USD for Abu Dhabi deliveries; empty means no minimum. */
   readonly minOrderAbuDhabi: string
+  /** Email address for the weekly JSON backup; empty disables the scheduled send. */
+  readonly weeklyBackupEmail: string
 }
 
 export type SettingsDraftValidation =
@@ -78,6 +80,7 @@ export type SettingsDraftValidation =
       readonly paymentRequestDetails: string
       readonly googleReviewUrl: string
       readonly minOrderAbuDhabiMinorUnits?: number
+      readonly weeklyBackupEmail: string
     }
   | { readonly valid: false; readonly issues: readonly string[] }
 
@@ -314,6 +317,7 @@ export function readSettingsDraft(
     paymentRequestDetails: stringValue(settings.paymentRequestDetails),
     googleReviewUrl: stringValue(settings.googleReviewUrl),
     minOrderAbuDhabi: optionalPositiveDollarsText(settings.minOrderAbuDhabiMinorUnits),
+    weeklyBackupEmail: stringValue(settings.weeklyBackupEmail),
   }
 }
 
@@ -326,6 +330,14 @@ function validOptionalUrl(value: string): boolean {
   } catch {
     return false
   }
+}
+
+// Permissive but practical: something@something.something.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validOptionalEmail(value: string): boolean {
+  if (value === '') return true
+  return value.length <= 254 && EMAIL_PATTERN.test(value)
 }
 
 export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValidation {
@@ -355,6 +367,10 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
   if (!validOptionalUrl(googleReviewUrl)) {
     issues.push('קישור הביקורות בגוגל חייב להיות כתובת HTTP או HTTPS תקינה.')
   }
+  const weeklyBackupEmail = draft.weeklyBackupEmail.trim()
+  if (!validOptionalEmail(weeklyBackupEmail)) {
+    issues.push('כתובת האימייל לגיבוי שבועי אינה תקינה.')
+  }
   const minOrderParsed = parseLegacyUsdAmount(draft.minOrderAbuDhabi)
   if (minOrderParsed.state === 'invalid') {
     issues.push('מינימום הזמנה לאבו דאבי חייב להיות סכום בדולרים חיובי עם עד שתי ספרות אחרי הנקודה.')
@@ -377,6 +393,7 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
         siteBanner,
         paymentRequestDetails,
         googleReviewUrl,
+        weeklyBackupEmail,
         minOrderAbuDhabiMinorUnits:
           minOrderParsed.state === 'valid' && minOrderParsed.minorUnits > 0
             ? minOrderParsed.minorUnits
@@ -416,11 +433,15 @@ export function applySettingsToStore(
     siteBanner: result.siteBanner === '' ? null : result.siteBanner,
     paymentRequestDetails: result.paymentRequestDetails,
     googleReviewUrl: result.googleReviewUrl,
+    weeklyBackupEmail: result.weeklyBackupEmail,
   }
   if (result.minOrderAbuDhabiMinorUnits !== undefined) {
     settings.minOrderAbuDhabiMinorUnits = result.minOrderAbuDhabiMinorUnits
   } else {
     delete settings.minOrderAbuDhabiMinorUnits
+  }
+  if (result.weeklyBackupEmail === '') {
+    delete settings.weeklyBackupEmail
   }
   if (result.orderingOpen) {
     delete settings.orderingClosedUntil

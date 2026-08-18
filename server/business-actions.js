@@ -430,6 +430,7 @@ module.exports = {
   effectiveOrderingOpen,
   orderingStatus,
   upcomingSundayDubai,
+  withSettingsUpdate,
   setOrderingOpen,
   setSiteBanner,
   setItemStock,

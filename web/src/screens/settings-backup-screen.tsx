@@ -489,6 +489,18 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
               <p className="mt-1 text-xs font-black text-destructive">אזור מוגן — שחזור לעולם אינו מתבצע בלי אימות ואישור.</p>
             </div>
           </div>
+          <label className="mt-5 block max-w-md text-xs font-black text-muted-foreground">
+            אימייל לגיבוי שבועי (ריק = לא שולחים)
+            <input
+              aria-label="אימייל לגיבוי שבועי"
+              dir="ltr"
+              type="email"
+              value={currentDraft.weeklyBackupEmail}
+              onChange={(event) => setDraft({ ...currentDraft, weeklyBackupEmail: event.currentTarget.value })}
+              placeholder="backup@example.com"
+              className="mt-2 min-h-11 w-full rounded-xl border border-border px-4 text-left text-sm font-bold outline-none"
+            />
+          </label>
           <div className="mt-5 flex flex-wrap gap-3">
             <button type="button" onClick={() => void downloadBackup()} disabled={backupState.kind === 'busy'} className={`${actionClassName} bg-primary text-primary-foreground`}>
               <LocalIcon name="ph:cloud-arrow-up-bold" />

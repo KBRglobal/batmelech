@@ -190,6 +190,90 @@ test('nightly backup uploads an encrypted snapshot once per day', async () => {
   assert.equal(bare._current().settings.meyBackupFor, undefined);
 });
 
+test('weekly email backup fires once on Sunday at 08:00 Dubai and records the send', async () => {
+  const repository = fakeRepository({
+    orders: [{ id: 'a', name: 'שמור', total: 100 }],
+    settings: { weeklyBackupEmail: 'lin@batmelech.ae' },
+  });
+  const emails = [];
+  const sendBackupEmail = async ({ toEmail, artifact }) => {
+    emails.push({ toEmail, artifact });
+  };
+  const restore = stubTelegram([]);
+  try {
+    const clock = createBusinessClock({
+      repository,
+      botToken: 't',
+      chatId: '-1',
+      env: { RESEND_API_KEY: 're_test' },
+      logger: silentLogger,
+      now: () => new Date('2026-08-16T04:00:00Z'), // Sunday 08:00 Dubai
+      sendBackupEmail,
+    });
+    await clock.tick();
+    await clock.tick(); // second tick same day must be silent
+  } finally {
+    restore();
+  }
+  assert.equal(emails.length, 1);
+  assert.equal(emails[0].toEmail, 'lin@batmelech.ae');
+  assert.match(emails[0].artifact.filename, /batmelech-orders-2026-08-16\.json$/u);
+  assert.equal(JSON.parse(emails[0].artifact.content).orders[0].name, 'שמור');
+
+  const currentSettings = repository._current().settings;
+  assert.equal(currentSettings.meyWeeklyBackupEmailFor, '2026-08-16');
+  assert.equal(typeof currentSettings.lastWeeklyBackupAt, 'number');
+  assert.ok(currentSettings.lastWeeklyBackupAt > 0);
+});
+
+test('weekly email backup stays quiet without a configured address or on wrong day/time', async () => {
+  const noEmailRepo = fakeRepository({ orders: [], settings: {} });
+  const emails = [];
+  const sendBackupEmail = async ({ toEmail, artifact }) => {
+    emails.push({ toEmail, artifact });
+  };
+  const restore = stubTelegram([]);
+  try {
+    // No email configured.
+    await createBusinessClock({
+      repository: noEmailRepo,
+      botToken: 't',
+      chatId: '-1',
+      env: { RESEND_API_KEY: 're_test' },
+      logger: silentLogger,
+      now: () => new Date('2026-08-16T04:00:00Z'),
+      sendBackupEmail,
+    }).tick();
+
+    // Email configured but it is Saturday.
+    const saturdayRepo = fakeRepository({ orders: [], settings: { weeklyBackupEmail: 'lin@batmelech.ae' } });
+    await createBusinessClock({
+      repository: saturdayRepo,
+      botToken: 't',
+      chatId: '-1',
+      env: { RESEND_API_KEY: 're_test' },
+      logger: silentLogger,
+      now: () => new Date('2026-08-15T04:00:00Z'), // Saturday 08:00 Dubai
+      sendBackupEmail,
+    }).tick();
+
+    // Email configured, Sunday, but before 08:00 Dubai.
+    const earlyRepo = fakeRepository({ orders: [], settings: { weeklyBackupEmail: 'lin@batmelech.ae' } });
+    await createBusinessClock({
+      repository: earlyRepo,
+      botToken: 't',
+      chatId: '-1',
+      env: { RESEND_API_KEY: 're_test' },
+      logger: silentLogger,
+      now: () => new Date('2026-08-16T02:00:00Z'), // Sunday 06:00 Dubai
+      sendBackupEmail,
+    }).tick();
+  } finally {
+    restore();
+  }
+  assert.equal(emails.length, 0);
+});
+
 test(' texts contain no technical jargon', () => {
   const digest = wednesdayDigestText('2026-08-21', []);
   assert.match(digest, /תזכורת רביעי/u);

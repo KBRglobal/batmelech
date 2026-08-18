@@ -6,15 +6,17 @@
 // Same discipline as delivery-scheduler.js: claim-before-send (a restarted
 // process stays quiet), Dubai time only, deterministic Hebrew templates.
 
-const { claimDailyMarker } = require('../business-actions');
+const { claimDailyMarker, withSettingsUpdate } = require('../business-actions');
 const { dubaiDateString, dubaiMinutesOfDay, parseClockMinutes } = require('./delivery-day');
 const { sendTelegramMessage } = require('./send-message');
 const { encryptSecret } = require('../business-data/secret-box');
+const { sendBackupEmail: defaultSendBackupEmail } = require('../business-data/send-backup-email');
 
 const TICK_MS = 60_000;
 const WEDNESDAY_DIGEST_MINUTES = 10 * 60; // 10:00
 const WEEKLY_SUMMARY_MINUTES = 21 * 60 + 30; // 21:30, Saturday night
 const BACKUP_MINUTES = 3 * 60 + 30; // 03:30
+const WEEKLY_BACKUP_MINUTES = 8 * 60; // 08:00 Sunday
 
 const CANCELLED = new Set(['בוטלה', 'cancelled', 'canceled']);
 
@@ -110,6 +112,16 @@ function weeklySummaryText(orders, range) {
   return lines.join('\n');
 }
 
+function createBackupArtifact(store, now) {
+  const content = JSON.stringify(store, null, 2);
+  if (content === undefined) throw new TypeError('store could not be serialized');
+  return {
+    filename: `batmelech-orders-${dubaiDateString(now)}.json`,
+    content,
+    mimeType: 'application/json',
+  };
+}
+
 function createBusinessClock({
   repository,
   botToken,
@@ -118,6 +130,7 @@ function createBusinessClock({
   env = process.env,
   logger = console,
   now = () => new Date(),
+  sendBackupEmail = defaultSendBackupEmail,
 } = {}) {
   let timer = null;
 
@@ -165,6 +178,41 @@ function createBusinessClock({
     }
   }
 
+  function alreadySentToday(settings, today) {
+    const last = settings.lastWeeklyBackupAt;
+    if (typeof last !== 'number' || !Number.isSafeInteger(last) || last < 0) return false;
+    const lastDate = new Date(last);
+    if (!Number.isFinite(lastDate.getTime())) return false;
+    return dubaiDateString(lastDate) === today;
+  }
+
+  async function runWeeklyEmailBackup(state, nowDate, nowMin) {
+    if (dubaiWeekday(nowDate) !== 'Sun' || nowMin < WEEKLY_BACKUP_MINUTES) return;
+    const settings = state.data.settings && typeof state.data.settings === 'object' ? state.data.settings : {};
+    const toEmail = typeof settings.weeklyBackupEmail === 'string' ? settings.weeklyBackupEmail.trim() : '';
+    if (toEmail === '') return;
+    const apiKey = env.RESEND_API_KEY;
+    if (typeof apiKey !== 'string' || apiKey.trim() === '') {
+      logger.error('business-clock: weekly backup email skipped — RESEND_API_KEY is not configured');
+      return;
+    }
+    const today = dubaiDateString(nowDate);
+    if (alreadySentToday(settings, today)) return;
+    const claim = await claimDailyMarker(repository, 'meyWeeklyBackupEmailFor', today);
+    if (!claim.ok || !claim.claimed) return;
+    try {
+      const artifact = createBackupArtifact(state.data, nowDate);
+      await sendBackupEmail({ apiKey: apiKey.trim(), toEmail, artifact });
+      const recorded = await withSettingsUpdate(repository, (nextSettings) => ({
+        ...nextSettings,
+        lastWeeklyBackupAt: nowDate.getTime(),
+      }));
+      if (!recorded.ok) logger.error('business-clock: weekly backup email sent but failed to record timestamp');
+    } catch (error) {
+      logger.error('business-clock: weekly backup email failed', error);
+    }
+  }
+
   async function tick() {
     try {
       const nowDate = now();
@@ -173,6 +221,7 @@ function createBusinessClock({
       await runBackup(state, nowDate, nowMin);
       await runWednesdayDigest(state, nowDate, nowMin);
       await runWeeklySummary(state, nowDate, nowMin);
+      await runWeeklyEmailBackup(state, nowDate, nowMin);
     } catch (error) {
       logger.error('business-clock: tick failed', error);
     }

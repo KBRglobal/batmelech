@@ -90,6 +90,7 @@ describe('settings backup domain', () => {
       paymentRequestDetails: '',
       googleReviewUrl: '',
       minOrderAbuDhabi: '',
+      weeklyBackupEmail: '',
     }
     expect(validateSettingsDraft(nextDraft)).toMatchObject({ valid: true, maxMeals: 20 })
     const saved = applySettingsToStore(store, nextDraft, DEFAULT_SETTINGS_CATALOG)
@@ -144,6 +145,7 @@ describe('settings backup domain', () => {
         paymentRequestDetails: '',
         googleReviewUrl: '',
         minOrderAbuDhabi: '',
+      weeklyBackupEmail: '',
       },
       DEFAULT_SETTINGS_CATALOG,
     )
@@ -171,6 +173,7 @@ describe('settings backup domain', () => {
       paymentRequestDetails: '',
       googleReviewUrl: '',
       minOrderAbuDhabi: '',
+      weeklyBackupEmail: '',
     })
 
     expect(result.valid).toBe(false)
@@ -193,6 +196,7 @@ describe('settings backup domain', () => {
           paymentRequestDetails: '',
           googleReviewUrl: '',
           minOrderAbuDhabi: '',
+      weeklyBackupEmail: '',
         },
         DEFAULT_SETTINGS_CATALOG,
       ),
@@ -227,6 +231,35 @@ describe('settings backup domain', () => {
       DEFAULT_SETTINGS_CATALOG,
     )
     expect('minOrderAbuDhabiMinorUnits' in (cleared.settings as object)).toBe(false)
+  })
+
+  it('reads, validates and saves the weekly backup email address', () => {
+    const store = {
+      orders: [],
+      settings: { weeklyBackupEmail: 'backup@example.com' },
+    } as LegacyStore
+    const draft = readSettingsDraft(store, DEFAULT_SETTINGS_CATALOG)
+    expect(draft.weeklyBackupEmail).toBe('backup@example.com')
+
+    const empty = validateSettingsDraft({ ...draft, weeklyBackupEmail: '' })
+    expect(empty.valid).toBe(true)
+
+    const invalid = validateSettingsDraft({ ...draft, weeklyBackupEmail: 'not-an-email' })
+    expect(invalid.valid).toBe(false)
+
+    const saved = applySettingsToStore(
+      { orders: [] },
+      { ...draft, weeklyBackupEmail: 'lin@batmelech.ae ' },
+      DEFAULT_SETTINGS_CATALOG,
+    )
+    expect((saved.settings as { weeklyBackupEmail?: string }).weeklyBackupEmail).toBe('lin@batmelech.ae')
+
+    const cleared = applySettingsToStore(
+      saved,
+      { ...draft, weeklyBackupEmail: '' },
+      DEFAULT_SETTINGS_CATALOG,
+    )
+    expect('weeklyBackupEmail' in (cleared.settings as object)).toBe(false)
   })
 })
 
