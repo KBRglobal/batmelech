@@ -10,6 +10,7 @@ import { DeliveryWindowsSection } from '../components/delivery-windows-section.t
 import { HolidayMenusSection } from '../components/holiday-menus-section.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
 import { useStore } from '../data/use-store.ts'
+import { buildDishCostIndex } from '../domain/cost-lookup.ts'
 import {
   applySettingsToStore,
   createBackupArtifact,
@@ -114,6 +115,7 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
   const validation = validateSettingsDraft(currentDraft)
   const review = reviewBackupText(backupText, baseStore)
   const stockItems = Object.values(catalogResult.catalog.categories).flat()
+  const dishCostsByName = buildDishCostIndex(baseStore).byName
 
   const latestBackupStore = async (): Promise<LegacyStore> => {
     const refreshed = await storeQuery.refetch({ throwOnError: true })
@@ -413,7 +415,7 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
 
         <DeliveryWindowsSection />
 
-        <HolidayMenusSection />
+        <HolidayMenusSection dishCostsByName={dishCostsByName} />
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-xl font-black text-primary">מצב האתר</h2>

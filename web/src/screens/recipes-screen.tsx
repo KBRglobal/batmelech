@@ -937,9 +937,22 @@ export function RecipesScreen({
   const missingCount = targets.filter((target) => !configuredByItemId.has(target.id)).length
   const doneCount = targets.length - missingCount
   const usage = buildIngredientUsage(currentDrafts)
+  // Production cost per configured dish, shown on the list card itself —
+  // computed from the LIVE drafts so an edit updates the number immediately.
+  const rowCosts = new Map<string, { perPortionMinorUnits: number; per100gMinorUnits: number | null; complete: boolean }>()
   const storedProducts = loadProductLibrary(baseStore).entries
   const allProducts = [...storedProducts, ...pendingProducts]
   const productLibrary = productLibraryMap(allProducts)
+  for (const draft of currentDrafts) {
+    const validated = validateRecipeDrafts([draft])
+    if (!validated.valid || validated.recipes.length !== 1) continue
+    const cost = costRecipe(validated.recipes[0]!, productLibrary)
+    rowCosts.set(draft.itemId, {
+      perPortionMinorUnits: cost.perYieldUnitMinorUnits,
+      per100gMinorUnits: cost.minorUnitsPer100g,
+      complete: cost.complete,
+    })
+  }
   const productNames = allProducts.map((entry) => entry.name)
 
   const defineProduct = (name: string, packSize: string, packUnit: string, priceMinorUnits: number) => {
@@ -1293,6 +1306,7 @@ export function RecipesScreen({
                   )
                 }
                 const editing = selectedIndex === row.index
+                const rowCost = rowCosts.get(row.id)
                 return (
                   <div
                     key={`${row.id}-${row.index}`}
@@ -1313,6 +1327,15 @@ export function RecipesScreen({
                               : ` · מוצר של ${row.draft.yield.trim()} מנות`
                             : ''}
                         </p>
+                        {rowCost !== undefined && (
+                          <p className="mt-1 text-xs font-black text-emerald-700">
+                            עלות ייצור: {minorUnitsToMoney(rowCost.perPortionMinorUnits)} AED למנה
+                            {rowCost.per100gMinorUnits !== null
+                              ? ` · ${minorUnitsToMoney(rowCost.per100gMinorUnits)} ל-100 גרם`
+                              : ''}
+                            {rowCost.complete ? '' : ' · חלקי'}
+                          </p>
+                        )}
                         {metaChips}
                       </div>
                       {editing && (

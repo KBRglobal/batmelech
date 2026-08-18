@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
+import type { DishCost } from '../domain/cost-lookup.ts'
+import { minorUnitsToMoney } from '../domain/product-library.ts'
 import { LocalIcon } from './local-icon.tsx'
 
 // Holiday menus editor: the server computes the Hebrew calendar (13 months
@@ -134,7 +136,11 @@ function toPayload(menus: EditableMenu[]) {
 const FIELD_CLASS =
   'min-h-10 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20'
 
-export function HolidayMenusSection() {
+export function HolidayMenusSection({
+  dishCostsByName,
+}: {
+  readonly dishCostsByName?: ReadonlyMap<string, DishCost>
+} = {}) {
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [menus, setMenus] = useState<EditableMenu[]>([])
   const [loadError, setLoadError] = useState(false)
@@ -393,6 +399,14 @@ export function HolidayMenusSection() {
                           <label className="block text-[11px] font-black">
                             שם המנה (עברית)
                             <input value={dish.name} onChange={(event) => editDish(menu.id, index, { name: event.currentTarget.value })} maxLength={240} className={`mt-1 ${FIELD_CLASS}`} />
+                            {(() => {
+                              const cost = dishCostsByName?.get(dish.name.trim())
+                              return cost === undefined ? null : (
+                                <span className="mt-1 block text-[11px] font-black text-emerald-700">
+                                  עלות ייצור: {minorUnitsToMoney(cost.perPortionMinorUnits)} AED{cost.complete ? '' : ' · חלקי'}
+                                </span>
+                              )
+                            })()}
                           </label>
                           <label className="block text-[11px] font-black">
                             שם באנגלית

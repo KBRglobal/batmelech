@@ -34,6 +34,8 @@ import {
   type StoreSaveHandler,
 } from '../domain/settings-catalog.ts'
 import { parseLegacyUsdAmount } from '../domain/customers-finance.ts'
+import { buildDishCostIndex, type DishCost } from '../domain/cost-lookup.ts'
+import { minorUnitsToMoney } from '../domain/product-library.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { isVersionedStateEnvelope, type VersionedStateEnvelope } from '../services/state-api.ts'
 
@@ -176,13 +178,35 @@ function KitchenMetaFields({
   )
 }
 
+function signedMoney(minorUnits: number): string {
+  return minorUnits < 0 ? `-${minorUnitsToMoney(-minorUnits)}` : minorUnitsToMoney(minorUnits)
+}
+
+// Production cost, Lin's eyes only — never printed on a bon, an invoice, or
+// any customer-facing surface.
+function CostLine({ cost, salePriceMinorUnits }: { cost: DishCost | undefined; salePriceMinorUnits?: number }) {
+  if (cost === undefined) return null
+  return (
+    <p className="text-xs font-black text-emerald-700">
+      עלות ייצור: {minorUnitsToMoney(cost.perPortionMinorUnits)} AED
+      {cost.per100gMinorUnits !== null ? ` · ${minorUnitsToMoney(cost.per100gMinorUnits)} ל-100 גרם` : ''}
+      {salePriceMinorUnits !== undefined
+        ? ` · רווח: ${signedMoney(salePriceMinorUnits - cost.perPortionMinorUnits)}`
+        : ''}
+      {cost.complete ? '' : ' · חלקי'}
+    </p>
+  )
+}
+
 function CategoryEditor({
   category,
   catalog,
+  dishCosts,
   onUpdate,
 }: {
   category: MenuCategoryKey
   catalog: SettingsCatalog
+  dishCosts: ReadonlyMap<string, DishCost>
   onUpdate: (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => void
 }) {
   const items = catalog.categories[category]
@@ -275,6 +299,7 @@ function CategoryEditor({
                 </button>
               )}
             </div>
+            <CostLine cost={dishCosts.get(item.id)} />
             <textarea
               aria-label={`תיאור — ${item.name}`}
               defaultValue={item.description}
@@ -410,9 +435,11 @@ function ImageUploadField({
 
 function ExtrasEditor({
   catalog,
+  dishCosts,
   onUpdate,
 }: {
   catalog: SettingsCatalog
+  dishCosts: ReadonlyMap<string, DishCost>
   onUpdate: (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => void
 }) {
   const [newName, setNewName] = useState('')
@@ -455,6 +482,7 @@ function ExtrasEditor({
                 הסרה
               </button>
             </div>
+            <CostLine cost={dishCosts.get(item.id)} salePriceMinorUnits={item.priceMinorUnits} />
             <textarea
               aria-label={`תיאור — ${item.name}`}
               defaultValue={item.description}
@@ -519,9 +547,11 @@ function ExtrasEditor({
 
 function LunchEditor({
   catalog,
+  dishCosts,
   onUpdate,
 }: {
   catalog: SettingsCatalog
+  dishCosts: ReadonlyMap<string, DishCost>
   onUpdate: (mutate: (catalog: SettingsCatalog) => SettingsCatalog) => void
 }) {
   const commitPrice = (path: LunchPricePath) => (next: number) =>
@@ -538,7 +568,12 @@ function LunchEditor({
             <h3 className="font-black text-primary">{item.name}</h3>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {item.priceMinorUnits !== null && (
-                <PriceField label={`מחיר ${item.name}`} value={item.priceMinorUnits} onCommit={commitPrice({ kind: 'base', itemKey: item.key })} />
+                <div className="space-y-2">
+                  <PriceField label={`מחיר ${item.name}`} value={item.priceMinorUnits} onCommit={commitPrice({ kind: 'base', itemKey: item.key })} />
+                  {item.itemId !== null && (
+                    <CostLine cost={dishCosts.get(item.itemId)} salePriceMinorUnits={item.priceMinorUnits} />
+                  )}
+                </div>
               )}
               {item.variants.map((variant) => (
                 <div key={variant.key} className="space-y-2">
@@ -547,6 +582,7 @@ function LunchEditor({
                     value={variant.priceMinorUnits}
                     onCommit={commitPrice({ kind: 'variant', itemKey: item.key, variantKey: variant.key })}
                   />
+                  <CostLine cost={dishCosts.get(variant.itemId)} salePriceMinorUnits={variant.priceMinorUnits} />
                   {variant.weekendOnly && <p className="text-xs font-black text-amber-800">זמין בסוף שבוע בלבד</p>}
                   {variant.includedSides > 0 && <p className="text-xs font-bold text-muted-foreground">כולל {variant.includedSides} תוספות</p>}
                   {variant.extraSideMinorUnits !== null && (
@@ -559,11 +595,14 @@ function LunchEditor({
                 </div>
               ))}
               {item.addon !== null && (
-                <PriceField
-                  label={`${item.name} — ${item.addon.name}`}
-                  value={item.addon.priceMinorUnits}
-                  onCommit={commitPrice({ kind: 'addon', itemKey: item.key })}
-                />
+                <div className="space-y-2">
+                  <PriceField
+                    label={`${item.name} — ${item.addon.name}`}
+                    value={item.addon.priceMinorUnits}
+                    onCommit={commitPrice({ kind: 'addon', itemKey: item.key })}
+                  />
+                  <CostLine cost={dishCosts.get(item.addon.id)} salePriceMinorUnits={item.addon.priceMinorUnits} />
+                </div>
               )}
             </div>
           </section>
@@ -594,6 +633,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
   }
   const initialization = initializationRef.current
   const { baseEnvelope, baseStore, loaded } = initialization
+  const dishCosts = buildDishCostIndex(baseStore).byItemId
   const current = catalogOverride ?? loaded.catalog
   const validation = validateSettingsCatalog(current)
   const blockingLoadWarnings = loaded.warnings.filter((warning) => warning.code !== 'SUPERSEDED_EXTRA_REMOVED')
@@ -717,10 +757,10 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
 
       <section className="mt-8 space-y-3 pb-24">
         {MENU_CATEGORY_KEYS.map((category) => (
-          <CategoryEditor key={category} category={category} catalog={current} onUpdate={onUpdate} />
+          <CategoryEditor key={category} category={category} catalog={current} dishCosts={dishCosts} onUpdate={onUpdate} />
         ))}
-        <ExtrasEditor catalog={current} onUpdate={onUpdate} />
-        <LunchEditor catalog={current} onUpdate={onUpdate} />
+        <ExtrasEditor catalog={current} dishCosts={dishCosts} onUpdate={onUpdate} />
+        <LunchEditor catalog={current} dishCosts={dishCosts} onUpdate={onUpdate} />
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background/90 px-5 py-3 backdrop-blur">
