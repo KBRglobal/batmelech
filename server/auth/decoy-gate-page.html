@@ -19,22 +19,21 @@
   html, body {
     margin: 0;
     min-height: 100vh;
+    min-height: 100svh;
     background: var(--bg);
     color: var(--ink);
     font-family: 'Assistant', sans-serif;
   }
   body {
     display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 24px;
     position: relative;
-    overflow: hidden;
+    overflow-x: hidden;
   }
   .blur { position: absolute; width: 500px; height: 500px; border-radius: 50%; filter: blur(150px); opacity: 0.1; pointer-events: none; }
   .blur-1 { top: 0; left: 0; background: var(--accent); transform: translate(-50%, -50%); }
   .blur-2 { bottom: 0; right: 0; background: var(--pink); transform: translate(50%, 50%); }
-  main { position: relative; z-index: 1; width: 100%; max-width: 32rem; text-align: center; }
+  main { position: relative; z-index: 1; width: 100%; max-width: 32rem; margin: auto; text-align: center; }
   .logo-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 24px; }
   .logo-wrap::before {
     content: '';
@@ -115,6 +114,18 @@
   .footer-divider img { height: 32px; filter: grayscale(1); }
   .brand-tag { margin-top: 16px; font-size: .65rem; font-weight: 900; text-transform: uppercase; letter-spacing: .4em; color: rgba(59, 21, 26, .4); }
   [hidden] { display: none !important; }
+  @media (max-width: 480px) {
+    body { padding: 16px; }
+    .blur { width: 320px; height: 320px; filter: blur(100px); }
+    .logo-wrap { width: 150px; height: 150px; margin-bottom: 16px; }
+    .ghost-404 { font-size: 4.5rem; }
+    h2 { font-size: 1.45rem; }
+    .lede { font-size: 1rem; margin-bottom: 24px; }
+    .card { padding: 20px; border-radius: 1.75rem; margin-bottom: 24px; }
+    .input-wrap input { padding: 16px 48px; font-size: 1rem; }
+    .input-wrap svg { right: 16px; }
+    .btn { padding: 14px 20px; font-size: 1rem; }
+  }
 </style>
 </head>
 <body>

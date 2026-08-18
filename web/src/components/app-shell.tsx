@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router'
 import type { NavLinkRenderProps } from 'react-router'
@@ -112,6 +113,19 @@ const PRIMARY_NAVIGATION = [
   },
 ] as const satisfies readonly PrimaryNavigationItem[]
 
+// On phones the full destination list no longer fits a bottom bar, so the
+// bar keeps the four everyday destinations plus a "more" toggle that opens a
+// bottom sheet with everything else (including alerts, legacy and logout).
+const MOBILE_BAR_PATHS: readonly string[] = [
+  APP_ROUTES.today,
+  APP_ROUTES.orders,
+  APP_ROUTES.newOrder,
+  APP_ROUTES.preparation,
+]
+
+const MOBILE_BAR_NAVIGATION = PRIMARY_NAVIGATION.filter((item) => MOBILE_BAR_PATHS.includes(item.path))
+const MOBILE_SHEET_NAVIGATION = PRIMARY_NAVIGATION.filter((item) => !MOBILE_BAR_PATHS.includes(item.path))
+
 function desktopLinkClassName({ isActive }: NavLinkRenderProps) {
   const stateClassName = isActive
     ? 'bg-secondary text-primary shadow-sm ring-1 ring-border'
@@ -125,8 +139,19 @@ function mobileLinkClassName({ isActive }: NavLinkRenderProps) {
     ? 'bg-primary text-primary-foreground shadow-sm'
     : 'text-muted-foreground hover:bg-secondary hover:text-primary'
 
-  return `flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[0.6875rem] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${stateClassName}`
+  return `flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.6875rem] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${stateClassName}`
 }
+
+function sheetLinkClassName({ isActive }: NavLinkRenderProps) {
+  const stateClassName = isActive
+    ? 'bg-primary text-primary-foreground shadow-sm'
+    : 'text-muted-foreground hover:bg-secondary hover:text-primary'
+
+  return `flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${stateClassName}`
+}
+
+const SHEET_ROW_CLASS_NAME =
+  'flex min-h-11 w-full items-center gap-3 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
 async function handleLogout() {
   await fetch('/api/auth/logout', { method: 'POST' })
@@ -199,43 +224,97 @@ function MobileHeader() {
 }
 
 function MobileNavigation() {
+  const [moreOpen, setMoreOpen] = useState(false)
+  const closeMore = () => setMoreOpen(false)
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMoreOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [moreOpen])
+
   return (
-    <nav
-      aria-label="ניווט ראשי לנייד"
-      className="fixed inset-x-0 bottom-0 z-40 overflow-x-auto border-t border-border bg-card/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(99,33,40,0.08)] backdrop-blur-xl md:hidden print:hidden"
-    >
-      <div className="mx-auto flex w-max min-w-full items-stretch justify-start gap-1">
-        {PRIMARY_NAVIGATION.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end}
-            className={mobileLinkClassName}
+    <>
+      {moreOpen ? (
+        <div className="fixed inset-0 z-40 md:hidden print:hidden">
+          <button
+            type="button"
+            aria-label="סגירת התפריט"
+            onClick={closeMore}
+            className="absolute inset-0 h-full w-full cursor-default bg-foreground/30 backdrop-blur-sm"
+          />
+          <div
+            id="mobile-more-sheet"
+            aria-label="ניווט נוסף"
+            className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-card px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_-20px_50px_rgba(99,33,40,0.16)]"
           >
-            <LocalIcon name={item.icon} className="text-xl" />
-            <span className="whitespace-nowrap">{item.label}</span>
-          </NavLink>
-        ))}
-        <div className="mt-auto">
-          <NewOrderAlerts />
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border" aria-hidden="true" />
+            <nav aria-label="כל המסכים" className="grid grid-cols-3 gap-2">
+              {MOBILE_SHEET_NAVIGATION.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.end}
+                  onClick={closeMore}
+                  className={sheetLinkClassName}
+                >
+                  <LocalIcon name={item.icon} className="text-xl" />
+                  <span className="max-w-full truncate">{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+            <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
+              <NewOrderAlerts />
+              <a href="/legacy/" className={SHEET_ROW_CLASS_NAME}>
+                <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
+                <span>המערכת הישנה</span>
+              </a>
+              <button type="button" onClick={handleLogout} className={SHEET_ROW_CLASS_NAME}>
+                <LocalIcon name="ph:sign-out-bold" className="text-xl" />
+                <span>התנתקות</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <a
-          href="/legacy/"
-          className="flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
-          <span className="whitespace-nowrap">המערכת הישנה</span>
-        </a>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[0.6875rem] font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <LocalIcon name="ph:sign-out-bold" className="text-xl" />
-          <span className="whitespace-nowrap">התנתקות</span>
-        </button>
-      </div>
-    </nav>
+      ) : null}
+
+      <nav
+        aria-label="ניווט ראשי לנייד"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(99,33,40,0.08)] backdrop-blur-xl md:hidden print:hidden"
+      >
+        <div className="grid grid-cols-5 gap-1">
+          {MOBILE_BAR_NAVIGATION.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.end}
+              onClick={closeMore}
+              className={mobileLinkClassName}
+            >
+              <LocalIcon name={item.icon} className="text-xl" />
+              <span className="max-w-full truncate">{item.label}</span>
+            </NavLink>
+          ))}
+          <button
+            type="button"
+            aria-expanded={moreOpen}
+            aria-controls="mobile-more-sheet"
+            onClick={() => setMoreOpen((open) => !open)}
+            className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[0.6875rem] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+              moreOpen
+                ? 'bg-secondary text-primary shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:bg-secondary hover:text-primary'
+            }`}
+          >
+            <LocalIcon name={moreOpen ? 'ph:x-bold' : 'ph:caret-up-bold'} className="text-xl" />
+            <span className="max-w-full truncate">עוד</span>
+          </button>
+        </div>
+      </nav>
+    </>
   )
 }
 

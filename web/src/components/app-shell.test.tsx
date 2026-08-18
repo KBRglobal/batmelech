@@ -15,7 +15,8 @@ function LocationProbe() {
 afterEach(cleanup)
 
 describe('AppShell', () => {
-  it('renders every operator destination as a real local route in desktop and mobile navigation', () => {
+  it('renders every operator destination as a real local route in desktop and mobile navigation', async () => {
+    const user = userEvent.setup()
     const { container } = render(
       <MemoryRouter initialEntries={[APP_ROUTES.today]}>
         <AppShell>
@@ -23,6 +24,11 @@ describe('AppShell', () => {
         </AppShell>
       </MemoryRouter>,
     )
+
+    // The mobile bottom bar keeps only the everyday destinations; the rest
+    // live in the "more" bottom sheet, so open it before counting links.
+    await user.click(screen.getByRole('button', { name: 'עוד' }))
+
     const expectedLinks = [
       ['היום', APP_ROUTES.today],
       ['הזמנות', APP_ROUTES.orders],
@@ -71,6 +77,29 @@ describe('AppShell', () => {
     const main = container.querySelector('#main-content')!
     expect(main.className).toContain('print:min-h-0')
     expect(main.className).toContain('print:pb-0')
+  })
+
+  it('keeps secondary destinations inside the mobile more sheet and closes it on navigation', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={[APP_ROUTES.today]}>
+        <AppShell>
+          <LocationProbe />
+        </AppShell>
+      </MemoryRouter>,
+    )
+
+    // Closed sheet: secondary destinations exist only in the desktop sidebar.
+    expect(screen.getAllByRole('link', { name: 'הגדרות' })).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'עוד' }))
+    expect(screen.getAllByRole('link', { name: 'הגדרות' })).toHaveLength(2)
+
+    await user.click(screen.getAllByRole('link', { name: 'הגדרות' })[1]!)
+
+    expect(screen.getByLabelText('current route').textContent).toBe(APP_ROUTES.settings)
+    expect(screen.getAllByRole('link', { name: 'הגדרות' })).toHaveLength(1)
   })
 
   it('navigates through an operator link and updates its active state', async () => {
