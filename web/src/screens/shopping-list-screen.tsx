@@ -21,8 +21,18 @@ import {
   type PreparationItemDemand,
   type PreparationPlan,
 } from '../domain/preparation.ts'
+import {
+  loadProductLibrary,
+  minorUnitsToMoney,
+  SUPPLIER_LABELS,
+  type ProductLibraryEntry,
+} from '../domain/product-library.ts'
 import type { RecipeDefinition } from '../domain/recipes.ts'
 import { resolvePreparationCatalog } from '../domain/settings-catalog.ts'
+import {
+  attachProcurement,
+  type ProcurementShoppingListItem,
+} from '../domain/shopping-list-procurement.ts'
 import {
   buildShoppingList,
   type ShoppingListItem,
@@ -203,7 +213,7 @@ function ShoppingRow({
   saveState,
   saveBlocked,
 }: {
-  item: ShoppingListItem
+  item: ProcurementShoppingListItem
   store: Readonly<LegacyStore>
   serviceDate: string | null
   onToggle?: ToggleShoppingCompletion
@@ -248,6 +258,27 @@ function ShoppingRow({
           </button>
         </div>
       </div>
+      {item.procurement !== null && item.procurement.options.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-black">
+          {item.procurement.options
+            .filter((option) => option.comparable)
+            .map((option) => (
+              <span
+                key={option.supplier}
+                className={`rounded-full px-3 py-1 ${
+                  option.supplier === item.procurement!.cheapestSupplier
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-secondary text-muted-foreground'
+                }`}
+              >
+                {SUPPLIER_LABELS[option.supplier]}: {option.packsNeeded} אריזות · {minorUnitsToMoney(option.totalMinorUnits)} AED
+              </span>
+            ))}
+          {item.procurement.kosherLocked && (
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">כשר — רק רימון</span>
+          )}
+        </div>
+      )}
       {saveState !== undefined && saveState.kind !== 'saving' && (
         <p
           className={`mt-3 text-xs font-black ${saveState.kind === 'error' ? 'text-destructive' : 'text-emerald-700'}`}
@@ -320,6 +351,10 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
     ? plan.itemDemands
     : plan.itemDemands.filter(({ serviceDate }) => serviceDate === requestedDate)
   const result = buildShoppingList(demands, recipeConfiguration.recipes)
+  const productLibrary = new Map<string, ProductLibraryEntry>(
+    loadProductLibrary(store).entries.map((entry) => [entry.id, entry]),
+  )
+  const procurement = attachProcurement(result, productLibrary)
   const preparationGroups = requestedDate === ''
     ? plan.dates
     : plan.dates.filter(({ serviceDate }) => serviceDate === requestedDate)
@@ -475,7 +510,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
         </div>
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <span className="text-[0.6875rem] font-black text-muted-foreground">מצרכים שחושבו</span>
-          <strong className="mt-1 block text-xl font-black text-primary">{result.items.length}</strong>
+          <strong className="mt-1 block text-xl font-black text-primary">{procurement.items.length}</strong>
         </div>
       </div>
 
@@ -484,7 +519,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
         <ConfigurationWarnings catalogState={catalogState} recipeState={recipeConfiguration.state} />
         <ShoppingWarnings result={result} demands={demands} />
 
-        {result.items.length === 0 ? (
+        {procurement.items.length === 0 ? (
           <ScreenState
             kind="empty"
             title={emptyState.title}
@@ -494,7 +529,7 @@ export function ShoppingListScreen({ onSave }: { readonly onSave?: ConfirmedStor
           />
         ) : (
           <section className="space-y-3" aria-label="מצרכים לקנייה">
-            {result.items.map((item) => (
+            {procurement.items.map((item) => (
               <ShoppingRow
                 key={`${item.ingredientId}-${item.unit}`}
                 item={item}

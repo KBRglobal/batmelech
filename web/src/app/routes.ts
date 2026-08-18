@@ -22,6 +22,7 @@ export const APP_ROUTES = {
   settings: '/settings',
   menuSettings: '/settings/menu',
   recipeSettings: '/settings/recipes',
+  productLibrary: '/settings/product-library',
   shoppingList: '/shopping-list',
   customerOrder: '/customer-order',
   legacyCustomerOrder: '/order-form.html',
