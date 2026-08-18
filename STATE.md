@@ -1,4 +1,4 @@
-# STATE — batmelech (updated: 2026-08-18 04:30)
+# STATE — batmelech (updated: 2026-08-18 05:10)
 
 ## Now (start here in a new session)
 Build session 2026-08-18: the three ordered flagships from roadmap v3 are BUILT,
@@ -121,6 +121,55 @@ coverage, site locales verified in a real browser locally + bundle hash live).
 - Localization: admin-entered dish descriptions/banners render as typed (Hebrew)
   in en/fr — flagged, acceptable; real photography still missing (placeholder
   badge now localized).
+
+## Shipped in the second wave (2026-08-18 ~05:00, all deployed + live-verified)
+Moshe: "everything is for now except real photos." Built, tested, deployed, verified:
+- **Customer tracking page** (`/t/<orderId>/<sig>`, server/track/): signed HMAC link
+  (derived 'tracking-scope' secret), server-rendered trilingual status page
+  (timeline, courier ETA when fresh, proof photo after delivery, NO PII/prices),
+  generic 404 on anything invalid; staff mint endpoint `/api/tracking-link/<id>`
+  (gated) + copy button in the order editor's edit-mode section.
+- **Site concierge chat** (server/ai/concierge-*, customer-site concierge-chat.tsx):
+  public POST /api/site/concierge, 20/15min/IP, answers in the visitor's language
+  from live-catalog knowledge + fixed facts only, number-grounding guard; floating
+  widget on every site page, 3 locales.
+- **Deliveries map + drag route** (leaflet dep in web/): numbered pins + polyline
+  from hotel coords, OSM tiles; manual drag route override persisted per date in
+  `settings.routeOverrides` with "חזרה לסדר המוצע"; route-order.ts applyRouteOverride.
+- **Delivery time windows** (server/delivery-windows.js): settings.deliveryWindows
+  [{key,start,end,capacity}], public availability endpoint, checkout window picker
+  (3 locales, fail-open), race-safe capacity 409 inside the save-retry loop, admin
+  editor section in Settings (`/api/settings/delivery-windows`).
+- **Jewish holidays** (server/holidays/): pure Intl Hebrew calendar (keyed by ICU
+  month NAMES — leap-year safe; verified live: Rosh Hashanah 2026-09-12), public
+  /api/site/holidays, holiday menus CRUD (gated /api/holidays) stored in
+  settings.holidayMenus with publish windows + order cutoffs, admin section, festive
+  site section on home (3 locales, dishes → cart with canonical Hebrew names).
+- **Kitchen v2** (Moshe: statuses, everything one-tap, simplest UI): per-dish stage
+  cycle on tap — התחלתי להכין → מוכן → ארוז ('packed' stored as boolean true so the
+  preparation screen still sees completed; intermediates are strings in prepDone —
+  operational-state now tolerates them); orders board with one-tap status chips;
+  /api/kitchen accepts kitchen OR staff session; projection now includes
+  name/time/hotelName (still no phones/payments/notes).
+- **Orders screen**: in-place editing (name/date/time/total, pencil→input→✓/Esc)
+  via bounded applyOrderFieldEdit; Excel export of the filtered table; group frames
+  now UNMISSABLE (thick colored border + tinted surface + side ribbon, stable color
+  per group name).
+- **Excel exports** (services/table-export.ts CSV+BOM) on customers + finance;
+  **new-order browser notifications** (bell in the shell, 60s poll, primed silently).
+- **SEO/AEO**: trilingual sitemap with hreflang (42 URLs), llms.txt languages
+  section, X-Robots-Tag noindex added to /app (was already on /admin//orders/admin/
+  /kitchen), robots disallows /kitchen + /t; PROTECTED_PREFIXES extended with
+  /api/holidays + /api/tracking-link (+ regression test lists all staff prefixes —
+  REMEMBER: every new gated /api/* mount must be added there).
+- Suites at ship: server 495, web 673, customer-site 5; all builds green.
+
+### Open after wave 2
+- Mey live test in the real Telegram group — waiting for Moshe to message her
+  (sandbox cannot POST to the live webhook: permission classifier).
+- Real photography + kashrut certification — waiting on Moshe (his explicit hold).
+- Delivery windows + holiday menus are MECHANISMS — Lin/Moshe fill actual windows,
+  holiday dishes and prices in Settings; nothing invented.
 
 ## Older context below (2026-08-14)
 
