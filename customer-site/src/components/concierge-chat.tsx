@@ -123,9 +123,13 @@ export function ConciergeChat() {
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5">
             <Bubble role="assistant">{t.greeting}</Bubble>
-            {messages.map((message, index) => (
-              <Bubble key={index} role={message.role}>{message.content}</Bubble>
-            ))}
+            {messages.map((message, index) =>
+              message.role === 'assistant' ? (
+                <AssistantBubble key={index} content={message.content} whatsappLabel={t.whatsapp} />
+              ) : (
+                <Bubble key={index} role="user">{message.content}</Bubble>
+              )
+            )}
             {sending && (
               <Bubble role="assistant">
                 <span className="inline-flex items-center gap-2 text-[#3B151A]/60">
@@ -195,6 +199,43 @@ export function ConciergeChat() {
         )}
       </button>
     </div>
+  )
+}
+
+// The model is told to say "ask on WhatsApp" without spelling out a number.
+// If a raw number or wa.me link still slips into the text, strip it here —
+// the visitor always gets a clean sentence plus one styled, clickable button.
+export const WHATSAPP_MENTION = /wa\.me|whatsapp|whats\s*app|וואטסאפ|ווטסאפ/iu
+
+export function stripWhatsAppContact(content: string): string {
+  return content
+    .replace(/https?:\/\/wa\.me\/\S+/giu, '')
+    .replace(/(?:\+?\(?971\)?[\s-]*)?0?58[\s-]*628[\s-]*8776/gu, '')
+    .replace(/\s+([.,:;!?])/gu, '$1')
+    .replace(/[:;][\s]*([.,!?])/gu, '$1')
+    .replace(/[ \t]{2,}/gu, ' ')
+    .replace(/[:\s]+$/gu, '')
+    .trim()
+}
+
+function AssistantBubble({ content, whatsappLabel }: { readonly content: string; readonly whatsappLabel: string }) {
+  const mentionsWhatsApp = WHATSAPP_MENTION.test(content)
+  const text = mentionsWhatsApp ? stripWhatsAppContact(content) : content
+  return (
+    <Bubble role="assistant">
+      {text !== '' && <span className="block">{text}</span>}
+      {mentionsWhatsApp && (
+        <a
+          href={WHATSAPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#F5A83A] text-[#3B151A] px-3 py-1.5 text-xs font-black shadow"
+        >
+          <Icon icon="ph:whatsapp-logo-fill" className="text-base" />
+          {whatsappLabel}
+        </a>
+      )}
+    </Bubble>
   )
 }
 

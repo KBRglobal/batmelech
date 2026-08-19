@@ -97,6 +97,14 @@ test('knowledge block carries business facts and the live catalog, never admin b
   assert.doesNotMatch(knowledge, /admin-internal-id/u);
 });
 
+test('the fee depends on the emirate alone and the prompt tells the model to place hotels itself', () => {
+  const knowledge = buildKnowledgeBlock({ menu: MENU });
+  assert.match(knowledge, /depends only on the emirate/u);
+  const { CONCIERGE_SYSTEM_PROMPT } = require('../server/ai/concierge-prompt');
+  assert.match(CONCIERGE_SYSTEM_PROMPT, /identify yourself whether it is in Dubai or Abu Dhabi/u);
+  assert.match(CONCIERGE_SYSTEM_PROMPT, /Never answer "I am not sure" about a well-known UAE location/u);
+});
+
 test('route builds knowledge from the repository state and returns the reply', async () => {
   let received = null;
   const router = createConciergeRouter({

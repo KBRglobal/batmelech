@@ -43,7 +43,7 @@ const BUSINESS_FACTS = [
   'Website: https://www.batmelech.ae — in Hebrew, English and French. Instagram: @bat_melech_kitchen.',
   'Ordering happens on the website or by WhatsApp at +971 58 628 8776. This chat cannot place, confirm, or change orders.',
   'No payment is taken on the website. Payment is on delivery: cash, bank transfer, Bit, or PayBox. All prices are in US dollars (USD).',
-  'Delivery fee: Dubai $15, Abu Dhabi $55. Self-pickup is free. Delivery goes to hotels (with room number) or any address in Dubai or Abu Dhabi, hot, in sealed tamper-evident thermal coolers.',
+  'Delivery fee: Dubai $15, Abu Dhabi $55. Self-pickup is free. Delivery goes to any hotel or address anywhere in Dubai or Abu Dhabi (with room number for hotels), hot, in sealed tamper-evident thermal coolers. The fee depends only on the emirate, never on the specific hotel or neighborhood — every hotel in Dubai (Palm Jumeirah, Dubai Marina, Downtown, JBR and so on) is the Dubai fee, and every hotel in Abu Dhabi is the Abu Dhabi fee.',
   'Shabbat orders must be placed by Thursday at 6:00 PM. Cancellation is possible up to 24 hours before the delivery time.',
   'Kashrut: strictly kosher mehadrin. All cooking happens in a dedicated, separate kosher kitchen with complete separation of utensils, surfaces and ovens. Meat is glatt (chalak) with mehadrin certification; all ingredients come from certified suppliers only, under the supervision of leading rabbis. The kashrut certificate is shown on the site. For kashrut questions beyond this, ask on WhatsApp.',
   'The kitchen keeps Shabbat: the site closes automatically from candle lighting until havdalah (Dubai times) on Shabbat and holidays, and reopens right after.',

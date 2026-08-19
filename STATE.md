@@ -7,7 +7,11 @@
   question and Mey with a recipe question.
 
 ## Recently done (last ~10, newest first)
-- 2026-08-19 Full business knowledge for both assistants (this session, uncommitted → commit sha below once committed):
+- 2026-08-19 Concierge follow-ups (this session): geography rule — model places
+  hotels itself (Five Palm → Dubai → $15), never "not sure" on known UAE spots;
+  WhatsApp handoff is a styled clickable button (AssistantBubble strips raw
+  numbers/links, prompt tells model not to spell them; customer-site rebuilt).
+- 2026-08-19 Full business knowledge for both assistants (be86443):
   - `server/ai/site-knowledge.js` — one shared knowledge base from live state:
     business facts mirroring the customer site (kashrut, payment, delivery
     fees, Thursday 18:00 cutoff, 24h cancellation, events, plata), package
