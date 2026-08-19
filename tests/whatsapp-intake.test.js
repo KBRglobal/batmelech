@@ -142,6 +142,84 @@ test('intake saves a reviewable order, records it in the audit log, and returns 
   assert.equal(audit[0].undo.orderId, saved.id);
 });
 
+// Regression: מיי used to save only a bare order shell (name/phone/date)
+// with the dish list buried in free-text notes, so every order she took
+// still needed a human to rebuild it item by item in the panel. She now
+// resolves quantities the same way the panel does — a couple-meal count
+// with no explicit digit still fills in fish/salad/dessert defaults from
+// the package rules, exactly matching what the panel would produce from
+// the identical message (see web's package-rules.test.ts / order-editor.test.ts).
+test('resolves a couple-meal order into the same structured fields the panel would build', async () => {
+  const coupleMealState = {
+    orders: [],
+    settings: {},
+    menu: {
+      couplePrice: 230,
+      challahPrice: 10,
+      salads: ['כרוב לבן קלאסי', 'מטבוחה פיקנטית'],
+      firsts: ['פילה דג ברוטב מרוקאי'],
+      mains: ['קציצות בשר ברוטב אדום עשיר'],
+      sides: ['אורז לבן'],
+      desserts: ['סופלה שוקולד', 'סוכריות בקלוואה'],
+      extras: [{ name: 'מגש בשרים', price: 120 }],
+    },
+  };
+  const repository = fakeRepository(coupleMealState);
+  const intake = createWhatsAppIntake({
+    repository,
+    reviewOrderIntake: async ({ message, catalog }) => {
+      const byName = new Map(catalog.map((item) => [item.name, item]));
+      const item = (name, quantity, sourceText) => ({
+        catalogItemId: byName.get(name).id,
+        catalogItemName: name,
+        category: byName.get(name).category,
+        quantity,
+        sourceText,
+        confidence: 0.9,
+      });
+      return reviewFixture({
+        draft: {
+          customerName: 'לקוחה מהוואטסאפ',
+          customerPhone: null,
+          serviceDate: null,
+          serviceTime: null,
+          fulfillmentMethod: 'unknown',
+          deliveryLocation: null,
+          items: [
+            item('ארוחה זוגית', 2, 'ל 2 זוגות'),
+            item('פילה דג ברוטב מרוקאי', null, 'דגים מרוקאים'),
+            item('כרוב לבן קלאסי', null, 'כרוב לבן'),
+            item('מטבוחה פיקנטית', null, 'מטבוחה'),
+            item('קציצות בשר ברוטב אדום עשיר', null, 'קציצות ברוטב אדום'),
+            item('סופלה שוקולד', null, 'סופלה שוקולד'),
+          ],
+          notes: [],
+        },
+        unknownItems: [],
+        missingFields: [],
+      });
+    },
+    logger: silentLogger,
+  });
+
+  const result = await intake.intake('ל 2 זוגות: דגים מרוקאים, כרוב לבן, מטבוחה, קציצות ברוטב אדום, סופלה שוקולד');
+  assert.equal(result.ok, true);
+
+  const saved = repository._current().orders[0];
+  assert.equal(saved.meals, 2);
+  // 2 fish units per meal x 2 meals = 4, per package-rules.js — never a
+  // private "x2" here.
+  assert.equal(saved.firsts['פילה דג ברוטב מרוקאי'], 4);
+  assert.deepEqual(saved.salads['כרוב לבן קלאסי'], { o: 1, p: 0 });
+  assert.deepEqual(saved.salads['מטבוחה פיקנטית'], { o: 1, p: 0 });
+  assert.equal(saved.mains['קציצות בשר ברוטב אדום עשיר'], 1);
+  // 2 dessert half-units per meal x 2 meals = 4 half-units; a soufflé is
+  // one half-unit, so 4 soufflés.
+  assert.equal(saved.desserts['סופלה שוקולד'], 4);
+  assert.match(saved.notes, /פילה דג ברוטב מרוקאי x4/u);
+  assert.match(saved.notes, /סופלה שוקולד x4/u);
+});
+
 test('intake respects the emergency freeze and reports pipeline failures', async () => {
   const frozenRepository = fakeRepository({ ...menuState(), settings: { meyWritesFrozen: true } });
   const intake = createWhatsAppIntake({

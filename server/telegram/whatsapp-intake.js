@@ -13,6 +13,7 @@
 const crypto = require('node:crypto');
 const { normalizeWhatsAppInput } = require('../ai/whatsapp-chat');
 const { isWritesFrozen, recordOrderCreated } = require('./mey-audited-actions');
+const { resolveReviewItemQuantities } = require('../domain/resolve-review-items');
 
 const MAX_ATTEMPTS = 5;
 const MAX_CONVERSATION_LENGTH = 24000;
@@ -118,21 +119,44 @@ function dubaiToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
 }
 
-function summaryLines(review) {
+function summaryLines(review, resolvedQuantities) {
   return review.draft.items.map((item) => ({
     name: item.catalogItemName,
-    qty: item.quantity,
+    qty: resolvedQuantities.get(item.catalogItemId) ?? item.quantity,
     priceUsd: null,
   }));
 }
 
-function buildOrderNotes(review, conversation) {
+// Builds the structured order fields (meals/challot/salads/firsts/mains/
+// sides/desserts) directly in the legacy store shape — the same shape
+// serializeOrderDraft produces for the panel — so an order מיי creates
+// looks, to every other reader of the store, exactly like one the panel
+// or the public site created.
+function buildStructuredOrderFields(catalogById, resolvedQuantities) {
+  const fields = { meals: 0, challot: 0, salads: {}, firsts: {}, mains: {}, sides: {}, desserts: {}, extras: {} };
+  for (const [catalogItemId, quantity] of resolvedQuantities) {
+    const catalogItem = catalogById.get(catalogItemId);
+    if (!catalogItem) continue;
+    if (catalogItem.category === 'couple_meal') fields.meals = quantity;
+    else if (catalogItem.category === 'challahs') fields.challot = quantity;
+    else if (catalogItem.category === 'salad') fields.salads[catalogItem.name] = { o: quantity, p: 0 };
+    else if (catalogItem.category === 'first') fields.firsts[catalogItem.name] = quantity;
+    else if (catalogItem.category === 'main') fields.mains[catalogItem.name] = quantity;
+    else if (catalogItem.category === 'side') fields.sides[catalogItem.name] = quantity;
+    else if (catalogItem.category === 'dessert') fields.desserts[catalogItem.name] = quantity;
+    else if (catalogItem.category === 'extra') fields.extras[catalogItem.name] = { q: quantity, note: '' };
+  }
+  return fields;
+}
+
+function buildOrderNotes(review, conversation, resolvedQuantities) {
   const lines = [];
   lines.push('נקלטה מוואטסאפ דרך מיי — טעונה בדיקה ואישור בפאנל.');
   lines.push('');
   lines.push('פריטים שזוהו:');
   for (const item of review.draft.items) {
-    lines.push(`• ${item.catalogItemName}${item.quantity === null ? ' — כמות לא צוינה' : ` x${item.quantity}`}`);
+    const quantity = resolvedQuantities.get(item.catalogItemId) ?? item.quantity;
+    lines.push(`• ${item.catalogItemName}${quantity === null ? ' — כמות לא צוינה' : ` x${quantity}`}`);
   }
   if (review.draft.items.length === 0) lines.push('• (לא זוהו פריטים ודאיים)');
   if (review.unknownItems.length > 0) {
@@ -204,6 +228,7 @@ function createWhatsAppIntake({
       if (items.length < 5) {
         return { ok: false, error: 'menu_unavailable' };
       }
+      const catalogById = new Map(items.map((item) => [item.id, item]));
 
       let review;
       try {
@@ -212,6 +237,11 @@ function createWhatsAppIntake({
         logger.error('mey whatsapp intake review failed', error);
         return { ok: false, error: 'review_failed' };
       }
+      // A brand-new order starts at 0 meals, exactly like the panel's own
+      // "new order" draft — the resolver treats a selection with no meal
+      // count yet as "at least one meal" the moment a dish is named.
+      const resolvedQuantities = resolveReviewItemQuantities(review.draft.items, catalogById, 0);
+      const structuredFields = buildStructuredOrderFields(catalogById, resolvedQuantities);
 
       const now = new Date();
       const orderId = `mey-${now.getTime()}-${crypto.randomBytes(4).toString('hex')}`;
@@ -229,7 +259,8 @@ function createWhatsAppIntake({
         ...(location && !isPickup ? { place: location } : {}),
         status: 'חדשה',
         source: 'mey-whatsapp',
-        notes: buildOrderNotes(review, conversation),
+        ...structuredFields,
+        notes: buildOrderNotes(review, conversation, resolvedQuantities),
         total: 0,
         payMethod: '',
         paid: 'לא',
@@ -254,7 +285,7 @@ function createWhatsAppIntake({
           replyDraft = await draftOrderReply({
             conversation,
             summary: {
-              lines: summaryLines(review),
+              lines: summaryLines(review, resolvedQuantities),
               totalUsd: null,
               serviceDate: serviceDate,
               serviceTime: order.time || null,
