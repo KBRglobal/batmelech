@@ -13,8 +13,8 @@ const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 
 const PLAN = Object.freeze({
   storageLimitBytes: 2 * 1024 * 1024 * 1024, // 2 GB purchased plan
-  upgradeUrlYearly: '', // Stripe payment link — filled once created
-  upgradeUrlMonthly: '', // Stripe payment link — filled once created
+  upgradeUrlYearly: 'https://buy.stripe.com/4gM28q9l7aoZ6mt7yRe3e05', // AED 480/year
+  upgradeUrlMonthly: 'https://buy.stripe.com/14A3cucxj9kVfX36uNe3e06', // AED 40/month
   domainName: 'batmelech.ae',
   domainExpiry: '', // ISO date — filled once known
   supportContact: 'KBR',
