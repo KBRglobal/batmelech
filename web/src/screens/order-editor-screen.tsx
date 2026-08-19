@@ -205,6 +205,26 @@ interface ManagerFinding {
   readonly id: string
   readonly label: string
   readonly sourceText: string | null
+  readonly field?: AIReview['missingFields'][number]['field']
+}
+
+// The exact aria-label of the form control a missing-field chore is about —
+// clicking the chore jumps straight there instead of leaving the operator
+// to scroll and hunt for it themselves.
+const FIELD_TARGET_LABELS: Partial<Record<AIReview['missingFields'][number]['field'], string>> = {
+  customer_name: 'שם מלא',
+  customer_phone: 'מספר טלפון',
+  service_date: 'תאריך ההזמנה',
+  service_time: 'שעת הגעה',
+  fulfillment_method: 'איסוף עצמי',
+  delivery_location: 'שם מלון / יעד',
+}
+
+function jumpToField(label: string) {
+  const element = document.querySelector<HTMLElement>(`[aria-label="${label}"]`)
+  if (!element) return
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  element.focus({ preventScroll: true })
 }
 
 function paidExtraPrice(price: number | null, currency: 'USD' | null): string | null {
@@ -365,6 +385,7 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu, draft: OrderDr
         id: `missing:${index}`,
         label: MISSING_FIELD_LABELS[finding.field],
         sourceText: finding.sourceText,
+        field: finding.field,
       }]
     }),
     ...paidExtras.map((extra, index) => {
@@ -465,12 +486,23 @@ function OrderManagerPanel({
           <ul className="mt-3 space-y-2">
             {findings.map((finding) => {
               const isAcknowledged = acknowledged.has(finding.id)
+              const targetLabel = finding.field ? FIELD_TARGET_LABELS[finding.field] : undefined
               return (
                 <li key={finding.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3 ${isAcknowledged ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-card'}`}>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-primary">{finding.label}</p>
                     {finding.sourceText && <q className="mt-1 block break-words text-xs font-bold text-muted-foreground [overflow-wrap:anywhere]">{finding.sourceText}</q>}
                   </div>
+                  {targetLabel && (
+                    <button
+                      type="button"
+                      onClick={() => jumpToField(targetLabel)}
+                      className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-primary/20 bg-card px-4 text-xs font-black text-primary hover:bg-secondary"
+                    >
+                      <LocalIcon name="ph:caret-down-bold" className="text-base" />
+                      <span>למילוי</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     aria-pressed={isAcknowledged}
@@ -1645,7 +1677,7 @@ function OrderEditorContent({
             </Field>
           </div>
           <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-border px-4 text-sm font-black text-primary">
-            <input type="checkbox" checked={draft.pickup} onChange={(event) => patch({ pickup: event.currentTarget.checked })} className="size-5 accent-primary" />
+            <input aria-label="איסוף עצמי" type="checkbox" checked={draft.pickup} onChange={(event) => patch({ pickup: event.currentTarget.checked })} className="size-5 accent-primary" />
             <span>איסוף עצמי</span>
           </label>
           {!draft.pickup && (

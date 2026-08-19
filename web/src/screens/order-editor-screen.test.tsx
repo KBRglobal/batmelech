@@ -826,7 +826,16 @@ describe('OrderEditorScreen', () => {
     expect(within(manager).getByText('חסר מספר טלפון')).toBeTruthy()
     expect(within(manager).getAllByRole('button', { name: /^טופל:/ })).toHaveLength(1)
 
-    await user.type(screen.getByLabelText('מספר טלפון'), '0501234567')
+    // Clicking the chore itself jumps straight to its form field — no
+    // hunting for it by scrolling.
+    const scrollIntoView = vi.fn()
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+    const phoneField = screen.getByLabelText('מספר טלפון')
+    await user.click(within(manager).getByRole('button', { name: 'למילוי' }))
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(document.activeElement).toBe(phoneField)
+
+    await user.type(phoneField, '0501234567')
 
     expect(within(manager).queryByText('חסר מספר טלפון')).toBeNull()
     expect(within(manager).queryAllByRole('button', { name: /^טופל:/ })).toHaveLength(0)
