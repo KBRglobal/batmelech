@@ -833,6 +833,69 @@ describe('OrderEditorScreen', () => {
     expect(within(manager).queryByText(/לבירור$/)).toBeNull()
   })
 
+  it('offers a follow-up-message merge before the first save, without losing the in-progress draft', async () => {
+    const store: LegacyStore = { orders: [] }
+    const menu = buildOrderEditorMenu(store)
+    const catalog = buildAIOrderCatalog(menu)
+    const reviewedDraft = {
+      ...createOrderDraft(menu, new Date(2026, 7, 12)),
+      name: 'לקוחה מהוואטסאפ',
+      meals: 2,
+    }
+    const review = AIReviewSchema.parse({
+      reviewOnly: true,
+      draft: {
+        customerName: 'לקוחה מהוואטסאפ',
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [],
+        notes: [],
+      },
+      corrections: [],
+      ambiguities: [],
+      paidExtras: [],
+      unknownItems: [],
+      missingFields: [{
+        field: 'service_time',
+        sourceText: null,
+        reason: 'The customer has not confirmed a delivery time yet.',
+      }],
+      warnings: [],
+      overallConfidence: 0.9,
+    })
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    renderEditor(APP_ROUTES.newOrder, {
+      review,
+      reviewedDraft,
+      reviewedCatalogSignature: JSON.stringify(catalog.items),
+      reviewedRevision: 1,
+      reviewedHash: 'a'.repeat(64),
+      reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'לקוחה מהוואטסאפ',
+    })
+
+    await screen.findByRole('region', { name: 'מנהל ההזמנה מוואטסאפ' })
+    await user.click(screen.getByRole('button', { name: 'פענוח הודעת המשך' }))
+
+    const location = screen.getByTestId('location').textContent ?? ''
+    expect(location.startsWith(`${APP_ROUTES.orderImportReview}|`)) .toBe(true)
+    const state = JSON.parse(location.slice(location.indexOf('|') + 1)) as {
+      baseDraft: { id: unknown; name: string; meals: number }
+      followUpOrderId?: unknown
+    }
+    // Merges onto the draft already built here — nothing typed so far is lost —
+    // and stays on the "new order" flow since it was never saved yet.
+    expect(state.baseDraft.id).toBeNull()
+    expect(state.baseDraft.name).toBe('לקוחה מהוואטסאפ')
+    expect(state.baseDraft.meals).toBe(2)
+    expect(state.followUpOrderId).toBeUndefined()
+  })
+
   it('resolves selections with no explicit digits via the meal structure, not "not applied"', async () => {
     // Regression: applyAIReviewToDraft filled these in from the couple-meal
     // structure, but the "מה נכנס להזמנה" preview read the raw AI quantity

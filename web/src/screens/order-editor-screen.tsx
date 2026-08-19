@@ -1556,6 +1556,28 @@ function OrderEditorContent({
           </section>
         )}
 
+        {mode === 'new' && managerReview && (
+          <section className="rounded-[2rem] border border-border bg-secondary p-5 sm:p-7">
+            <div className="flex items-center gap-3 text-primary">
+              <LocalIcon name="ph:arrows-clockwise-bold" className="text-2xl" />
+              <h2 className="font-black">הלקוח שלח עוד הודעה לפני השמירה?</h2>
+            </div>
+            <p className="mt-2 text-xs font-bold text-muted-foreground">מדביקים רק את ההודעה החדשה (למשל שעת מסירה שהתקבלה) — המערכת תשלים את מה שהיה חסר, בלי לאבד מה שכבר נבנה כאן.</p>
+            <button
+              type="button"
+              onClick={() => {
+                navigate(APP_ROUTES.orderImportReview, {
+                  state: { baseDraft: { ...draft, id: null } },
+                })
+              }}
+              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary"
+            >
+              <LocalIcon name="ph:chat-dots-bold" className="text-lg" />
+              <span>פענוח הודעת המשך</span>
+            </button>
+          </section>
+        )}
+
         <Section id="details" title="פרטי ההזמנה">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <Field label="לאיזה תאריך ההזמנה?">
