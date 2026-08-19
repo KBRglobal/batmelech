@@ -264,3 +264,26 @@ test('a manual date correction overrides the scan and refuses future dates', asy
   });
   assert.equal(future.status, 400);
 });
+
+test('manual date correction sets the exact stated date and refuses future ones', async (t) => {
+  const { router } = makeRouter();
+  const base = await serve(t, router);
+
+  const { invoice } = await (await jsonRequest(base, '/api/settings/supplier-invoices', {
+    method: 'POST',
+    body: { fileBase64: PDF_DATA_URL, fileName: 'invoice.pdf' },
+  })).json();
+
+  const fixed = await jsonRequest(base, `/api/settings/supplier-invoices/${invoice.id}`, {
+    method: 'PATCH',
+    body: { purchasedAt: '2026-07-02' },
+  });
+  assert.equal(fixed.status, 200);
+  assert.equal((await fixed.json()).invoice.purchasedAt, '2026-07-02');
+
+  const future = await jsonRequest(base, `/api/settings/supplier-invoices/${invoice.id}`, {
+    method: 'PATCH',
+    body: { purchasedAt: '2099-01-01' },
+  });
+  assert.equal(future.status, 400);
+});
