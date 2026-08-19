@@ -1,12 +1,30 @@
 # STATE — batmelech (updated: 2026-08-19 05:10)
 
 ## Now (in progress)
-- Full-knowledge assistants shipped locally, NOT yet deployed — waiting for
-  Moshe's go-ahead to deploy to Railway (his rule: always ask before deploy).
-  Next concrete step: deploy, then live-verify the concierge with the fish
-  question and Mey with a recipe question.
+- ALL DEPLOYED AND LIVE-VERIFIED (2026-08-19 ~06:30): full-knowledge
+  assistants, chat UX round, mobile polish sweep, clean root domain.
+  Live checks passed: concierge answered fish/Five Palm/peanuts correctly;
+  root serves the site (200), /site/checkout 301->/checkout, sitemap clean,
+  /api/state still decoy-404. Remaining known items: PageSpeed performance
+  (NO_LCP error on lab run — likely Reveal opacity-gating + heavy Supabase
+  JPEGs; hero img now fetchPriority=high), real dish photos still pending.
 
 ## Recently done (last ~10, newest first)
+- 2026-08-19 Clean root domain (ee1e607): site serves at batmelech.ae/* via
+  SITE_PAGE_REGEX mount before the decoy gate; /site page URLs 301 to root
+  (assets/files keep /site); dynamic router basename; canonical/hreflang/
+  sitemap/llms.txt/robots all point at root. SOURCE of sitemap/llms.txt is
+  customer-site/public/ — the vite build overwrites site/ copies.
+- 2026-08-19 Railway CLI session died mid-session (their auth had an outage,
+  HTTP 500 on device authorization). Recovered via browserless pairing +
+  Moshe's CLI login. INVENTORY gap still open: no valid persisted token.
+- 2026-08-19 Mobile polish sweep (43cf53d, from 4 audit agents): hero glass
+  card removed on phones (text directly on photo + drop-shadow per BRAND.md),
+  all CTA pills right-sized, radii scaled down at 390px, compact shabbat-order
+  bottom bar, two-row nav, footer 2-col + phone RTL fix + no stray cream band,
+  weekdays badge/allergy corner collision fixed, contrast fixes, 44px tap
+  targets, iOS: no focus auto-zoom (viewport maximum-scale=1) and chat sheet
+  tracks visualViewport so the keyboard never covers the input.
 - 2026-08-19 Mobile + allergy round: chat is a full bottom sheet on phones
   (dvh height, header close button, 16px input so iOS stops zooming,
   safe-area padding, toggle hidden while open and on the three bottom-bar
