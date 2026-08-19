@@ -427,6 +427,52 @@ function catalogItemQuantityIsGrounded(sourceText, quantity, catalogItem) {
   );
 }
 
+const HEBREW_COUPLE_MEAL_NUMBER_WORDS = Object.keys(NUMBER_WORD_VALUES).filter((word) =>
+  /^[֐-׿]+$/u.test(word)
+);
+const NUMBER_TOKEN_PATTERN = `(?:\\d+|${HEBREW_COUPLE_MEAL_NUMBER_WORDS.join('|')})`;
+
+// The couple-meal count is the single number every other included quantity
+// (fish/salad/main/side/dessert allowances, see package-rules.ts on the web
+// side) gets computed from downstream — trusting the model's own digit
+// extraction for it was found to be unreliable even when it quoted the
+// right source text. Re-derived here deterministically from the message
+// itself, independent of what the model reported, so this one field can
+// never be silently wrong.
+function extractStatedCoupleMealCount(message) {
+  const normalized = normalizeEvidenceText(message);
+
+  const numberBeforeCouple = normalized.match(
+    new RegExp(`(?:ל[־-]?\\s*)?(${NUMBER_TOKEN_PATTERN})\\s*זוג(?:ות|יות|ים)?`, 'u')
+  );
+  if (numberBeforeCouple) {
+    const count = NUMBER_WORD_VALUES[numberBeforeCouple[1]] ?? Number(numberBeforeCouple[1]);
+    if (Number.isInteger(count) && count > 0) {
+      return { count, sourceText: numberBeforeCouple[0] };
+    }
+  }
+
+  const numberAfterCouple = normalized.match(
+    new RegExp(`זוג(?:ית|ים|ות|יות)?\\s+(${NUMBER_TOKEN_PATTERN})`, 'u')
+  );
+  if (numberAfterCouple) {
+    const count = NUMBER_WORD_VALUES[numberAfterCouple[1]] ?? Number(numberAfterCouple[1]);
+    if (Number.isInteger(count) && count > 0) {
+      return { count, sourceText: numberAfterCouple[0] };
+    }
+  }
+
+  const englishCouples = normalized.match(/(\d+)\s*couples?/iu);
+  if (englishCouples) {
+    const count = Number(englishCouples[1]);
+    if (Number.isInteger(count) && count > 0) {
+      return { count, sourceText: englishCouples[0] };
+    }
+  }
+
+  return null;
+}
+
 function draftTextIsGrounded(draft, message) {
   const values = [
     draft.customerName,
@@ -817,6 +863,33 @@ function sanitizeReview(review, catalog, message) {
         (finding) => `${finding.field}\u0000${finding.sourceText || ''}`
       );
       warn('quantity_missing', 'Confirm an ungrounded item quantity before applying this draft.');
+    }
+  }
+
+  const coupleMealHint = extractStatedCoupleMealCount(message);
+  const coupleMealCatalogItem = catalog.find((entry) => entry.category === 'couple_meal');
+  if (coupleMealHint && coupleMealCatalogItem) {
+    const existingItem = sanitized.draft.items.find(
+      (item) => item.catalogItemId === coupleMealCatalogItem.id
+    );
+    if (!existingItem) {
+      sanitized.draft.items.push({
+        catalogItemId: coupleMealCatalogItem.id,
+        catalogItemName: coupleMealCatalogItem.name,
+        category: coupleMealCatalogItem.category,
+        quantity: coupleMealHint.count,
+        sourceText: coupleMealHint.sourceText,
+        confidence: 1,
+      });
+      changed = true;
+    } else if (existingItem.quantity !== coupleMealHint.count) {
+      const staleSourceText = existingItem.sourceText;
+      existingItem.quantity = coupleMealHint.count;
+      existingItem.sourceText = coupleMealHint.sourceText;
+      sanitized.missingFields = sanitized.missingFields.filter(
+        (field) => !(field.field === 'item_quantity' && field.sourceText === staleSourceText)
+      );
+      changed = true;
     }
   }
 

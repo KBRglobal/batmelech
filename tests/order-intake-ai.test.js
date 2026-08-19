@@ -1324,3 +1324,111 @@ test('colloquial Hebrew dish names match their formal catalog items', () => {
     assert.equal(sourceTextMatchesCatalogItem(quote, item), false, `${quote} must not match ${item.name}`);
   }
 });
+
+// The couple-meal count drives every other included quantity downstream
+// (fish/salad/main/side/dessert allowances — see package-rules.ts on the
+// web side), so it cannot be left to the model's own digit extraction: a
+// real live run quoted the correct source text ("ל 2 זוגות") but still
+// reported quantity 1. This is re-derived deterministically from the
+// message itself and overrides whatever the provider returned.
+const coupleMealCatalog = [
+  {
+    id: 'meal:couple',
+    name: 'ארוחה זוגית',
+    category: 'couple_meal',
+    aliases: ['זוגית', 'ארוחה לזוג'],
+    isPaidExtra: false,
+    price: 230,
+    currency: 'USD',
+  },
+  {
+    id: 'first:0',
+    name: 'פילה דג ברוטב מרוקאי',
+    category: 'first',
+    aliases: ['דגים מרוקאים'],
+    isPaidExtra: false,
+    price: null,
+    currency: null,
+  },
+];
+
+test('corrects a couple-meal count the provider quoted correctly but miscounted', async () => {
+  const message = 'טוב קודם כל אני רוצה לשריין ארוחת שבת ל 2 זוגות. דגים מרוקאים';
+  const providerReview = completeReview({
+    draft: {
+      items: [
+        {
+          catalogItemId: 'meal:couple',
+          catalogItemName: 'ארוחה זוגית',
+          category: 'couple_meal',
+          quantity: 1,
+          sourceText: 'ל 2 זוגות',
+          confidence: 0.9,
+        },
+      ],
+    },
+  });
+  const fake = fakeOpenAI({ status: 'completed', output: [], output_parsed: providerReview });
+  const reviewer = createOpenAIOrderIntake({ client: fake.client, model: 'test-model' });
+
+  const review = await reviewer({ message, catalog: coupleMealCatalog });
+
+  const mealItem = review.draft.items.find((item) => item.catalogItemId === 'meal:couple');
+  assert.equal(mealItem.quantity, 2);
+  assert.equal(mealItem.sourceText, 'ל 2 זוגות');
+  assert.equal(OrderIntakeReviewSchema.safeParse(review).success, true);
+});
+
+test('fills in a couple-meal item the provider omitted, from the stated count alone', async () => {
+  const message = 'שתי זוגיות בבקשה, דגים מרוקאים';
+  const providerReview = completeReview({
+    draft: {
+      items: [
+        {
+          catalogItemId: 'first:0',
+          catalogItemName: 'פילה דג ברוטב מרוקאי',
+          category: 'first',
+          quantity: null,
+          sourceText: 'דגים מרוקאים',
+          confidence: 0.9,
+        },
+      ],
+    },
+  });
+  const fake = fakeOpenAI({ status: 'completed', output: [], output_parsed: providerReview });
+  const reviewer = createOpenAIOrderIntake({ client: fake.client, model: 'test-model' });
+
+  const review = await reviewer({ message, catalog: coupleMealCatalog });
+
+  const mealItem = review.draft.items.find((item) => item.catalogItemId === 'meal:couple');
+  assert.ok(mealItem, 'the couple-meal item should be filled in, not left missing');
+  assert.equal(mealItem.quantity, 2);
+  assert.equal(mealItem.sourceText, 'שתי זוגיות');
+});
+
+test('leaves an already-correct couple-meal count untouched', async () => {
+  const message = 'זוגית אחת בבקשה, דגים מרוקאים';
+  const providerReview = completeReview({
+    draft: {
+      items: [
+        {
+          catalogItemId: 'meal:couple',
+          catalogItemName: 'ארוחה זוגית',
+          category: 'couple_meal',
+          quantity: 1,
+          sourceText: 'זוגית אחת',
+          confidence: 0.95,
+        },
+      ],
+    },
+  });
+  const fake = fakeOpenAI({ status: 'completed', output: [], output_parsed: providerReview });
+  const reviewer = createOpenAIOrderIntake({ client: fake.client, model: 'test-model' });
+
+  const review = await reviewer({ message, catalog: coupleMealCatalog });
+
+  const mealItem = review.draft.items.find((item) => item.catalogItemId === 'meal:couple');
+  assert.equal(mealItem.quantity, 1);
+  assert.equal(mealItem.confidence, 0.95);
+  assert.equal(review.overallConfidence, 0.8);
+});
