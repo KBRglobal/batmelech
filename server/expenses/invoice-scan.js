@@ -40,6 +40,7 @@ const InvoiceScanSchema = z.object({
 const SYSTEM_PROMPT = [
   'You read supplier invoices and receipts for a kosher catering kitchen in Dubai.',
   'Extract the merchant name, the purchase date (YYYY-MM-DD), the ISO currency code, the grand total, and every line item.',
+  'Dates on UAE invoices are printed day-first (DD/MM/YYYY). Never emit a purchase date later than today; if a parsed date lands in the future, the day and month were swapped — flip them.',
   'All money amounts must be integer minor units (fils/agorot/cents): 12.50 AED -> 1250.',
   'Classify every item into exactly one category:',
   'fruits (fresh fruit), vegetables (fresh vegetables and herbs), meat_fish (meat, poultry, fish), dairy (milk, cheese, eggs), dry_goods (grains, spices, oil, canned, baking, drinks), packaging (containers, bags, disposables, cleaning), other (anything else, including delivery fees and deposits).',
@@ -108,7 +109,7 @@ function createInvoiceScanner({
           {
             role: 'user',
             content: [
-              { type: 'input_text', text: 'Extract this supplier invoice.' },
+              { type: 'input_text', text: `Extract this supplier invoice. Today is ${new Date().toISOString().slice(0, 10)}.` },
               fileContent,
             ],
           },
