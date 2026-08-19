@@ -127,9 +127,7 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   const operationsReviewIndex = source.indexOf("app.use('/api/ai/operations-review', createOperationsReviewRouter");
   const hotelSearchIndex = source.indexOf("app.use('/api/hotels/search', createHotelSearchRouter");
   const stateApiIndex = source.indexOf("app.use('/api/state'");
-  const legacyManagerIndex = source.indexOf("app.use('/legacy', createLegacyManagerRouter");
   const reactIndex = source.indexOf("app.use('/app', createReactAppRouter");
-  const legacyHtmlIndex = source.indexOf("app.use('/index.html', createLegacyManagerRouter");
 
   assert.ok(healthIndex >= 0, 'health route must exist');
   assert.ok(siteStaticIndex > healthIndex, 'public site static mount must exist');
@@ -143,9 +141,10 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.ok(operationsReviewIndex > authIndex, 'operations AI review must remain behind the staff gate');
   assert.ok(stateApiIndex > operationsReviewIndex, 'operations AI review must not shadow the state API');
   assert.ok(stateApiIndex > authIndex, 'state API must remain behind the staff gate');
-  assert.ok(legacyManagerIndex > stateApiIndex, 'legacy manager backup must use the versioned state API');
-  assert.ok(reactIndex > legacyManagerIndex, 'React must not shadow the legacy manager backup');
-  assert.ok(legacyHtmlIndex > reactIndex, 'legacy HTML serving must remain explicit after the React app mount');
+  assert.ok(reactIndex > stateApiIndex, 'React must mount after the state API');
+  // The legacy manager is retired: nothing may serve it or its sync bootstrap.
+  assert.doesNotMatch(source, /createLegacyManagerRouter/);
+  assert.doesNotMatch(source, /bm-sync\.js/);
   assert.match(source, /app\.get\('\/healthz'/);
   assert.match(source, /createCustomerOrderRouter\(\{ getContentRoot: \(\) => contentRoot \}\)/);
   assert.equal(source.match(/app\.use\('\/api\/hotels\/search'/g)?.length, 1);
@@ -153,7 +152,6 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /createHotelSearchRouter\(\)/);
   assert.equal(source.match(/app\.use\('\/api\/ai\/operations-review'/g)?.length, 1);
   assert.match(source, /createOperationsReviewRouter\(\)/);
-  assert.match(source, /app\.get\(\/\^\\\/legacy\$\//);
   assert.match(source, /app\.get\(\/\^\\\/app\$\//);
   // The clean-root era: '/' serves the public site directly; staff sessions
   // still land in the admin app, and old /site page URLs 301 to the root.
@@ -174,39 +172,34 @@ test('public customer form cannot receive the manager sync bootstrap or state AP
   const authIndex = source.indexOf("app.use(createDecoyGate(SESSION_SECRET));");
   const jsonIndex = source.indexOf('app.use(express.json');
   const stateApiIndex = source.indexOf("app.use('/api/state'");
-  const htmlInjectionIndex = source.indexOf("app.use('/index.html', createLegacyManagerRouter");
 
   assert.ok(publicRouteIndex >= 0);
   assert.ok(authIndex > publicRouteIndex);
   assert.ok(jsonIndex > authIndex);
   assert.ok(stateApiIndex > jsonIndex);
-  assert.ok(htmlInjectionIndex > stateApiIndex);
+  assert.doesNotMatch(source, /createLegacyManagerRouter/);
   assert.equal(source.match(/app\.use\('\/order-form\.html'/g)?.length, 1);
 });
 
-test('stale HTML bookmarks redirect before the explicit legacy entry', () => {
+test('stale HTML bookmarks still redirect to the live surfaces', () => {
   const source = fs.readFileSync(serverPath, 'utf8');
   const staleManagerIndex = source.indexOf("app.get('/app.html'");
   const staleCustomerIndex = source.indexOf("app.get('/order.html'");
-  const genericHtmlIndex = source.indexOf("app.use('/index.html', createLegacyManagerRouter");
 
   assert.ok(staleManagerIndex >= 0);
   assert.ok(staleCustomerIndex > staleManagerIndex);
-  assert.ok(genericHtmlIndex > staleCustomerIndex);
   assert.match(source, /app\.get\('\/app\.html'[\s\S]*?response\.redirect\(302, '\/app\/today'\)/u);
   assert.match(source, /app\.get\('\/order\.html'[\s\S]*?response\.redirect\(302, '\/order-form\.html'\)/u);
   assert.match(source.slice(staleManagerIndex, staleCustomerIndex), /Cache-Control', 'no-store'/u);
-  assert.match(source.slice(staleCustomerIndex, genericHtmlIndex), /Cache-Control', 'no-store'/u);
 });
 
-test('only explicit legacy manager entry points can receive the sync bootstrap', () => {
+test('the legacy manager is fully retired', () => {
   const source = fs.readFileSync(serverPath, 'utf8');
 
-  assert.equal(source.match(/createLegacyManagerRouter\(\{ getContentRoot: \(\) => contentRoot \}\)/g)?.length, 2);
-  assert.match(source, /app\.use\('\/legacy', createLegacyManagerRouter/);
-  assert.match(source, /app\.use\('\/index\.html', createLegacyManagerRouter/);
+  assert.doesNotMatch(source, /createLegacyManagerRouter/);
+  assert.doesNotMatch(source, /'\/legacy'/);
+  assert.doesNotMatch(source, /bm-sync\.js/);
   assert.doesNotMatch(source, /endsWith\('\.html'\)|readFile\(file|replace\('<head>'/);
-  assert.ok(source.indexOf("app.use('/index.html'") < source.indexOf('express.static(contentRoot)(req, res, next);'));
 });
 
 test('server fails closed before a database connection when the state capability is absent', () => {

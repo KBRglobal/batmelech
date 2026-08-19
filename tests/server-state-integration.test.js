@@ -12,14 +12,12 @@ test('server mounts one injected versioned state router behind authentication', 
   const customerFormIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
   const authIndex = source.indexOf("app.use(createDecoyGate(SESSION_SECRET));");
   const stateIndex = source.indexOf("app.use('/api/state', createStateRouter");
-  const legacyIndex = source.indexOf("app.use('/legacy', createLegacyManagerRouter");
   const reactIndex = source.indexOf("app.use('/app', createReactAppRouter");
 
   assert.ok(customerFormIndex >= 0);
   assert.ok(authIndex > customerFormIndex);
   assert.ok(stateIndex > authIndex);
-  assert.ok(legacyIndex > stateIndex);
-  assert.ok(reactIndex > legacyIndex);
+  assert.ok(reactIndex > stateIndex);
   assert.equal(source.match(/createStateRouter\(/g)?.length, 1);
   assert.match(source, /createStateSafetyService\(\{ repository: stateRepository \}\)/);
 });

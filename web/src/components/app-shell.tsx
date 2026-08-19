@@ -186,13 +186,6 @@ function DesktopNavigation() {
         <div className="mt-auto">
           <NewOrderAlerts />
         </div>
-        <a
-          href="/legacy/"
-          className="group flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
-          <span>המערכת הישנה</span>
-        </a>
         <button
           type="button"
           onClick={handleLogout}
@@ -268,10 +261,6 @@ function MobileNavigation() {
             </nav>
             <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
               <NewOrderAlerts />
-              <a href="/legacy/" className={SHEET_ROW_CLASS_NAME}>
-                <LocalIcon name="ph:arrow-counter-clockwise-bold" className="text-xl" />
-                <span>המערכת הישנה</span>
-              </a>
               <button type="button" onClick={handleLogout} className={SHEET_ROW_CLASS_NAME}>
                 <LocalIcon name="ph:sign-out-bold" className="text-xl" />
                 <span>התנתקות</span>

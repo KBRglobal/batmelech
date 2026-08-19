@@ -48,10 +48,8 @@ describe('AppShell', () => {
       expect(links.map((link) => link.getAttribute('href'))).toEqual([route, route])
     }
 
-    const legacyLinks = screen.getAllByRole('link', { name: 'המערכת הישנה' })
-    expect(legacyLinks).toHaveLength(2)
-    expect(legacyLinks.map((link) => link.getAttribute('href'))).toEqual(['/legacy/', '/legacy/'])
-    expect(legacyLinks.every((link) => link.getAttribute('target') === null)).toBe(true)
+    // The legacy manager was retired — its entry point must not render.
+    expect(screen.queryByRole('link', { name: 'המערכת הישנה' })).toBeNull()
 
     expect(container.querySelector('a[href="#"]')).toBeNull()
     expect(container.querySelector('svg')).toBeNull()

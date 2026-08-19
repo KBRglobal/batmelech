@@ -10,7 +10,6 @@ const { createOrderReplyRouter } = require('./server/ai/order-reply-route');
 const { createOperationsReviewRouter } = require('./server/ai/operations-review-route');
 const { createCustomerOrderRouter } = require('./server/customer-order-route');
 const { createPublicLandingRouter } = require('./server/public-landing-route');
-const { createLegacyManagerRouter } = require('./server/legacy-manager-route');
 const { createHotelSearchRouter } = require('./server/hotels/hotel-search-route');
 const { PUBLIC_SITE_SECURITY_HEADERS, createReactAppRouter } = require('./server/react-app-route');
 const { transformSiteIndexHtml } = require('./server/site-meta');
@@ -311,7 +310,6 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /orders/admin',
     'Disallow: /app',
     'Disallow: /api',
-    'Disallow: /legacy',
     'Disallow: /kitchen',
     'Disallow: /t',
     'Disallow: /calendar',
@@ -489,10 +487,6 @@ if (stateRepository) {
 // --- Staff-only delivery proof photo gallery: read-only, safe field set only ---
 app.use('/api/delivery-photos', createDeliveryPhotosRouter({ repository: stateRepository }));
 
-// --- Permanent legacy manager backup: authenticated, same versioned state ---
-app.get(/^\/legacy$/, (req, res) => res.redirect(308, '/legacy/'));
-app.use('/legacy', createLegacyManagerRouter({ getContentRoot: () => contentRoot }));
-
 // Retire stale HTML entry points before the generic legacy file handler. Old
 // bookmarks must never execute obsolete pricing or whole-state persistence.
 app.get('/app.html', (_request, response) => {
@@ -540,11 +534,8 @@ app.use('/orders/admin', (request, response, next) => {
 }, createReactAppRouter({ reactRoot: REACT_ROOT }));
 
 
-// --- Explicit emergency legacy entry; unrelated HTML never receives app state ---
-app.use('/index.html', createLegacyManagerRouter({ getContentRoot: () => contentRoot }));
-
-// bm-sync.js always comes from the server image (server-owned, not repo content)
-app.get('/bm-sync.js', (req, res) => res.sendFile(path.join(ROOT, 'bm-sync.js')));
+// The legacy manager was retired; old entry points fall through to the
+// decoy gate like any other unknown path.
 // contentRoot is the WHOLE repo checkout, not a curated public/ folder — this
 // must stay session-gated or every source file (server.js, STATE.md, client
 // requirement docs, ...) becomes a public static file. The decoy gate above

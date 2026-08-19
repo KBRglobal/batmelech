@@ -147,12 +147,12 @@ export function NewOrderAlerts() {
         : enabled
           ? 'התראות על הזמנות חדשות פועלות — לחיצה מכבה'
           : 'הפעלת התראות דפדפן על הזמנות חדשות'}
-      className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-4 text-sm font-black transition-colors ${
+      className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-2xl px-4 text-sm font-black transition-colors ${
         enabled ? 'bg-emerald-50 text-emerald-900' : blocked ? 'bg-rose-50 text-destructive' : 'text-primary hover:bg-secondary'
       }`}
     >
       <LocalIcon name={enabled ? 'ph:bell-ringing-bold' : 'ph:bell-bold'} className="text-xl" />
-      <span>{enabled ? 'התראות פועלות' : blocked ? 'התראות חסומות בדפדפן' : 'התראות על הזמנה חדשה'}</span>
+      <span className="min-w-0 truncate">{enabled ? 'התראות פועלות' : blocked ? 'התראות חסומות' : 'התראות הזמנות'}</span>
     </button>
   )
 }
