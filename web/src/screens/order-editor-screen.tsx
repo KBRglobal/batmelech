@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
+import { readWhatsAppExportFile } from '../domain/whatsapp-export-file.ts'
 import { ScreenState } from '../components/screen-state.tsx'
 import {
   createVersionedRequestId,
@@ -1412,12 +1413,38 @@ function OrderEditorContent({
               placeholder="מדביקים כאן את ההודעה המלאה..."
               className={`${inputClassName} mt-4 min-h-32 resize-y`}
             />
+            <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-2xl border border-border bg-card px-4 text-xs font-black text-primary hover:bg-background">
+              <LocalIcon name="ph:file-text-bold" className="text-lg" />
+              <span>או העלאת קובץ ייצוא שיחה מוואטסאפ</span>
+              <input
+                type="file"
+                accept=".txt,.zip,text/plain,application/zip,application/x-zip-compressed"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0]
+                  event.currentTarget.value = ''
+                  if (!file) return
+                  void readWhatsAppExportFile(file, 24000).then((result) => {
+                    if ('error' in result) {
+                      setImportError(
+                        result.error === 'not_chat_export'
+                          ? 'לא נמצא קובץ שיחה בקובץ שהועלה — מייצאים מוואטסאפ עם "ייצוא צ׳אט"'
+                          : 'לא הצלחנו לקרוא את הקובץ — אפשר לנסות שוב או להדביק את הטקסט',
+                      )
+                      return
+                    }
+                    setImportText(result.text)
+                    setImportError(result.trimmed ? 'השיחה ארוכה — נלקחו ההודעות האחרונות (שם נמצאת ההזמנה)' : '')
+                  })
+                }}
+              />
+            </label>
             {importError && <p role="alert" className="mt-2 text-xs font-black text-destructive">{importError}</p>}
             <button
               type="button"
               onClick={() => {
                 if (!importText.trim()) {
-                  setImportError('הדביקי קודם את הודעת הלקוח.')
+                  setImportError('הדביקי קודם את הודעת הלקוח, או העלי קובץ ייצוא שיחה.')
                   return
                 }
                 navigate(APP_ROUTES.orderImportReview, {
