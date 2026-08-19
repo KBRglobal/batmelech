@@ -190,10 +190,10 @@ test('set_delivery_checkin rejects an unknown state and an unknown order', async
   assert.equal(missing.error, 'order not found');
 });
 
-test('the tool surface exposes nineteen well-formed definitions', async () => {
+test('the tool surface exposes twenty-two well-formed definitions', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
 
-  assert.equal(tools.definitions.length, 19);
+  assert.equal(tools.definitions.length, 22);
   for (const definition of tools.definitions) {
     assert.equal(definition.type, 'function', `${definition.name} must be a function tool`);
     assert.equal(typeof definition.name, 'string');
@@ -211,6 +211,120 @@ test('the tool surface exposes nineteen well-formed definitions', async () => {
   assert.ok(names.includes('build_order_from_whatsapp'));
   assert.ok(names.includes('get_plata_status'));
   assert.ok(names.includes('set_plata_status'));
+  assert.ok(names.includes('get_business_knowledge'));
+  assert.ok(names.includes('get_dish_recipe'));
+  assert.ok(names.includes('search_products'));
+});
+
+// --- full business knowledge -------------------------------------------------
+
+function knowledgeState() {
+  return {
+    orders: [],
+    settings: { out: ['סלק מבושל'] },
+    menu: {
+      couplePrice: 230,
+      salads: ['כרוב לבן קלאסי', 'כרוב סגול במיונז'],
+      mains: ['קציצות בשר ברוטב אדום עשיר'],
+      itemIds: { mains: { 'קציצות בשר ברוטב אדום עשיר': 'shabbat-mains-01' } },
+      extras: [{ id: 'x1', name: 'מגש תפו"א קריספיים', price: 30 }],
+    },
+    recipes: [
+      {
+        itemId: 'shabbat-mains-01',
+        yield: 20,
+        ingredients: [
+          { ingredientId: 'i1', ingredientName: 'בשר טחון', quantity: '2', unit: 'ק"ג' },
+          { ingredientId: 'i2', ingredientName: 'רסק עגבניות', quantity: '500', unit: 'גרם' },
+        ],
+      },
+    ],
+    productLibrary: [
+      {
+        id: 'i1',
+        name: 'בשר טחון',
+        category: 'meat',
+        kosherOnly: true,
+        supplierOverride: null,
+        insignificant: false,
+        listings: {
+          rimon: { packSize: '1', packUnit: 'ק"ג', packPriceMinorUnits: 4_500, updatedAt: 1, manualPrice: null },
+        },
+      },
+    ],
+  };
+}
+
+test('get_business_knowledge returns the full site knowledge from live state', async () => {
+  const tools = toolsFor(knowledgeState());
+  const result = await tools.execute('get_business_knowledge', {});
+  assert.match(result.knowledge, /2 fillets, one per person/u);
+  assert.match(result.knowledge, /כרוב סגול במיונז/u);
+  assert.match(result.knowledge, /Currently sold out.*סלק מבושל/u);
+  assert.match(result.knowledge, /קציצות בשר ברוטב אדום עשיר: בשר טחון, רסק עגבניות\./u);
+  // Ingredient names only — never quantities from the recipe book.
+  assert.doesNotMatch(result.knowledge, /ק"ג/u);
+});
+
+test('get_dish_recipe finds a recipe by partial dish name with full quantities', async () => {
+  const tools = toolsFor(knowledgeState());
+  const found = await tools.execute('get_dish_recipe', { dishName: 'קציצות בשר' });
+  assert.equal(found.count, 1);
+  assert.equal(found.recipes[0].dishName, 'קציצות בשר ברוטב אדום עשיר');
+  assert.equal(found.recipes[0].yield, 20);
+  assert.deepEqual(found.recipes[0].ingredients[0], {
+    name: 'בשר טחון',
+    quantity: '2',
+    unit: 'ק"ג',
+    wastePercent: null,
+  });
+
+  const missing = await tools.execute('get_dish_recipe', { dishName: 'פיצה' });
+  assert.equal(missing.count, 0);
+  assert.match(missing.note, /אין מתכון תואם/u);
+});
+
+test('search_products returns supplier listings with prices in currency units', async () => {
+  const tools = toolsFor(knowledgeState());
+  const result = await tools.execute('search_products', { query: 'בשר' });
+  assert.equal(result.count, 1);
+  assert.equal(result.products[0].name, 'בשר טחון');
+  assert.equal(result.products[0].listings.rimon.packPrice, 45);
+
+  const all = await tools.execute('search_products', { query: '' });
+  assert.equal(all.count, 1);
+});
+
+// --- stock marking with inexact names -----------------------------------------
+
+test('set_item_stock with an ambiguous name writes nothing and returns the candidates', async () => {
+  const repository = fakeRepository(knowledgeState());
+  const tools = createMeyTools({ repository, logger: silentLogger });
+
+  const result = await tools.execute('set_item_stock', { itemName: 'כרוב אדום', inStock: false });
+  assert.equal(result.ok, false);
+  assert.equal(result.needsClarification, true);
+  assert.ok(result.candidates.includes('כרוב לבן קלאסי'));
+  assert.ok(result.candidates.includes('כרוב סגול במיונז'));
+  assert.deepEqual(repository._current().settings.out, ['סלק מבושל'], 'nothing was marked');
+});
+
+test('set_item_stock accepts an exact menu name and an unknown name fails safe', async () => {
+  const repository = fakeRepository(knowledgeState());
+  const tools = createMeyTools({ repository, logger: silentLogger });
+
+  const marked = await tools.execute('set_item_stock', { itemName: 'כרוב סגול במיונז', inStock: false });
+  assert.equal(marked.ok, true);
+  assert.ok(repository._current().settings.out.includes('כרוב סגול במיונז'));
+
+  // Restoring a name that only exists in the out list still works.
+  const restored = await tools.execute('set_item_stock', { itemName: 'סלק מבושל', inStock: true });
+  assert.equal(restored.ok, true);
+  assert.equal(repository._current().settings.out.includes('סלק מבושל'), false);
+
+  const unknown = await tools.execute('set_item_stock', { itemName: 'שווארמה', inStock: false });
+  assert.equal(unknown.ok, false);
+  assert.match(unknown.error, /לא נמצא בתפריט/u);
 });
 
 test('get_menu_and_settings answers with the ordering state as it is right now', async () => {

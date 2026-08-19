@@ -74,16 +74,22 @@ async function withServer(router, run) {
 const USER_QUESTION = { messages: [{ role: 'user', content: 'How much is the Shabbat package?' }] };
 
 test('knowledge block carries business facts and the live catalog, never admin bookkeeping', () => {
-  const knowledge = buildKnowledgeBlock(MENU);
+  const knowledge = buildKnowledgeBlock({ menu: MENU });
   // Fixed business facts.
   assert.match(knowledge, /kosher home kitchen in Dubai/u);
   assert.match(knowledge, /Dubai \$15, Abu Dhabi \$55/u);
   assert.match(knowledge, /Self-pickup is free/u);
   assert.match(knowledge, /cash, bank transfer, Bit, or PayBox/u);
   assert.match(knowledge, /\+971 58 628 8776/u);
-  // Live catalog projection: package base price, dish names, priced extras.
-  assert.match(knowledge, /Shabbat package for two, base price: \$250/u);
-  assert.match(knowledge, /Challah: \$10/u);
+  // Site policy facts a visitor asks about.
+  assert.match(knowledge, /Thursday at 6:00 PM/u);
+  assert.match(knowledge, /24 hours before/u);
+  assert.match(knowledge, /mehadrin/u);
+  // Package rules — including how many fish a couple package includes.
+  assert.match(knowledge, /package for two \(מארז שבת זוגי יוקרתי\) costs \$250/u);
+  assert.match(knowledge, /2 fillets, one per person/u);
+  assert.match(knowledge, /extra challah \$10 each/u);
+  // Live catalog projection: dish names, priced extras, lunch.
   assert.match(knowledge, /Matbucha/u);
   assert.match(knowledge, /Yerushalmi Kugel — \$35/u);
   assert.match(knowledge, /baguette — \$18/u);
@@ -137,7 +143,7 @@ test('route validates shape and caps', async () => {
 });
 
 test('number grounding: invented price is retried once, grounded retry wins', async () => {
-  const knowledge = buildKnowledgeBlock(MENU);
+  const knowledge = buildKnowledgeBlock({ menu: MENU });
   const good = 'The Shabbat package for two is $250, and the kugel is $35.';
   const retry = fakeOpenAIClient(['The package is $999.', good]);
   const answerer = createOpenAIConcierge({ client: retry.client, model: 'm', env: {} });
