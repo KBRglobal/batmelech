@@ -42,7 +42,7 @@ export function PageHero({
   return (
     <section className={`relative ${SIZE_CLASS[size]} flex flex-col overflow-hidden`}>
       <div className="absolute inset-0">
-        <img src={image} alt={imageAlt ?? `${title[0]} ${title[1]}`} className="w-full h-full object-cover" />
+        <img src={image} alt={imageAlt ?? `${title[0]} ${title[1]}`} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
         {/* Cream wordmark logo needs a guaranteed-dark upper half on ANY photo
             (kashrut's certificate hero is nearly white) — hold ~35% brand-brown
             through the logo zone before clearing to let the photo's color through. */}
