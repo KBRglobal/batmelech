@@ -233,8 +233,103 @@ function catalogIdentityOccurrences(sourceText, catalogItem) {
   return occurrences;
 }
 
+// Customers write short colloquial names ("כרוב לבן"), the catalog holds the
+// kitchen's formal names ("כרוב לבן קלאסי"). Words that only describe form or
+// quantity carry no identity, so they never count for or against a match.
+const GENERIC_EVIDENCE_WORDS = new Set([
+  'מנה', 'מנות', 'מגש', 'מגשי', 'מגשים', 'תוספת', 'תוספות', 'אקסטרה', 'אקסטרות',
+  'סוג', 'סוגי', 'סוגים', 'נוסף', 'נוספת', 'נוספות', 'נוספים', 'נתח', 'נתחים',
+  'יח', 'יחידות', 'קטן', 'קטנה', 'גדול', 'גדולה', 'זוגי', 'אישי', 'אישית',
+  'שבת', 'עוד', 'גם', 'רק', 'אחד', 'אחת', 'שני', 'שתי', 'שניים', 'שתיים',
+  'עם', 'בלי', 'ללא', 'של',
+]);
+
+// Common menu abbreviations, expanded before word comparison.
+const EVIDENCE_WORD_EXPANSIONS = new Map([
+  ['תפוא', ['תפוחי', 'אדמה']],
+]);
+
+const HEBREW_STRIPPABLE_PREFIXES = new Set(['ב', 'ל', 'ה', 'ו', 'מ', 'כ', 'ש']);
+
+function evidenceContentWords(text) {
+  const normalized = normalizeEvidenceText(text)
+    .toLowerCase()
+    // expand the ubiquitous menu abbreviation תפו"א before tokenizing —
+    // the gershayim otherwise splits it into meaningless tokens
+    .replace(/תפו["'\u05f3\u05f4]?א/gu, 'תפוחי אדמה');
+  const words = [];
+  for (const match of normalized.matchAll(/[\p{L}]+/gu)) {
+    const word = match[0];
+    if (word.length < 2) continue;
+    if (GENERIC_EVIDENCE_WORDS.has(word)) continue;
+    // a generic word behind a grammatical prefix ("בנוסף", "ומגש") is still generic
+    if (GENERIC_EVIDENCE_WORDS.has(stripOneHebrewPrefix(word))) continue;
+    words.push(word);
+  }
+  return words;
+}
+
+function stripOneHebrewPrefix(word) {
+  return word.length > 2 && HEBREW_STRIPPABLE_PREFIXES.has(word[0]) ? word.slice(1) : word;
+}
+
+// Same word up to a short inflection: singular/plural, gender, construct
+// state ("דגים"~"דג", "זוגות"~"זוגית", "צהוב"~"צהובה", "פילטים"~"פילה").
+function inflectionCompatible(a, b) {
+  if (a === b) return true;
+  let commonPrefix = 0;
+  while (commonPrefix < a.length && commonPrefix < b.length && a[commonPrefix] === b[commonPrefix]) {
+    commonPrefix += 1;
+  }
+  // one word contains the other with a short suffix ("דג" -> "דגים")
+  if ((commonPrefix === a.length || commonPrefix === b.length) &&
+      commonPrefix >= 2 && Math.abs(a.length - b.length) <= 3) {
+    return true;
+  }
+  return commonPrefix >= 3 && a.length - commonPrefix <= 3 && b.length - commonPrefix <= 3;
+}
+
+// Full/defective Hebrew spelling fallback ("פילפלים"~"פלפל").
+function stripHebrewVowelLetters(word) {
+  const stripped = word.replace(/[יו]/gu, '');
+  return stripped.length >= 2 ? stripped : word;
+}
+
+function coreWordsCompatible(a, b) {
+  if (inflectionCompatible(a, b)) return true;
+  return inflectionCompatible(stripHebrewVowelLetters(a), stripHebrewVowelLetters(b));
+}
+
+// Grammatical prefixes (ב/ל/ה/ו/מ/כ/ש) may sit on either side ("ברוטב"~"רוטב"),
+// so compatibility is tried with and without one stripped prefix on each side.
+function evidenceWordsCompatible(a, b) {
+  for (const left of new Set([a, stripOneHebrewPrefix(a)])) {
+    for (const right of new Set([b, stripOneHebrewPrefix(b)])) {
+      if (coreWordsCompatible(left, right)) return true;
+    }
+  }
+  return false;
+}
+
 function sourceTextMatchesCatalogItem(sourceText, catalogItem) {
-  return catalogIdentityOccurrences(sourceText, catalogItem).length > 0;
+  if (catalogIdentityOccurrences(sourceText, catalogItem).length > 0) return true;
+
+  // Subset rule: every identifying word the customer wrote must exist in the
+  // catalog item's name or aliases. The customer may say less than the formal
+  // name, never something the name does not contain.
+  const quoteWords = evidenceContentWords(sourceText);
+  if (quoteWords.length === 0) return false;
+  const identityWords = [catalogItem.name, ...catalogItem.aliases].flatMap((identity) =>
+    evidenceContentWords(identity)
+  );
+  if (identityWords.length === 0) return false;
+  let strongMatch = false;
+  for (const quoteWord of quoteWords) {
+    const matched = identityWords.some((identityWord) => evidenceWordsCompatible(quoteWord, identityWord));
+    if (!matched) return false;
+    if (quoteWord.length >= 3) strongMatch = true;
+  }
+  return strongMatch;
 }
 
 function digitValue(character) {
@@ -953,4 +1048,5 @@ module.exports = {
   OrderIntakeServiceError,
   SERVICE_ERROR_CODES,
   createOpenAIOrderIntake,
+  sourceTextMatchesCatalogItem,
 };

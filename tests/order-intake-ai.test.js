@@ -16,6 +16,7 @@ const {
   OrderIntakeServiceError,
   SERVICE_ERROR_CODES,
   createOpenAIOrderIntake,
+  sourceTextMatchesCatalogItem,
 } = require('../server/ai/openai-order-intake');
 const {
   MAX_MESSAGE_LENGTH,
@@ -284,7 +285,7 @@ test('uses official Responses structured output and preserves every review findi
   assert.equal(request.text.format.strict, true);
   assert.match(request.input[0].content, /self-correct/i);
   assert.match(request.input[0].content, /misspell/i);
-  assert.match(request.input[0].content, /cloud-like couscous/i);
+  assert.match(request.input[0].content, /קוסקוס עננים/u);
   assert.match(request.input[0].content, /Never invent a quantity/i);
   assert.match(request.input[0].content, /Never invent or calculate a price/i);
   assert.match(request.input[0].content, /isPaidExtra/i);
@@ -1284,4 +1285,42 @@ test('structured review schema is strict and rejects missing or invented fields'
     }).success,
     false
   );
+});
+
+// Regression for the real customer messages of 2026-08-19 that the intake
+// failed to understand: colloquial subset names must match the kitchen's
+// formal catalog names, while lookalike items must never cross-match.
+test('colloquial Hebrew dish names match their formal catalog items', () => {
+  const couple = { name: 'ארוחה זוגית', aliases: ['זוגית', 'ארוחה לזוג'] };
+  const positive = [
+    ['ארוחת שבת ל 2 זוגות', couple],
+    ['זוגית אחת (230$)', couple],
+    ['כרוב לבן', { name: 'כרוב לבן קלאסי', aliases: [] }],
+    ['מטבוחה', { name: 'מטבוחה פיקנטית', aliases: [] }],
+    ['סלק', { name: 'סלק מבושל', aliases: [] }],
+    ['דגים מרוקאים', { name: 'פילה דג ברוטב מרוקאי', aliases: [] }],
+    ['2 פילטים דג מרוקאי', { name: 'פילה דג ברוטב מרוקאי', aliases: [] }],
+    ['פילפלים חריפים', { name: 'פלפל חריף צלוי', aliases: [] }],
+    ['תפוחי אדמה', { name: 'סלט תפו"א', aliases: [] }],
+    ['טבחה עוף צהוב עם תפוחי אדמה', { name: 'טבחה עוף צהובה עם תפו"א', aliases: [] }],
+    ['קציצות ברוטב אדום', { name: 'קציצות בשר ברוטב אדום עשיר', aliases: [] }],
+    ['1 קציצות בשר בריבת בצל', { name: 'קציצות בשר בריבת בצל וערמונים', aliases: [] }],
+    ['אורז פרסי', { name: 'אורז מתובל / פרסי עם עשבי תיבול', aliases: [] }],
+    ['מגש שניצל - 100$', { name: 'מגש שניצלים (זוגי, כ־13–15 יח׳)', aliases: [] }],
+    ['נתח צלי בקר - 150$', { name: 'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)', aliases: [] }],
+    ['1 חומוס - 15$', { name: 'תוספת חומוס ישראלי לניגוב', aliases: [] }],
+  ];
+  for (const [quote, item] of positive) {
+    assert.equal(sourceTextMatchesCatalogItem(quote, item), true, `${quote} should match ${item.name}`);
+  }
+
+  const negative = [
+    ['סלט ביצים', { name: 'סלק מבושל', aliases: [] }],
+    ['פסטה אדומה', { name: 'קציצות בשר ברוטב אדום עשיר', aliases: [] }],
+    ['חלה', { name: 'ארוחה זוגית', aliases: [] }],
+    ['אורז לבן', { name: 'כרוב לבן קלאסי', aliases: [] }],
+  ];
+  for (const [quote, item] of negative) {
+    assert.equal(sourceTextMatchesCatalogItem(quote, item), false, `${quote} must not match ${item.name}`);
+  }
 });
