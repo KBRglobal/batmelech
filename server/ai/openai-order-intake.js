@@ -892,13 +892,27 @@ function sanitizeReview(review, catalog, message) {
 function createOpenAIOrderIntake({
   client,
   model,
+  reasoningEffort,
   env = process.env,
   clientFactory = (options) => new OpenAI(options),
 } = {}) {
   let openAIClient = client || null;
 
+  // Intake gets its own model/effort knobs (OPENAI_INTAKE_MODEL /
+  // OPENAI_INTAKE_EFFORT) so upgrading order understanding does not raise
+  // the cost of every other AI feature sharing OPENAI_MODEL.
+  function resolveReasoningEffort() {
+    const selected = typeof reasoningEffort === 'string' ? reasoningEffort : env.OPENAI_INTAKE_EFFORT;
+    return ['minimal', 'low', 'medium', 'high'].includes(selected) ? selected : null;
+  }
+
   function resolveModel() {
-    const selectedModel = typeof model === 'string' ? model : env.OPENAI_MODEL;
+    const selectedModel =
+      typeof model === 'string'
+        ? model
+        : typeof env.OPENAI_INTAKE_MODEL === 'string' && env.OPENAI_INTAKE_MODEL.trim()
+          ? env.OPENAI_INTAKE_MODEL
+          : env.OPENAI_MODEL;
     if (typeof selectedModel !== 'string' || !selectedModel.trim()) {
       throw serviceError(SERVICE_ERROR_CODES.NOT_CONFIGURED);
     }
@@ -951,10 +965,12 @@ function createOpenAIOrderIntake({
       let response;
 
       try {
+        const effortOverride = resolveReasoningEffort();
         response = await selectedClient.responses.parse({
           model: selectedModel,
           store: false,
           ...(isRetry ? OPENAI_RETRY_LIMITS : OPENAI_REQUEST_LIMITS),
+          ...(effortOverride ? { reasoning: { effort: effortOverride } } : {}),
           input: [
             {
               role: 'system',
