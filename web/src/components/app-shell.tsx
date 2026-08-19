@@ -26,92 +26,53 @@ type PrimaryNavigationItem = {
     | typeof APP_ROUTES.activity
     | typeof APP_ROUTES.calendar
     | typeof APP_ROUTES.invoices
+    | typeof APP_ROUTES.supplierExpenses
     | typeof APP_ROUTES.customers
     | typeof APP_ROUTES.settings
   icon: LocalIconName
   end: boolean
 }
 
-const PRIMARY_NAVIGATION = [
+interface NavigationGroup {
+  label: string
+  items: readonly PrimaryNavigationItem[]
+}
+
+// The menu is grouped by what Lin is doing: the daily flow, money, and
+// administration — so a new money screen slots in without a flat 15-item wall.
+const NAVIGATION_GROUPS: readonly NavigationGroup[] = [
   {
-    label: 'היום',
-    path: APP_ROUTES.today,
-    icon: 'ph:calendar-bold',
-    end: true,
+    label: 'עבודה שוטפת',
+    items: [
+      { label: 'היום', path: APP_ROUTES.today, icon: 'ph:calendar-bold', end: true },
+      { label: 'הזמנות', path: APP_ROUTES.orders, icon: 'ph:shopping-cart-bold', end: true },
+      { label: 'הזמנה חדשה', path: APP_ROUTES.newOrder, icon: 'ph:plus-circle-bold', end: false },
+      { label: 'סיכום הכנות', path: APP_ROUTES.preparation, icon: 'ph:cooking-pot-bold', end: false },
+      { label: 'משלוחים', path: APP_ROUTES.deliveries, icon: 'ph:truck-bold', end: true },
+      { label: 'לוח שנה', path: APP_ROUTES.calendar, icon: 'ph:calendar-bold', end: true },
+    ],
   },
   {
-    label: 'הזמנות',
-    path: APP_ROUTES.orders,
-    icon: 'ph:shopping-cart-bold',
-    end: true,
+    label: 'כסף',
+    items: [
+      { label: 'כספים', path: APP_ROUTES.finance, icon: 'ph:coins-bold', end: true },
+      { label: 'חשבוניות', path: APP_ROUTES.invoices, icon: 'ph:receipt-bold', end: true },
+      { label: 'הוצאות ספקים', path: APP_ROUTES.supplierExpenses, icon: 'ph:file-text-bold', end: true },
+      { label: 'תובנות', path: APP_ROUTES.insights, icon: 'ph:chart-pie-slice-bold', end: true },
+    ],
   },
   {
-    label: 'הזמנה חדשה',
-    path: APP_ROUTES.newOrder,
-    icon: 'ph:plus-circle-bold',
-    end: false,
+    label: 'ניהול',
+    items: [
+      { label: 'לקוחות', path: APP_ROUTES.customers, icon: 'ph:users-bold', end: true },
+      { label: 'רשימת קניות', path: APP_ROUTES.shoppingList, icon: 'ph:list-checks-bold', end: true },
+      { label: 'יומן פעילות', path: APP_ROUTES.activity, icon: 'ph:clock-counter-clockwise-bold', end: true },
+      { label: 'הגדרות', path: APP_ROUTES.settings, icon: 'ph:gear-six-bold', end: false },
+    ],
   },
-  {
-    label: 'סיכום הכנות',
-    path: APP_ROUTES.preparation,
-    icon: 'ph:cooking-pot-bold',
-    end: false,
-  },
-  {
-    label: 'יומן פעילות',
-    path: APP_ROUTES.activity,
-    icon: 'ph:clock-counter-clockwise-bold',
-    end: true,
-  },
-  {
-    label: 'לוח שנה',
-    path: APP_ROUTES.calendar,
-    icon: 'ph:calendar-bold',
-    end: true,
-  },
-  {
-    label: 'רשימת קניות',
-    path: APP_ROUTES.shoppingList,
-    icon: 'ph:list-checks-bold',
-    end: true,
-  },
-  {
-    label: 'משלוחים',
-    path: APP_ROUTES.deliveries,
-    icon: 'ph:truck-bold',
-    end: true,
-  },
-  {
-    label: 'כספים',
-    path: APP_ROUTES.finance,
-    icon: 'ph:coins-bold',
-    end: true,
-  },
-  {
-    label: 'תובנות',
-    path: APP_ROUTES.insights,
-    icon: 'ph:chart-pie-slice-bold',
-    end: true,
-  },
-  {
-    label: 'חשבוניות',
-    path: APP_ROUTES.invoices,
-    icon: 'ph:receipt-bold',
-    end: true,
-  },
-  {
-    label: 'לקוחות',
-    path: APP_ROUTES.customers,
-    icon: 'ph:users-bold',
-    end: true,
-  },
-  {
-    label: 'הגדרות',
-    path: APP_ROUTES.settings,
-    icon: 'ph:gear-six-bold',
-    end: false,
-  },
-] as const satisfies readonly PrimaryNavigationItem[]
+]
+
+const PRIMARY_NAVIGATION = NAVIGATION_GROUPS.flatMap((group) => group.items)
 
 // On phones the full destination list no longer fits a bottom bar, so the
 // bar keeps the four everyday destinations plus a "more" toggle that opens a
@@ -171,17 +132,26 @@ function DesktopNavigation() {
 
       <GlobalSearch variant="desktop" />
 
-      <nav aria-label="ניווט ראשי" className="flex flex-1 flex-col gap-1.5">
-        {PRIMARY_NAVIGATION.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end}
-            className={desktopLinkClassName}
-          >
-            <LocalIcon name={item.icon} className="text-xl" />
-            <span>{item.label}</span>
-          </NavLink>
+      <nav aria-label="ניווט ראשי" className="flex flex-1 flex-col gap-1.5 overflow-y-auto">
+        {NAVIGATION_GROUPS.map((group) => (
+          <div key={group.label} className="mb-2">
+            <p className="mb-1.5 px-4 text-[0.6875rem] font-black uppercase tracking-wide text-muted-foreground/70">
+              {group.label}
+            </p>
+            <div className="flex flex-col gap-1">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.end}
+                  className={desktopLinkClassName}
+                >
+                  <LocalIcon name={item.icon} className="text-xl" />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
         <div className="mt-auto">
           <NewOrderAlerts />

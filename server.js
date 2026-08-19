@@ -50,7 +50,9 @@ const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-
 const { createInvoiceBrowseRouter } = require('./server/business-data/invoice-browse-route');
 const { createDeliveryPhotosRouter } = require('./server/business-data/delivery-photos-route');
 const { createMenuImageRouter } = require('./server/menu-image-route');
-const { createInvoiceFilesRouter } = require('./server/invoice-files-route');
+const { createSupplierInvoicesRouter } = require('./server/expenses/supplier-invoices-route');
+const { createInvoiceScanner } = require('./server/expenses/invoice-scan');
+const supplierInvoicesRepository = require('./server/expenses/repository');
 const { createStoragePlan } = require('./server/storage-plan');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
@@ -104,6 +106,7 @@ if (process.env.DATABASE_URL) {
     async initialize() {
       await rawStateRepository.initialize();
       await businessDataRepository.initializeBusinessData(pool);
+      await supplierInvoicesRepository.initializeSupplierInvoices(pool);
     },
   };
   // Any successful state save (admin editor, site checkout, backup restore)
@@ -440,13 +443,18 @@ if (pool && process.env.BM_SECRETS_KEY) {
 const storagePlan = createStoragePlan();
 app.use('/api/settings/storage-plan', storagePlan.createRouter());
 
-// --- Admin-only supplier invoice archive (upload/list/view/delete). ---
+// --- Admin-only supplier expenses: upload + AI scan + categorized archive. ---
 {
   const invoiceFilesStorage = createR2Storage();
-  if (invoiceFilesStorage.enabled) {
-    app.use('/api/settings/invoice-files', createInvoiceFilesRouter({ storage: invoiceFilesStorage, quota: storagePlan }));
+  if (invoiceFilesStorage.enabled && pool) {
+    app.use('/api/settings/supplier-invoices', createSupplierInvoicesRouter({
+      pool,
+      storage: invoiceFilesStorage,
+      scanner: createInvoiceScanner(),
+      quota: storagePlan,
+    }));
   } else {
-    app.use('/api/settings/invoice-files', (_request, response) => {
+    app.use('/api/settings/supplier-invoices', (_request, response) => {
       response.set('Cache-Control', 'no-store');
       response.status(503).json({ error: 'not configured' });
     });

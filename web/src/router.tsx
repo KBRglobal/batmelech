@@ -12,6 +12,7 @@ import { CalendarScreen } from './screens/calendar-screen.tsx'
 import { CostReportScreen } from './screens/cost-report-screen.tsx'
 import { InsightsScreen } from './screens/insights-screen.tsx'
 import { InvoicesScreen } from './screens/invoices-screen.tsx'
+import { SupplierExpensesScreen } from './screens/supplier-expenses-screen.tsx'
 import { KitchenScreen, KitchenStandaloneScreen } from './screens/kitchen-screen.tsx'
 import { LabelsScreen } from './screens/labels-screen.tsx'
 import { MenuEditorScreen } from './screens/menu-editor-screen.tsx'
@@ -133,6 +134,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.activity} element={<ActivityScreen />} />
         <Route path={APP_ROUTES.calendar} element={<CalendarScreen />} />
         <Route path={APP_ROUTES.invoices} element={<InvoicesScreen />} />
+        <Route path={APP_ROUTES.supplierExpenses} element={<SupplierExpensesScreen />} />
         <Route path={APP_ROUTES.customers} element={<CustomersScreenWithSave />} />
         <Route path={APP_ROUTES.settings} element={<SettingsScreenWithSave />} />
         <Route path={APP_ROUTES.menuSettings} element={<MenuScreenWithSave />} />

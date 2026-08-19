@@ -19,6 +19,7 @@ export const APP_ROUTES = {
   activity: '/activity',
   calendar: '/calendar',
   invoices: '/invoices',
+  supplierExpenses: '/supplier-expenses',
   customers: '/customers',
   settings: '/settings',
   menuSettings: '/settings/menu',
