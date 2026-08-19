@@ -2055,7 +2055,7 @@ export function applyAIReviewToDraft(
     pickup:
       review.draft.fulfillmentMethod === 'pickup'
         ? true
-        : review.draft.fulfillmentMethod === 'delivery'
+        : review.draft.fulfillmentMethod === 'delivery' || reviewedDeliveryLocation !== null
           ? false
           : draft.pickup,
     notes:

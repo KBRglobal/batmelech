@@ -732,10 +732,11 @@ describe('OrderEditorScreen', () => {
     expect(within(manager).getAllByText('ומגש שניצלים אחד').length).toBeGreaterThanOrEqual(2)
     expect(within(manager).getByText(`${trayName} · 1 · $100.00`)).toBeTruthy()
     expect(within(manager).getByText(`אישור תוספת בתשלום: ${trayName} · 1 · $100.00`)).toBeTruthy()
-    expect(within(manager).getByText('הלקוח תיקן: „בעצם שתי זוגיות” ל„זוגית אחת”')).toBeTruthy()
+    // Self-corrections are applied information, no longer a chore to close.
+    expect(within(manager).queryByText('הלקוח תיקן: „בעצם שתי זוגיות” ל„זוגית אחת”')).toBeNull()
     expect(within(manager).getByText('צריך לוודא לאיזו מנה הלקוח התכוון')).toBeTruthy()
     expect(within(manager).getByText('חסר מספר טלפון')).toBeTruthy()
-    expect(within(manager).getByText('יש פרט נוסף שצריך לבדוק מול הודעת הלקוח')).toBeTruthy()
+    expect(within(manager).queryByText('יש פרט נוסף שצריך לבדוק מול הודעת הלקוח')).toBeNull()
     expect(within(manager).queryByText(/Provider/)).toBeNull()
     expect((screen.getByLabelText('שם מלא') as HTMLInputElement).value).toBe('לקוחה מהוואטסאפ')
 
@@ -746,8 +747,9 @@ describe('OrderEditorScreen', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
 
     const findingButtons = within(manager).getAllByRole('button', { name: /^טופל:/ })
-    expect(findingButtons).toHaveLength(6)
-    expect(new Set(findingButtons.map((button) => button.getAttribute('aria-label'))).size).toBe(6)
+    // corrections and the vague catch-all are no longer chores: 6 -> 4
+    expect(findingButtons).toHaveLength(4)
+    expect(new Set(findingButtons.map((button) => button.getAttribute('aria-label'))).size).toBe(4)
     for (let index = 0; index < findingButtons.length; index += 1) {
       const next = within(manager).getAllByRole('button', { name: /^טופל:/ })
         .find((button) => button.getAttribute('aria-pressed') === 'false')

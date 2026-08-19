@@ -269,8 +269,9 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
   for (const warning of review.warnings) {
     if (
       warning.severity !== 'warning' ||
+      warning.code === 'other' || // the vague catch-all was pure noise as a chore
       warningFallbacks.has(warning.code) ||
-      (warning.code !== 'other' && coveredWarningCodes.has(warning.code))
+      coveredWarningCodes.has(warning.code)
     ) continue
     warningFallbacks.set(warning.code, {
       id: `warning:${warning.code}`,
@@ -292,16 +293,22 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
         sourceText: finding.sourceText,
       }]
     }),
-    ...review.corrections.map((finding, index) => ({
-      id: `correction:${index}`,
-      label: `הלקוח תיקן: „${finding.originalText}” ל„${finding.correctedText}”`,
-      sourceText: finding.correctedText,
-    })),
-    ...review.ambiguities.map((finding, index) => ({
-      id: `ambiguity:${index}`,
-      label: 'צריך לוודא לאיזו מנה הלקוח התכוון',
-      sourceText: finding.sourceText,
-    })),
+    // Customer self-corrections are already APPLIED by the model — they are
+    // information, not work. Surfacing them as chores buried the real ones.
+
+    ...review.ambiguities.flatMap((finding, index) => {
+      // A one-candidate "ambiguity" whose candidate is already in the draft
+      // is the model second-guessing itself — nothing for a human to close.
+      if (
+        finding.candidateCatalogItemIds.length === 1 &&
+        review.draft.items.some((item) => item.catalogItemId === finding.candidateCatalogItemIds[0])
+      ) return []
+      return [{
+        id: `ambiguity:${index}`,
+        label: 'צריך לוודא לאיזו מנה הלקוח התכוון',
+        sourceText: finding.sourceText,
+      }]
+    }),
     ...review.unknownItems.map((finding, index) => ({
       id: `unknown:${index}`,
       label: finding.requestedQuantity === null
@@ -317,6 +324,8 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
       // Selections resolved their own quantity from the meal structure —
       // a leftover item_quantity note about them is pure noise.
       if (finding.field === 'item_quantity' && finding.sourceText && selectionSources.has(finding.sourceText)) return []
+      // A named hotel/address IS the delivery answer — nothing to confirm.
+      if (finding.field === 'fulfillment_method' && review.draft.deliveryLocation !== null) return []
       return [{
         id: `missing:${index}`,
         label: MISSING_FIELD_LABELS[finding.field],
