@@ -115,7 +115,8 @@ test('the public site policy allows every host the built bundle loads', async (t
   assert.deepEqual(directives.get('script-src'), ["'self'"]);
   assert.ok(directives.get('style-src').includes('https://fonts.googleapis.com'));
   assert.ok(directives.get('font-src').includes('https://fonts.gstatic.com'));
-  assert.ok(directives.get('img-src').includes('https://ggrhecslgdflloszjkwl.supabase.co'));
+  assert.ok(directives.get('img-src').includes('https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev'));
+  assert.ok(!directives.get('img-src').some((value) => value.includes('supabase.co')));
   assert.ok(directives.get('img-src').includes('https://randomuser.me'));
   for (const iconifyHost of ['https://api.iconify.design', 'https://api.simplesvg.com', 'https://api.unisvg.com']) {
     assert.ok(directives.get('connect-src').includes(iconifyHost));

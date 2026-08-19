@@ -67,12 +67,12 @@ export function PrivateBBQExperience() {
     <ExperienceLayout
       content={{
         ...t,
-        heroImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Pqb5NHS9yrn.jpeg',
-        cornerImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/tAiOfOnE1Pu.jpeg',
+        heroImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Pqb5NHS9yrn.jpeg',
+        cornerImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/tAiOfOnE1Pu.jpeg',
         gallery: [
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/bq8wCPGKU11.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/EXGsZ8YfU8c.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nsSTu1IMHv0.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/bq8wCPGKU11.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/EXGsZ8YfU8c.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/nsSTu1IMHv0.jpeg',
         ],
       }}
     />

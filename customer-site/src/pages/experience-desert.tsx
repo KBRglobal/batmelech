@@ -67,12 +67,12 @@ export function DesertSafariExperience() {
     <ExperienceLayout
       content={{
         ...t,
-        heroImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/NBoBkJO5uOO.jpeg',
-        cornerImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/0z6cLGFdsyI.jpeg',
+        heroImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/NBoBkJO5uOO.jpeg',
+        cornerImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/0z6cLGFdsyI.jpeg',
         gallery: [
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/3NjmofEbSU0.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hQfhwTbpf9J.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/3NjmofEbSU0.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/hQfhwTbpf9J.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/fbh1mGqHGeE.jpeg',
         ],
       }}
     />

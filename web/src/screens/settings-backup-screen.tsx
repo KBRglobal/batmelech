@@ -4,6 +4,7 @@ import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { StaffLoginSection } from '../components/staff-login-section.tsx'
+import { StoragePlanSection } from '../components/storage-plan-section.tsx'
 import { StateHistorySection } from '../components/state-history-section.tsx'
 import { MeyAuditSection } from '../components/mey-audit-section.tsx'
 import { DeliveryWindowsSection } from '../components/delivery-windows-section.tsx'
@@ -238,6 +239,8 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
       </header>
 
       <div className="mt-8 space-y-8">
+        <StoragePlanSection />
+
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">
           <div className="flex items-center gap-3">
             <LocalIcon name="ph:chart-pie-slice-bold" className="text-xl text-accent" />

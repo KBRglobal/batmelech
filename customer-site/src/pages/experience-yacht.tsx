@@ -67,12 +67,12 @@ export function YachtPartyExperience() {
     <ExperienceLayout
       content={{
         ...t,
-        heroImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/sjRUzhRX09D.jpeg',
-        cornerImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Tr7Zvl6EB0X.jpeg',
+        heroImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/sjRUzhRX09D.jpeg',
+        cornerImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Tr7Zvl6EB0X.jpeg',
         gallery: [
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ciDIhEK0crg.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/s3QaubcTbIN.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/OIC46tu7QUo.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ciDIhEK0crg.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/s3QaubcTbIN.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/OIC46tu7QUo.jpeg',
         ],
       }}
     />

@@ -18,7 +18,7 @@ const INPUT_CLASS =
 // Submitted phone codes never change; only the country labels are localized.
 const PHONE_CODES = ['+971', '+972', '+1', '+44'] as const
 const CHECKOUT_HERO_IMAGE =
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg'
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/L5fzK0kRQ4N.jpeg'
 
 // Localized copy. Hebrew is the source of truth; English is written for an
 // American Jewish audience and French for a French Jewish audience — native

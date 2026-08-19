@@ -305,7 +305,7 @@ function validatedNavigationHref(value: unknown): string | null {
 // strict as validatedNavigationHref: https only, no credentials, no other host.
 const R2_PUBLIC_HOSTNAME = /^pub-[a-z0-9]+\.r2\.dev$/
 
-function validatedProofHref(value: unknown): string | null {
+export function validatedProofHref(value: unknown): string | null {
   const raw = boundedText(value)
   if (raw === '') return null
   try {

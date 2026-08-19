@@ -67,12 +67,12 @@ export function VillaPartyExperience() {
     <ExperienceLayout
       content={{
         ...t,
-        heroImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/T9Q0QhPImYP.jpeg',
-        cornerImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hqJqmcg5k3O.jpeg',
+        heroImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/T9Q0QhPImYP.jpeg',
+        cornerImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/hqJqmcg5k3O.jpeg',
         gallery: [
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Ows6YIFL56o.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Lh0FCekcbt7.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/twpm8363MgJ.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Ows6YIFL56o.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Lh0FCekcbt7.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/twpm8363MgJ.jpeg',
         ],
       }}
     />

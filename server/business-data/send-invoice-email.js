@@ -9,7 +9,7 @@ function escapeHtml(value) {
 }
 
 const HERO_IMAGE_URL =
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg';
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/fbh1mGqHGeE.jpeg';
 const LOGO_URL = 'https://www.batmelech.ae/site/assets/logo-cream.png';
 const WA_URL = 'https://wa.me/971586288776';
 

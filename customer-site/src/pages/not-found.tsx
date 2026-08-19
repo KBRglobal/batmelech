@@ -37,7 +37,7 @@ export function NotFound() {
         size="compact"
         title={t.title as [string, string]}
         subtitle={t.subtitle}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ZEd1RfEEqbe.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ZEd1RfEEqbe.jpeg"
         imageAlt={t.heroAlt}
       />
       <main className="max-w-3xl mx-auto px-6 py-20 text-center">

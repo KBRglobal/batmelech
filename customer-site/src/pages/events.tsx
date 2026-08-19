@@ -8,27 +8,27 @@ import { useLocale, type Locale } from '../locale-context'
 const CARDS = [
   {
     to: '/experiences/bbq',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nsSTu1IMHv0.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/nsSTu1IMHv0.jpeg',
     icon: 'ph:fire-fill',
   },
   {
     to: '/experiences/yacht',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/OIC46tu7QUo.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/OIC46tu7QUo.jpeg',
     icon: 'ph:waves-fill',
   },
   {
     to: '/experiences/villa',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Lh0FCekcbt7.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Lh0FCekcbt7.jpeg',
     icon: 'ph:house-fill',
   },
   {
     to: '/experiences/suite',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/SuJ0WdhHMRh.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/SuJ0WdhHMRh.jpeg',
     icon: 'ph:heart-fill',
   },
   {
     to: '/experiences/desert',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hQfhwTbpf9J.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/hQfhwTbpf9J.jpeg',
     icon: 'ph:mountains-fill',
   },
 ]

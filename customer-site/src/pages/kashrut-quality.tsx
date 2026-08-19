@@ -150,7 +150,7 @@ export function KashrutQuality() {
         size="compact"
         badge={t.badge}
         title={t.title as [string, string]}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/d31Kxj4sAHE.jpeg"
         imageAlt={t.heroAlt}
       />
       <main className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-4xl mx-auto px-6">
@@ -161,7 +161,7 @@ export function KashrutQuality() {
           <p className="text-base md:text-xl font-bold text-[#3B151A]/70 leading-relaxed mb-8 md:mb-12">{t.intro}</p>
           <div className="rounded-3xl md:rounded-[4rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white aspect-video mb-12 md:mb-20">
             <img
-              src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7zzOf0cSMJb.jpeg"
+              src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7zzOf0cSMJb.jpeg"
               alt={t.certificateAlt}
               className="w-full h-full object-cover"
             />

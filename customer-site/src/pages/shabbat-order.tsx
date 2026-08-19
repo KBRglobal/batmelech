@@ -34,37 +34,37 @@ type Option = {
 }
 
 const SALADS: Option[] = [
-  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
-  { id: 'salad-cabbage-purple', name: 'כרוב סגול במיונז', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-381-bR993g9VsLN.jpeg', allergy: 'egg' },
-  { id: 'salad-coleslaw', name: 'קולסלאו', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/FV0qotWV27P.jpeg', allergy: 'egg' },
-  { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/cVEz0yFtGoP.jpeg', allergy: 'spicy' },
-  { id: 'salad-chirshi', name: "צ'ירשי טריפוליטאי", img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/LkkkAnY1xCn.jpeg' },
-  { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/suiaqbglZMf.jpeg', allergy: 'spicy' },
+  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
+  { id: 'salad-cabbage-purple', name: 'כרוב סגול במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-381-bR993g9VsLN.jpeg', allergy: 'egg' },
+  { id: 'salad-coleslaw', name: 'קולסלאו', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/FV0qotWV27P.jpeg', allergy: 'egg' },
+  { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/cVEz0yFtGoP.jpeg', allergy: 'spicy' },
+  { id: 'salad-chirshi', name: "צ'ירשי טריפוליטאי", img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/LkkkAnY1xCn.jpeg' },
+  { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/suiaqbglZMf.jpeg', allergy: 'spicy' },
   { id: 'salad-msir', name: 'מסייר (חמוצים)', img: '/site/assets/pickles-real.jpg', realPhoto: true },
-  { id: 'salad-tahini', name: 'טחינה', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7GjgJuaYjlq.jpeg' },
-  { id: 'salad-beet', name: 'סלק מבושל', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/twpm8363MgJ.jpeg' },
-  { id: 'salad-carrot', name: 'גזר מרוקאי מבושל', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ktV7lQAiCxj.jpeg', allergy: 'spicy' },
-  { id: 'salad-eggplant-mayo', name: 'חציל במיונז', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ArFGA1BIJAz.jpeg', allergy: 'egg' },
-  { id: 'salad-eggplant-fried', name: 'חציל מטוגן', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/oIpRFnfrVKc.jpeg' },
-  { id: 'salad-pepper-roasted', name: 'פלפלים קלויים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-371-liCX1e96i1L.jpeg' },
-  { id: 'salad-cherry-spicy', name: 'עגבניות שרי חריפות', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Cb9z6EshGnU.jpeg', allergy: 'spicy' },
-  { id: 'salad-pepper-hot', name: 'פלפל חריף צלוי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/M6PCfCukw4f.jpeg', allergy: 'spicy' },
-  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Vz9NyTP6CaJ.jpeg', allergy: 'egg' },
-  { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/yt88LuvAVmz.jpeg', allergy: 'egg' },
+  { id: 'salad-tahini', name: 'טחינה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7GjgJuaYjlq.jpeg' },
+  { id: 'salad-beet', name: 'סלק מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/twpm8363MgJ.jpeg' },
+  { id: 'salad-carrot', name: 'גזר מרוקאי מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ktV7lQAiCxj.jpeg', allergy: 'spicy' },
+  { id: 'salad-eggplant-mayo', name: 'חציל במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ArFGA1BIJAz.jpeg', allergy: 'egg' },
+  { id: 'salad-eggplant-fried', name: 'חציל מטוגן', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/oIpRFnfrVKc.jpeg' },
+  { id: 'salad-pepper-roasted', name: 'פלפלים קלויים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-371-liCX1e96i1L.jpeg' },
+  { id: 'salad-cherry-spicy', name: 'עגבניות שרי חריפות', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Cb9z6EshGnU.jpeg', allergy: 'spicy' },
+  { id: 'salad-pepper-hot', name: 'פלפל חריף צלוי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/M6PCfCukw4f.jpeg', allergy: 'spicy' },
+  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Vz9NyTP6CaJ.jpeg', allergy: 'egg' },
+  { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/yt88LuvAVmz.jpeg', allergy: 'egg' },
 ]
 
 const FIRST_COURSES: Option[] = [
-  { id: 'first-fish-pair', name: 'זוג פילה דג בר טרי (חריימה/מרוקאי)', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/DNV0D2JBB1h.jpeg', allergy: 'gluten-free' },
-  { id: 'first-fish-balls', name: 'קציצות דגים ברוטב מרוקאי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1UoTNxPxBpB.jpeg' },
+  { id: 'first-fish-pair', name: 'זוג פילה דג בר טרי (חריימה/מרוקאי)', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/DNV0D2JBB1h.jpeg', allergy: 'gluten-free' },
+  { id: 'first-fish-balls', name: 'קציצות דגים ברוטב מרוקאי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/1UoTNxPxBpB.jpeg' },
 ]
 
 const MAIN_COURSES: Option[] = [
-  { id: 'main-meat-red', name: 'קציצות בשר ברוטב אדום עשיר', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-40-yVr6wFVvFkl.jpeg', allergy: 'gluten' },
-  { id: 'main-meat-pea', name: 'קציצות בשר עם אפונה וארטישוק', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nQX6y7PSyNL.jpeg' },
-  { id: 'main-meat-chestnut', name: 'קציצות בשר בריבת בצל וערמונים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/qVICFmHhkmz.jpeg' },
-  { id: 'main-chicken-red', name: 'טבחה עוף אדומה עם שעועית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg' },
-  { id: 'main-chicken-morocco', name: 'תבשיל עוף מרוקאי עם חומוסים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ZBzRBV0QnjT.jpeg' },
-  { id: 'main-chicken-yellow', name: 'טבחה עוף צהובה עם תפו"א', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/00bCUcj59KN.jpeg' },
+  { id: 'main-meat-red', name: 'קציצות בשר ברוטב אדום עשיר', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-40-yVr6wFVvFkl.jpeg', allergy: 'gluten' },
+  { id: 'main-meat-pea', name: 'קציצות בשר עם אפונה וארטישוק', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/nQX6y7PSyNL.jpeg' },
+  { id: 'main-meat-chestnut', name: 'קציצות בשר בריבת בצל וערמונים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/qVICFmHhkmz.jpeg' },
+  { id: 'main-chicken-red', name: 'טבחה עוף אדומה עם שעועית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/d31Kxj4sAHE.jpeg' },
+  { id: 'main-chicken-morocco', name: 'תבשיל עוף מרוקאי עם חומוסים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ZBzRBV0QnjT.jpeg' },
+  { id: 'main-chicken-yellow', name: 'טבחה עוף צהובה עם תפו"א', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/00bCUcj59KN.jpeg' },
 ]
 
 const SIDES: Option[] = [
@@ -74,8 +74,8 @@ const SIDES: Option[] = [
 ]
 
 const DESSERTS: Option[] = [
-  { id: 'dessert-baklava', name: 'סוכריות בקלאווה', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/JCOJo8pP96p.jpeg' },
-  { id: 'dessert-souffle', name: 'סופלה שוקולד', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/MmM6NDYjm66.jpeg' },
+  { id: 'dessert-baklava', name: 'סוכריות בקלאווה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/JCOJo8pP96p.jpeg' },
+  { id: 'dessert-souffle', name: 'סופלה שוקולד', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/MmM6NDYjm66.jpeg' },
 ]
 
 const ALLERGY_ICON: Record<string, string> = {
@@ -381,7 +381,7 @@ export function ShabbatOrder() {
         badge={t.heroBadge}
         title={t.heroTitle}
         subtitle={t.heroSubtitle}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L5fzK0kRQ4N.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/L5fzK0kRQ4N.jpeg"
         imageAlt={t.heroImageAlt}
       />
 

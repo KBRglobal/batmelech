@@ -9,7 +9,7 @@ import { useLocale, type Locale } from '../locale-context'
 const WHATSAPP_NUMBER = '+971 58 628 8776'
 const WHATSAPP_URL = 'https://wa.me/971586288776'
 
-const HERO_IMAGE = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Tr7Zvl6EB0X.jpeg'
+const HERO_IMAGE = 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Tr7Zvl6EB0X.jpeg'
 
 // One icon per step — real icon-library icons only, never built inline.
 const STEP_ICONS = [

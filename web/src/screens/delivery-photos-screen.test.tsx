@@ -50,7 +50,7 @@ describe('DeliveryPhotosScreen', () => {
             date: '2099-08-14',
             time: '14:00',
             hotelName: 'Hilton',
-            deliveryProofUrl: `https://example.com/${HASH}.jpg`,
+            deliveryProofUrl: `https://pub-testbucket123.r2.dev/${HASH}.jpg`,
             deliveryProofAt: Date.UTC(2099, 7, 14, 10, 0),
             status: 'נמסרה',
           },
@@ -69,11 +69,11 @@ describe('DeliveryPhotosScreen', () => {
     expect(screen.getByText(/נמסרה/)).toBeTruthy()
 
     const link = screen.getByRole('link', { name: /פתח בתצוגה מלאה/ })
-    expect(link.getAttribute('href')).toBe(`https://example.com/${HASH}.jpg`)
+    expect(link.getAttribute('href')).toBe(`https://pub-testbucket123.r2.dev/${HASH}.jpg`)
     expect(link.getAttribute('target')).toBe('_blank')
 
     const image = screen.getByRole('img', { name: 'תמונת מסירה — דנה' })
-    expect(image.getAttribute('src')).toBe(`https://example.com/${HASH}.jpg`)
+    expect(image.getAttribute('src')).toBe(`https://pub-testbucket123.r2.dev/${HASH}.jpg`)
   })
 
   it('shows an error state with retry when the server fails', async () => {

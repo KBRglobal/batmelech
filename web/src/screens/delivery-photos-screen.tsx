@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import { validatedProofHref } from '../domain/delivery-dashboard.ts'
 
 export interface DeliveryPhoto {
   readonly id: string
@@ -41,14 +42,14 @@ function PhotoCard({ photo }: { readonly photo: DeliveryPhoto }) {
 
   return (
     <a
-      href={photo.deliveryProofUrl}
+      href={validatedProofHref(photo.deliveryProofUrl) ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
       className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-colors hover:bg-secondary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         <img
-          src={photo.deliveryProofUrl}
+          src={validatedProofHref(photo.deliveryProofUrl) ?? ''}
           alt={`תמונת מסירה — ${photo.name}`}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"

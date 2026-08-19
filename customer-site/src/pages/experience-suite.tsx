@@ -67,12 +67,12 @@ export function SuiteDiningExperience() {
     <ExperienceLayout
       content={{
         ...t,
-        heroImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7LwAsxOnwJr.jpeg',
-        cornerImg: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/eOOVHEcx5tD.jpeg',
+        heroImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7LwAsxOnwJr.jpeg',
+        cornerImg: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/eOOVHEcx5tD.jpeg',
         gallery: [
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/xE7I0jbpGOl.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/SuJ0WdhHMRh.jpeg',
-          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ktV7lQAiCxj.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/xE7I0jbpGOl.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/SuJ0WdhHMRh.jpeg',
+          'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ktV7lQAiCxj.jpeg',
         ],
       }}
     />

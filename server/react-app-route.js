@@ -15,7 +15,7 @@ const PUBLIC_SITE_SECURITY_HEADERS = Object.freeze({
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://ggrhecslgdflloszjkwl.supabase.co https://randomuser.me",
+    "img-src 'self' data: https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev https://randomuser.me",
     "connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",

@@ -8,14 +8,14 @@ import { useLocale, type Locale } from '../locale-context'
 import { dishName } from '../dish-names'
 
 const PHOTO_URLS = [
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Hgw2QN4Smv3.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/bq8wCPGKU11.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/fbh1mGqHGeE.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Tr7Zvl6EB0X.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hqJqmcg5k3O.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/T9Q0QhPImYP.jpeg',
-  'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/XE7I0jbpGOl.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Hgw2QN4Smv3.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/bq8wCPGKU11.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/fbh1mGqHGeE.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Tr7Zvl6EB0X.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/d31Kxj4sAHE.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/hqJqmcg5k3O.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/T9Q0QhPImYP.jpeg',
+  'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/xE7I0jbpGOl.jpeg',
 ]
 
 const HE = {

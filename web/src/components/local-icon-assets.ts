@@ -2,6 +2,8 @@ const PUBLIC_BASE = import.meta.env.BASE_URL
 
 export const LOCAL_ICON_PATHS = {
   'ph:bell-bold': `${PUBLIC_BASE}icons/ph-bell-bold.svg`,
+  'ph:hard-drives-bold': `${PUBLIC_BASE}icons/ph-hard-drives-bold.svg`,
+  'ph:globe-bold': `${PUBLIC_BASE}icons/ph-globe-bold.svg`,
   'ph:bell-ringing-bold': `${PUBLIC_BASE}icons/ph-bell-ringing-bold.svg`,
   'ph:download-simple-bold': `${PUBLIC_BASE}icons/ph-download-simple-bold.svg`,
   'ph:dots-six-vertical-bold': `${PUBLIC_BASE}icons/ph-dots-six-vertical-bold.svg`,

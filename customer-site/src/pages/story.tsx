@@ -67,7 +67,7 @@ export function Story() {
         size="tall"
         badge={t.badge}
         title={t.title as [string, string]}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hqJqmcg5k3O.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/hqJqmcg5k3O.jpeg"
         imageAlt={t.heroAlt}
       />
 
@@ -76,7 +76,7 @@ export function Story() {
           <div className="flex flex-col md:flex-row gap-16 md:gap-20 items-start">
             <div className="md:w-1/3 md:sticky md:top-10 w-full">
               <img
-                src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/8BFD80FA-B647-4892-88DA-A42D9A482CDF-ednYRxQWIlt.png"
+                src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/8BFD80FA-B647-4892-88DA-A42D9A482CDF-ednYRxQWIlt.png"
                 alt={t.portraitAlt}
                 className="w-full aspect-[4/5] rounded-[2.5rem] md:rounded-[4rem] border-4 md:border-8 border-white shadow-2xl object-cover object-top"
               />

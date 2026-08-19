@@ -51,6 +51,7 @@ const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-
 const { createInvoiceBrowseRouter } = require('./server/business-data/invoice-browse-route');
 const { createDeliveryPhotosRouter } = require('./server/business-data/delivery-photos-route');
 const { createMenuImageRouter } = require('./server/menu-image-route');
+const { createStoragePlan } = require('./server/storage-plan');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
 const { createStateSafetyService } = require('./server/state/state-service');
@@ -436,11 +437,15 @@ if (pool && process.env.BM_SECRETS_KEY) {
   });
 }
 
+// --- Admin-only storage plan status (usage, quota, upgrade links). ---
+const storagePlan = createStoragePlan();
+app.use('/api/settings/storage-plan', storagePlan.createRouter());
+
 // --- Admin-only dish photo upload for the menu editor. ---
 {
   const menuImageStorage = createR2Storage();
   if (menuImageStorage.enabled) {
-    app.use('/api/settings/menu-image', createMenuImageRouter({ storage: menuImageStorage }));
+    app.use('/api/settings/menu-image', createMenuImageRouter({ storage: menuImageStorage, quota: storagePlan }));
   } else {
     app.use('/api/settings/menu-image', (_request, response) => {
       response.set('Cache-Control', 'no-store');

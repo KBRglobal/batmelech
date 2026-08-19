@@ -35,7 +35,7 @@ const MENU: MenuItem[] = [
   {
     id: 'schnitzel-baguette',
     name: 'בגט / חלת שניצל ישראלי',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7VXcb8xTxLR.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7VXcb8xTxLR.jpeg',
     allergies: ['gluten', 'egg'],
     variants: [
       // Variant labels stay Hebrew — they are folded into the canonical
@@ -48,7 +48,7 @@ const MENU: MenuItem[] = [
   {
     id: 'tunisian-baguette',
     name: 'בגט טוניסאי אותנטי',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/L2KsnsfAZbI.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/L2KsnsfAZbI.jpeg',
     allergies: ['gluten', 'egg'],
     price: 22,
     lunchKey: 'baguette',
@@ -171,7 +171,7 @@ export function Weekdays() {
         badge={t.heroBadge}
         title={t.heroTitle}
         subtitle={t.heroSubtitle}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1zGIolEp4on.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/1zGIolEp4on.jpeg"
         imageAlt={t.heroImageAlt}
       />
 

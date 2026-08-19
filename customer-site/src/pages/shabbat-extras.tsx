@@ -24,21 +24,21 @@ type Royal = { id: string; name: string; price: number; note?: string; dark?: bo
 // catalog is present, the rendered lists ARE the catalog (photos, order,
 // admin-added dishes included) and these supply legacy ids/images by name.
 const SALADS: Salad[] = [
-  { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/cVEz0yFtGoP.jpeg' },
-  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg' },
-  { id: 'salad-tahini', name: 'טחינה', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7GjgJuaYjlq.jpeg' },
-  { id: 'salad-pepper-hot', name: 'פלפל חריף צלוי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/M6PCfCukw4f.jpeg' },
-  { id: 'salad-beet', name: 'סלק מבושל', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/twpm8363MgJ.jpeg' },
-  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Vz9NyTP6CaJ.jpeg' },
-  { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/yt88LuvAVmz.jpeg' },
-  { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/suiaqbglZMf.jpeg' },
-  { id: 'salad-eggplant-mayo', name: 'חציל במיונז', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ArFGA1BIJAz.jpeg' },
-  { id: 'salad-pepper-roasted', name: 'פלפלים קלויים', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/WhatsAppImage2026-08-13at17-58-371-liCX1e96i1L.jpeg' },
+  { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/cVEz0yFtGoP.jpeg' },
+  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg' },
+  { id: 'salad-tahini', name: 'טחינה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7GjgJuaYjlq.jpeg' },
+  { id: 'salad-pepper-hot', name: 'פלפל חריף צלוי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/M6PCfCukw4f.jpeg' },
+  { id: 'salad-beet', name: 'סלק מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/twpm8363MgJ.jpeg' },
+  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Vz9NyTP6CaJ.jpeg' },
+  { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/yt88LuvAVmz.jpeg' },
+  { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/suiaqbglZMf.jpeg' },
+  { id: 'salad-eggplant-mayo', name: 'חציל במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ArFGA1BIJAz.jpeg' },
+  { id: 'salad-pepper-roasted', name: 'פלפלים קלויים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-371-liCX1e96i1L.jpeg' },
 ]
 
 const FIRST_COURSES: Choice[] = [
-  { id: 'first-fish-pair', name: 'זוג פילה דג בר-ים טרי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/XrjUItAqBlY.jpeg', price: FIRST_PRICE },
-  { id: 'first-fish-balls', name: 'קציצות דגים ברוטב מרוקאי', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/1UoTNxPxBpB.jpeg', price: FIRST_PRICE },
+  { id: 'first-fish-pair', name: 'זוג פילה דג בר-ים טרי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/XrjUItAqBlY.jpeg', price: FIRST_PRICE },
+  { id: 'first-fish-balls', name: 'קציצות דגים ברוטב מרוקאי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/1UoTNxPxBpB.jpeg', price: FIRST_PRICE },
 ]
 
 const ROYAL: Royal[] = [
@@ -64,11 +64,11 @@ const ROYAL: Royal[] = [
 ]
 
 const DESSERTS = [
-  { id: 'dessert-baklava', name: 'סוכריות בקלאווה מלכותיות', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/JCOJo8pP96p.jpeg' },
-  { id: 'dessert-souffle', name: 'סופלה שוקולד פרימיום (פרווה)', img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/MmM6NDYjm66.jpeg' },
+  { id: 'dessert-baklava', name: 'סוכריות בקלאווה מלכותיות', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/JCOJo8pP96p.jpeg' },
+  { id: 'dessert-souffle', name: 'סופלה שוקולד פרימיום (פרווה)', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/MmM6NDYjm66.jpeg' },
 ]
 
-const LOGO_URL = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/bat-removebg-preview1-jKe7guxvdXt.png'
+const LOGO_URL = 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/bat-removebg-preview1-jKe7guxvdXt.png'
 
 // Live category → renderable cards, in the admin's saved order. A live dish
 // reuses the matching hardcoded card's stable id and falls back to its image
@@ -291,7 +291,7 @@ export function ShabbatExtras() {
         badge="Royal Catering Dubai"
         title={t.heroTitle}
         subtitle={t.heroSubtitle}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nnwx4pzCGTT.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/nnwx4pzCGTT.jpeg"
         imageAlt={t.heroImageAlt}
       >
         <h2 className="text-2xl md:text-4xl font-black font-heading italic text-white/90 leading-tight tracking-tight mb-6">
@@ -480,7 +480,7 @@ export function ShabbatExtras() {
 
           <div className="relative z-10 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden h-[260px] md:h-[500px] shadow-2xl border-4 md:border-8 border-white/5 mb-16 md:mb-24">
             <img
-              src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/LN9pezK0tQH.jpeg"
+              src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/LN9pezK0tQH.jpeg"
               alt={t.specialsTitle}
               className="w-full h-full object-cover"
             />
@@ -574,7 +574,7 @@ export function ShabbatExtras() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
             <div className="h-[220px] md:h-[400px] overflow-hidden">
               <img
-                src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/q97J0XWOoFu.jpeg"
+                src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/q97J0XWOoFu.jpeg"
                 alt={t.dessertsImageAlt}
                 className="w-full h-full object-cover"
               />

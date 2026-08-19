@@ -11,42 +11,42 @@ import { useLocale, type Locale } from '../locale-context'
 const EXPERIENCE_META = [
   {
     to: '/experiences/bbq',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/nsSTu1IMHv0.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/nsSTu1IMHv0.jpeg',
     icon: 'ph:fire-fill',
   },
   {
     to: '/experiences/yacht',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/OIC46tu7QUo.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/OIC46tu7QUo.jpeg',
     icon: 'ph:waves-fill',
   },
   {
     to: '/experiences/villa',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/Lh0FCekcbt7.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Lh0FCekcbt7.jpeg',
     icon: 'ph:house-fill',
   },
   {
     to: '/experiences/suite',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/SuJ0WdhHMRh.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/SuJ0WdhHMRh.jpeg',
     icon: 'ph:heart-fill',
   },
   {
     to: '/experiences/desert',
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/hQfhwTbpf9J.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/hQfhwTbpf9J.jpeg',
     icon: 'ph:mountains-fill',
   },
 ]
 
 const TESTIMONIAL_META = [
   {
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ZEd1RfEEqbe.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ZEd1RfEEqbe.jpeg',
     avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
   },
   {
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/psq4DoJL0is.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/psq4DoJL0is.jpeg',
     avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
   },
   {
-    img: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/gpJVV6ZvEfk.jpeg',
+    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/gpJVV6ZvEfk.jpeg',
     avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
   },
 ]
@@ -357,7 +357,7 @@ export function Home() {
         badge={t.hero.badge}
         title={t.hero.title as [string, string]}
         subtitle={t.hero.subtitle}
-        image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
+        image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/GQcIcze6r9C.jpeg"
         imageAlt={t.hero.imageAlt}
       >
         <div className="flex flex-col sm:flex-row gap-3 md:gap-6 w-full sm:w-auto justify-center mt-4">
@@ -383,7 +383,7 @@ export function Home() {
           <div className="max-w-4xl mx-auto">
             <div className="mb-16 inline-block">
               <img
-                src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/8BFD80FA-B647-4892-88DA-A42D9A482CDF-ednYRxQWIlt.png"
+                src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/8BFD80FA-B647-4892-88DA-A42D9A482CDF-ednYRxQWIlt.png"
                 alt={t.story.portraitAlt}
                 className="w-40 h-40 md:w-56 md:h-56 rounded-full border-[12px] border-white shadow-2xl object-cover object-top mx-auto"
               />
@@ -406,7 +406,7 @@ export function Home() {
         <section id="shabbat-promo" ref={shabbatReveal.ref} className={`mb-32 scroll-mt-24 ${shabbatReveal.className}`}>
           <div className="relative h-[30rem] md:h-[40rem] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white group">
             <img
-              src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/NPPrDqcdlgE.jpeg"
+              src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/NPPrDqcdlgE.jpeg"
               alt={t.shabbatPromo.imageAlt}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110"
             />
@@ -435,7 +435,7 @@ export function Home() {
         <section id="weekday-promo" ref={weekdayReveal.ref} className={`mb-32 scroll-mt-24 ${weekdayReveal.className}`}>
           <div className="relative h-[30rem] md:h-[40rem] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white group">
             <img
-              src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/32nv8K7lIKf.jpeg"
+              src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/32nv8K7lIKf.jpeg"
               alt={t.weekdayPromo.imageAlt}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110"
             />

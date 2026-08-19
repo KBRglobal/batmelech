@@ -16,7 +16,7 @@ const UploadSchema = z.object({
   imageBase64: z.string().min(1).max(Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 100),
 });
 
-function createMenuImageRouter({ storage, logger = console }) {
+function createMenuImageRouter({ storage, quota = null, logger = console }) {
   if (!storage || typeof storage.putMenuItemImage !== 'function') {
     throw new TypeError('An R2 storage instance with putMenuItemImage is required');
   }
@@ -57,12 +57,22 @@ function createMenuImageRouter({ storage, logger = console }) {
       return response.status(400).json({ error: 'image must be non-empty and under 5MB' });
     }
 
+    // The storage plan is metered and enforced server-side.
+    if (quota && (await quota.isOverQuota(buffer.byteLength))) {
+      return response.status(413).json({
+        error: 'storage limit reached',
+        code: 'STORAGE_LIMIT',
+        message: 'חבילת האחסון מלאה. יש לרכוש הרחבת אחסון כדי להעלות תמונות נוספות.',
+      });
+    }
+
     const uploaded = await storage.putMenuItemImage({ buffer, contentType });
     if (!uploaded) {
       logger.error('menu image upload failed');
       return response.status(503).json({ error: 'upload failed, please try again' });
     }
 
+    if (quota) quota.invalidateCache();
     return response.status(201).json({ url: uploaded.url });
   });
 
