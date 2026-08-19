@@ -5,6 +5,7 @@ import { ScreenState } from '../components/screen-state.tsx'
 import { formatInvoiceAmount, formatInvoiceDate } from '../domain/invoice-format.ts'
 import { INVOICEABLE_ORDERS_QUERY_KEY, NewInvoiceForm } from './new-invoice-form.tsx'
 import { loadInvoices, resendInvoice, type Invoice } from '../services/invoices-api.ts'
+import { InvoiceArchiveSection } from '../components/invoice-archive-section.tsx'
 
 const INVOICES_QUERY_KEY = ['bat-melech', 'invoices'] as const
 
@@ -237,6 +238,10 @@ export function InvoicesScreen() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="mt-8">
+        <InvoiceArchiveSection />
       </div>
     </div>
   )

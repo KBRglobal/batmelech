@@ -12,7 +12,7 @@
 // webhook handler.
 
 const crypto = require('node:crypto');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 
 const REQUIRED_ENV = [
   'R2_ACCOUNT_ID',
@@ -132,6 +132,80 @@ function createR2Storage({ env = process.env, clientFactory = (options) => new S
         return null;
       }
       return { url: `${env.R2_PUBLIC_URL.trim().replace(/\/$/u, '')}/${key}`, key };
+    },
+    // Supplier invoice archive. Same bucket, its own prefix. These are
+    // sensitive business documents: no public URL is ever returned — the
+    // server streams them back through the authenticated route only.
+    async putInvoiceFile({ buffer, contentType = 'application/pdf', fileName = '' } = {}) {
+      if (!Buffer.isBuffer(buffer) || buffer.byteLength === 0) {
+        logger.error('putInvoiceFile: empty buffer');
+        return null;
+      }
+      const month = new Date().toISOString().slice(0, 7);
+      const suffix = crypto.randomBytes(8).toString('hex');
+      const safeName = String(fileName).replace(/[^A-Za-z0-9._\u0590-\u05FF-]/gu, '-').slice(0, 80) || 'invoice';
+      const key = `invoices/${month}/${Date.now()}-${suffix}-${safeName}`;
+      try {
+        await resolveClient().send(new PutObjectCommand({
+          Bucket: env.R2_BUCKET_NAME.trim(),
+          Key: key,
+          Body: buffer,
+          ContentType: typeof contentType === 'string' && contentType.trim() !== '' ? contentType.trim() : 'application/pdf',
+        }));
+      } catch (error) {
+        logger.error('putInvoiceFile failed', error);
+        return null;
+      }
+      return { key };
+    },
+    async listInvoiceFiles() {
+      const files = [];
+      let continuationToken;
+      try {
+        do {
+          const response = await resolveClient().send(new ListObjectsV2Command({
+            Bucket: env.R2_BUCKET_NAME.trim(),
+            Prefix: 'invoices/',
+            ContinuationToken: continuationToken,
+          }));
+          for (const object of response.Contents || []) {
+            files.push({ key: object.Key, size: object.Size || 0, uploadedAt: object.LastModified || null });
+          }
+          continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+        } while (continuationToken);
+      } catch (error) {
+        logger.error('listInvoiceFiles failed', error);
+        return null;
+      }
+      return files;
+    },
+    async getInvoiceFile(key) {
+      if (typeof key !== 'string' || !key.startsWith('invoices/') || key.includes('..')) return null;
+      try {
+        const response = await resolveClient().send(new GetObjectCommand({
+          Bucket: env.R2_BUCKET_NAME.trim(),
+          Key: key,
+        }));
+        const chunks = [];
+        for await (const chunk of response.Body) chunks.push(chunk);
+        return { buffer: Buffer.concat(chunks), contentType: response.ContentType || 'application/pdf' };
+      } catch (error) {
+        logger.error('getInvoiceFile failed', error);
+        return null;
+      }
+    },
+    async deleteInvoiceFile(key) {
+      if (typeof key !== 'string' || !key.startsWith('invoices/') || key.includes('..')) return false;
+      try {
+        await resolveClient().send(new DeleteObjectCommand({
+          Bucket: env.R2_BUCKET_NAME.trim(),
+          Key: key,
+        }));
+        return true;
+      } catch (error) {
+        logger.error('deleteInvoiceFile failed', error);
+        return false;
+      }
     },
   };
 }

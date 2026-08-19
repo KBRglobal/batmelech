@@ -50,6 +50,7 @@ const { createInvoiceDownloadRouter } = require('./server/business-data/invoice-
 const { createInvoiceBrowseRouter } = require('./server/business-data/invoice-browse-route');
 const { createDeliveryPhotosRouter } = require('./server/business-data/delivery-photos-route');
 const { createMenuImageRouter } = require('./server/menu-image-route');
+const { createInvoiceFilesRouter } = require('./server/invoice-files-route');
 const { createStoragePlan } = require('./server/storage-plan');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
@@ -438,6 +439,19 @@ if (pool && process.env.BM_SECRETS_KEY) {
 // --- Admin-only storage plan status (usage, quota, upgrade links). ---
 const storagePlan = createStoragePlan();
 app.use('/api/settings/storage-plan', storagePlan.createRouter());
+
+// --- Admin-only supplier invoice archive (upload/list/view/delete). ---
+{
+  const invoiceFilesStorage = createR2Storage();
+  if (invoiceFilesStorage.enabled) {
+    app.use('/api/settings/invoice-files', createInvoiceFilesRouter({ storage: invoiceFilesStorage, quota: storagePlan }));
+  } else {
+    app.use('/api/settings/invoice-files', (_request, response) => {
+      response.set('Cache-Control', 'no-store');
+      response.status(503).json({ error: 'not configured' });
+    });
+  }
+}
 
 // --- Admin-only dish photo upload for the menu editor. ---
 {
