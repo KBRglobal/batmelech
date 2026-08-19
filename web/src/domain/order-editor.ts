@@ -2032,6 +2032,46 @@ function withQuantity(record: Readonly<Record<string, number>>, name: string, qu
   return { ...record, [name]: quantity }
 }
 
+// A couple-meal SELECTION carries no quantity in the customer's words —
+// choosing it is the whole statement; the meal structure defines amounts.
+// The AI grounds quantities to explicit digits only, so most selections
+// arrive null. Resolve them with the meal's own logic instead of dropping
+// them (dropping produced empty, useless drafts) — shared by the actual
+// apply step and by any UI that previews what the review will produce, so
+// the two never disagree about what "recognized" means.
+export function resolveReviewItemQuantities(
+  reviewItems: AIReview['draft']['items'],
+  targetsById: Readonly<Record<string, AICatalogTarget>>,
+  currentMeals: number,
+): ReadonlyMap<string, number> {
+  const hasSelections = reviewItems.some((item) => {
+    const kind = targetsById[item.catalogItemId]?.kind
+    return kind === 'salad' || kind === 'first' || kind === 'main' || kind === 'side' || kind === 'dessert'
+  })
+  const statedMeals = reviewItems.find(
+    (item) => targetsById[item.catalogItemId]?.kind === 'meals' && item.quantity !== null,
+  )?.quantity
+  const assumedMeals = statedMeals ?? (hasSelections ? Math.max(currentMeals, 1) : currentMeals)
+
+  const defaultQuantityFor = (kind: AICatalogTarget['kind']): number | null => {
+    if (kind === 'meals') return assumedMeals
+    if (kind === 'first') return assumedMeals * 2 // each couple meal includes two fillet units
+    if (kind === 'salad' || kind === 'main' || kind === 'side' || kind === 'dessert') return 1
+    if (kind === 'extra') return 1
+    return null // challahs follow the meal count automatically; lunch stays explicit
+  }
+
+  const resolved = new Map<string, number>()
+  for (const item of reviewItems) {
+    const target = targetsById[item.catalogItemId]
+    if (!target) continue
+    const quantity = item.quantity ?? defaultQuantityFor(target.kind)
+    if (quantity === null) continue
+    resolved.set(item.catalogItemId, quantity)
+  }
+  return resolved
+}
+
 export function applyAIReviewToDraft(
   draft: OrderDraft,
   review: AIReview,
@@ -2069,37 +2109,13 @@ export function applyAIReviewToDraft(
     ...review.draft.items.filter((item) => targetsById[item.catalogItemId]?.kind === 'lunch-addon'),
   ]
 
-  // A couple-meal SELECTION carries no quantity in the customer's words —
-  // choosing it is the whole statement; the meal structure defines amounts.
-  // The AI grounds quantities to explicit digits only, so most selections
-  // arrive null. Apply them with the meal's own logic instead of dropping
-  // them (dropping produced empty, useless drafts).
-  const hasSelections = itemsInDependencyOrder.some((item) => {
-    const kind = targetsById[item.catalogItemId]?.kind
-    return kind === 'salad' || kind === 'first' || kind === 'main' || kind === 'side' || kind === 'dessert'
-  })
-  const statedMeals = itemsInDependencyOrder.find(
-    (item) => targetsById[item.catalogItemId]?.kind === 'meals' && item.quantity !== null,
-  )?.quantity
-  const assumedMeals = statedMeals ?? (hasSelections ? Math.max(draft.meals, 1) : draft.meals)
-
-  const defaultQuantityFor = (kind: AICatalogTarget['kind']): number | null => {
-    if (kind === 'meals') return assumedMeals
-    if (kind === 'first') return assumedMeals * 2 // each couple meal includes two fillet units
-    if (kind === 'salad' || kind === 'main' || kind === 'side' || kind === 'dessert') return 1
-    if (kind === 'extra') return 1
-    return null // challahs follow the meal count automatically; lunch stays explicit
-  }
+  const resolvedQuantities = resolveReviewItemQuantities(review.draft.items, targetsById, draft.meals)
 
   for (const item of itemsInDependencyOrder) {
     const target = targetsById[item.catalogItemId]
     if (!target) continue
-    let quantity = item.quantity
-    if (quantity === null) {
-      const fallback = defaultQuantityFor(target.kind)
-      if (fallback === null) continue
-      quantity = fallback
-    }
+    const quantity = resolvedQuantities.get(item.catalogItemId)
+    if (quantity === undefined) continue
     if (target.kind === 'meals') {
       next = menu
         ? applyCoupleMealQuantity(next, menu, quantity)

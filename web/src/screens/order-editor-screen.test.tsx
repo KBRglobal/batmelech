@@ -10,6 +10,7 @@ import { useStore } from '../data/use-store.ts'
 import { createVersionedRequestId } from '../data/use-save-order.ts'
 import {
   AIReviewSchema,
+  applyAIReviewToDraft,
   buildAIOrderCatalog,
   buildOrderEditorMenu,
   createOrderDraft,
@@ -768,6 +769,128 @@ describe('OrderEditorScreen', () => {
       meals: 1,
       extras: { [trayName]: { q: 1 } },
     })
+  })
+
+  it('resolves selections with no explicit digits via the meal structure, not "not applied"', async () => {
+    // Regression: applyAIReviewToDraft filled these in from the couple-meal
+    // structure, but the "מה נכנס להזמנה" preview read the raw AI quantity
+    // and showed every selection as "לא הוחל · חסרה כמות" even though the
+    // saved order was correct — a real customer message caught this live.
+    const store: LegacyStore = { orders: [] }
+    const menu = buildOrderEditorMenu(store)
+    const catalog = buildAIOrderCatalog(menu)
+    const salad = catalog.items.find((item) => item.category === 'salad')!
+    const first = catalog.items.find((item) => item.category === 'first')!
+    const main = catalog.items.find((item) => item.category === 'main')!
+    const dessert = catalog.items.find((item) => item.category === 'dessert')!
+    const review = AIReviewSchema.parse({
+      reviewOnly: true,
+      draft: {
+        customerName: 'לקוחה מהוואטסאפ',
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [
+          {
+            catalogItemId: 'meal:couple',
+            catalogItemName: 'ארוחה זוגית',
+            category: 'couple_meal',
+            quantity: 1,
+            sourceText: 'זוגית אחת',
+            confidence: 1,
+          },
+          {
+            catalogItemId: salad.id,
+            catalogItemName: salad.name,
+            category: 'salad',
+            quantity: null,
+            sourceText: 'סלטים',
+            confidence: 0.9,
+          },
+          {
+            catalogItemId: first.id,
+            catalogItemName: first.name,
+            category: 'first',
+            quantity: null,
+            sourceText: 'דגים מרוקאים',
+            confidence: 0.9,
+          },
+          {
+            catalogItemId: main.id,
+            catalogItemName: main.name,
+            category: 'main',
+            quantity: null,
+            sourceText: 'עיקרית',
+            confidence: 0.9,
+          },
+          {
+            catalogItemId: dessert.id,
+            catalogItemName: dessert.name,
+            category: 'dessert',
+            quantity: null,
+            sourceText: 'סופלה שוקולד',
+            confidence: 0.9,
+          },
+        ],
+        notes: [],
+      },
+      corrections: [],
+      ambiguities: [],
+      paidExtras: [],
+      unknownItems: [],
+      missingFields: [],
+      warnings: [],
+      overallConfidence: 0.9,
+    })
+    // Production applies the review before handing off to this screen
+    // (order-import-review-screen.tsx) — build reviewedDraft the same way,
+    // so the test exercises the real save path, not a hand-typed stand-in.
+    const zeroBaseline = { ...createOrderDraft(menu, new Date(2026, 7, 12)), name: 'לקוחה מהוואטסאפ', meals: 0, challot: 0 }
+    const reviewedDraft = applyAIReviewToDraft(zeroBaseline, review, catalog.targetsById, menu)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, request) => {
+      const command = JSON.parse(String(request?.body)) as { localState: LegacyStore }
+      return new Response(JSON.stringify({
+        ok: true,
+        idempotent: false,
+        revision: 2,
+        ts: 2,
+        hash: 'b'.repeat(64),
+        data: command.localState,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    renderEditor(APP_ROUTES.newOrder, {
+      review,
+      reviewedDraft,
+      reviewedCatalogSignature: JSON.stringify(catalog.items),
+      reviewedRevision: 1,
+      reviewedHash: 'a'.repeat(64),
+      reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'הודעה מלאה',
+    })
+
+    const manager = await screen.findByRole('region', { name: 'מנהל ההזמנה מוואטסאפ' })
+    expect(within(manager).queryByText(/לא הוחל/)).toBeNull()
+    expect(within(manager).getByText(`${salad.name} · 1`)).toBeTruthy()
+    expect(within(manager).getByText(`${first.name} · 2`)).toBeTruthy()
+    expect(within(manager).getByText(`${main.name} · 1`)).toBeTruthy()
+    expect(within(manager).getByText(`${dessert.name} · 1`)).toBeTruthy()
+
+    const save = screen.getByRole('button', { name: 'שמירת ההזמנה' })
+    expect(save.hasAttribute('disabled')).toBe(false)
+    await user.click(save)
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+    const command = JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body)) as { localState: LegacyStore }
+    const saved = command.localState.orders[0] as Record<string, unknown>
+    expect(saved.meals).toBe(1)
+    expect((saved.salads as Record<string, { o: number }>)[salad.name]?.o).toBe(1)
+    expect((saved.firsts as Record<string, number>)[first.name]).toBe(2)
+    expect((saved.mains as Record<string, number>)[main.name]).toBe(1)
+    expect((saved.desserts as Record<string, number>)[dessert.name]).toBe(1)
   })
 
   it('keeps a warning-only handoff blocked until its Hebrew fallback is acknowledged', async () => {

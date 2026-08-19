@@ -41,6 +41,7 @@ import {
   orderPricingFingerprint,
   readLunchPlates,
   resizeLunchPlates,
+  resolveReviewItemQuantities,
   parseHotelSearchResponse,
   serializeOrderDraft,
   validateOrderDraft,
@@ -212,11 +213,18 @@ function paidExtraPrice(price: number | null, currency: 'USD' | null): string | 
   return price.toFixed(2)
 }
 
-function recognizedReviewItems(review: AIReview, menu: OrderEditorMenu) {
-  const currentCatalogById = new Map(buildAIOrderCatalog(menu).items.map((item) => [item.id, item]))
+function recognizedReviewItems(review: AIReview, menu: OrderEditorMenu, currentMeals: number) {
+  const catalog = buildAIOrderCatalog(menu)
+  const currentCatalogById = new Map(catalog.items.map((item) => [item.id, item]))
+  const resolvedQuantities = resolveReviewItemQuantities(review.draft.items, catalog.targetsById, currentMeals)
   return review.draft.items.flatMap((reviewItem) => {
     const catalogItem = currentCatalogById.get(reviewItem.catalogItemId)
-    return catalogItem ? [{ reviewItem, catalogItem }] : []
+    if (!catalogItem) return []
+    // Show what will actually land in the order, not the raw AI quantity —
+    // a selection with no stated digits still resolves via the meal
+    // structure, so it must not read as "not applied".
+    const resolvedQuantity = resolvedQuantities.get(reviewItem.catalogItemId) ?? reviewItem.quantity
+    return [{ reviewItem: { ...reviewItem, quantity: resolvedQuantity }, catalogItem }]
   })
 }
 
@@ -347,19 +355,21 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
 function OrderManagerPanel({
   review,
   menu,
+  currentMeals,
   sourceMessage,
   acknowledged,
   onToggleAcknowledged,
 }: {
   readonly review: AIReview
   readonly menu: OrderEditorMenu
+  readonly currentMeals: number
   readonly sourceMessage: string | null
   readonly acknowledged: ReadonlySet<string>
   readonly onToggleAcknowledged: (id: string) => void
 }) {
   const findings = managerFindings(review, menu)
   const remaining = findings.filter((finding) => !acknowledged.has(finding.id)).length
-  const recognizedItems = recognizedReviewItems(review, menu)
+  const recognizedItems = recognizedReviewItems(review, menu, currentMeals)
   const paidExtras = recognizedPaidExtras(review, menu)
 
   return (
@@ -478,7 +488,7 @@ function ReplyDraftBox({
     try {
       const pricing = calculateOrderDraftPricing(draft, menu, { allowMixedLunchAndShabbat: true })
       const totalUsd = pricing.result ? pricing.result.totalMinorUnits / 100 : null
-      const recognized = recognizedReviewItems(review, menu)
+      const recognized = recognizedReviewItems(review, menu, draft.meals)
       const lines = recognized.flatMap(({ reviewItem, catalogItem }) =>
         reviewItem.quantity === null
           ? []
@@ -1371,6 +1381,7 @@ function OrderEditorContent({
           <OrderManagerPanel
             review={managerReview}
             menu={menu}
+            currentMeals={draft.meals}
             sourceMessage={managerSourceMessage}
             acknowledged={acknowledgedManagerFindings}
             onToggleAcknowledged={(id) => {
