@@ -98,9 +98,79 @@
   animation: page-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-float,
-  .page-transition {
-    animation: none;
+/* Ambient motion is part of the brand and is deliberately NOT gated on
+   prefers-reduced-motion (explicit product decision). */
+
+@keyframes chat-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes chat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes chat-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes chat-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes chat-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+.chat-panel {
+  animation: chat-sheet-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (min-width: 768px) {
+  .chat-panel {
+    animation: chat-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+.chat-backdrop {
+  animation: chat-fade 0.3s ease;
+}
+.chat-bubble-in {
+  animation: chat-bubble-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.chat-dot {
+  animation: chat-dot 1.2s ease-in-out infinite;
+}
+.chat-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.chat-dot:nth-child(3) {
+  animation-delay: 0.3s;
 }
