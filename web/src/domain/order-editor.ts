@@ -2069,41 +2069,68 @@ export function applyAIReviewToDraft(
     ...review.draft.items.filter((item) => targetsById[item.catalogItemId]?.kind === 'lunch-addon'),
   ]
 
+  // A couple-meal SELECTION carries no quantity in the customer's words —
+  // choosing it is the whole statement; the meal structure defines amounts.
+  // The AI grounds quantities to explicit digits only, so most selections
+  // arrive null. Apply them with the meal's own logic instead of dropping
+  // them (dropping produced empty, useless drafts).
+  const hasSelections = itemsInDependencyOrder.some((item) => {
+    const kind = targetsById[item.catalogItemId]?.kind
+    return kind === 'salad' || kind === 'first' || kind === 'main' || kind === 'side' || kind === 'dessert'
+  })
+  const statedMeals = itemsInDependencyOrder.find(
+    (item) => targetsById[item.catalogItemId]?.kind === 'meals' && item.quantity !== null,
+  )?.quantity
+  const assumedMeals = statedMeals ?? (hasSelections ? Math.max(draft.meals, 1) : draft.meals)
+
+  const defaultQuantityFor = (kind: AICatalogTarget['kind']): number | null => {
+    if (kind === 'meals') return assumedMeals
+    if (kind === 'first') return assumedMeals * 2 // each couple meal includes two fillet units
+    if (kind === 'salad' || kind === 'main' || kind === 'side' || kind === 'dessert') return 1
+    if (kind === 'extra') return 1
+    return null // challahs follow the meal count automatically; lunch stays explicit
+  }
+
   for (const item of itemsInDependencyOrder) {
-    if (item.quantity === null) continue
     const target = targetsById[item.catalogItemId]
     if (!target) continue
+    let quantity = item.quantity
+    if (quantity === null) {
+      const fallback = defaultQuantityFor(target.kind)
+      if (fallback === null) continue
+      quantity = fallback
+    }
     if (target.kind === 'meals') {
       next = menu
-        ? applyCoupleMealQuantity(next, menu, item.quantity)
-        : { ...next, meals: item.quantity }
+        ? applyCoupleMealQuantity(next, menu, quantity)
+        : { ...next, meals: quantity }
     }
-    else if (target.kind === 'challahs') next = { ...next, challot: item.quantity }
+    else if (target.kind === 'challahs') next = { ...next, challot: quantity }
     else if (target.kind === 'salad') {
       next = {
         ...next,
         salads: {
           ...next.salads,
-          [target.name]: { ordered: item.quantity, gift: next.salads[target.name]?.gift ?? 0 },
+          [target.name]: { ordered: quantity, gift: next.salads[target.name]?.gift ?? 0 },
         },
       }
-    } else if (target.kind === 'first') next = { ...next, firsts: withQuantity(next.firsts, target.name, item.quantity) }
-    else if (target.kind === 'main') next = { ...next, mains: withQuantity(next.mains, target.name, item.quantity) }
-    else if (target.kind === 'side') next = { ...next, sides: withQuantity(next.sides, target.name, item.quantity) }
-    else if (target.kind === 'dessert') next = { ...next, desserts: withQuantity(next.desserts, target.name, item.quantity) }
+    } else if (target.kind === 'first') next = { ...next, firsts: withQuantity(next.firsts, target.name, quantity) }
+    else if (target.kind === 'main') next = { ...next, mains: withQuantity(next.mains, target.name, quantity) }
+    else if (target.kind === 'side') next = { ...next, sides: withQuantity(next.sides, target.name, quantity) }
+    else if (target.kind === 'dessert') next = { ...next, desserts: withQuantity(next.desserts, target.name, quantity) }
     else if (target.kind === 'extra') {
       next = {
         ...next,
         extras: {
           ...next.extras,
-          [target.name]: { quantity: item.quantity, note: next.extras[target.name]?.note ?? '' },
+          [target.name]: { quantity: quantity, note: next.extras[target.name]?.note ?? '' },
         },
       }
     } else if (target.kind === 'lunch') {
       const current = next.lunch[target.key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
-      const updated = item.quantity === 0
+      const updated = quantity === 0
         ? { ...current, quantity: 0, sides: {}, addonQuantity: 0 }
-        : { ...current, quantity: item.quantity, variantKey: target.variantKey }
+        : { ...current, quantity: quantity, variantKey: target.variantKey }
       const lunch = { ...next.lunch }
       const {
         quantity: _quantity,
@@ -2122,7 +2149,7 @@ export function applyAIReviewToDraft(
       const current = next.lunch[target.key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
       const updated = {
         ...current,
-        addonQuantity: current.quantity > 0 ? item.quantity : 0,
+        addonQuantity: current.quantity > 0 ? quantity : 0,
       }
       const lunch = { ...next.lunch }
       const hasKnownSelection =

@@ -247,6 +247,12 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
       finding.field === 'item_quantity' && finding.sourceText ? [finding.sourceText] : []),
   )
   const ambiguitySources = new Set(review.ambiguities.map((finding) => finding.sourceText))
+  const selectionSources = new Set(
+    review.draft.items.flatMap((item) =>
+      ['salad', 'first', 'main', 'side', 'dessert', 'couple_meal', 'challahs'].includes(item.category)
+        ? [item.sourceText]
+        : []),
+  )
   const paidExtras = recognizedPaidExtras(review, menu)
   const coveredWarningCodes = new Set<AIReview['warnings'][number]['code']>()
   if (paidExtras.length > 0) coveredWarningCodes.add('paid_extra')
@@ -273,14 +279,19 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
     })
   }
   return [
-    ...review.draft.items.flatMap((finding, index) =>
-      finding.quantity === null && !missingQuantitySources.has(finding.sourceText)
-      ? [{
-          id: `item-quantity:${index}`,
-          label: `צריך לקבוע כמות עבור ${finding.catalogItemName}`,
-          sourceText: finding.sourceText,
-        }]
-      : []),
+    ...review.draft.items.flatMap((finding, index) => {
+      // Couple-meal selections carry no quantity by nature — choosing the
+      // dish is the whole statement, the meal structure sets the amounts.
+      // Only standalone paid extras still deserve a quantity check.
+      const selectionCategories = new Set(['salad', 'first', 'main', 'side', 'dessert', 'couple_meal', 'challahs'])
+      if (finding.quantity !== null || selectionCategories.has(finding.category)) return []
+      if (missingQuantitySources.has(finding.sourceText)) return []
+      return [{
+        id: `item-quantity:${index}`,
+        label: `הוזן 1 — כדאי לוודא כמות עבור ${finding.catalogItemName}`,
+        sourceText: finding.sourceText,
+      }]
+    }),
     ...review.corrections.map((finding, index) => ({
       id: `correction:${index}`,
       label: `הלקוח תיקן: „${finding.originalText}” ל„${finding.correctedText}”`,
@@ -298,15 +309,20 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
         : `הפריט לא נמצא בתפריט · כמות ${finding.requestedQuantity}`,
       sourceText: finding.sourceText,
     })),
-    ...review.missingFields.flatMap((finding, index) =>
-      finding.sourceText && ambiguitySources.has(finding.sourceText) &&
+    ...review.missingFields.flatMap((finding, index) => {
+      if (
+        finding.sourceText && ambiguitySources.has(finding.sourceText) &&
         (finding.field === 'item_quantity' || finding.field === 'item_choice')
-        ? []
-        : [{
-            id: `missing:${index}`,
-            label: MISSING_FIELD_LABELS[finding.field],
-            sourceText: finding.sourceText,
-          }]),
+      ) return []
+      // Selections resolved their own quantity from the meal structure —
+      // a leftover item_quantity note about them is pure noise.
+      if (finding.field === 'item_quantity' && finding.sourceText && selectionSources.has(finding.sourceText)) return []
+      return [{
+        id: `missing:${index}`,
+        label: MISSING_FIELD_LABELS[finding.field],
+        sourceText: finding.sourceText,
+      }]
+    }),
     ...paidExtras.map((extra, index) => {
       const price = paidExtraPrice(extra.catalogItem.price, extra.catalogItem.currency)
       return {
