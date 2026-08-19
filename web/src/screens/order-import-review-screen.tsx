@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
+import { readWhatsAppExportFile } from '../domain/whatsapp-export-file.ts'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
 import {
@@ -605,20 +606,34 @@ export function OrderImportReviewScreen() {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-2xl border border-border bg-background px-4 text-xs font-black text-primary hover:bg-secondary">
                 <LocalIcon name="ph:file-text-bold" className="text-lg" />
-                <span>קובץ ייצוא שיחה (txt)</span>
+                <span>קובץ ייצוא שיחה (txt / zip)</span>
                 <input
                   type="file"
-                  accept=".txt,text/plain"
+                  accept=".txt,.zip,text/plain,application/zip,application/x-zip-compressed"
                   className="sr-only"
                   disabled={isBusy}
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0]
                     event.currentTarget.value = ''
                     if (!file) return
-                    void file.text().then((text) => {
+                    void readWhatsAppExportFile(file, MAX_CONVERSATION_LENGTH).then((result) => {
+                      if ('error' in result) {
+                        setErrorMessage(
+                          result.error === 'not_chat_export'
+                            ? 'לא נמצא קובץ שיחה בקובץ שהועלה — מייצאים מוואטסאפ עם "ייצוא צ׳אט"'
+                            : 'לא הצלחנו לקרוא את הקובץ — אפשר לנסות שוב או להדביק את הטקסט',
+                        )
+                        setStatus('error')
+                        return
+                      }
                       setImageDataUrl(null)
-                      setMessage(text.slice(0, MAX_CONVERSATION_LENGTH))
-                      setStatus('idle')
+                      setMessage(result.text)
+                      if (result.trimmed) {
+                        setErrorMessage('השיחה ארוכה — נלקחו ההודעות האחרונות (שם נמצאת ההזמנה)')
+                        setStatus('error')
+                      } else {
+                        setStatus('idle')
+                      }
                     })
                   }}
                 />
