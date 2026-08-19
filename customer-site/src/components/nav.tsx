@@ -112,17 +112,22 @@ export function LanguageSwitcher() {
   )
 }
 
+// Mobile: two rows (logo + actions above, nav links below, full width) so the
+// links are never clipped. Desktop (md:contents dissolves the wrapper): the
+// original single row — logo, centered nav, actions.
 export function NavHeader({ active }: { active: string }) {
   return (
-    <header className="w-full pt-5 px-4 md:pt-8 md:px-16 flex items-center justify-between gap-2 md:gap-6">
-      <NavLogo />
-      <div className="flex-1 min-w-0 flex items-center justify-center">
-        <Nav active={active} />
+    <header className="w-full pt-4 px-4 md:pt-8 md:px-16 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
+      <div className="flex items-center justify-between gap-2 md:contents">
+        <NavLogo />
+        <div className="flex items-center gap-2 md:gap-3 shrink-0 md:order-3">
+          <LanguageSwitcher />
+          <PhoneBadge />
+          <NavCartButton />
+        </div>
       </div>
-      <div className="flex items-center gap-2 md:gap-3 shrink-0">
-        <LanguageSwitcher />
-        <PhoneBadge />
-        <NavCartButton />
+      <div className="min-w-0 flex items-center justify-center md:flex-1 md:order-2">
+        <Nav active={active} />
       </div>
     </header>
   )

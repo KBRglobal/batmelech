@@ -279,6 +279,33 @@ function ingredientLines(data) {
   );
 }
 
+// The two lines that let the model answer "is there X anywhere in the food?"
+// honestly: the full inventory of every ingredient the recorded recipes use,
+// and the list of menu dishes whose recipe is not recorded yet (for those the
+// model must not claim to know and should send the question to WhatsApp).
+function allergenCoverageLines(data) {
+  const dishes = dishIngredients(data);
+  const lines = [];
+  const inventory = [...new Set(dishes.flatMap((dish) => dish.ingredients))];
+  if (inventory.length > 0) {
+    lines.push(`Complete inventory of every ingredient used across the recorded recipes: ${inventory.join(', ')}.`);
+  }
+  const recorded = new Set(dishes.map((dish) => dish.name));
+  const menu = isRecord(data.menu) ? data.menu : {};
+  const missing = [];
+  for (const category of Object.keys(CATEGORY_LABELS)) {
+    for (const name of names(menu[category])) {
+      if (!recorded.has(name) && !missing.includes(name)) missing.push(name);
+    }
+  }
+  if (missing.length > 0) {
+    lines.push(
+      `Dishes whose detailed ingredient list is NOT recorded here yet (do not guess their contents; offer to confirm on WhatsApp): ${missing.join(', ')}.`
+    );
+  }
+  return lines;
+}
+
 function dubaiTodayIso() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
 }
@@ -309,6 +336,14 @@ function buildSiteKnowledge(data, { today } = {}) {
       'Dish ingredients (from the kitchen recipe book — ingredient names only). ' +
         'When answering allergy questions, list the ingredients but add that dishes may contain traces of allergens and severe allergies must be confirmed by phone:\n- ' +
         ingredients.join('\n- ')
+    );
+  }
+
+  const coverage = allergenCoverageLines(safeData);
+  if (coverage.length > 0) {
+    sections.push(
+      'Allergen coverage. Use this to answer "is there X in the food?" questions: if the ingredient does not appear in the inventory below, say that according to the kitchen recipes it is not used — while still giving the traces caveat. For dishes listed as not recorded, do not guess:\n- ' +
+        coverage.join('\n- ')
     );
   }
 

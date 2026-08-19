@@ -7,6 +7,13 @@
   question and Mey with a recipe question.
 
 ## Recently done (last ~10, newest first)
+- 2026-08-19 Mobile + allergy round: chat is a full bottom sheet on phones
+  (dvh height, header close button, 16px input so iOS stops zooming,
+  safe-area padding, toggle hidden while open and on the three bottom-bar
+  pages: shabbat-order/extras/checkout); nav header is two rows on mobile
+  (links were clipped); allergen coverage in knowledge — full ingredient
+  inventory + explicit list of dishes with no recorded recipe, prompt rule
+  for real allergy answers. Verified by Playwright screenshots at 390px+1366px.
 - 2026-08-19 Concierge follow-ups (this session): geography rule — model places
   hotels itself (Five Palm → Dubai → $15), never "not sure" on known UAE spots;
   WhatsApp handoff is a styled clickable button (AssistantBubble strips raw

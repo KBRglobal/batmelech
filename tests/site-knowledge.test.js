@@ -112,6 +112,12 @@ test('knowledge covers package rules, live status, windows, holidays and dish me
   assert.match(knowledge, /תבשיל עוף מרוקאי עם חומוסים: עוף שלם, חומוס יבש\./u);
   assert.match(knowledge, /קובה סולת: סולת\./u);
 
+  // Allergen coverage: the full ingredient inventory plus the dishes whose
+  // recipes are not recorded yet, so "is there X in the food" gets honesty.
+  assert.match(knowledge, /Complete inventory of every ingredient used across the recorded recipes: עוף שלם, חומוס יבש, סולת\./u);
+  assert.match(knowledge, /NOT recorded here yet[^\n]*טחינה, מטבוחה פיקנטית, פילה דג ברוטב מרוקאי, אורז לבן, סופלה שוקולד/u);
+  assert.doesNotMatch(knowledge, /NOT recorded here yet[^\n]*תבשיל עוף מרוקאי/u);
+
   // Admin bookkeeping never leaks: quantities, supplier prices, capacities,
   // audit entries, blocked phones, customer data, internal ids.
   assert.doesNotMatch(knowledge, /900/u);
