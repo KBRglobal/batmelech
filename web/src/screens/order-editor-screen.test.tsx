@@ -15,6 +15,7 @@ import {
   buildOrderEditorMenu,
   createOrderDraft,
 } from '../domain/order-editor.ts'
+import { classifyDessertKind, defaultDessertPortionsForMeals } from '../domain/package-rules.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { OrderEditorScreen } from './order-editor-screen.tsx'
 
@@ -345,17 +346,22 @@ describe('OrderEditorScreen', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('blocks unpriced main and Shabbat-side overages in the visible editor', async () => {
+  it('auto-prices an extra main in the visible editor, but still blocks unpriced Shabbat-side overage', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
     renderEditor()
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
     await user.click(screen.getByRole('button', { name: 'הוספה לקציצות בשר ברוטב אדום עשיר' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לקציצות בשר עם אפונה וארטישוק' }))
-    await user.click(screen.getByRole('button', { name: 'הוספה לאורז לבן' }))
-    await user.click(screen.getByRole('button', { name: 'הוספה לאורז לבן' }))
 
-    expect(screen.getByText(/יותר מנות עיקריות ממספר הארוחות/)).toBeTruthy()
+    // A second main is a confirmed $100 upsell — priced, not blocked.
+    expect(screen.queryByText(/יותר מנות עיקריות ממספר הארוחות/)).toBeNull()
+    expect(screen.getByText('עיקרית נוספת ×1')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
+
+    // A side overage still has no confirmed price, so it still blocks.
+    await user.click(screen.getByRole('button', { name: 'הוספה לאורז לבן' }))
+    await user.click(screen.getByRole('button', { name: 'הוספה לאורז לבן' }))
     expect(screen.getByText(/יותר תוספות שבת ממספר הארוחות/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
   })
@@ -878,7 +884,8 @@ describe('OrderEditorScreen', () => {
     expect(within(manager).getByText(`${salad.name} · 1`)).toBeTruthy()
     expect(within(manager).getByText(`${first.name} · 2`)).toBeTruthy()
     expect(within(manager).getByText(`${main.name} · 1`)).toBeTruthy()
-    expect(within(manager).getByText(`${dessert.name} · 1`)).toBeTruthy()
+    const expectedDessertQuantity = defaultDessertPortionsForMeals(classifyDessertKind(dessert.name), 1)
+    expect(within(manager).getByText(`${dessert.name} · ${expectedDessertQuantity}`)).toBeTruthy()
 
     const save = screen.getByRole('button', { name: 'שמירת ההזמנה' })
     expect(save.hasAttribute('disabled')).toBe(false)
@@ -890,7 +897,7 @@ describe('OrderEditorScreen', () => {
     expect((saved.salads as Record<string, { o: number }>)[salad.name]?.o).toBe(1)
     expect((saved.firsts as Record<string, number>)[first.name]).toBe(2)
     expect((saved.mains as Record<string, number>)[main.name]).toBe(1)
-    expect((saved.desserts as Record<string, number>)[dessert.name]).toBe(1)
+    expect((saved.desserts as Record<string, number>)[dessert.name]).toBe(expectedDessertQuantity)
   })
 
   it('keeps a warning-only handoff blocked until its Hebrew fallback is acknowledged', async () => {

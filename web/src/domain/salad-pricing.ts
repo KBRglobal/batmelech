@@ -5,8 +5,12 @@ import {
   requireNonNegativeSafeInteger,
   usdFromMinorUnits,
 } from './money.ts'
+import { SALADS_INCLUDED_PER_MEAL } from './package-rules.ts'
 
-export const INCLUDED_SALADS_PER_COUPLE_MEAL = 4
+// Re-exported under its historical name — the included amount is now
+// defined once in package-rules.ts; this module and the AI-intake resolver
+// both read it from there.
+export const INCLUDED_SALADS_PER_COUPLE_MEAL = SALADS_INCLUDED_PER_MEAL
 export const EXTRA_SALAD_BLOCK_SIZE = 4
 export const EXTRA_SALAD_BLOCK_PRICE_MINOR_UNITS = 2_500
 export const EXTRA_SALAD_SINGLE_PRICE_MINOR_UNITS = 700

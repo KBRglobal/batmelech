@@ -855,7 +855,8 @@ describe('deterministic draft pricing and allowances', () => {
     expect(abuDhabi.result?.totalMinorUnits).toBe(28_500)
   })
 
-  it('blocks unpriced Shabbat main and side overages, including standalone selections', () => {
+  it('auto-prices an extra Shabbat main course, and still blocks unpriced side overage', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
     const pricing = calculateOrderDraftPricing(
       draftWith({
         meals: 1,
@@ -865,19 +866,45 @@ describe('deterministic draft pricing and allowances', () => {
         },
         sides: { 'אורז לבן': 2 },
       }),
-      buildOrderEditorMenu(emptyStore),
+      menu,
     )
+    // Extra main is a confirmed, priced upsell ($100/unit) — it must never
+    // block the save, unlike the still-unpriced extra side.
+    expect(pricing.issues.some((issue) => issue.blocking)).toBe(true)
     expect(pricing.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'MAIN_OVERAGE', blocking: true }),
       expect.objectContaining({ code: 'SIDE_OVERAGE', blocking: true }),
     ]))
-    expect(pricing.result?.lines.some((line) => /עיקר|תוספות שבת/u.test(line.name))).toBe(false)
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'עיקרית נוספת',
+      quantity: 1,
+      unitPriceMinorUnits: menu.extraMainPriceMinorUnits,
+      amountMinorUnits: menu.extraMainPriceMinorUnits,
+    }))
 
     const standalone = calculateOrderDraftPricing(
       draftWith({ meals: 0, challot: 0, mains: { 'קציצות בשר ברוטב אדום עשיר': 1 } }),
-      buildOrderEditorMenu(emptyStore),
+      menu,
     )
-    expect(standalone.issues).toContainEqual(expect.objectContaining({ code: 'MAIN_OVERAGE', blocking: true }))
+    expect(standalone.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'עיקרית נוספת',
+      quantity: 1,
+      unitPriceMinorUnits: menu.extraMainPriceMinorUnits,
+    }))
+  })
+
+  it('respects a site-configured extra-main price instead of the $100 default', () => {
+    const store: LegacyStore = { orders: [], menu: { mainExtraPrice: 75 } }
+    const menu = buildOrderEditorMenu(store)
+    expect(menu.extraMainPriceMinorUnits).toBe(7_500)
+    const pricing = calculateOrderDraftPricing(
+      draftWith({ meals: 1, mains: { 'קציצות בשר ברוטב אדום עשיר': 2 } }),
+      menu,
+    )
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'עיקרית נוספת',
+      unitPriceMinorUnits: 7_500,
+      amountMinorUnits: 7_500,
+    }))
   })
 
   it('charges every challah when there are zero couple meals', () => {
@@ -1309,7 +1336,7 @@ describe('delivery-confirmation fields through an admin edit', () => {
 
 describe('manual total overrides price-availability blocks', () => {
   const baseIssues = [
-    { code: 'MAIN_OVERAGE', message: 'נבחרו יותר מנות עיקריות ממספר הארוחות הזוגיות. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.', blocking: true },
+    { code: 'SIDE_OVERAGE', message: 'נבחרו יותר תוספות שבת ממספר הארוחות הזוגיות. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.', blocking: true },
     { code: 'PRICING_ERROR', message: 'אי אפשר לחשב מחיר בטוח עד שהכמויות יתוקנו.', blocking: true },
     { code: 'INVALID_CUSTOM_ITEM', message: 'פריט חופשי 1 חסר שם, כמות או מחיר תקין.', blocking: true },
     { code: 'TOTAL_MISMATCH', message: 'סך התשלום שונה מהמחיר המחושב — התאמה ידנית.', blocking: false },
@@ -1319,8 +1346,8 @@ describe('manual total overrides price-availability blocks', () => {
     const menu = buildOrderEditorMenu({ orders: [] })
     const priced = { ...createOrderDraft(menu), total: '200' }
     const demoted = demotePriceAvailabilityIssues(baseIssues, priced)
-    expect(demoted.find((issue) => issue.code === 'MAIN_OVERAGE')?.blocking).toBe(false)
-    expect(demoted.find((issue) => issue.code === 'MAIN_OVERAGE')?.message).not.toContain('אי אפשר לשמור')
+    expect(demoted.find((issue) => issue.code === 'SIDE_OVERAGE')?.blocking).toBe(false)
+    expect(demoted.find((issue) => issue.code === 'SIDE_OVERAGE')?.message).not.toContain('אי אפשר לשמור')
     expect(demoted.find((issue) => issue.code === 'PRICING_ERROR')?.blocking).toBe(false)
     // Data-integrity issues keep blocking even with a manual total.
     expect(demoted.find((issue) => issue.code === 'INVALID_CUSTOM_ITEM')?.blocking).toBe(true)

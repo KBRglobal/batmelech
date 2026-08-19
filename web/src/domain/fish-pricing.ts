@@ -5,12 +5,16 @@ import {
   requireNonNegativeSafeInteger,
   usdFromMinorUnits,
 } from './money.ts'
+import { FISH_UNITS_INCLUDED_PER_MEAL } from './package-rules.ts'
 
 export const MOROCCAN_FILLET_NAME = 'פילה דג ברוטב מרוקאי'
 export const CHRAIME_FILLET_NAME = 'פילה דג ברוטב חריימה'
 export const FISH_CAKE_PORTION_NAME = 'קציצות דגים ברוטב מרוקאי'
 
-export const FILLET_UNITS_PER_COUPLE_MEAL = 2
+// Re-exported under its historical name — the included amount is now
+// defined once in package-rules.ts; this module and the AI-intake resolver
+// both read it from there.
+export const FILLET_UNITS_PER_COUPLE_MEAL = FISH_UNITS_INCLUDED_PER_MEAL
 export const EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS = 3_000
 
 export interface FishPricingInput {

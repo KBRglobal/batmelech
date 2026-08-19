@@ -1,5 +1,15 @@
 import { z } from 'zod'
 import { EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS } from './fish-pricing.ts'
+import {
+  BAKLAVA_HALF_UNITS_PER_PORTION,
+  classifyDessertKind,
+  DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
+  FISH_UNITS_INCLUDED_PER_MEAL,
+  MAINS_INCLUDED_PER_MEAL,
+  SIDES_INCLUDED_PER_MEAL,
+  SOUFFLE_HALF_UNITS_PER_PORTION,
+  defaultDessertPortionsForMeals,
+} from './package-rules.ts'
 import { checkedAdd, checkedMultiply, requireNonNegativeSafeInteger } from './money.ts'
 import {
   DELIVERY_EXTRA_NAME,
@@ -16,6 +26,7 @@ import type { LegacyOrder, LegacyStore } from './store.ts'
 
 export const DEFAULT_COUPLE_PRICE_MINOR_UNITS = 23_000
 export const DEFAULT_CHALLAH_PRICE_MINOR_UNITS = 1_000
+export const DEFAULT_EXTRA_MAIN_PRICE_MINOR_UNITS = 10_000
 
 export const DEFAULT_MENU_CATEGORIES = {
   salads: [
@@ -142,6 +153,7 @@ export interface OrderEditorMenu {
   readonly saladRemainderPriceMinorUnits: number
   readonly extraFishFilletPriceMinorUnits: number
   readonly extraDessertHalfUnitMinorUnits: number
+  readonly extraMainPriceMinorUnits: number
 }
 
 const DEFAULT_LUNCH: readonly LunchItem[] = [
@@ -815,6 +827,10 @@ export function buildOrderEditorMenu(store: LegacyStore): OrderEditorMenu {
       EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
     ),
     extraDessertHalfUnitMinorUnits: dollarsNumberToMinorUnits(rawMenu.dessertExtraPrice, 0),
+    extraMainPriceMinorUnits: dollarsNumberToMinorUnits(
+      rawMenu.mainExtraPrice,
+      DEFAULT_EXTRA_MAIN_PRICE_MINOR_UNITS,
+    ),
   }
 }
 
@@ -1056,17 +1072,21 @@ export function calculateDessertAllowance(draft: OrderDraft): DessertAllowance {
   let baklavaQuantity = 0
   let unclassifiedQuantity = 0
   for (const [name, quantity] of Object.entries(draft.desserts)) {
-    const normalized = name.normalize('NFKC')
-    if (normalized.includes('סופלה')) souffleQuantity = checkedAdd(souffleQuantity, quantity)
-    else if (/\u05d1\u05e7\u05dc/u.test(normalized)) baklavaQuantity = checkedAdd(baklavaQuantity, quantity)
+    const kind = classifyDessertKind(name)
+    if (kind === 'souffle') souffleQuantity = checkedAdd(souffleQuantity, quantity)
+    else if (kind === 'baklava') baklavaQuantity = checkedAdd(baklavaQuantity, quantity)
     else unclassifiedQuantity = checkedAdd(unclassifiedQuantity, quantity)
   }
   const selectedHalfUnits = checkedAdd(
-    souffleQuantity,
-    checkedMultiply(baklavaQuantity, 2, 'baklava allowance units'),
+    checkedMultiply(souffleQuantity, SOUFFLE_HALF_UNITS_PER_PORTION, 'souffle allowance units'),
+    checkedMultiply(baklavaQuantity, BAKLAVA_HALF_UNITS_PER_PORTION, 'baklava allowance units'),
     'dessert allowance units',
   )
-  const includedHalfUnits = checkedMultiply(draft.meals, 2, 'included dessert units')
+  const includedHalfUnits = checkedMultiply(
+    draft.meals,
+    DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
+    'included dessert units',
+  )
   return {
     souffleQuantity,
     baklavaQuantity,
@@ -1090,7 +1110,6 @@ export interface DraftIssue {
     | 'RESERVED_CUSTOM_ITEM'
     | 'UNKNOWN_LUNCH_VARIANT'
     | 'WEEKDAY_LUNCH_CHALLAH'
-    | 'MAIN_OVERAGE'
     | 'SIDE_OVERAGE'
     | 'MIXED_LUNCH_SHABBAT_UNCONFIRMED'
     | 'DESSERT_OVERAGE'
@@ -1194,16 +1213,15 @@ export function calculateOrderDraftPricing(
     })
   }
 
+  // Extra mains beyond the meal's included one are now a confirmed, priced
+  // upsell ($100/unit, like fish and salads) — not a blocked state. Sides
+  // stay blocked below: no confirmed extra-side price exists yet.
+  const includedMains = checkedMultiply(draft.meals, MAINS_INCLUDED_PER_MEAL, 'included mains')
   const selectedMains = sumCounts(Object.values(draft.mains), 'selected mains')
-  if (selectedMains > draft.meals) {
-    issues.push({
-      code: 'MAIN_OVERAGE',
-      message: 'נבחרו יותר מנות עיקריות ממספר הארוחות הזוגיות. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.',
-      blocking: true,
-    })
-  }
+  const extraMains = Math.max(0, selectedMains - includedMains)
+  const includedSides = checkedMultiply(draft.meals, SIDES_INCLUDED_PER_MEAL, 'included sides')
   const selectedSides = sumCounts(Object.values(draft.sides), 'selected Shabbat sides')
-  if (selectedSides > draft.meals) {
+  if (selectedSides > includedSides) {
     issues.push({
       code: 'SIDE_OVERAGE',
       message: 'נבחרו יותר תוספות שבת ממספר הארוחות הזוגיות. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.',
@@ -1408,6 +1426,15 @@ export function calculateOrderDraftPricing(
     })
   }
 
+  if (extraMains > 0) {
+    chargeLines.push({
+      source: 'other',
+      name: 'עיקרית נוספת',
+      quantity: extraMains,
+      unitPriceMinorUnits: menu.extraMainPriceMinorUnits,
+    })
+  }
+
   const orderedSalads = sumCounts(
     Object.values(draft.salads).map((selection) => selection.ordered),
     'ordered salads',
@@ -1473,7 +1500,6 @@ export function calculateOrderDraftPricing(
 // (bad quantities, unknown variants, reserved items) are NOT in this list
 // and always block.
 export const PRICE_AVAILABILITY_ISSUE_CODES: ReadonlySet<string> = new Set([
-  'MAIN_OVERAGE',
   'SIDE_OVERAGE',
   'DESSERT_UNCLASSIFIED',
   'PRICING_ERROR',
@@ -2053,11 +2079,25 @@ export function resolveReviewItemQuantities(
   )?.quantity
   const assumedMeals = statedMeals ?? (hasSelections ? Math.max(currentMeals, 1) : currentMeals)
 
-  const defaultQuantityFor = (kind: AICatalogTarget['kind']): number | null => {
-    if (kind === 'meals') return assumedMeals
-    if (kind === 'first') return assumedMeals * 2 // each couple meal includes two fillet units
-    if (kind === 'salad' || kind === 'main' || kind === 'side' || kind === 'dessert') return 1
-    if (kind === 'extra') return 1
+  // The one place this resolver disagrees with a flat "1 unit chosen" is
+  // dessert: portions are not equal size (a soufflé serves one person, a
+  // baklava portion serves two), so the default must reflect the included
+  // half-unit budget for the SPECIFIC dish the customer named, via the same
+  // classifier the pricing engine uses — never a second, drifting guess.
+  const defaultQuantityFor = (target: AICatalogTarget): number | null => {
+    if (target.kind === 'meals') return assumedMeals
+    // Each fillet's unit count comes from the package rule, not a private
+    // "* 2" here — a rule change updates pricing and this default together.
+    if (target.kind === 'first') return assumedMeals * FISH_UNITS_INCLUDED_PER_MEAL
+    // Salad, main, and side selections are named one dish at a time (the
+    // customer lists each kind separately, e.g. 4 salad names for the
+    // included 4) — a mention is one portion of that specific dish, however
+    // many kinds the package includes in total.
+    if (target.kind === 'salad' || target.kind === 'main' || target.kind === 'side') return 1
+    if (target.kind === 'dessert') {
+      return defaultDessertPortionsForMeals(classifyDessertKind(target.name), assumedMeals)
+    }
+    if (target.kind === 'extra') return 1
     return null // challahs follow the meal count automatically; lunch stays explicit
   }
 
@@ -2065,8 +2105,8 @@ export function resolveReviewItemQuantities(
   for (const item of reviewItems) {
     const target = targetsById[item.catalogItemId]
     if (!target) continue
-    const quantity = item.quantity ?? defaultQuantityFor(target.kind)
-    if (quantity === null) continue
+    const quantity = item.quantity ?? defaultQuantityFor(target)
+    if (quantity === null || quantity === 0) continue
     resolved.set(item.catalogItemId, quantity)
   }
   return resolved
