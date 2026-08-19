@@ -3,6 +3,7 @@
 const OpenAI = require('openai');
 const { MEY_SYSTEM_PROMPT } = require('./mey-persona');
 const { createMeyTools } = require('./mey-tools');
+const { loadRecentTurns, appendTurn } = require('./mey-memory');
 
 const OPENAI_CLIENT_OPTIONS = Object.freeze({ maxRetries: 1, timeout: 60_000 });
 const MAX_TOOL_ROUNDS = 6;
@@ -10,6 +11,7 @@ const FALLBACK_REPLY = 'משהו השתבש אצלי, נסי לשלוח שוב �
 
 function createMeyAgent({
   repository,
+  pool = null,
   logger = console,
   env = process.env,
   whatsappIntake = null,
@@ -57,9 +59,23 @@ function createMeyAgent({
         ? `[השולח: ${senderName || 'ללא שם'}${senderUsername ? ` @${senderUsername}` : ''}]\n`
         : '';
 
+      // Rolling memory: the last turns of the group conversation, so follow-ups
+      // ("וזה?", "אז מה אמרת קודם?") make sense. Memory failures degrade to a
+      // memoryless reply, never to a crash.
+      let recentTurns = [];
+      if (pool) {
+        try {
+          recentTurns = await loadRecentTurns(pool);
+        } catch (error) {
+          logger.error('mey memory load failed', error);
+        }
+      }
+
+      const userTurn = `${senderLine}${userMessage.trim()}`;
       const input = [
         { role: 'system', content: MEY_SYSTEM_PROMPT },
-        { role: 'user', content: `${senderLine}${userMessage.trim()}` },
+        ...recentTurns,
+        { role: 'user', content: userTurn },
       ];
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
@@ -79,6 +95,12 @@ function createMeyAgent({
         const functionCalls = (response.output || []).filter((item) => item.type === 'function_call');
         if (functionCalls.length === 0) {
           const text = typeof response.output_text === 'string' ? response.output_text.trim() : '';
+          if (pool && text) {
+            // remember the exchange; failures must not delay or break the reply
+            appendTurn(pool, 'user', userTurn)
+              .then(() => appendTurn(pool, 'assistant', text))
+              .catch((error) => logger.error('mey memory append failed', error));
+          }
           return text || FALLBACK_REPLY;
         }
 

@@ -53,6 +53,7 @@ const { createMenuImageRouter } = require('./server/menu-image-route');
 const { createSupplierInvoicesRouter } = require('./server/expenses/supplier-invoices-route');
 const { createInvoiceScanner } = require('./server/expenses/invoice-scan');
 const supplierInvoicesRepository = require('./server/expenses/repository');
+const { initializeMeyMemory } = require('./server/telegram/mey-memory');
 const { createStoragePlan } = require('./server/storage-plan');
 const { createStateRepository } = require('./server/state/state-repository');
 const { createStateRouter } = require('./server/state/state-route');
@@ -107,6 +108,7 @@ if (process.env.DATABASE_URL) {
       await rawStateRepository.initialize();
       await businessDataRepository.initializeBusinessData(pool);
       await supplierInvoicesRepository.initializeSupplierInvoices(pool);
+      await initializeMeyMemory(pool);
     },
   };
   // Any successful state save (admin editor, site checkout, backup restore)
@@ -209,7 +211,7 @@ if (stateRepository && process.env.TELEGRAM_WEBHOOK_SECRET && process.env.TELEGR
     reviewOrderIntake: createOpenAIOrderIntake(),
     draftOrderReply: createOpenAIOrderReply(),
   });
-  const meyAgent = createMeyAgent({ repository: stateRepository, whatsappIntake });
+  const meyAgent = createMeyAgent({ repository: stateRepository, pool, whatsappIntake });
   const r2Storage = createR2Storage();
   app.use(
     '/api/telegram/webhook',
