@@ -777,6 +777,62 @@ describe('OrderEditorScreen', () => {
     })
   })
 
+  it('closes a missing-field chore the moment the operator fills the matching form field, no separate "handled" click', async () => {
+    const store: LegacyStore = { orders: [] }
+    const menu = buildOrderEditorMenu(store)
+    const catalog = buildAIOrderCatalog(menu)
+    const reviewedDraft = {
+      ...createOrderDraft(menu, new Date(2026, 7, 12)),
+      name: 'לקוחה מהוואטסאפ',
+    }
+    const review = AIReviewSchema.parse({
+      reviewOnly: true,
+      draft: {
+        customerName: 'לקוחה מהוואטסאפ',
+        customerPhone: null,
+        serviceDate: null,
+        serviceTime: null,
+        fulfillmentMethod: 'unknown',
+        deliveryLocation: null,
+        items: [],
+        notes: [],
+      },
+      corrections: [],
+      ambiguities: [],
+      paidExtras: [],
+      unknownItems: [],
+      missingFields: [{
+        field: 'customer_phone',
+        sourceText: null,
+        reason: 'The customer never stated a phone number.',
+      }],
+      warnings: [],
+      overallConfidence: 0.9,
+    })
+    mockedUseStore.mockReturnValue(queryResult({ store }))
+    const user = userEvent.setup()
+    renderEditor(APP_ROUTES.newOrder, {
+      review,
+      reviewedDraft,
+      reviewedCatalogSignature: JSON.stringify(catalog.items),
+      reviewedRevision: 1,
+      reviewedHash: 'a'.repeat(64),
+      reviewedTs: 1,
+      reviewedStateSignature: JSON.stringify(store),
+      reviewedMessage: 'לקוחה מהוואטסאפ',
+    })
+
+    const manager = await screen.findByRole('region', { name: 'מנהל ההזמנה מוואטסאפ' })
+    expect(within(manager).getByText('חסר מספר טלפון')).toBeTruthy()
+    expect(within(manager).getAllByRole('button', { name: /^טופל:/ })).toHaveLength(1)
+
+    await user.type(screen.getByLabelText('מספר טלפון'), '0501234567')
+
+    expect(within(manager).queryByText('חסר מספר טלפון')).toBeNull()
+    expect(within(manager).queryAllByRole('button', { name: /^טופל:/ })).toHaveLength(0)
+    expect(within(manager).queryByText(/לבירור$/)).toBeNull()
+  })
+
   it('resolves selections with no explicit digits via the meal structure, not "not applied"', async () => {
     // Regression: applyAIReviewToDraft filled these in from the couple-meal
     // structure, but the "מה נכנס להזמנה" preview read the raw AI quantity

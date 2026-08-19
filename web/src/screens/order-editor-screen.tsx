@@ -249,7 +249,31 @@ function recognizedPaidExtras(review: AIReview, menu: OrderEditorMenu) {
   })
 }
 
-function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly ManagerFinding[] {
+// A missing-field chore is only real work while the operator hasn't
+// already filled the matching form field — once they type the phone
+// number in, the chore must close itself, not sit there demanding a
+// second, separate "handled" click for the same fact.
+function missingFieldIsAlreadyFilled(field: AIReview['missingFields'][number]['field'], draft: OrderDraft): boolean {
+  const hasDeliveryLocation = draft.place.trim() !== '' || draft.hotelName.trim() !== '' || draft.address.trim() !== ''
+  switch (field) {
+    case 'customer_name':
+      return draft.name.trim() !== ''
+    case 'customer_phone':
+      return draft.phone.trim() !== ''
+    case 'service_date':
+      return draft.date.trim() !== ''
+    case 'service_time':
+      return draft.time.trim() !== ''
+    case 'fulfillment_method':
+      return draft.pickup || hasDeliveryLocation
+    case 'delivery_location':
+      return draft.pickup || hasDeliveryLocation
+    default:
+      return false
+  }
+}
+
+function managerFindings(review: AIReview, menu: OrderEditorMenu, draft: OrderDraft): readonly ManagerFinding[] {
   const missingQuantitySources = new Set(
     review.missingFields.flatMap((finding) =>
       finding.field === 'item_quantity' && finding.sourceText ? [finding.sourceText] : []),
@@ -334,6 +358,9 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
       if (finding.field === 'item_quantity' && finding.sourceText && selectionSources.has(finding.sourceText)) return []
       // A named hotel/address IS the delivery answer — nothing to confirm.
       if (finding.field === 'fulfillment_method' && review.draft.deliveryLocation !== null) return []
+      // Typing the value directly into its form field closes the chore —
+      // no separate "handled" click for the same fact.
+      if (missingFieldIsAlreadyFilled(finding.field, draft)) return []
       return [{
         id: `missing:${index}`,
         label: MISSING_FIELD_LABELS[finding.field],
@@ -355,6 +382,7 @@ function managerFindings(review: AIReview, menu: OrderEditorMenu): readonly Mana
 function OrderManagerPanel({
   review,
   menu,
+  draft,
   currentMeals,
   sourceMessage,
   acknowledged,
@@ -362,12 +390,13 @@ function OrderManagerPanel({
 }: {
   readonly review: AIReview
   readonly menu: OrderEditorMenu
+  readonly draft: OrderDraft
   readonly currentMeals: number
   readonly sourceMessage: string | null
   readonly acknowledged: ReadonlySet<string>
   readonly onToggleAcknowledged: (id: string) => void
 }) {
-  const findings = managerFindings(review, menu)
+  const findings = managerFindings(review, menu, draft)
   const remaining = findings.filter((finding) => !acknowledged.has(finding.id)).length
   const recognizedItems = recognizedReviewItems(review, menu, currentMeals)
   const paidExtras = recognizedPaidExtras(review, menu)
@@ -1201,7 +1230,7 @@ function OrderEditorContent({
   const manualTotalCoversPricing = hasValidManualTotal(draft)
   const unresolvedManagerFindings = managerReview === null
     ? []
-    : managerFindings(managerReview, menu).filter((finding) => !acknowledgedManagerFindings.has(finding.id))
+    : managerFindings(managerReview, menu, draft).filter((finding) => !acknowledgedManagerFindings.has(finding.id))
   const saveIsSafelyBlocked =
     !persistenceReady ||
     hasBlockingIssue ||
@@ -1381,6 +1410,7 @@ function OrderEditorContent({
           <OrderManagerPanel
             review={managerReview}
             menu={menu}
+            draft={draft}
             currentMeals={draft.meals}
             sourceMessage={managerSourceMessage}
             acknowledged={acknowledgedManagerFindings}
