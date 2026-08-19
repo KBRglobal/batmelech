@@ -300,17 +300,17 @@ export function ShabbatExtras() {
         <div className="flex items-center justify-center gap-4 md:gap-8 pt-4 md:pt-6 border-t border-white/10 text-white">
           <div className="text-center">
             <div className="text-[#F5A83A] font-black text-lg md:text-2xl">{t.statKosherValue}</div>
-            <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">{t.statKosherLabel}</div>
+            <div className="text-[10px] uppercase tracking-widest opacity-50">{t.statKosherLabel}</div>
           </div>
           <div className="w-px h-8 md:h-10 bg-white/10" />
           <div className="text-center">
             <div className="text-[#F5A83A] font-black text-lg md:text-2xl">{t.statChefValue}</div>
-            <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">{t.statChefLabel}</div>
+            <div className="text-[10px] uppercase tracking-widest opacity-50">{t.statChefLabel}</div>
           </div>
           <div className="w-px h-8 md:h-10 bg-white/10" />
           <div className="text-center">
             <div className="text-[#F5A83A] font-black text-lg md:text-2xl">{t.statRoyalValue}</div>
-            <div className="text-[8px] md:text-[10px] uppercase tracking-widest opacity-50">{t.statRoyalLabel}</div>
+            <div className="text-[10px] uppercase tracking-widest opacity-50">{t.statRoyalLabel}</div>
           </div>
         </div>
       </PageHero>
@@ -364,7 +364,7 @@ export function ShabbatExtras() {
                       type="button"
                       disabled={soldOut}
                       onClick={() => addLine({ id: s.id, name: s.name, displayName, unitPrice: price })}
-                      className="mt-3 w-8 h-8 rounded-full border border-[#3B151A]/10 flex items-center justify-center transition-colors enabled:hover:bg-[#3B151A] enabled:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="mt-3 w-11 h-11 rounded-full border border-[#3B151A]/10 flex items-center justify-center transition-colors enabled:hover:bg-[#3B151A] enabled:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Icon icon="ph:plus" />
                     </button>
@@ -373,7 +373,7 @@ export function ShabbatExtras() {
                       <button
                         type="button"
                         onClick={() => setQty(s.id, qty - 1)}
-                        className="w-8 h-8 rounded-full bg-[#F7ECE6] flex items-center justify-center"
+                        className="w-11 h-11 rounded-full bg-[#F7ECE6] flex items-center justify-center"
                       >
                         −
                       </button>
@@ -381,7 +381,7 @@ export function ShabbatExtras() {
                         type="button"
                         disabled={soldOut}
                         onClick={() => setQty(s.id, qty + 1)}
-                        className="w-8 h-8 rounded-full bg-[#3B151A] text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="w-11 h-11 rounded-full bg-[#3B151A] text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         <Icon icon="ph:plus" className="text-xs" />
                       </button>
@@ -404,12 +404,15 @@ export function ShabbatExtras() {
             const displayName = dishName(c.name, locale)
             return (
               <div key={c.id} className="bg-white rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-xl border border-[#3B151A]/5 group">
-                <div className="h-48 md:h-64 overflow-hidden relative">
+                <div className="h-48 md:h-64 overflow-hidden relative bg-[#F7ECE6]">
                   {img !== null ? (
                     <img
                       src={img}
                       alt={displayName}
                       loading="lazy"
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none'
+                      }}
                       className={`w-full h-full object-cover transition-transform duration-700 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
                     />
                   ) : (
@@ -488,7 +491,7 @@ export function ShabbatExtras() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 md:gap-x-32 gap-y-10 md:gap-y-20 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 md:gap-x-32 gap-y-8 md:gap-y-20 relative z-10">
             {royalItems.map((r) => {
               const qty = qtyOf(r.id)
               const soldOut = isOutOfStock(r.name)
@@ -627,6 +630,7 @@ export function ShabbatExtras() {
         </section>
       </main>
 
+      {count > 0 && (
       <div className="fixed bottom-4 md:bottom-10 left-4 right-4 md:left-6 md:right-6 z-[200] max-w-2xl mx-auto">
         <div className="bg-[#3B151A]/95 backdrop-blur-3xl rounded-[2rem] md:rounded-[3rem] p-3 md:p-4 pe-6 md:pe-12 flex items-center justify-between shadow-[0_50px_100px_rgba(0,0,0,0.4)] border border-white/10">
           <div className="text-white">
@@ -648,6 +652,7 @@ export function ShabbatExtras() {
           </button>
         </div>
       </div>
+      )}
     </div>
   )
 }

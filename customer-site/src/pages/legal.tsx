@@ -122,7 +122,7 @@ export function Legal() {
   const { locale, dir } = useLocale()
   const t = COPY[locale]
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-20" dir={dir}>
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir={dir}>
       <PageHero
         active="/legal"
         size="compact"
@@ -130,10 +130,10 @@ export function Legal() {
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/ZEd1RfEEqbe.jpeg"
         imageAlt={t.heroAlt}
       />
-      <main className="max-w-4xl mx-auto px-6 py-16 space-y-16 text-start">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-16 pb-16 md:pb-24 space-y-10 md:space-y-16 text-start">
         <section>
           <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">{t.terms.title}</h2>
-          <div className="space-y-4 text-lg font-bold text-[#3B151A]/80 leading-relaxed">
+          <div className="space-y-3 md:space-y-4 text-base md:text-lg font-medium text-[#3B151A]/80 leading-relaxed">
             <p>{t.terms.intro}</p>
             <ul className="list-disc ps-6 space-y-2">
               {t.terms.items.map((item) => (
@@ -144,7 +144,7 @@ export function Legal() {
         </section>
         <section>
           <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">{t.privacy.title}</h2>
-          <div className="space-y-4 text-lg font-bold text-[#3B151A]/80 leading-relaxed">
+          <div className="space-y-3 md:space-y-4 text-base md:text-lg font-medium text-[#3B151A]/80 leading-relaxed">
             <p>{t.privacy.intro}</p>
             <ul className="list-disc ps-6 space-y-2">
               {t.privacy.items.map((item) => (
@@ -155,7 +155,7 @@ export function Legal() {
         </section>
         <section>
           <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">{t.general.title}</h2>
-          <div className="space-y-4 text-lg font-bold text-[#3B151A]/80 leading-relaxed">
+          <div className="space-y-3 md:space-y-4 text-base md:text-lg font-medium text-[#3B151A]/80 leading-relaxed">
             <ul className="list-disc ps-6 space-y-2">
               {t.general.items.map((item) => (
                 <li key={item}>{item}</li>
@@ -163,9 +163,9 @@ export function Legal() {
             </ul>
           </div>
         </section>
-        <section className="bg-[#3B151A] p-10 rounded-[3rem] text-white">
+        <section className="bg-[#3B151A] p-7 md:p-10 rounded-[2rem] md:rounded-[3rem] text-white text-start">
           <h2 className="text-2xl font-black font-heading mb-4 text-[#F5A83A]">{t.allergy.title}</h2>
-          <p className="text-lg font-bold leading-relaxed">{t.allergy.body}</p>
+          <p className="text-base md:text-lg font-medium leading-relaxed">{t.allergy.body}</p>
         </section>
       </main>
       <Footer />

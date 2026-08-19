@@ -175,20 +175,20 @@ export function Weekdays() {
         imageAlt={t.heroImageAlt}
       />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-20 pb-56">
+      <main className="relative z-10 max-w-7xl mx-auto px-6 py-12 md:py-20 pb-28 md:pb-32">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-6xl font-black font-heading mb-6 tracking-tight">{t.menuHeading}</h2>
           <p className="max-w-2xl mx-auto text-[#3B151A]/60 font-bold text-lg mb-8">
             {t.menuIntro}
           </p>
           <div className="flex justify-center gap-4">
-            <span className="flex items-center gap-1 text-[10px] font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
+            <span className="flex items-center gap-1 text-xs font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
               <Icon icon="ph:bread-bold" className="text-amber-800" /> {t.legendGluten}
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
+            <span className="flex items-center gap-1 text-xs font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
               <Icon icon="ph:egg-bold" className="text-amber-600" /> {t.legendEgg}
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
+            <span className="flex items-center gap-1 text-xs font-black bg-white/50 px-2 py-1 rounded-md border border-[#EDB2C1]/30">
               <Icon icon="ph:pepper-bold" className="text-red-600" /> {t.legendSpicy}
             </span>
           </div>
@@ -207,11 +207,11 @@ export function Weekdays() {
             <Reveal
               key={item.id}
               delay={(i % 3) * 100}
-              className="bg-white rounded-[4rem] p-8 shadow-2xl border-2 border-[#EDB2C1]/20 transition-all duration-500 hover:-translate-y-3 flex flex-col"
+              className="bg-white rounded-[2.5rem] md:rounded-[4rem] p-6 md:p-8 shadow-2xl border-2 border-[#EDB2C1]/20 transition-all duration-500 hover:-translate-y-3 flex flex-col"
             >
-              <div className="relative aspect-square rounded-[3.5rem] overflow-hidden mb-8 shadow-xl">
+              <div className="relative aspect-square rounded-3xl md:rounded-[3.5rem] overflow-hidden mb-6 md:mb-8 shadow-xl">
                 <Photo src={item.img} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} alt={displayItemName} real={item.realPhoto} />
-                <div className="absolute top-6 end-6 flex flex-col gap-2">
+                <div className="absolute top-6 start-6 flex flex-col gap-2">
                   {item.allergies.map((a) => (
                     <span key={a} className="bg-white/90 p-2 rounded-2xl shadow-xl flex items-center justify-center" title={a}>
                       <Icon icon={ALLERGY_ICON[a]} className="text-xl" />
@@ -222,7 +222,7 @@ export function Weekdays() {
               </div>
               <div className="flex-grow">
                 <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight">{displayItemName}</h3>
-                <p className="text-[10px] text-[#3B151A]/40 font-black mb-4">{itemCopy.ingredients}</p>
+                <p className="text-xs text-[#3B151A]/60 font-bold mb-4">{itemCopy.ingredients}</p>
                 <p className="text-[#3B151A]/60 font-bold mb-8 leading-relaxed text-lg">{itemCopy.desc}</p>
                 {dish !== null && (dish.imageUrl !== null || dish.description !== '') && (
                   <div className="mb-8 flex flex-col gap-3">
@@ -287,7 +287,7 @@ export function Weekdays() {
         </div>
       </main>
 
-      <Footer className="mb-40" />
+      <Footer />
     </div>
   )
 }

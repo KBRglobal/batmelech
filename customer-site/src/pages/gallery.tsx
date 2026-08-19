@@ -105,7 +105,7 @@ export function Gallery() {
   }, [catalog])
 
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir={dir}>
       <PageHero
         active="/gallery"
         size="compact"
@@ -115,11 +115,11 @@ export function Gallery() {
         image={PHOTO_URLS[0]}
         imageAlt={t.photoAlts[0]}
       />
-      <main className="pt-16 max-w-7xl mx-auto px-6">
+      <main className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-7xl mx-auto px-6">
         <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
           {PHOTO_URLS.map((img, i) => (
             <Reveal key={img} delay={(i % 4) * 80} className="break-inside-avoid">
-              <img src={img} alt={t.photoAlts[i]} className="w-full rounded-[2rem] shadow-lg border-2 border-white transition-transform hover:scale-[1.02]" />
+              <img src={img} alt={t.photoAlts[i]} className="w-full rounded-xl md:rounded-[2rem] shadow-lg border-2 border-white transition-transform hover:scale-[1.02]" />
             </Reveal>
           ))}
         </div>
@@ -154,14 +154,14 @@ export function Gallery() {
           </section>
         )}
         <Reveal>
-          <section className="mt-32 bg-white p-12 md:p-24 rounded-[5rem] text-center border-2 border-[#EDB2C1]/20 shadow-2xl">
-            <h2 className="text-4xl md:text-5xl font-black font-heading mb-8">{t.ctaTitle}</h2>
-            <p className="text-[#3B151A]/70 text-xl font-bold mb-12">{t.ctaBody}</p>
+          <section className="mt-16 md:mt-32 bg-white p-8 md:p-24 rounded-[2.5rem] md:rounded-[5rem] text-center border-2 border-[#EDB2C1]/20 shadow-2xl">
+            <h2 className="text-3xl md:text-5xl font-black font-heading mb-4 md:mb-8">{t.ctaTitle}</h2>
+            <p className="text-[#3B151A]/70 text-base md:text-xl font-bold mb-8 md:mb-12">{t.ctaBody}</p>
             <a
               href="https://wa.me/971586288776"
-              className="inline-flex items-center gap-6 bg-[#3B151A] text-white px-16 py-8 rounded-full font-black text-2xl shadow-2xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all transform hover:scale-105"
+              className="inline-flex items-center justify-center gap-3 md:gap-6 bg-[#3B151A] text-white px-8 py-4 md:px-16 md:py-8 rounded-2xl md:rounded-full font-black text-lg md:text-2xl shadow-2xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all transform hover:scale-105"
             >
-              {t.ctaButton} <Icon icon="ph:chat-circle-dots-fill" className="text-3xl" />
+              {t.ctaButton} <Icon icon="ph:chat-circle-dots-fill" className="text-2xl md:text-3xl shrink-0" />
             </a>
           </section>
         </Reveal>

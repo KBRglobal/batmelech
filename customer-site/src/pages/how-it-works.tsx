@@ -153,7 +153,7 @@ export function HowItWorks() {
   const t = COPY[locale]
 
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir={dir}>
       <PageHero
         active="/how-it-works"
         size="compact"
@@ -179,7 +179,7 @@ export function HowItWorks() {
             <Reveal key={step.title} delay={(i % 5) * 80}>
               <div className="bg-white rounded-[2.5rem] md:rounded-[3.5rem] p-8 md:p-12 shadow-xl border-2 border-[#EDB2C1]/20 flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-10">
                 <div className="flex items-center gap-5 shrink-0">
-                  <span className="text-5xl md:text-7xl font-black font-heading text-[#EDB2C1]/60 leading-none">
+                  <span className="text-5xl md:text-7xl font-black font-heading text-[#EDB2C1] leading-none">
                     {i + 1}
                   </span>
                   <span className="w-16 h-16 md:w-20 md:h-20 rounded-[1.5rem] md:rounded-[2rem] bg-[#3B151A] text-[#F5A83A] flex items-center justify-center shadow-xl">
@@ -217,14 +217,14 @@ export function HowItWorks() {
             <div className="flex flex-col sm:flex-row justify-center gap-5">
               <Link
                 to={href('/weekdays')}
-                className="inline-flex items-center justify-center gap-3 bg-[#3B151A] text-white px-10 py-6 rounded-full font-black text-xl shadow-2xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all transform hover:scale-105"
+                className="inline-flex items-center justify-center gap-3 bg-[#3B151A] text-white px-8 py-4 md:px-10 md:py-6 rounded-full font-black text-lg md:text-xl shadow-2xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all transform hover:scale-105"
               >
                 <Icon icon="ph:sun-fill" className="text-2xl" />
                 {t.menuWeekday}
               </Link>
               <Link
                 to={href('/shabbat-order')}
-                className="inline-flex items-center justify-center gap-3 bg-[#F5A83A] text-white px-10 py-6 rounded-full font-black text-xl shadow-2xl hover:bg-[#3B151A] transition-all transform hover:scale-105"
+                className="inline-flex items-center justify-center gap-3 bg-[#F5A83A] text-[#3B151A] px-8 py-4 md:px-10 md:py-6 rounded-full font-black text-lg md:text-xl shadow-2xl hover:bg-[#3B151A] hover:text-white transition-all transform hover:scale-105"
               >
                 <Icon icon="ph:crown-fill" className="text-2xl" />
                 {t.menuShabbat}
@@ -234,7 +234,7 @@ export function HowItWorks() {
         </Reveal>
 
         <Reveal>
-          <section className="mt-24 bg-white p-12 md:p-20 rounded-[4rem] md:rounded-[5rem] text-center border-2 border-[#EDB2C1]/20 shadow-2xl">
+          <section className="mt-16 md:mt-24 bg-white p-8 md:p-20 rounded-[2.5rem] md:rounded-[5rem] text-center border-2 border-[#EDB2C1]/20 shadow-2xl">
             <h2 className="text-3xl md:text-5xl font-black font-heading mb-6">{t.ctaTitle}</h2>
             <p className="text-[#3B151A]/70 text-lg md:text-xl font-bold mb-4">{t.ctaBody}</p>
             <p className="text-2xl md:text-3xl font-black mb-10" dir="ltr">{WHATSAPP_NUMBER}</p>
@@ -242,7 +242,7 @@ export function HowItWorks() {
               href={WHATSAPP_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-5 bg-[#3B151A] text-white px-12 md:px-16 py-6 md:py-8 rounded-full font-black text-xl md:text-2xl shadow-2xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all transform hover:scale-105"
+              className="inline-flex items-center justify-center gap-3 md:gap-5 bg-[#3B151A] text-white px-8 py-4 md:px-16 md:py-8 rounded-full font-black text-lg md:text-2xl shadow-2xl hover:bg-[#F5A83A] hover:text-[#3B151A] transition-all transform hover:scale-105"
             >
               {t.ctaButton} <Icon icon="ph:whatsapp-logo-fill" className="text-3xl" />
             </a>

@@ -165,7 +165,7 @@ export default function App() {
       ?.setAttribute('content', path === '/checkout' ? 'noindex,nofollow' : 'index,follow,max-image-preview:large')
   }, [pathname, hash, locale, path])
 
-  const showFloatingCart = path !== '/checkout' && path !== '/shabbat-extras'
+  const showFloatingCart = path !== '/checkout' && path !== '/shabbat-extras' && path !== '/shabbat-order'
 
   // Every route at once, not a banner on top of a live menu: the site rests.
   // The status fetch defaults to open, so a failed or slow call never hides

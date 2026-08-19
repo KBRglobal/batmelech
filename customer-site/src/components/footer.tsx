@@ -61,10 +61,10 @@ export function Footer({ className = '' }: { className?: string }) {
   const { locale, href } = useLocale()
   const t = COPY[locale]
   return (
-    <footer className={`bg-white border-t-2 border-[#EDB2C1]/30 pt-20 pb-10 ${className}`}>
+    <footer className={`bg-white border-t-2 border-[#EDB2C1]/30 pt-14 md:pt-20 pb-10 ${className}`}>
       <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 pb-16 border-b border-[#EDB2C1]/20">
-          <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 pb-12 md:pb-16 border-b border-[#EDB2C1]/20">
+          <div className="col-span-2 md:col-span-1 flex flex-col gap-4">
             <Link to={href('/')} className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#EDB2C1]/30 shadow-md">
               <img src="/site/assets/logo.jpg" alt={t.logoAlt} className="w-full h-full object-cover" />
             </Link>
@@ -91,9 +91,9 @@ export function Footer({ className = '' }: { className?: string }) {
 
           <div className="flex flex-col gap-3">
             <h4 className="font-black text-[#3B151A] mb-1">{t.contactTitle}</h4>
-            <a href="tel:+971586288776" className="flex items-center gap-2 text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm" dir="ltr">
+            <a href="tel:+971586288776" className="flex items-center gap-2 text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm">
               <Icon icon="ph:phone-fill" />
-              +971 58 628 8776
+              <span dir="ltr">+971 58 628 8776</span>
             </a>
             <a
               href="https://wa.me/971586288776"

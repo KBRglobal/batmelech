@@ -385,7 +385,7 @@ export function ShabbatOrder() {
         imageAlt={t.heroImageAlt}
       />
 
-      <main className="max-w-5xl mx-auto px-6 pt-20 space-y-20">
+      <main className="max-w-5xl mx-auto px-6 pt-12 md:pt-20 space-y-12 md:space-y-20">
         <div>
           <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
             {t.intro}
@@ -398,7 +398,7 @@ export function ShabbatOrder() {
         >
           {t.extrasLink}
         </Link>
-        <div className="bg-amber-100/50 border-2 border-amber-200 p-8 rounded-[3rem] flex items-start gap-6 shadow-sm">
+        <div className="bg-amber-100/50 border-2 border-amber-200 p-5 md:p-8 rounded-3xl md:rounded-[3rem] flex items-start gap-4 md:gap-6 shadow-sm">
           <Icon icon="ph:info-fill" className="text-amber-600 text-4xl shrink-0" />
           <div>
             <h5 className="font-black text-amber-900 text-xl mb-2">{t.infoTitle}</h5>
@@ -439,7 +439,7 @@ export function ShabbatOrder() {
                     />
                   )}
                   {s.allergy && (
-                    <span className="absolute top-2 end-2 bg-white/90 p-1.5 rounded-lg shadow-md">
+                    <span className="absolute top-2 start-2 bg-white/90 p-1.5 rounded-lg shadow-md">
                       <Icon icon={ALLERGY_ICON[s.allergy]} className="text-sm" />
                     </span>
                   )}
@@ -545,16 +545,16 @@ export function ShabbatOrder() {
         </div>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 md:p-10 bg-[#F7ECE6]/95 backdrop-blur-3xl border-t-4 border-[#EDB2C1]/20 z-[200] shadow-[0_-30px_60px_rgba(0,0,0,0.15)]">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 md:gap-10">
-          <div className="flex items-center gap-6 md:gap-10 w-full sm:w-auto justify-center sm:justify-start">
-            <div className="w-20 h-20 md:w-28 md:h-28 rounded-[2rem] md:rounded-[3rem] bg-[#3B151A] text-white flex flex-col items-center justify-center shadow-2xl border-4 border-[#F5A83A]/30 shrink-0">
-              <span className="text-2xl md:text-4xl font-black">${total.toFixed(2).replace(/\.00$/, '')}</span>
-              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest opacity-40">USD</span>
+      <div className="fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:p-10 bg-[#F7ECE6]/95 backdrop-blur-3xl border-t-2 md:border-t-4 border-[#EDB2C1]/20 z-[200] shadow-[0_-30px_60px_rgba(0,0,0,0.15)]">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 md:gap-10">
+          <div className="flex items-center gap-4 md:gap-10 w-full sm:w-auto justify-center sm:justify-start">
+            <div className="w-14 h-14 md:w-28 md:h-28 rounded-2xl md:rounded-[3rem] bg-[#3B151A] text-white flex flex-col items-center justify-center shadow-2xl border-2 md:border-4 border-[#F5A83A]/30 shrink-0">
+              <span className="text-base md:text-4xl font-black">${total.toFixed(2).replace(/\.00$/, '')}</span>
+              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest opacity-40">USD</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[#F5A83A] text-xs font-black uppercase tracking-[0.3em] mb-1">{t.packageName}</span>
-              <span className="text-xl md:text-3xl font-black leading-tight">
+              <span className={`text-[#F5A83A] text-xs font-black mb-1 ${locale === 'he' ? '' : 'uppercase tracking-[0.3em]'}`}>{t.packageName}</span>
+              <span className="text-sm md:text-3xl font-black leading-snug">
                 {soldOutPicks.length > 0
                   ? t.soldOutLabel(soldOutPicks.map((item) => displayDish(item.name, locale)).join(', '))
                   : canContinue
@@ -567,7 +567,7 @@ export function ShabbatOrder() {
             type="button"
             disabled={!canContinue}
             onClick={handleContinue}
-            className="w-full sm:w-auto bg-[#3B151A] hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed text-white px-12 md:px-20 py-6 md:py-8 rounded-[2rem] md:rounded-[3rem] font-black text-xl md:text-3xl shadow-2xl transition-all flex items-center justify-center gap-4 md:gap-6 group"
+            className="w-full sm:w-auto bg-[#3B151A] hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed text-white px-8 md:px-20 py-4 md:py-8 rounded-2xl md:rounded-[3rem] font-black text-lg md:text-3xl shadow-2xl transition-all flex items-center justify-center gap-4 md:gap-6 group"
           >
             {t.continueCta}{' '}
             <Icon
@@ -611,7 +611,7 @@ function QtyCard({
   compact?: boolean
 }) {
   return (
-    <div className="group relative bg-white rounded-[3.5rem] overflow-hidden border-4 border-transparent transition-all hover:shadow-xl">
+    <div className="group relative bg-white rounded-3xl md:rounded-[3.5rem] overflow-hidden border-4 border-transparent transition-all hover:shadow-xl">
       <div className={compact ? 'aspect-video overflow-hidden relative' : 'aspect-video overflow-hidden relative'}>
         {choice.img === '' ? (
           <div className="w-full h-full bg-[#F7ECE6] flex items-center justify-center">
@@ -621,7 +621,7 @@ function QtyCard({
           <Photo src={choice.img} alt={displayName} className={`w-full h-full object-cover ${soldOut ? 'grayscale opacity-60' : ''}`} real={choice.realPhoto} />
         )}
         {choice.allergy && (
-          <span className="absolute top-4 end-4 bg-white/90 p-2 rounded-xl shadow-lg">
+          <span className="absolute top-4 start-4 bg-white/90 p-2 rounded-xl shadow-lg">
             <Icon icon={ALLERGY_ICON[choice.allergy]} className="text-lg" />
           </span>
         )}

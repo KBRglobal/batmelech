@@ -482,10 +482,10 @@ export function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-48" dir={dir}>
       <PageHero active="/checkout" size="compact" title={t.heroTitle} image={CHECKOUT_HERO_IMAGE} imageAlt={t.heroImageAlt} />
 
-      <main className="max-w-3xl mx-auto px-6 py-12 space-y-12">
+      <main className="max-w-3xl mx-auto px-6 py-8 md:py-12 space-y-8 md:space-y-12">
         <section className="bg-white rounded-[3rem] p-6 md:p-8 shadow-xl border border-[#EDB2C1]/20">
           <h2 className="text-2xl font-black font-heading mb-6 border-b border-[#EDB2C1]/10 pb-4 flex items-center gap-3">
             <Icon icon="ph:basket-fill" className="text-[#F5A83A]" />
@@ -496,12 +496,18 @@ export function Checkout() {
               <div key={line.id} className="flex items-start justify-between gap-4">
                 <div className="flex-grow">
                   <h4 className="font-black">{line.displayName ?? line.name}</h4>
-                  {line.note && <p className="text-xs text-[#3B151A]/50 font-bold mt-1 leading-relaxed">{line.note}</p>}
+                  {line.note && (
+                    <div className="text-xs text-[#3B151A]/50 font-bold mt-1 leading-relaxed space-y-0.5">
+                      {line.note.split(' | ').map((part) => (
+                        <p key={part}>{part}</p>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       type="button"
                       onClick={() => setQty(line.id, line.qty - 1)}
-                      className="w-8 h-8 rounded-lg bg-[#F7ECE6] font-black flex items-center justify-center"
+                      className="w-11 h-11 rounded-xl bg-[#F7ECE6] font-black flex items-center justify-center"
                     >
                       −
                     </button>
@@ -509,7 +515,7 @@ export function Checkout() {
                     <button
                       type="button"
                       onClick={() => setQty(line.id, line.qty + 1)}
-                      className="w-8 h-8 rounded-lg bg-[#F7ECE6] font-black flex items-center justify-center"
+                      className="w-11 h-11 rounded-xl bg-[#F7ECE6] font-black flex items-center justify-center"
                     >
                       +
                     </button>
@@ -768,7 +774,7 @@ export function Checkout() {
         </section>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#F7ECE6]/90 backdrop-blur-xl border-t border-[#EDB2C1]/30 z-[100]">
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 bg-[#F7ECE6]/90 backdrop-blur-xl border-t border-[#EDB2C1]/30 z-[100]">
         <div className="max-w-3xl mx-auto">
           <button
             type="button"
@@ -781,11 +787,11 @@ export function Checkout() {
                 clear()
               }
             }}
-            className={`w-full py-6 rounded-[2.5rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 group ${
+            className={`w-full py-4 md:py-6 rounded-2xl md:rounded-[2.5rem] font-black text-lg md:text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 group ${
               canSubmit ? 'bg-[#3B151A] text-white hover:bg-black' : 'bg-[#3B151A]/30 text-white/60 cursor-not-allowed'
             }`}
           >
-            {t.submitCta} <Icon icon="ph:check-circle-fill" className="text-3xl group-hover:scale-125 transition-transform" />
+            {t.submitCta} <Icon icon="ph:check-circle-fill" className="text-2xl md:text-3xl shrink-0 group-hover:scale-125 transition-transform" />
           </button>
           {orderError && (
             <p className="text-center text-sm font-black text-[#8D182C] mt-3" role="alert">

@@ -72,17 +72,17 @@ export function Story() {
       />
 
       <main className="relative z-10 max-w-5xl mx-auto px-6 py-24 pb-32 -mt-24">
-        <div className="bg-white rounded-[5rem] p-8 md:p-24 shadow-2xl border border-[#EDB2C1]/30">
+        <div className="bg-white rounded-[3rem] md:rounded-[5rem] p-6 md:p-24 shadow-2xl border border-[#EDB2C1]/30">
           <div className="flex flex-col md:flex-row gap-16 md:gap-20 items-start">
             <div className="md:w-1/3 md:sticky md:top-10 w-full">
               <img
                 src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/ai/8BFD80FA-B647-4892-88DA-A42D9A482CDF-ednYRxQWIlt.png"
                 alt={t.portraitAlt}
-                className="w-full aspect-[4/5] rounded-[4rem] border-8 border-white shadow-2xl object-cover object-top"
+                className="w-full aspect-[4/5] rounded-[2.5rem] md:rounded-[4rem] border-4 md:border-8 border-white shadow-2xl object-cover object-top"
               />
               <div className="mt-12 text-center md:text-start">
                 <h3 className="text-3xl font-black">{t.founderName}</h3>
-                <p className="text-[#EDB2C1] font-bold italic">{t.founderRole}</p>
+                <p className="text-[#8D182C] font-bold">{t.founderRole}</p>
               </div>
             </div>
             <div className="md:w-2/3 text-start">
@@ -90,7 +90,7 @@ export function Story() {
                 <p>{t.p1}</p>
                 <p>{t.p2}</p>
                 <p>{t.p3}</p>
-                <p className="text-3xl md:text-5xl font-black text-[#8D182C] italic py-10 border-y border-[#EDB2C1]/20 my-12 text-center">
+                <p className="text-3xl md:text-5xl font-black text-[#8D182C] py-8 md:py-10 border-y border-[#EDB2C1]/20 my-8 md:my-12 text-center">
                   {t.pull}
                 </p>
                 <p>{t.p4}</p>
@@ -106,7 +106,7 @@ export function Story() {
                 </Link>
                 <Link
                   to={href('/weekdays')}
-                  className="bg-[#EDB2C1]/10 px-12 py-6 rounded-full font-black text-xl shadow-xl hover:scale-105 transition-all border-2 border-[#EDB2C1]/40"
+                  className="bg-[#F7ECE6] text-[#3B151A] px-8 py-4 md:px-12 md:py-6 rounded-full font-black text-lg md:text-xl shadow-xl hover:scale-105 transition-all border-2 border-[#3B151A]/15"
                 >
                   {t.ctaWeekday}
                 </Link>

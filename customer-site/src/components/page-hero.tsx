@@ -56,24 +56,32 @@ export function PageHero({
       </div>
       <div className="relative z-10 flex flex-col flex-grow">
         <NavHeader active={active} />
-        <div className="flex-grow flex flex-col items-center justify-center text-center px-6 py-16">
-          <div className="w-40 h-40 md:w-56 md:h-56 mb-6 animate-float">
+        <div className="flex-grow flex flex-col items-center justify-center text-center px-6 py-10 md:py-16">
+          <div className="w-24 h-24 md:w-56 md:h-56 mb-4 md:mb-6 animate-float">
             <img
               src="/site/assets/logo-cream.png"
               alt={t.logoAlt}
               className="w-full h-full object-contain drop-shadow-[0_2px_18px_rgba(59,21,26,0.65)]"
             />
           </div>
-          <div className="max-w-4xl backdrop-blur-md bg-black/10 p-10 rounded-[4rem] border border-white/10 shadow-2xl">
+          {/* On phones the frosted panel used to blanket the whole photo — the
+              hero read as "blurred pixels + text". Mobile shows the text
+              directly on the image (drop-shadows carry legibility, per
+              BRAND.md); the glass card look starts at md. */}
+          <div className="max-w-4xl md:backdrop-blur-md md:bg-black/10 p-0 md:p-10 rounded-none md:rounded-[4rem] border-0 md:border md:border-white/10 md:shadow-2xl">
             {badge && (
-              <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#F5A83A] text-white rounded-full text-xs font-black mb-8 shadow-xl tracking-widest uppercase">
+              <div className="inline-flex items-center gap-3 px-5 md:px-6 py-2 bg-[#F5A83A] text-white rounded-full text-xs font-black mb-5 md:mb-8 shadow-xl tracking-widest uppercase">
                 <span>{badge}</span>
               </div>
             )}
-            <h1 className="text-4xl md:text-7xl font-black text-white font-heading tracking-tight leading-none mb-6">
-              {title[0]} <span className="text-[#F5A83A]">{title[1]}</span>
+            <h1 className="text-4xl md:text-7xl font-black text-white font-heading tracking-tight leading-tight md:leading-none mb-4 md:mb-6 drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
+              {title[0]} <span className="text-[#F5A83A] inline-block">{title[1]}</span>
             </h1>
-            {subtitle && <p className="text-white/90 text-lg md:text-2xl font-bold max-w-3xl leading-relaxed mb-4">{subtitle}</p>}
+            {subtitle && (
+              <p className="text-white/90 text-base md:text-2xl font-bold max-w-3xl mx-auto leading-relaxed mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
+                {subtitle}
+              </p>
+            )}
             {children}
           </div>
         </div>

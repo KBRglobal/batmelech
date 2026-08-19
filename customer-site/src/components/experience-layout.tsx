@@ -33,7 +33,7 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
   const t = COPY[locale]
   const pageTitle = content.title.join(' ')
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir={dir}>
       <PageHero
         active="/events"
         size="tall"
@@ -44,13 +44,13 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
         imageAlt={pageTitle}
       />
 
-      <main className="relative max-w-7xl mx-auto px-6">
-        <section className="mb-32 pt-20">
+      <main className="relative max-w-7xl mx-auto px-6 pb-16 md:pb-32">
+        <section className="mb-16 md:mb-32 pt-12 md:pt-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="flex flex-col gap-4">
               {content.bullets.map((b) => (
                 <div key={b.text} className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-[#EDB2C1]/10">
-                  <Icon icon={b.icon} className="text-[#F5A83A] text-2xl" />
+                  <Icon icon={b.icon} className="text-[#F5A83A] text-2xl shrink-0" />
                   <span className="font-bold text-lg text-[#3B151A]">{b.text}</span>
                 </div>
               ))}
@@ -67,11 +67,11 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
         </section>
 
         <Reveal>
-          <section className="mb-32">
-            <h2 className="text-4xl font-black font-heading mb-12">{content.galleryTitle}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <section className="mb-16 md:mb-32">
+            <h2 className="text-3xl md:text-4xl font-black font-heading mb-8 md:mb-12">{content.galleryTitle}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {content.gallery.map((img, i) => (
-                <div key={img} className="h-96 rounded-[3rem] overflow-hidden shadow-xl">
+                <div key={img} className="h-72 md:h-96 rounded-3xl md:rounded-[3rem] overflow-hidden shadow-xl">
                   <img src={img} alt={content.galleryAlt[i]} className="w-full h-full object-cover" />
                 </div>
               ))}
@@ -80,15 +80,15 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
         </Reveal>
 
         <Reveal>
-          <section className="bg-[#3B151A] p-12 md:p-24 rounded-[5rem] text-center shadow-2xl">
+          <section className="bg-[#3B151A] p-8 md:p-24 rounded-[2.5rem] md:rounded-[5rem] text-center shadow-2xl">
             <div className="relative z-10 max-w-3xl mx-auto">
-              <h2 className="text-4xl md:text-6xl font-black text-white mb-8 font-heading leading-tight">{content.ctaTitle}</h2>
-              <p className="text-white/60 text-xl font-bold mb-12 leading-relaxed">{content.ctaBody}</p>
+              <h2 className="text-3xl md:text-6xl font-black text-white mb-4 md:mb-8 font-heading leading-tight">{content.ctaTitle}</h2>
+              <p className="text-white/60 text-base md:text-xl font-bold mb-8 md:mb-12 leading-relaxed">{content.ctaBody}</p>
               <a
                 href="https://wa.me/971586288776"
-                className="inline-flex items-center gap-6 bg-[#F5A83A] text-[#3B151A] px-16 py-8 rounded-[3rem] font-black text-3xl shadow-2xl hover:bg-white transition-all transform hover:scale-105"
+                className="inline-flex items-center justify-center gap-3 md:gap-6 bg-[#F5A83A] text-[#3B151A] px-8 py-4 md:px-16 md:py-8 rounded-2xl md:rounded-[3rem] font-black text-lg md:text-3xl shadow-2xl hover:bg-white transition-all transform hover:scale-105"
               >
-                {t.quoteCta} <Icon icon="ph:whatsapp-logo-fill" className="text-4xl" />
+                {t.quoteCta} <Icon icon="ph:whatsapp-logo-fill" className="text-2xl md:text-4xl shrink-0" />
               </a>
             </div>
           </section>

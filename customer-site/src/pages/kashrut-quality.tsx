@@ -144,7 +144,7 @@ export function KashrutQuality() {
   const { locale, dir } = useLocale()
   const t = COPY[locale]
   return (
-    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-32" dir={dir}>
+    <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30" dir={dir}>
       <PageHero
         active="/kashrut"
         size="compact"
@@ -153,13 +153,13 @@ export function KashrutQuality() {
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/d31Kxj4sAHE.jpeg"
         imageAlt={t.heroAlt}
       />
-      <main className="pt-16 max-w-4xl mx-auto px-6">
-        <section className="mb-20 text-center">
+      <main className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-4xl mx-auto px-6">
+        <section className="mb-14 md:mb-20 text-center">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-[#3B151A] rounded-full text-[#F5A83A] text-5xl mb-8 shadow-2xl">
             <Icon icon="ph:certificate-fill" />
           </div>
-          <p className="text-xl font-bold text-[#3B151A]/70 leading-relaxed mb-12">{t.intro}</p>
-          <div className="rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white aspect-video mb-20">
+          <p className="text-base md:text-xl font-bold text-[#3B151A]/70 leading-relaxed mb-8 md:mb-12">{t.intro}</p>
+          <div className="rounded-3xl md:rounded-[4rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white aspect-video mb-12 md:mb-20">
             <img
               src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/7zzOf0cSMJb.jpeg"
               alt={t.certificateAlt}
@@ -187,14 +187,14 @@ export function KashrutQuality() {
             <FaqItem key={item.q} q={item.q} a={item.a} />
           ))}
         </section>
-        <section className="bg-[#3B151A] p-12 rounded-[5rem] text-center shadow-2xl">
+        <section className="bg-[#3B151A] p-8 md:p-12 rounded-[2.5rem] md:rounded-[5rem] text-center shadow-2xl">
           <h4 className="text-2xl font-black text-white mb-6 font-heading italic">{t.quote}</h4>
           <p className="text-white/60 font-bold mb-10">{t.outroBody}</p>
           <a
             href="https://wa.me/971586288776"
-            className="inline-flex items-center gap-4 bg-[#F5A83A] text-[#3B151A] px-12 py-6 rounded-2xl font-black text-xl hover:bg-white transition-all"
+            className="inline-flex items-center justify-center gap-3 md:gap-4 bg-[#F5A83A] text-[#3B151A] px-8 py-4 md:px-12 md:py-6 rounded-2xl font-black text-lg md:text-xl hover:bg-white transition-all"
           >
-            {t.outroCta} <Icon icon="ph:whatsapp-logo-fill" className="text-2xl" />
+            {t.outroCta} <Icon icon="ph:whatsapp-logo-fill" className="text-2xl shrink-0" />
           </a>
         </section>
       </main>
@@ -205,7 +205,7 @@ export function KashrutQuality() {
 
 function FaqItem({ q, a }: { q: string; a: string }) {
   return (
-    <div className="bg-white p-8 rounded-[3rem] border-2 border-[#EDB2C1]/20 shadow-lg text-start">
+    <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border-2 border-[#EDB2C1]/20 shadow-lg text-start">
       <h3 className="text-xl font-black mb-3">{q}</h3>
       <p className="font-bold text-[#3B151A]/70 leading-relaxed">{a}</p>
     </div>
@@ -214,7 +214,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 function InfoCard({ icon, title, children }: { icon: string; title: string; children: string }) {
   return (
-    <div className="bg-white p-10 rounded-[3rem] border-2 border-[#EDB2C1]/20 shadow-lg">
+    <div className="bg-white p-7 md:p-10 rounded-[2rem] md:rounded-[3rem] border-2 border-[#EDB2C1]/20 shadow-lg">
       <h3 className="text-2xl font-black mb-4 flex items-center gap-3">
         <Icon icon={icon} className="text-[#F5A83A]" /> {title}
       </h3>

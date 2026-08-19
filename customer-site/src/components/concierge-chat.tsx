@@ -168,6 +168,31 @@ export function ConciergeChat() {
     }
   }, [open])
 
+  // iOS keyboard: position:fixed sticks to the LAYOUT viewport, so an open
+  // keyboard hides the bottom of the sheet — including the input. Track the
+  // visual viewport and, while the keyboard occludes it, size and pin the
+  // sheet to exactly the visible area so the input rides above the keyboard.
+  const [keyboardBox, setKeyboardBox] = useState<{ height: number; top: number } | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const viewport = window.visualViewport
+    if (!viewport) return
+    const isPhone = window.matchMedia('(max-width: 767px)').matches
+    if (!isPhone) return
+    const update = () => {
+      const occluded = window.innerHeight - viewport.height
+      setKeyboardBox(occluded > 80 ? { height: viewport.height, top: viewport.offsetTop } : null)
+    }
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    update()
+    return () => {
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+      setKeyboardBox(null)
+    }
+  }, [open])
+
   const deliver = async (history: ChatMessage[]) => {
     setFailed(false)
     setSending(true)
@@ -211,7 +236,14 @@ export function ConciergeChat() {
         />
       )}
       {open && (
-        <div className="chat-panel fixed inset-x-0 bottom-0 w-full h-[85dvh] rounded-t-3xl md:relative md:inset-auto md:bottom-auto md:w-[24rem] md:max-w-[calc(100vw-5rem)] md:h-[28rem] md:max-h-[70vh] md:rounded-3xl bg-[#F7ECE6] shadow-2xl border border-[#3B151A]/10 flex flex-col overflow-hidden">
+        <div
+          className="chat-panel fixed inset-x-0 bottom-0 w-full h-[85dvh] rounded-t-3xl md:relative md:inset-auto md:bottom-auto md:w-[24rem] md:max-w-[calc(100vw-5rem)] md:h-[28rem] md:max-h-[70vh] md:rounded-3xl bg-[#F7ECE6] shadow-2xl border border-[#3B151A]/10 flex flex-col overflow-hidden"
+          style={
+            keyboardBox
+              ? { height: `${keyboardBox.height}px`, top: `${keyboardBox.top}px`, bottom: 'auto' }
+              : undefined
+          }
+        >
           <div className="bg-[#3B151A] text-white px-5 py-4 flex items-center gap-3 shrink-0">
             <span className="w-9 h-9 rounded-full bg-[#F5A83A] text-[#3B151A] flex items-center justify-center shrink-0">
               <Icon icon="ph:chat-circle-dots-fill" className="text-xl" />

@@ -360,26 +360,26 @@ export function Home() {
         image="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/ucQtca7hCDw/components/GQcIcze6r9C.jpeg"
         imageAlt={t.hero.imageAlt}
       >
-        <div className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto justify-center mt-4">
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-6 w-full sm:w-auto justify-center mt-4">
           <Link
             to={href('/shabbat-order')}
-            className="bg-white text-[#3B151A] px-14 py-7 rounded-full font-black text-2xl shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-4 group"
+            className="bg-white text-[#3B151A] px-8 py-4 md:px-14 md:py-7 rounded-full font-black text-base md:text-2xl shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3 md:gap-4 group"
           >
-            <Icon icon="ph:calendar-heart-fill" className="text-3xl group-hover:animate-bounce" />
+            <Icon icon="ph:calendar-heart-fill" className="text-xl md:text-3xl shrink-0 group-hover:animate-bounce" />
             {t.hero.ctaShabbat}
           </Link>
           <Link
             to={href('/weekdays')}
-            className="bg-[#3B151A] text-white px-14 py-7 rounded-full font-black text-2xl hover:bg-black transition-all flex items-center justify-center shadow-2xl border-2 border-[#EDB2C1]/30"
+            className="bg-[#3B151A] text-white px-8 py-4 md:px-14 md:py-7 rounded-full font-black text-base md:text-2xl hover:bg-black transition-all flex items-center justify-center shadow-2xl border-2 border-[#EDB2C1]/30"
           >
             {t.hero.ctaWeekday}
           </Link>
         </div>
       </PageHero>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pb-32">
+      <main className="relative z-10 max-w-7xl mx-auto px-6 pb-16 md:pb-32">
         <HolidayMenuSection />
-        <section id="story" ref={storyReveal.ref} className={`mb-32 scroll-mt-24 pt-32 text-center ${storyReveal.className}`}>
+        <section id="story" ref={storyReveal.ref} className={`mb-20 md:mb-32 scroll-mt-24 pt-20 md:pt-32 text-center ${storyReveal.className}`}>
           <div className="max-w-4xl mx-auto">
             <div className="mb-16 inline-block">
               <img
@@ -410,7 +410,7 @@ export function Home() {
               alt={t.shabbatPromo.imageAlt}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110"
             />
-            <div className={`absolute inset-0 ${startGradient} from-black/80 via-black/20 to-transparent`} />
+            <div className={`absolute inset-0 ${startGradient} from-black/80 via-black/45 md:via-black/20 to-transparent`} />
             <div className="absolute inset-0 flex flex-col justify-center items-start p-8 md:p-24 text-start">
               <div className="max-w-xl space-y-6 md:space-y-8">
                 <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#F5A83A] text-[#3B151A] rounded-full text-xs font-black tracking-widest uppercase">
@@ -439,7 +439,7 @@ export function Home() {
               alt={t.weekdayPromo.imageAlt}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110"
             />
-            <div className={`absolute inset-0 ${endGradient} from-black/80 via-black/20 to-transparent`} />
+            <div className={`absolute inset-0 ${endGradient} from-black/80 via-black/45 md:via-black/20 to-transparent`} />
             <div className="absolute inset-0 flex flex-col justify-center items-end p-8 md:p-24 text-start">
               <div className="max-w-xl space-y-6 md:space-y-8 flex flex-col items-end">
                 <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#3B151A] text-[#EDB2C1] rounded-full text-xs font-black tracking-widest uppercase">
@@ -477,11 +477,11 @@ export function Home() {
               <Link
                 key={exp.to}
                 to={href(exp.to)}
-                className="group relative h-[28rem] md:h-[35rem] rounded-[3.5rem] overflow-hidden shadow-2xl border-2 border-white block"
+                className="group relative h-[24rem] md:h-[35rem] rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border-2 border-white block"
               >
                 <img src={exp.img} alt={t.experiences[i].title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                <div className="absolute bottom-10 start-10 end-10">
+                <div className="absolute bottom-6 start-6 end-6 md:bottom-10 md:start-10 md:end-10">
                   <div className="mb-4 flex items-center gap-3">
                     <Icon icon={exp.icon} className="text-[#F5A83A] text-3xl" />
                     <span className="text-white/60 font-black tracking-widest uppercase text-xs">{t.experiences[i].tag}</span>
@@ -531,7 +531,7 @@ export function Home() {
                           <Icon key={s} icon="ph:star-fill" />
                         ))}
                       </div>
-                      <p className="text-lg font-bold leading-relaxed italic mb-6">{t.testimonials[i].quote}</p>
+                      <p className="text-lg font-bold leading-relaxed mb-6">{t.testimonials[i].quote}</p>
                       <div className="flex items-center gap-3">
                         <img src={meta.avatar} alt={t.testimonials[i].name} className="w-12 h-12 rounded-full border-2 border-white shadow-lg" />
                         <div className="flex flex-col">
