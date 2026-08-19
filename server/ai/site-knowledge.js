@@ -31,9 +31,9 @@ const CATEGORY_LABELS = Object.freeze({
 const FALLBACK_COUPLE_PRICE_USD = 230;
 const FALLBACK_CHALLAH_PRICE_USD = 10;
 const FALLBACK_INCLUDED_CHALLOT = 2;
-const SITE_EXTRA_SALAD_USD = 6.25;
-const SITE_EXTRA_FIRST_USD = 25;
-const SITE_EXTRA_MAIN_USD = 45;
+const SITE_EXTRA_SALAD_USD = 7;
+const SITE_EXTRA_FIRST_USD = 30;
+const SITE_EXTRA_MAIN_USD = 100;
 
 // Facts that live in the site's copy, not in state. Every number here matches
 // the deployed customer site — when the site changes, change this list too.
@@ -172,7 +172,10 @@ function packageLines(menu) {
       `${includedChallot} challot.`,
     'The first course of a package is a pair of fresh sea-bream fish fillets — 2 fillets, one per person — in chraime or Moroccan sauce, or a portion of Moroccan fish patties (קציצות דגים). So a package for two includes 2 fish fillets.',
     'The dessert portion of a package is two chocolate soufflés or one baklava portion.',
-    `Beyond what is included, on the website: extra salad $${SITE_EXTRA_SALAD_USD} each, extra first course $${SITE_EXTRA_FIRST_USD}, extra main $${SITE_EXTRA_MAIN_USD}, extra challah $${challahPrice} each.`,
+    `Beyond what is included: extra single salad $${SITE_EXTRA_SALAD_USD}, a block of 4 extra salads $25, extra fish fillet unit $${SITE_EXTRA_FIRST_USD}, extra main course $${SITE_EXTRA_MAIN_USD}, extra challah $${challahPrice} each.`,
+    'The 4 included salads may be split freely — for example half portions of two kinds; they do not have to be 4 different kinds.',
+    'There is no separate group pricing and no minimum order: a large or group order is simply priced as the matching number of couple packages plus extras.',
+    'Table setting service ("סט עריכה", $10 per person) includes per person: 2 plates, 2 spoons, 2 forks and 2 knives.',
     'Shabbat extras (the à la carte page) can be ordered freely with no package required.',
   ];
 }
