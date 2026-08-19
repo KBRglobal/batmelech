@@ -58,6 +58,12 @@ function fakePool() {
         });
         return { rows: [row] };
       }
+      if (sql.includes('SET purchased_at')) {
+        const row = rows.get(params[0]);
+        if (!row) return { rows: [] };
+        row.purchased_at = new Date(params[1]);
+        return { rows: [row] };
+      }
       if (sql.includes("SET status = 'failed'")) {
         const row = rows.get(params[0]);
         if (!row) return { rows: [] };
@@ -234,4 +240,27 @@ test('file reads refuse keys outside the invoices/ prefix', async (t) => {
     assert.equal(read.status, 404, `must refuse ${key}`);
   }
   assert.equal(client.sent.filter((command) => command.constructor.name === 'GetObjectCommand').length, 0);
+});
+
+test('a manual date correction overrides the scan and refuses future dates', async (t) => {
+  const { router } = makeRouter();
+  const base = await serve(t, router);
+
+  const { invoice } = await (await jsonRequest(base, '/api/settings/supplier-invoices', {
+    method: 'POST',
+    body: { fileBase64: PDF_DATA_URL, fileName: 'invoice.pdf' },
+  })).json();
+
+  const fixed = await jsonRequest(base, `/api/settings/supplier-invoices/${invoice.id}/date`, {
+    method: 'PATCH',
+    body: { purchasedAt: '2026-07-02' },
+  });
+  assert.equal(fixed.status, 200);
+  assert.equal((await fixed.json()).invoice.purchasedAt, '2026-07-02');
+
+  const future = await jsonRequest(base, `/api/settings/supplier-invoices/${invoice.id}/date`, {
+    method: 'PATCH',
+    body: { purchasedAt: '2099-01-01' },
+  });
+  assert.equal(future.status, 400);
 });

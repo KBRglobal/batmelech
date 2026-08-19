@@ -81,6 +81,16 @@ async function saveScanFailure(pool, id, message) {
   return result.rows[0] ? rowToRecord(result.rows[0]) : null;
 }
 
+async function setPurchasedAt(pool, id, purchasedAt) {
+  const result = await pool.query(
+    `UPDATE public.supplier_invoices
+     SET purchased_at = $2, updated_at = NOW()
+     WHERE id = $1 RETURNING *`,
+    [id, purchasedAt]
+  );
+  return result.rows[0] ? rowToRecord(result.rows[0]) : null;
+}
+
 async function listSupplierInvoices(pool) {
   const result = await pool.query(
     `SELECT * FROM public.supplier_invoices
@@ -107,6 +117,7 @@ module.exports = {
   createSupplierInvoice,
   saveScanResult,
   saveScanFailure,
+  setPurchasedAt,
   listSupplierInvoices,
   getSupplierInvoice,
   deleteSupplierInvoice,

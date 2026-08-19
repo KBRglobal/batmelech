@@ -151,6 +151,26 @@ function createSupplierInvoicesRouter({ pool, storage, scanner, quota = null, lo
     }
   });
 
+  // Manual correction for a misread purchase date — the human reading of the
+  // printed document is the source of truth, above any scan.
+  router.patch('/:id/date', async (request, response) => {
+    const parsed = z.object({ purchasedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u) }).safeParse(request.body);
+    if (!parsed.success) {
+      return response.status(400).json({ error: 'invalid date' });
+    }
+    if (parsed.data.purchasedAt > new Date().toISOString().slice(0, 10)) {
+      return response.status(400).json({ error: 'a purchase date cannot be in the future' });
+    }
+    try {
+      const updated = await repository.setPurchasedAt(pool, request.params.id, parsed.data.purchasedAt);
+      if (!updated) return response.status(404).json({ error: 'not found' });
+      return response.json({ invoice: updated });
+    } catch (error) {
+      logger.error('supplier invoice date update failed:', error?.message || error);
+      return response.status(502).json({ error: 'update failed' });
+    }
+  });
+
   router.get('/file', async (request, response) => {
     const key = typeof request.query.key === 'string' ? request.query.key : '';
     const file = await storage.getInvoiceFile(key);
