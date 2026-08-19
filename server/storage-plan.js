@@ -16,7 +16,7 @@ const PLAN = Object.freeze({
   upgradeUrlYearly: 'https://buy.stripe.com/4gM28q9l7aoZ6mt7yRe3e05', // AED 480/year
   upgradeUrlMonthly: 'https://buy.stripe.com/14A3cucxj9kVfX36uNe3e06', // AED 40/month
   domainName: 'batmelech.ae',
-  domainExpiry: '', // ISO date — filled once known
+  domainExpiry: '2027-08-12',
   supportContact: 'KBR',
 });
 
