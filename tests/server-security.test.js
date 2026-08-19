@@ -120,8 +120,8 @@ test('production serves only its immutable deployed source tree', () => {
 test('React production route remains behind auth and cannot shadow APIs or legacy HTML', () => {
   const source = fs.readFileSync(serverPath, 'utf8');
   const healthIndex = source.indexOf("app.get('/healthz'");
-  const siteStaticIndex = source.indexOf("app.use('/site', createReactAppRouter(");
-  const rootIndex = source.indexOf("app.get(/^\\/$/, (request, response) => {");
+  const siteStaticIndex = source.indexOf("app.use('/site', publicSiteRouter);");
+  const rootIndex = source.indexOf("SITE_PAGE_REGEX.test(request.path)");
   const customerFormIndex = source.indexOf("app.use('/order-form.html', createCustomerOrderRouter");
   const authIndex = source.indexOf("app.use(createDecoyGate(SESSION_SECRET));");
   const operationsReviewIndex = source.indexOf("app.use('/api/ai/operations-review', createOperationsReviewRouter");
@@ -155,12 +155,15 @@ test('React production route remains behind auth and cannot shadow APIs or legac
   assert.match(source, /createOperationsReviewRouter\(\)/);
   assert.match(source, /app\.get\(\/\^\\\/legacy\$\//);
   assert.match(source, /app\.get\(\/\^\\\/app\$\//);
-  assert.match(source, /app\.get\(\/\^\\\/\$\//);
+  // The clean-root era: '/' serves the public site directly; staff sessions
+  // still land in the admin app, and old /site page URLs 301 to the root.
+  assert.match(source, /response\.redirect\(302, '\/admin\/today'\)/);
+  assert.match(source, /response\.redirect\(301, rest === '' \? '\/' : rest\)/);
   assert.match(source, /response\.set\('Cache-Control', 'no-store'\)/);
   // Root only enters the authenticated React manager when the request already
   // carries a valid session (checked explicitly, not by relying on route
   // order) — everyone else gets the public site, never admin data.
-  assert.match(source, /hasValidSession\(request, SESSION_SECRET\) \? '\/admin\/today' : '\/site\/'/);
+  assert.match(source, /request\.path === '\/' && hasValidSession\(request, SESSION_SECRET\)/);
   assert.match(source, /getContentRoot: \(\) => contentRoot/);
   assert.doesNotMatch(source, /app\.use\('\/'\s*,\s*createReactAppRouter/);
 });

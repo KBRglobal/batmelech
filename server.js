@@ -136,14 +136,23 @@ app.use('/assets', express.static(path.join(contentRoot, 'public', 'assets'), {
   index: false,
 }));
 
-// --- Public customer-facing site: no Basic Auth, no admin state. Same
-// static-plus-SPA-fallback shape as the authenticated React app so deep
-// links like /site/checkout resolve to the client router instead of 404. ---
-app.use('/site', createReactAppRouter({
+// --- Public customer-facing site. Canonical home is the CLEAN ROOT domain
+// (batmelech.ae/...); the historical /site page URLs 301 there so old links
+// and search results consolidate. Files (assets, sitemap.xml, llms.txt) keep
+// their extensions and keep serving under /site — the built bundle's base
+// path needs no change. ---
+app.get(/^\/site(?:\/|$)/, (request, response, next) => {
+  const rest = request.path.slice('/site'.length) || '/';
+  if (path.extname(rest) !== '') return next();
+  response.set('Cache-Control', 'no-store');
+  return response.redirect(301, rest === '' ? '/' : rest);
+});
+const publicSiteRouter = createReactAppRouter({
   reactRoot: path.join(contentRoot, 'site'),
   securityHeaders: PUBLIC_SITE_SECURITY_HEADERS,
   transformIndexHtml: transformSiteIndexHtml,
-}));
+});
+app.use('/site', publicSiteRouter);
 // Public order intake from the customer site's checkout — persists straight
 // into the same orders[] the admin app reads, no admin auth, no state sync.
 if (stateRepository) {
@@ -270,11 +279,29 @@ if (pool) {
     response.status(503).send('Not available');
   });
 }
-// Root goes to the public site for customers; staff with an active session
-// land straight in the admin app instead.
-app.get(/^\/$/, (request, response) => {
-  response.set('Cache-Control', 'no-store');
-  response.redirect(302, hasValidSession(request, SESSION_SECRET) ? '/admin/today' : '/site/');
+// The public site answers on the clean root domain. Staff with an active
+// session still land straight in the admin app from '/'. Only the known
+// site pages are claimed — every staff/hidden path stays untouched and
+// keeps falling through to the decoy gate.
+const SITE_PAGE_NAMES = [
+  'weekdays', 'story', 'shabbat-order', 'shabbat-extras', 'checkout',
+  'legal', 'kashrut', 'gallery', 'events', 'how-it-works', 'experiences',
+];
+const SITE_PAGE_REGEX = new RegExp(
+  `^/(?:en|fr)?/?$|^/(?:(?:en|fr)/)?(?:${SITE_PAGE_NAMES.join('|')})(?:/|$)`
+);
+app.use((request, response, next) => {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return next();
+  if (request.path === '/' && hasValidSession(request, SESSION_SECRET)) {
+    response.set('Cache-Control', 'no-store');
+    return response.redirect(302, '/admin/today');
+  }
+  if (!SITE_PAGE_REGEX.test(request.path)) return next();
+  return publicSiteRouter(request, response, next);
+});
+
+app.get('/sitemap.xml', (_request, response) => {
+  response.sendFile(path.join(contentRoot, 'site', 'sitemap.xml'));
 });
 
 app.get('/robots.txt', (_request, response) => {
@@ -287,7 +314,7 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /kitchen',
     'Disallow: /t',
     'Disallow: /calendar',
-    'Sitemap: https://www.batmelech.ae/site/sitemap.xml',
+    'Sitemap: https://www.batmelech.ae/sitemap.xml',
   ].join('\n') + '\n');
 });
 

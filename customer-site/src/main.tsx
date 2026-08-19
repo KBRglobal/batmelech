@@ -9,7 +9,11 @@ import { SiteCatalogProvider } from './catalog-context'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename="/site">
+    <BrowserRouter
+      basename={
+        window.location.pathname === '/site' || window.location.pathname.startsWith('/site/') ? '/site' : '/'
+      }
+    >
       <SiteStatusProvider>
         <SiteCatalogProvider>
         <CartProvider>

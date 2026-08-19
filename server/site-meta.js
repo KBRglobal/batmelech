@@ -96,7 +96,7 @@ function parseSitePath(requestPath) {
 function localizedSiteUrl(locale, page) {
   const prefix = locale === 'he' ? '' : `/${locale}`;
   const suffix = page === '/' ? (locale === 'he' ? '/' : '') : page;
-  return `${SITE_ORIGIN}/site${prefix}${suffix}`;
+  return `${SITE_ORIGIN}${prefix}${suffix}`;
 }
 
 // Rewrites the head of the built index.html for one request path. Unknown

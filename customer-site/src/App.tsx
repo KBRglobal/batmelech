@@ -151,15 +151,15 @@ export default function App() {
       document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', meta.title)
       document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', meta.description)
     }
-    const canonicalUrl = `https://www.batmelech.ae/site${pathname === '/' ? '/' : pathname}`
+    const canonicalUrl = `https://www.batmelech.ae${pathname === '/' ? '/' : pathname}`
     document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl)
     document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl)
     // Every page announces its two siblings; Hebrew is the default.
     for (const alternate of ['he', 'en', 'fr'] as const) {
       const alternatePath = localizedHref(alternate, path)
-      upsertLinkTag('alternate', alternate, `https://www.batmelech.ae/site${alternatePath === '/' ? '/' : alternatePath}`)
+      upsertLinkTag('alternate', alternate, `https://www.batmelech.ae${alternatePath === '/' ? '/' : alternatePath}`)
     }
-    upsertLinkTag('alternate', 'x-default', `https://www.batmelech.ae/site${path === '/' ? '/' : path}`)
+    upsertLinkTag('alternate', 'x-default', `https://www.batmelech.ae${path === '/' ? '/' : path}`)
     document
       .querySelector('meta[name="robots"]')
       ?.setAttribute('content', path === '/checkout' ? 'noindex,nofollow' : 'index,follow,max-image-preview:large')
