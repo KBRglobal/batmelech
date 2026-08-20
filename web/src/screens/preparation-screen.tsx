@@ -239,15 +239,41 @@ function groupByItemName<T extends { itemName: string }>(details: readonly T[]):
   return map
 }
 
-// Native title attribute: no extra popover component, works on hover and
-// on mobile long-press, and never needs its own positioning/z-index logic.
-function customerTooltip(
-  entries: readonly { customerName: string; quantity: number; gift?: boolean }[] | undefined,
-): string | undefined {
-  if (!entries || entries.length === 0) return undefined
-  return entries
-    .map((entry) => `${entry.customerName || 'ללא שם'} ×${entry.quantity}${entry.gift ? ' (פינוק)' : ''}`)
-    .join('\n')
+// Hover has no equivalent on a phone, which is where this screen mostly
+// gets used — so "who ordered this" is a tap-to-open note, not a title
+// attribute. Dishes with no matching detail render as plain, unclickable text.
+function DishNameWithDetail({
+  name,
+  entries,
+  className,
+}: {
+  name: string
+  entries: readonly { customerName: string; quantity: number; gift?: boolean }[] | undefined
+  className: string
+}) {
+  const [open, setOpen] = useState(false)
+  if (!entries || entries.length === 0) return <span className={className}>{name}</span>
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`${className} text-right underline decoration-dotted underline-offset-4`}
+      >
+        {name}
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5">
+          {entries.map((entry, index) => (
+            <li key={index} className="text-[0.6875rem] font-bold text-muted-foreground">
+              {entry.customerName || 'ללא שם'} ×{entry.quantity}{entry.gift ? ' (פינוק)' : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 function NumberCategory({
@@ -281,14 +307,11 @@ function NumberCategory({
       </h3>
       <ul className="mt-4 divide-y divide-border">
         {entries.map(([name, quantity]) => (
-          <li key={name} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <span
-              className="min-w-0 flex-1 text-sm font-bold text-foreground"
-              title={customerTooltip(details?.get(name))}
-            >
-              {name}
-            </span>
-            <strong className="rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity}</strong>
+          <li key={name} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0 flex-1">
+              <DishNameWithDetail name={name} entries={details?.get(name)} className="text-sm font-bold text-foreground" />
+            </div>
+            <strong className="shrink-0 rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity}</strong>
             <CompletionControl
               serviceDate={serviceDate}
               category={category}
@@ -332,16 +355,16 @@ function SaladCategory({
       </h3>
       <ul className="mt-4 divide-y divide-border">
         {entries.map(([name, quantity]) => (
-          <li key={name} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <div className="min-w-0 flex-1" title={customerTooltip(details?.get(name))}>
-              <span className="text-sm font-bold text-foreground">{name}</span>
+          <li key={name} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0 flex-1">
+              <DishNameWithDetail name={name} entries={details?.get(name)} className="text-sm font-bold text-foreground" />
               {quantity.gift > 0 && (
                 <span className="mt-0.5 block text-[0.6875rem] font-bold text-muted-foreground">
                   {quantity.ordered} בהזמנה + {quantity.gift} פינוק
                 </span>
               )}
             </div>
-            <strong className="rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity.total}</strong>
+            <strong className="shrink-0 rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity.total}</strong>
             <CompletionControl
               serviceDate={serviceDate}
               category="salads"

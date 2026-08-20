@@ -137,11 +137,15 @@ describe('PreparationScreen', () => {
     expect(screen.getByText(/להתקשר בלובי/)).toBeTruthy()
     expect(screen.getByText(/אקסטרה אמיתית ×1 — לארוז בנפרד/)).toBeTruthy()
     expect(screen.getByText(/צהריים אמיתי ×1 — תוספת למנה ×2/)).toBeTruthy()
-    // Hovering a prep item reveals who ordered it.
-    expect(screen.getByText('דג אמיתי').getAttribute('title')).toBe('לקוחה אמיתית ×2')
-    const saladTooltip = screen.getByText('מטבוחה אמיתית').closest('div')?.getAttribute('title')
-    expect(saladTooltip).toContain('לקוחה אמיתית ×3')
-    expect(saladTooltip).toContain('לקוחה אמיתית ×1 (פינוק)')
+    // Tapping a prep item reveals who ordered it (no hover on a phone).
+    const fishButton = screen.getByRole('button', { name: 'דג אמיתי' })
+    expect(fishButton.getAttribute('aria-expanded')).toBe('false')
+    await userEvent.setup().click(fishButton)
+    expect(fishButton.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('לקוחה אמיתית ×2')).toBeTruthy()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'מטבוחה אמיתית' }))
+    expect(screen.getByText('לקוחה אמיתית ×3')).toBeTruthy()
+    expect(screen.getByText('לקוחה אמיתית ×1 (פינוק)')).toBeTruthy()
     // Every dish category — not just extras/lunch — shows up per customer below.
     expect(screen.getByText(/ראשונה · דג אמיתי ×2/)).toBeTruthy()
     expect(screen.getByText(/עיקרית · עיקרית אמיתית ×2/)).toBeTruthy()
