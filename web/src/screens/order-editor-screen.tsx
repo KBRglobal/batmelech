@@ -423,21 +423,22 @@ function OrderManagerPanel({
   const paidExtras = recognizedPaidExtras(review, menu)
 
   return (
-    <section aria-label="מנהל ההזמנה מוואטסאפ" className="space-y-4 rounded-[2rem] border border-primary/20 bg-secondary p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3 text-primary">
-          <LocalIcon name="ph:list-checks-bold" className="text-2xl" />
-          <div>
-            <h2 className="font-heading text-xl font-black">מנהל ההזמנה</h2>
-            <p className="mt-1 text-xs font-bold text-muted-foreground">ההזמנה כבר פתוחה לעריכה. עברי על מה שנבנה וסגרי את הדברים שדורשים טיפול.</p>
+    <section aria-label="מנהל ההזמנה מוואטסאפ" className="rounded-[2rem] border border-primary/20 bg-secondary p-5 shadow-sm sm:p-6">
+      <details className="space-y-4">
+        <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center gap-3 text-primary">
+            <LocalIcon name="ph:list-checks-bold" className="text-2xl" />
+            <div>
+              <h2 className="font-heading text-xl font-black">מנהל ההזמנה</h2>
+              <p className="mt-1 text-xs font-bold text-muted-foreground">ההזמנה כבר פתוחה לעריכה. עברי על מה שנבנה וסגרי את הדברים שדורשים טיפול.</p>
+            </div>
           </div>
-        </div>
-        {findings.length > 0 && (
-          <span className="rounded-full bg-card px-3 py-1 text-xs font-black text-primary">
-            {remaining === 0 ? 'כל הבירורים טופלו' : `${remaining} לבירור`}
-          </span>
-        )}
-      </div>
+          {findings.length > 0 && (
+            <span className="rounded-full bg-card px-3 py-1 text-xs font-black text-primary">
+              {remaining === 0 ? 'כל הבירורים טופלו' : `${remaining} לבירור`}
+            </span>
+          )}
+        </summary>
 
       {sourceMessage && (
         <details className="rounded-2xl border border-border bg-card p-4">
@@ -519,6 +520,7 @@ function OrderManagerPanel({
           </ul>
         </div>
       )}
+      </details>
     </section>
   )
 }
@@ -543,6 +545,7 @@ function ReplyDraftBox({
     | { readonly kind: 'ready'; readonly reply: string; readonly copied: boolean }
     | { readonly kind: 'error'; readonly message: string }
   >({ kind: 'idle' })
+  const detailsRef = useRef<HTMLDetailsElement>(null)
 
   const requestReply = async () => {
     setState({ kind: 'loading' })
@@ -594,24 +597,29 @@ function ReplyDraftBox({
 
   return (
     <section aria-label="טיוטת תשובה ללקוח" className="rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-primary">
-          <LocalIcon name="ph:chat-circle-text-bold" className="text-2xl" />
-          <div>
-            <h2 className="font-heading text-xl font-black">טיוטת תשובה ללקוח</h2>
-            <p className="mt-1 text-xs font-bold text-muted-foreground">מנוסחת בשפה של הלקוח, עם הסיכום, המחיר והשאלות על מה שחסר. את מעתיקה ושולחת בעצמך — המערכת לא שולחת כלום.</p>
+      <details ref={detailsRef}>
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center gap-3 text-primary">
+            <LocalIcon name="ph:chat-circle-text-bold" className="text-2xl" />
+            <div>
+              <h2 className="font-heading text-xl font-black">טיוטת תשובה ללקוח</h2>
+              <p className="mt-1 text-xs font-bold text-muted-foreground">מנוסחת בשפה של הלקוח, עם הסיכום, המחיר והשאלות על מה שחסר. את מעתיקה ושולחת בעצמך — המערכת לא שולחת כלום.</p>
+            </div>
           </div>
-        </div>
-        <button
-          type="button"
-          disabled={state.kind === 'loading'}
-          onClick={() => { void requestReply() }}
-          className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
-        >
-          <LocalIcon name="ph:magic-wand-bold" className={state.kind === 'loading' ? 'animate-spin text-lg' : 'text-lg'} />
-          <span>{state.kind === 'loading' ? 'מנסחת תשובה' : state.kind === 'ready' ? 'ניסוח מחדש' : 'ניסוח תשובה'}</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            disabled={state.kind === 'loading'}
+            onClick={(event) => {
+              event.preventDefault()
+              if (detailsRef.current) detailsRef.current.open = true
+              void requestReply()
+            }}
+            className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
+          >
+            <LocalIcon name="ph:magic-wand-bold" className={state.kind === 'loading' ? 'animate-spin text-lg' : 'text-lg'} />
+            <span>{state.kind === 'loading' ? 'מנסחת תשובה' : state.kind === 'ready' ? 'ניסוח מחדש' : 'ניסוח תשובה'}</span>
+          </button>
+        </summary>
       {state.kind === 'error' && <p role="alert" className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm font-black text-destructive">{state.message}</p>}
       {state.kind === 'ready' && (
         <div className="mt-4 space-y-3">
@@ -630,6 +638,7 @@ function ReplyDraftBox({
           </button>
         </div>
       )}
+      </details>
     </section>
   )
 }
@@ -728,7 +737,7 @@ function formatDeliveryTimestamp(value: number): string {
 function DeliveryProofSection({ order }: { readonly order: LegacyOrder | null }) {
   const proof = order === null ? null : deliveryProofSummary(order)
   return (
-    <Section id="proof" title="אישור מסירה">
+    <Section id="proof" title="אישור מסירה" collapsible>
       {proof === null || !proof.present ? (
         <p className="text-sm font-bold text-muted-foreground">אין עדיין אישור מסירה</p>
       ) : (
@@ -806,7 +815,7 @@ function DeleteOrderSection({
 }) {
   const [armed, setArmed] = useState(false)
   return (
-    <Section id="delete" title="מחיקת ההזמנה">
+    <Section id="delete" title="מחיקת ההזמנה" collapsible>
       <p className="text-xs font-bold text-muted-foreground">
         מחיקה מסירה את ההזמנה מכל המסכים, מהכמויות ומרשימת הקניות. אפשר לשחזר דרך היסטוריית השמירות בהגדרות.
       </p>
@@ -886,7 +895,7 @@ function PlataSection({
   }
 
   return (
-    <Section id="plata" title="פלטה ופיקדון">
+    <Section id="plata" title="פלטה ופיקדון" collapsible>
       {onSave === null ? (
         <p className="text-sm font-bold text-muted-foreground">אפשר לרשום פלטה אחרי ששומרים את ההזמנה.</p>
       ) : (
@@ -1502,20 +1511,22 @@ function OrderEditorContent({
           }
           return (
             <section aria-label="השינויים מהודעת ההמשך" className="rounded-[2rem] border border-primary/20 bg-secondary p-5 shadow-sm sm:p-6">
-              <div className="flex items-center gap-3 text-primary">
-                <LocalIcon name="ph:arrows-clockwise-bold" className="text-2xl" />
-                <h2 className="font-heading text-xl font-black">השינויים המוצעים על ההזמנה</h2>
-              </div>
-              {deltaLines.length > 0 ? (
-                <ul className="mt-4 space-y-2">
-                  {deltaLines.map((line, index) => (
-                    <li key={index} className="rounded-2xl border border-border bg-card p-3 text-sm font-black text-primary">{line}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 text-sm font-bold text-muted-foreground">לא זוהה שינוי לעומת ההזמנה השמורה — כדאי לבדוק את ההודעה ידנית.</p>
-              )}
-              <p className="mt-3 text-xs font-bold text-muted-foreground">שום דבר לא נשמר עד לחיצה על שמירת השינויים למטה.</p>
+              <details>
+                <summary className="flex cursor-pointer list-none items-center gap-3 text-primary [&::-webkit-details-marker]:hidden">
+                  <LocalIcon name="ph:arrows-clockwise-bold" className="text-2xl" />
+                  <h2 className="font-heading text-xl font-black">השינויים המוצעים על ההזמנה</h2>
+                </summary>
+                {deltaLines.length > 0 ? (
+                  <ul className="mt-4 space-y-2">
+                    {deltaLines.map((line, index) => (
+                      <li key={index} className="rounded-2xl border border-border bg-card p-3 text-sm font-black text-primary">{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm font-bold text-muted-foreground">לא זוהה שינוי לעומת ההזמנה השמורה — כדאי לבדוק את ההודעה ידנית.</p>
+                )}
+                <p className="mt-3 text-xs font-bold text-muted-foreground">שום דבר לא נשמר עד לחיצה על שמירת השינויים למטה.</p>
+              </details>
             </section>
           )
         })()}
