@@ -698,7 +698,7 @@ function Section({
 
   if (collapsible) {
     return (
-      <details id={`order-${id}`} open className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
+      <details id={`order-${id}`} className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{header}</summary>
         <div className="space-y-5 pt-1">{children}</div>
       </details>

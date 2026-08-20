@@ -244,9 +244,9 @@ describe('buildPreparationPlan', () => {
       extras: { Delivery: 3 },
       custom: { 'Chef special': 4 },
       lunch: {
-        'lunch-couscous': 1,
-        'lunch-couscous-mafrum': 2,
-        'lunch-plate-family': 3,
+        'Couscous special': 1,
+        'Mafrum add-on': 2,
+        'Schnitzel plate (Family)': 3,
       },
     })
 

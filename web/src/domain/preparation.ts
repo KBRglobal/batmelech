@@ -1027,7 +1027,7 @@ function addLunch(
       )
     }
 
-    addNumber(group.categories.lunch, selection.id, quantity, context, path)
+    addNumber(group.categories.lunch, selection.name, quantity, context, path)
     addDemand(group, 'lunch', selection, quantity, context, path)
     if (addonQuantity > 0 && item.addon !== undefined) {
       const addonSelection = {
@@ -1035,7 +1035,7 @@ function addLunch(
         name: item.addon.name,
         procurement: item.addon.procurement,
       }
-      addNumber(group.categories.lunch, addonSelection.id, addonQuantity, context, `${path}.addon`)
+      addNumber(group.categories.lunch, addonSelection.name, addonQuantity, context, `${path}.addon`)
       addDemand(group, 'lunch', addonSelection, addonQuantity, context, `${path}.addon`)
     }
 
