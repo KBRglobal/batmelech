@@ -410,6 +410,45 @@ describe('OrderEditorScreen', () => {
     expect(screen.getByLabelText('כמות מנת מפרום ביתי · $20.00').textContent).toBe('0')
   })
 
+  it('keeps each lunch plate under its own bread choice and note, not one shared note for the whole line', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        ok: true,
+        idempotent: false,
+        revision: 2,
+        ts: 2,
+        hash: 'b'.repeat(64),
+        data: { orders: [{ id: 'order-plates-1', name: 'לקוחה' }] },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+
+    await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
+    const rollLabel = 'בגט/חלת שניצל ישראלי'
+    await user.click(screen.getByRole('button', { name: `הוספה ל${rollLabel}` }))
+    await user.click(screen.getByRole('button', { name: `הוספה ל${rollLabel}` }))
+
+    const plate1 = screen.getByText('מנה 1 מתוך 2').closest('div')!
+    const plate2 = screen.getByText('מנה 2 מתוך 2').closest('div')!
+    await user.click(within(plate1).getByRole('radio', { name: /בבגט/ }))
+    await user.type(within(plate1).getByLabelText(/הערה למנה 1 מתוך 2/), 'בלי חרדל')
+    await user.click(within(plate2).getByRole('radio', { name: /בחלה/ }))
+    await user.type(within(plate2).getByLabelText(/הערה למנה 2 מתוך 2/), 'לחתוך לשני חצאים')
+
+    await user.click(screen.getByRole('button', { name: 'להשתמש במחיר המוצע' }))
+    await user.click(screen.getByRole('button', { name: 'שמירת ההזמנה' }))
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+    const [, request] = fetchSpy.mock.calls[0]!
+    const command = JSON.parse(String(request?.body)) as { localState: LegacyStore }
+    const saved = command.localState.orders[0]!.lunch as Record<string, { plates: readonly { variantKey: string; note: string }[] }>
+    expect(saved['schnitzel-roll'].plates).toEqual([
+      { variantKey: 'baguette', sides: {}, note: 'בלי חרדל' },
+      { variantKey: 'challah', sides: {}, note: 'לחתוך לשני חצאים' },
+    ])
+  })
+
   it('turns the untouched default into lunch-only and requires explicit approval for a mixed order', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()

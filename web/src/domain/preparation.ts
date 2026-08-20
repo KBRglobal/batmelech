@@ -151,6 +151,7 @@ export interface PreparationDishDetail extends CustomerSpecificDetail {
   readonly itemName: string
   readonly quantity: number
   readonly gift: boolean
+  readonly note: string
 }
 
 export interface PreparationLunchSide {
@@ -166,6 +167,7 @@ export interface PreparationLunchDetail extends CustomerSpecificDetail {
   readonly variantKey?: string
   readonly sides: readonly PreparationLunchSide[]
   readonly addonQuantity: number
+  readonly note: string
 }
 
 export interface PreparationHeatNote extends CustomerSpecificDetail {
@@ -797,10 +799,12 @@ function addStandardCategory(
   group: MutableDateGroup,
   category: (typeof STANDARD_CATEGORIES)[number],
   source: unknown,
+  notesSource: unknown,
   context: OrderContext,
   catalog: CatalogIndex,
 ): void {
   if (!isRecord(source)) return
+  const notes = isRecord(notesSource) ? notesSource : {}
 
   for (const [rawName, rawQuantity] of Object.entries(source)) {
     const itemName = rawName.trim()
@@ -808,7 +812,7 @@ function addStandardCategory(
     const quantity = readCount(rawQuantity, context, path, false)
     if (itemName === '' || quantity === null || quantity === 0) continue
     if (!addNumber(group.categories[category], itemName, quantity, context, path)) continue
-    group.dishDetails.push({ ...detailBase(context), category, itemName, quantity, gift: false })
+    group.dishDetails.push({ ...detailBase(context), category, itemName, quantity, gift: false, note: text(notes[itemName]) })
     const selection = selectionFor(catalog, category, itemName, context, path)
     if (selection !== null) addDemand(group, category, selection, quantity, context, path)
   }
@@ -839,8 +843,9 @@ function addSalads(
     const orderTotal = checkedCountAdd(ordered, gift, context, `${path}.total`)
     if (orderTotal === null) continue
     group.categories.salads.set(itemName, { ordered: nextOrdered, gift: nextGift })
-    if (ordered > 0) group.dishDetails.push({ ...detailBase(context), category: 'salads', itemName, quantity: ordered, gift: false })
-    if (gift > 0) group.dishDetails.push({ ...detailBase(context), category: 'salads', itemName, quantity: gift, gift: true })
+    const saladNote = text(isRecord(rawValue) ? rawValue.note : undefined)
+    if (ordered > 0) group.dishDetails.push({ ...detailBase(context), category: 'salads', itemName, quantity: ordered, gift: false, note: saladNote })
+    if (gift > 0) group.dishDetails.push({ ...detailBase(context), category: 'salads', itemName, quantity: gift, gift: true, note: saladNote })
 
     const selection = selectionFor(catalog, 'salads', itemName, context, path)
     if (selection !== null) {
@@ -976,23 +981,44 @@ function addLunch(
     let selection = item.selection
     let variantKey: string | undefined
     let itemName = item.name
+    // Different plates of the same lunch line can each be a different bread
+    // (baguette vs. challah) with their own note — a single combined line
+    // would silently collapse "1 baguette, 1 challah" into "2 baguette".
+    // Only trusted when the plates array actually accounts for every unit;
+    // otherwise this falls back to the single pooled line below.
+    let plateGroups: readonly { readonly variantKey: string; readonly note: string; readonly count: number }[] | null = null
     if (item.variants !== undefined) {
-      const requestedVariant = nonBlankText(rawValue.v)
-      const variant = item.variants.find((candidate) => candidate.key === requestedVariant) ?? item.variants[0]
-      if (requestedVariant !== '' && variant.key !== requestedVariant) {
-        pushWarning(
-          context.warnings,
-          context,
-          'LUNCH_VARIANT_FALLBACK',
-          `${path}.variant`,
-          `${path}.variant ${requestedVariant} is unknown; using ${variant.key}`,
-        )
+      const rawPlates = Array.isArray(rawValue.plates) ? rawValue.plates : null
+      if (rawPlates !== null && rawPlates.length === quantity && rawPlates.every(isRecord)) {
+        const grouped = new Map<string, { variantKey: string; note: string; count: number }>()
+        for (const rawPlate of rawPlates as readonly Record<string, unknown>[]) {
+          const requestedVariant = nonBlankText(rawPlate.variantKey ?? rawPlate.v)
+          const variant = item.variants.find((candidate) => candidate.key === requestedVariant) ?? item.variants[0]
+          const note = text(rawPlate.note)
+          const groupKey = `${variant.key}::${note}`
+          const existing = grouped.get(groupKey)
+          if (existing) existing.count += 1
+          else grouped.set(groupKey, { variantKey: variant.key, note, count: 1 })
+        }
+        plateGroups = [...grouped.values()]
+      } else {
+        const requestedVariant = nonBlankText(rawValue.v)
+        const variant = item.variants.find((candidate) => candidate.key === requestedVariant) ?? item.variants[0]
+        if (requestedVariant !== '' && variant.key !== requestedVariant) {
+          pushWarning(
+            context.warnings,
+            context,
+            'LUNCH_VARIANT_FALLBACK',
+            `${path}.variant`,
+            `${path}.variant ${requestedVariant} is unknown; using ${variant.key}`,
+          )
+        }
+        variantKey = variant.key
+        itemName = `${item.name} (${variant.name})`
+        selection = { id: variant.itemId, name: itemName, procurement: variant.procurement }
       }
-      variantKey = variant.key
-      itemName = `${item.name} (${variant.name})`
-      selection = { id: variant.itemId, name: itemName, procurement: variant.procurement }
     }
-    if (selection === undefined) continue
+    if (selection === undefined && plateGroups === null) continue
 
     const sides: PreparationLunchSide[] = []
     if (rawValue.sides !== undefined && !isRecord(rawValue.sides)) {
@@ -1039,8 +1065,43 @@ function addLunch(
       )
     }
 
-    addNumber(group.categories.lunch, selection.name, quantity, context, path)
-    addDemand(group, 'lunch', selection, quantity, context, path)
+    const sortedSides = sides.sort((left, right) => compareText(left.itemName, right.itemName))
+
+    if (plateGroups !== null) {
+      for (const plateGroup of plateGroups) {
+        const variant = item.variants!.find((candidate) => candidate.key === plateGroup.variantKey)!
+        const groupItemName = `${item.name} (${variant.name})`
+        const groupSelection = { id: variant.itemId, name: groupItemName, procurement: variant.procurement }
+        addNumber(group.categories.lunch, groupSelection.name, plateGroup.count, context, path)
+        addDemand(group, 'lunch', groupSelection, plateGroup.count, context, path)
+        group.lunchDetails.push({
+          ...detailBase(context),
+          itemKey: item.key,
+          itemName: groupItemName,
+          preparationKey: groupSelection.id,
+          quantity: plateGroup.count,
+          variantKey: plateGroup.variantKey,
+          sides: sortedSides,
+          addonQuantity: 0,
+          note: plateGroup.note,
+        })
+      }
+    } else if (selection !== undefined) {
+      addNumber(group.categories.lunch, selection.name, quantity, context, path)
+      addDemand(group, 'lunch', selection, quantity, context, path)
+      group.lunchDetails.push({
+        ...detailBase(context),
+        itemKey: item.key,
+        itemName,
+        preparationKey: selection.id,
+        quantity,
+        ...(variantKey === undefined ? {} : { variantKey }),
+        sides: sortedSides,
+        addonQuantity: item.addon === undefined ? 0 : addonQuantity,
+        note: text(rawValue.note),
+      })
+    }
+
     if (addonQuantity > 0 && item.addon !== undefined) {
       const addonSelection = {
         id: item.addon.itemId,
@@ -1050,17 +1111,6 @@ function addLunch(
       addNumber(group.categories.lunch, addonSelection.name, addonQuantity, context, `${path}.addon`)
       addDemand(group, 'lunch', addonSelection, addonQuantity, context, `${path}.addon`)
     }
-
-    group.lunchDetails.push({
-      ...detailBase(context),
-      itemKey: item.key,
-      itemName,
-      preparationKey: selection.id,
-      quantity,
-      ...(variantKey === undefined ? {} : { variantKey }),
-      sides: sides.sort((left, right) => compareText(left.itemName, right.itemName)),
-      addonQuantity: item.addon === undefined ? 0 : addonQuantity,
-    })
   }
 }
 
@@ -1408,9 +1458,10 @@ export function buildPreparationPlan(
     }
 
     addSalads(group, order.salads, context, catalogIndex)
-    for (const category of STANDARD_CATEGORIES) {
-      addStandardCategory(group, category, order[category], context, catalogIndex)
-    }
+    addStandardCategory(group, 'firsts', order.firsts, order.firstsNotes, context, catalogIndex)
+    addStandardCategory(group, 'mains', order.mains, order.mainsNotes, context, catalogIndex)
+    addStandardCategory(group, 'sides', order.sides, order.sidesNotes, context, catalogIndex)
+    addStandardCategory(group, 'desserts', order.desserts, order.dessertsNotes, context, catalogIndex)
     addExtras(group, order, context, catalogIndex)
     addCustomItems(group, order, context, catalogIndex)
     addLunch(group, order, context, catalogIndex)

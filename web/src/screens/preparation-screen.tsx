@@ -248,7 +248,7 @@ function DishNameWithDetail({
   className,
 }: {
   name: string
-  entries: readonly { customerName: string; quantity: number; gift?: boolean }[] | undefined
+  entries: readonly { customerName: string; quantity: number; gift?: boolean; note?: string }[] | undefined
   className: string
 }) {
   const [open, setOpen] = useState(false)
@@ -267,7 +267,7 @@ function DishNameWithDetail({
         <ul className="mt-1 space-y-0.5">
           {entries.map((entry, index) => (
             <li key={index} className="text-[0.6875rem] font-bold text-muted-foreground">
-              {entry.customerName || 'ללא שם'} ×{entry.quantity}{entry.gift ? ' (פינוק)' : ''}
+              {entry.customerName || 'ללא שם'} ×{entry.quantity}{entry.gift ? ' (פינוק)' : ''}{entry.note ? ` — ${entry.note}` : ''}
             </li>
           ))}
         </ul>
@@ -290,7 +290,7 @@ function NumberCategory({
   title: string
   category: Exclude<PreparationCompletionCategory, 'salads'>
   values: Readonly<Record<string, number>>
-  details?: ReadonlyMap<string, readonly { customerName: string; quantity: number }[]>
+  details?: ReadonlyMap<string, readonly { customerName: string; quantity: number; note?: string }[]>
   serviceDate: string
   store: Readonly<LegacyStore>
   onToggle?: ToggleCompletion
@@ -338,7 +338,7 @@ function SaladCategory({
   saveBlocked,
 }: {
   values: PreparationCategoryGroups['salads']
-  details?: ReadonlyMap<string, readonly { customerName: string; quantity: number; gift?: boolean }[]>
+  details?: ReadonlyMap<string, readonly { customerName: string; quantity: number; gift?: boolean; note?: string }[]>
   serviceDate: string
   store: Readonly<LegacyStore>
   onToggle?: ToggleCompletion
@@ -418,7 +418,7 @@ function Notes({ group }: { group: PreparationDateGroup }) {
         {group.dishDetails.map((detail, index) => (
           <li key={`dish-${String(detail.orderId)}-${detail.category}-${detail.itemName}-${detail.gift}-${index}`} className="rounded-2xl bg-secondary/60 p-4 text-sm leading-6">
             <strong className="text-primary">{detail.customerName || 'ללא שם'}:</strong>{' '}
-            {DISH_CATEGORY_LABELS[detail.category]} · {detail.itemName} ×{detail.quantity}{detail.gift ? ' — פינוק' : ''}
+            {DISH_CATEGORY_LABELS[detail.category]} · {detail.itemName} ×{detail.quantity}{detail.gift ? ' — פינוק' : ''}{detail.note ? ` — ${detail.note}` : ''}
           </li>
         ))}
         {group.extraDetails.map((detail, index) => (
@@ -435,6 +435,7 @@ function Notes({ group }: { group: PreparationDateGroup }) {
               ? ` — ${detail.sides.map((side) => `${side.itemName} ×${side.quantity}`).join(', ')}`
               : ''}
             {detail.addonQuantity > 0 ? ` — תוספת למנה ×${detail.addonQuantity}` : ''}
+            {detail.note ? ` — ${detail.note}` : ''}
           </li>
         ))}
       </ul>

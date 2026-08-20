@@ -1925,7 +1925,7 @@ function OrderEditorContent({
               const fallbackVariantKey = selection.variantKey || item.variants[0]?.key || ''
               const plates = item.variants.length > 0 && selection.quantity > 0
                 ? readLunchPlates(selection, item) ?? resizeLunchPlates(
-                    [{ variantKey: fallbackVariantKey, sides: selection.sides }],
+                    [{ variantKey: fallbackVariantKey, sides: selection.sides, note: selection.note }],
                     selection.quantity,
                     fallbackVariantKey,
                   )
@@ -1999,6 +1999,13 @@ function OrderEditorContent({
                               ))}
                             </div>
                           )}
+                          <input
+                            aria-label={plates.length > 1 ? `הערה למנה ${plateIndex + 1} מתוך ${plates.length} · ${item.name}` : `הערה ל${item.name}`}
+                            value={plate.note}
+                            onChange={(event) => setPlate(plateIndex, { ...plate, note: event.currentTarget.value })}
+                            placeholder="הערה"
+                            className={`${inputClassName} mt-3`}
+                          />
                         </div>
                       ))}
                     </div>
@@ -2006,7 +2013,7 @@ function OrderEditorContent({
                   {selection.quantity > 0 && item.addon && (
                     <div className="mt-4"><QuantityStepper label={`${item.addon.name} · ${formatUsdMinorUnits(item.addon.priceMinorUnits)}`} value={selection.addonQuantity} onChange={(addonQuantity) => updateLunch(item.key, { addonQuantity })} /></div>
                   )}
-                  {selection.quantity > 0 && (
+                  {selection.quantity > 0 && plates === null && (
                     <input
                       aria-label={`הערה ל${item.name}`}
                       value={selection.note}

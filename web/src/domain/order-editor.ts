@@ -390,15 +390,17 @@ export interface LunchDraftSelection {
 }
 
 /**
- * One diner's plate inside a lunch selection: its own variant and its own
- * sides. Stored as `plates` on the persisted selection, while the legacy
- * `v`/`sides` fields keep carrying the first plate's variant and the merged
- * sides so preparation summaries, bons, and WhatsApp text stay correct
- * without knowing plates exist.
+ * One diner's plate inside a lunch selection: its own variant, its own
+ * sides, and its own note (e.g. "no sauce"). Stored as `plates` on the
+ * persisted selection and read directly by preparation.ts so a mixed
+ * baguette/challah order never collapses into one wrong line. The legacy
+ * `v`/`sides` fields still carry the first plate's variant and the merged
+ * sides, for any older reader that doesn't know plates exist.
  */
 export interface LunchPlateDraft {
   readonly variantKey: string
   readonly sides: Readonly<Record<string, number>>
+  readonly note: string
 }
 
 export interface OrderDraft extends Record<string, unknown> {
@@ -702,6 +704,7 @@ export function readLunchPlates(
     plates.push({
       variantKey: text(value.variantKey ?? value.v) || item.variants[0]!.key,
       sides: normalizeQuantityMap(value.sides),
+      note: text(value.note),
     })
   }
   return plates
@@ -732,6 +735,7 @@ export function resizeLunchPlates(
       existing ?? {
         variantKey: plates?.[plates.length - 1]?.variantKey ?? defaultVariantKey,
         sides: {},
+        note: '',
       },
     )
   }

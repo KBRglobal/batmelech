@@ -252,19 +252,19 @@ describe('buildPreparationPlan', () => {
 
     expect(group.dishDetails).toHaveLength(13)
     expect(group.dishDetails).toEqual(expect.arrayContaining([
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'firsts', itemName: 'Fish', quantity: 2, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'mains', itemName: 'Chicken', quantity: 1, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'sides', itemName: 'Rice', quantity: 1, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'desserts', itemName: 'Souffle', quantity: 2, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Matbucha', quantity: 2, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Matbucha', quantity: 1, gift: true },
-      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Tahini', quantity: 2, gift: true },
-      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'firsts', itemName: 'Fish', quantity: 1, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'mains', itemName: 'Chicken', quantity: 2, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'sides', itemName: 'Rice', quantity: 2, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'desserts', itemName: 'Souffle', quantity: 1, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'salads', itemName: 'Matbucha', quantity: 1, gift: false },
-      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'salads', itemName: 'Matbucha', quantity: 2, gift: true },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'firsts', itemName: 'Fish', quantity: 2, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'mains', itemName: 'Chicken', quantity: 1, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'sides', itemName: 'Rice', quantity: 1, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'desserts', itemName: 'Souffle', quantity: 2, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Matbucha', quantity: 2, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Matbucha', quantity: 1, gift: true, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Tahini', quantity: 2, gift: true, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'firsts', itemName: 'Fish', quantity: 1, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'mains', itemName: 'Chicken', quantity: 2, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'sides', itemName: 'Rice', quantity: 2, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'desserts', itemName: 'Souffle', quantity: 1, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'salads', itemName: 'Matbucha', quantity: 1, gift: false, note: '' },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'salads', itemName: 'Matbucha', quantity: 2, gift: true, note: '' },
     ]))
 
     expect(group.extraDetails).toEqual([
@@ -323,6 +323,7 @@ describe('buildPreparationPlan', () => {
         quantity: 1,
         sides: [],
         addonQuantity: 2,
+        note: '',
       },
       {
         serviceDate: '2026-08-15',
@@ -339,6 +340,7 @@ describe('buildPreparationPlan', () => {
           { itemName: 'Rice', quantity: 3 },
         ],
         addonQuantity: 0,
+        note: '',
       },
       {
         serviceDate: '2026-08-15',
@@ -352,6 +354,7 @@ describe('buildPreparationPlan', () => {
         variantKey: 'family',
         sides: [{ itemName: 'Rice', quantity: 1 }],
         addonQuantity: 0,
+        note: '',
       },
     ])
     expect(group.heatNotes[0]).toMatchObject({
@@ -395,6 +398,95 @@ describe('buildPreparationPlan', () => {
       orderedQuantity: 3,
       giftQuantity: 3,
     })
+  })
+
+  it('keeps each lunch plate under its own variant and note instead of collapsing them into one pooled line', () => {
+    const orders: LegacyOrder[] = [{
+      id: 'plates-1',
+      date: '2026-08-20',
+      name: 'Dana',
+      group: 'dana-group',
+      lunch: {
+        'schnitzel-roll': {
+          q: '3',
+          plates: [
+            { v: 'baguette', sides: {}, note: '' },
+            { v: 'baguette', sides: {}, note: '' },
+            { v: 'challah', sides: {}, note: 'לחתוך לשני חצאים' },
+          ],
+        },
+      },
+    }]
+
+    const result = buildPreparationPlan(orders, CATALOG)
+    const group = dateGroup(result, '2026-08-20')
+
+    expect(result.complete).toBe(true)
+    expect(group.categories.lunch).toEqual({
+      'Schnitzel roll (Baguette)': 2,
+      'Schnitzel roll (Challah)': 1,
+    })
+    expect(group.lunchDetails).toEqual([
+      {
+        serviceDate: '2026-08-20',
+        orderId: 'plates-1',
+        orderGroup: 'dana-group',
+        customerName: 'Dana',
+        itemKey: 'schnitzel-roll',
+        itemName: 'Schnitzel roll (Baguette)',
+        preparationKey: 'lunch-roll-baguette',
+        quantity: 2,
+        variantKey: 'baguette',
+        sides: [],
+        addonQuantity: 0,
+        note: '',
+      },
+      {
+        serviceDate: '2026-08-20',
+        orderId: 'plates-1',
+        orderGroup: 'dana-group',
+        customerName: 'Dana',
+        itemKey: 'schnitzel-roll',
+        itemName: 'Schnitzel roll (Challah)',
+        preparationKey: 'lunch-roll-challah',
+        quantity: 1,
+        variantKey: 'challah',
+        sides: [],
+        addonQuantity: 0,
+        note: 'לחתוך לשני חצאים',
+      },
+    ])
+  })
+
+  it('carries a per-dish note into dishDetails for salads, firsts, mains, sides, and desserts', () => {
+    const orders: LegacyOrder[] = [{
+      id: 'noted-1',
+      date: '2026-08-20',
+      name: 'Nora',
+      salads: { Matbucha: { o: '1', note: 'קלוי חזק' } },
+      firsts: { Fish: '1' },
+      firstsNotes: { Fish: 'בלי עצמות' },
+      mains: { Chicken: '1' },
+      mainsNotes: { Chicken: 'בלי רוטב' },
+      sides: { Rice: '1' },
+      sidesNotes: { Rice: 'חם מאוד' },
+      desserts: { Souffle: '1' },
+      dessertsNotes: { Souffle: 'בלי אגוזים' },
+    }]
+
+    const result = buildPreparationPlan(orders, CATALOG)
+    const group = dateGroup(result, '2026-08-20')
+
+    expect(result.complete).toBe(true)
+    expect(group.dishDetails.map(({ category, itemName, note }) => ({ category, itemName, note }))).toEqual(
+      expect.arrayContaining([
+        { category: 'salads', itemName: 'Matbucha', note: 'קלוי חזק' },
+        { category: 'firsts', itemName: 'Fish', note: 'בלי עצמות' },
+        { category: 'mains', itemName: 'Chicken', note: 'בלי רוטב' },
+        { category: 'sides', itemName: 'Rice', note: 'חם מאוד' },
+        { category: 'desserts', itemName: 'Souffle', note: 'בלי אגוזים' },
+      ]),
+    )
   })
 
   it('uses the catalog first variant for empty or unknown lunch variants and validates nested sides and add-ons', () => {
