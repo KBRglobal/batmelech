@@ -1035,22 +1035,38 @@ function QuantityStepper({
 function QuantityCategory({
   names,
   quantities,
+  notes,
   outOfStock,
   update,
+  updateNote,
 }: {
   readonly names: readonly string[]
   readonly quantities: Readonly<Record<string, number>>
+  readonly notes?: Readonly<Record<string, string>>
   readonly outOfStock: ReadonlySet<string>
   readonly update: (name: string, quantity: number) => void
+  readonly updateNote?: (name: string, note: string) => void
 }) {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {names.map((name) => (
-        <div key={name} className={outOfStock.has(name) ? 'rounded-2xl bg-muted/50 opacity-70' : ''}>
-          <QuantityStepper label={name} value={quantities[name] ?? 0} onChange={(quantity) => update(name, quantity)} />
-          {outOfStock.has(name) && <p className="px-3 pb-2 text-xs font-black text-destructive">אזל מהמלאי — הבחירה עדיין פתוחה</p>}
-        </div>
-      ))}
+      {names.map((name) => {
+        const quantity = quantities[name] ?? 0
+        return (
+          <div key={name} className={outOfStock.has(name) ? 'rounded-2xl bg-muted/50 opacity-70' : ''}>
+            <QuantityStepper label={name} value={quantity} onChange={(nextQuantity) => update(name, nextQuantity)} />
+            {outOfStock.has(name) && <p className="px-3 pb-2 text-xs font-black text-destructive">אזל מהמלאי — הבחירה עדיין פתוחה</p>}
+            {updateNote && quantity > 0 && (
+              <input
+                aria-label={`הערה ל${name}`}
+                value={notes?.[name] ?? ''}
+                onChange={(event) => updateNote(name, event.currentTarget.value)}
+                placeholder="הערה"
+                className={`${inputClassName} mt-2`}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1069,11 +1085,22 @@ function updateQuantityRecord(
 function updateSaladRecord(
   record: OrderDraft['salads'],
   name: string,
-  selection: { readonly ordered: number; readonly gift: number },
+  selection: { readonly ordered: number; readonly gift: number; readonly note: string },
 ): OrderDraft['salads'] {
   const next = { ...record }
-  if (selection.ordered === 0 && selection.gift === 0) delete next[name]
+  if (selection.ordered === 0 && selection.gift === 0 && selection.note.trim().length === 0) delete next[name]
   else next[name] = selection
+  return next
+}
+
+function updateNoteRecord(
+  record: Readonly<Record<string, string>>,
+  name: string,
+  note: string,
+): Record<string, string> {
+  const next = { ...record }
+  if (note.trim().length === 0) delete next[name]
+  else next[name] = note
   return next
 }
 
@@ -1324,14 +1351,23 @@ function OrderEditorContent({
 
   const updateSalad = (
     name: string,
-    selection: { readonly ordered: number; readonly gift: number },
+    selection: { readonly ordered: number; readonly gift: number; readonly note: string },
   ) => {
     markShabbatSelectionChanged()
     patch({ salads: updateSaladRecord(draft.salads, name, selection) })
   }
 
+  const updateCategoryNote = (
+    key: 'firsts' | 'mains' | 'sides' | 'desserts',
+    name: string,
+    note: string,
+  ) => {
+    const notesKey = `${key}Notes` as const
+    patch({ [notesKey]: updateNoteRecord(draft[notesKey], name, note) })
+  }
+
   const updateLunch = (key: string, next: Partial<LunchDraftSelection>) => {
-    const current = draft.lunch[key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
+    const current = draft.lunch[key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0, note: '' }
     const merged = { ...current, ...next }
     const updated = merged.quantity === 0
       ? { ...merged, sides: {}, addonQuantity: 0 }
@@ -1819,7 +1855,7 @@ function OrderEditorContent({
           <p className="text-xs font-bold text-muted-foreground">עמודת פינוק לא מקטינה את הזכאות ולא מחויבת.</p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {menu.salads.map((name) => {
-              const selection = draft.salads[name] ?? { ordered: 0, gift: 0 }
+              const selection = draft.salads[name] ?? { ordered: 0, gift: 0, note: '' }
               return (
                 <div key={name} className={`rounded-2xl border border-border bg-background/60 p-3 ${outOfStock.has(name) ? 'opacity-70' : ''}`}>
                   <p className="mb-3 text-sm font-black text-primary">{name}</p>
@@ -1828,6 +1864,15 @@ function OrderEditorContent({
                     <div><span className="mb-1 block text-center text-[0.65rem] font-black text-muted-foreground">הוזמן</span><QuantityStepper compact label={`${name} הוזמן`} value={selection.ordered} onChange={(ordered) => updateSalad(name, { ...selection, ordered })} /></div>
                     <div><span className="mb-1 block text-center text-[0.65rem] font-black text-accent-foreground">פינוק</span><QuantityStepper compact label={`${name} פינוק`} value={selection.gift} onChange={(gift) => updateSalad(name, { ...selection, gift })} /></div>
                   </div>
+                  {(selection.ordered > 0 || selection.gift > 0) && (
+                    <input
+                      aria-label={`הערה ל${name}`}
+                      value={selection.note}
+                      onChange={(event) => updateSalad(name, { ...selection, note: event.currentTarget.value })}
+                      placeholder="הערה"
+                      className={`${inputClassName} mt-2`}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -1838,7 +1883,7 @@ function OrderEditorContent({
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-bold leading-6 text-amber-900">
             בכל זוגית כלולות שתי יחידות פילה. מנת קציצות דגים שווה לשתי יחידות. כל יחידה מעבר לכלול מחויבת ב־30$.
           </div>
-          <QuantityCategory names={menu.firsts} quantities={draft.firsts} outOfStock={outOfStock} update={(name, quantity) => updateCategory('firsts', name, quantity)} />
+          <QuantityCategory names={menu.firsts} quantities={draft.firsts} notes={draft.firstsNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('firsts', name, quantity)} updateNote={(name, note) => updateCategoryNote('firsts', name, note)} />
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <Field label="חריפות">
               <select aria-label="חריפות" value={draft.heat} onChange={(event) => patch({ heat: event.currentTarget.value })} className={inputClassName}>{HEAT_OPTIONS.map((value) => <option key={value} value={value}>{value || '— ללא בחירה —'}</option>)}</select>
@@ -1850,22 +1895,22 @@ function OrderEditorContent({
         </Section>
 
         <Section id="mains" title="עיקריות" summary={`${countRecord(draft.mains)} נבחרו`} collapsible>
-          <QuantityCategory names={menu.mains} quantities={draft.mains} outOfStock={outOfStock} update={(name, quantity) => updateCategory('mains', name, quantity)} />
+          <QuantityCategory names={menu.mains} quantities={draft.mains} notes={draft.mainsNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('mains', name, quantity)} updateNote={(name, note) => updateCategoryNote('mains', name, note)} />
           <Field label="הערה לעיקריות"><input aria-label="הערה לעיקריות" value={draft.mainsNote} onChange={(event) => patch({ mainsNote: event.currentTarget.value })} className={inputClassName} /></Field>
         </Section>
 
         <Section id="sides" title="תוספות" summary={`${countRecord(draft.sides)} נבחרו`} collapsible>
-          <QuantityCategory names={menu.sides} quantities={draft.sides} outOfStock={outOfStock} update={(name, quantity) => updateCategory('sides', name, quantity)} />
+          <QuantityCategory names={menu.sides} quantities={draft.sides} notes={draft.sidesNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('sides', name, quantity)} updateNote={(name, note) => updateCategoryNote('sides', name, note)} />
         </Section>
 
         <Section id="desserts" title="קינוחים" summary={`2 סופלה או בקלאווה אחת לזוגית`} collapsible>
-          <QuantityCategory names={menu.desserts} quantities={draft.desserts} outOfStock={outOfStock} update={(name, quantity) => updateCategory('desserts', name, quantity)} />
+          <QuantityCategory names={menu.desserts} quantities={draft.desserts} notes={draft.dessertsNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('desserts', name, quantity)} updateNote={(name, note) => updateCategoryNote('desserts', name, note)} />
         </Section>
 
         <Section id="lunch" title="תפריט צהריים" collapsible>
           <div className="space-y-4">
             {menu.lunch.map((item) => {
-              const selection = draft.lunch[item.key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0 }
+              const selection = draft.lunch[item.key] ?? { quantity: 0, variantKey: '', sides: {}, addonQuantity: 0, note: '' }
               const fallbackVariantKey = selection.variantKey || item.variants[0]?.key || ''
               const plates = item.variants.length > 0 && selection.quantity > 0
                 ? readLunchPlates(selection, item) ?? resizeLunchPlates(
@@ -1949,6 +1994,15 @@ function OrderEditorContent({
                   )}
                   {selection.quantity > 0 && item.addon && (
                     <div className="mt-4"><QuantityStepper label={`${item.addon.name} · ${formatUsdMinorUnits(item.addon.priceMinorUnits)}`} value={selection.addonQuantity} onChange={(addonQuantity) => updateLunch(item.key, { addonQuantity })} /></div>
+                  )}
+                  {selection.quantity > 0 && (
+                    <input
+                      aria-label={`הערה ל${item.name}`}
+                      value={selection.note}
+                      onChange={(event) => updateLunch(item.key, { note: event.currentTarget.value })}
+                      placeholder="הערה"
+                      className={`${inputClassName} mt-4`}
+                    />
                   )}
                 </div>
               )

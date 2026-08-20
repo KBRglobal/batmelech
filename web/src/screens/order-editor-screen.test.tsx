@@ -1347,6 +1347,38 @@ describe('OrderEditorScreen', () => {
     uuidSpy.mockRestore()
   })
 
+  it('shows a per-dish note input only once a dish is selected, and saves it under that category', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        ok: true,
+        idempotent: false,
+        revision: 2,
+        ts: 2,
+        hash: 'b'.repeat(64),
+        data: { orders: [{ id: 'order-note-1', name: 'לקוחה' }] },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+
+    await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
+    const dish = 'קציצות בשר ברוטב אדום עשיר'
+    expect(screen.queryByLabelText(`הערה ל${dish}`)).toBeNull()
+    await user.click(screen.getByRole('button', { name: `הוספה ל${dish}` }))
+    await user.type(await screen.findByLabelText(`הערה ל${dish}`), 'בלי רוטב חריף')
+
+    await user.click(screen.getByRole('button', { name: 'להשתמש במחיר המוצע' }))
+    await user.click(screen.getByRole('button', { name: 'שמירת ההזמנה' }))
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+    const [, request] = fetchSpy.mock.calls[0]!
+    const command = JSON.parse(String(request?.body)) as { localState: LegacyStore }
+    expect(command.localState.orders[0]).toMatchObject({
+      mains: { [dish]: 1 },
+      mainsNotes: { [dish]: 'בלי רוטב חריף' },
+    })
+  })
+
   it('refetches immediately before save and sends no POST when revision, hash, or menu changed', async () => {
     const initialStore: LegacyStore = { orders: [] }
     const newerStore: LegacyStore = {

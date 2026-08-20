@@ -363,6 +363,7 @@ export interface SaladDraftSelection {
   readonly [key: string]: unknown
   readonly ordered: number
   readonly gift: number
+  readonly note: string
 }
 
 export interface ExtraDraftSelection {
@@ -385,6 +386,7 @@ export interface LunchDraftSelection {
   readonly variantKey: string
   readonly sides: Readonly<Record<string, number>>
   readonly addonQuantity: number
+  readonly note: string
 }
 
 /**
@@ -424,12 +426,16 @@ export interface OrderDraft extends Record<string, unknown> {
   readonly challot: number
   readonly salads: Readonly<Record<string, SaladDraftSelection>>
   readonly firsts: Readonly<Record<string, number>>
+  readonly firstsNotes: Readonly<Record<string, string>>
   readonly heat: string
   readonly firstsNote: string
   readonly mains: Readonly<Record<string, number>>
+  readonly mainsNotes: Readonly<Record<string, string>>
   readonly mainsNote: string
   readonly sides: Readonly<Record<string, number>>
+  readonly sidesNotes: Readonly<Record<string, string>>
   readonly desserts: Readonly<Record<string, number>>
+  readonly dessertsNotes: Readonly<Record<string, string>>
   readonly extras: Readonly<Record<string, ExtraDraftSelection>>
   readonly custom: readonly CustomDraftItem[]
   readonly lunch: Readonly<Record<string, LunchDraftSelection>>
@@ -483,6 +489,16 @@ function normalizeQuantityMap(value: unknown): Record<string, number> {
   return result
 }
 
+function normalizeNoteMap(value: unknown): Record<string, string> {
+  const result: Record<string, string> = {}
+  if (!isPlainRecord(value)) return result
+  for (const [name, rawNote] of Object.entries(value)) {
+    const note = text(rawNote)
+    if (note.trim().length > 0) result[name] = note
+  }
+  return result
+}
+
 function isValidLegacyCount(value: unknown): boolean {
   return (
     (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) ||
@@ -492,6 +508,10 @@ function isValidLegacyCount(value: unknown): boolean {
 
 function hasValidQuantityMap(value: unknown): boolean {
   return value === undefined || (isPlainRecord(value) && Object.values(value).every(isValidLegacyCount))
+}
+
+function hasValidNoteMap(value: unknown): boolean {
+  return value === undefined || (isPlainRecord(value) && Object.values(value).every((note) => typeof note === 'string'))
 }
 
 function hasValidStructuredSelections(
@@ -520,8 +540,12 @@ export function legacyOrderEditIssue(order: LegacyOrder): string | null {
   if (![order.firsts, order.mains, order.sides, order.desserts].every(hasValidQuantityMap)) {
     return 'אחת מקבוצות המנות כוללת כמות ישנה שלא ניתן לשמר בבטחה.'
   }
+  if (![order.firstsNotes, order.mainsNotes, order.sidesNotes, order.dessertsNotes].every(hasValidNoteMap)) {
+    return 'אחת מהערות המנות נשמרה בפורמט לא תקין.'
+  }
   if (!hasValidStructuredSelections(order.salads, (selection) =>
-    ['o', 'ordered', 'p', 'gift'].every((key) => !Object.hasOwn(selection, key) || isValidLegacyCount(selection[key]))
+    ['o', 'ordered', 'p', 'gift'].every((key) => !Object.hasOwn(selection, key) || isValidLegacyCount(selection[key])) &&
+    (!Object.hasOwn(selection, 'note') || typeof selection.note === 'string')
   )) return 'רשימת הסלטים כוללת ערך ישן שלא ניתן לשמר בבטחה.'
   if (!hasValidStructuredSelections(order.extras, (selection) =>
     ['q', 'quantity'].every((key) => !Object.hasOwn(selection, key) || isValidLegacyCount(selection[key])) &&
@@ -539,7 +563,7 @@ export function legacyOrderEditIssue(order: LegacyOrder): string | null {
   }
   if (!hasValidStructuredSelections(order.lunch, (selection) =>
     ['q', 'quantity', 'addon', 'addonQuantity'].every((key) => !Object.hasOwn(selection, key) || isValidLegacyCount(selection[key])) &&
-    ['v', 'variantKey'].every((key) => !Object.hasOwn(selection, key) || typeof selection[key] === 'string') &&
+    ['v', 'variantKey', 'note'].every((key) => !Object.hasOwn(selection, key) || typeof selection[key] === 'string') &&
     (!Object.hasOwn(selection, 'sides') || hasValidQuantityMap(selection.sides))
   )) return 'רשימת הצהריים כוללת ערך ישן שלא ניתן לשמר בבטחה.'
   const hotelProviderId = order.hotelProviderId
@@ -576,9 +600,10 @@ function normalizeSalads(value: unknown): Record<string, SaladDraftSelection> {
     if (!isPlainRecord(rawSelection)) continue
     const ordered = count(rawSelection.o ?? rawSelection.ordered)
     const gift = count(rawSelection.p ?? rawSelection.gift)
-    const { o: _orderedLegacy, p: _giftLegacy, ordered: _ordered, gift: _gift, ...unknown } = rawSelection
-    if (ordered > 0 || gift > 0 || Object.keys(unknown).length > 0) {
-      result[name] = { ...structuredClone(unknown), ordered, gift }
+    const note = text(rawSelection.note)
+    const { o: _orderedLegacy, p: _giftLegacy, ordered: _ordered, gift: _gift, note: _note, ...unknown } = rawSelection
+    if (ordered > 0 || gift > 0 || note.length > 0 || Object.keys(unknown).length > 0) {
+      result[name] = { ...structuredClone(unknown), ordered, gift, note }
     }
   }
   return result
@@ -632,6 +657,7 @@ function normalizeLunch(value: unknown): Record<string, LunchDraftSelection> {
     const quantity = count(rawSelection.q ?? rawSelection.quantity)
     const addonQuantity = count(rawSelection.addon ?? rawSelection.addonQuantity)
     const sides = normalizeQuantityMap(rawSelection.sides)
+    const note = text(rawSelection.note)
     const {
       q: _quantityLegacy,
       quantity: _quantity,
@@ -640,15 +666,17 @@ function normalizeLunch(value: unknown): Record<string, LunchDraftSelection> {
       addon: _addonLegacy,
       addonQuantity: _addon,
       sides: _sides,
+      note: _note,
       ...unknown
     } = rawSelection
-    if (quantity > 0 || addonQuantity > 0 || Object.keys(sides).length > 0 || Object.keys(unknown).length > 0) {
+    if (quantity > 0 || addonQuantity > 0 || Object.keys(sides).length > 0 || note.length > 0 || Object.keys(unknown).length > 0) {
       result[key] = {
         ...structuredClone(unknown),
         quantity,
         variantKey: text(rawSelection.v ?? rawSelection.variantKey),
         sides,
         addonQuantity,
+        note,
       }
     }
   }
@@ -881,12 +909,16 @@ export function createOrderDraft(menu: OrderEditorMenu, now: Date = new Date()):
     challot: menu.includedChallahs,
     salads: {},
     firsts: {},
+    firstsNotes: {},
     heat: '',
     firstsNote: '',
     mains: {},
+    mainsNotes: {},
     mainsNote: '',
     sides: {},
+    sidesNotes: {},
     desserts: {},
+    dessertsNotes: {},
     extras: {},
     custom: [],
     lunch: {},
@@ -937,12 +969,16 @@ export function createOrderDraftFromLegacy(
     challot: countOrFallback(order.challot, defaults.challot),
     salads: normalizeSalads(order.salads),
     firsts: normalizeQuantityMap(order.firsts),
+    firstsNotes: normalizeNoteMap(order.firstsNotes),
     heat: text(order.heat),
     firstsNote: text(order.firstsNote),
     mains: normalizeQuantityMap(order.mains),
+    mainsNotes: normalizeNoteMap(order.mainsNotes),
     mainsNote: text(order.mainsNote),
     sides: normalizeQuantityMap(order.sides),
+    sidesNotes: normalizeNoteMap(order.sidesNotes),
     desserts: normalizeQuantityMap(order.desserts),
+    dessertsNotes: normalizeNoteMap(order.dessertsNotes),
     extras: normalizeExtras(order.extras),
     custom: normalizeCustom(order.custom),
     lunch: normalizeLunch(order.lunch),
@@ -1645,9 +1681,10 @@ function serializeSalads(
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {}
   for (const [name, selection] of Object.entries(selections)) {
-    const { ordered, gift, o: _ordered, p: _gift, ...unknown } = selection
-    if (ordered > 0 || gift > 0 || Object.keys(unknown).length > 0) {
-      result[name] = { ...unknown, o: ordered, p: gift }
+    const { ordered, gift, note: rawNote, o: _ordered, p: _gift, ...unknown } = selection
+    const note = text(rawNote)
+    if (ordered > 0 || gift > 0 || note.trim().length > 0 || Object.keys(unknown).length > 0) {
+      result[name] = { ...unknown, o: ordered, p: gift, note }
     }
   }
   return result
@@ -1693,18 +1730,21 @@ function serializeLunch(
       variantKey,
       sides,
       addonQuantity,
+      note: rawNote,
       q: _quantity,
       v: _variant,
       addon: _addon,
       ...unknown
     } = selection
-    if (quantity > 0 || addonQuantity > 0 || Object.keys(sides).length > 0 || Object.keys(unknown).length > 0) {
+    const note = text(rawNote)
+    if (quantity > 0 || addonQuantity > 0 || Object.keys(sides).length > 0 || note.trim().length > 0 || Object.keys(unknown).length > 0) {
       result[key] = {
         ...unknown,
         q: quantity,
         v: variantKey,
         sides: structuredClone(sides),
         addon: addonQuantity,
+        note,
       }
     }
   }
@@ -1775,12 +1815,16 @@ export function serializeOrderDraft(draft: OrderDraft, orderId: string): LegacyO
     challot: draft.challot,
     salads: serializeSalads(draft.salads),
     firsts: structuredClone(draft.firsts),
+    firstsNotes: structuredClone(draft.firstsNotes),
     heat: draft.heat,
     firstsNote: draft.firstsNote,
     mains: structuredClone(draft.mains),
+    mainsNotes: structuredClone(draft.mainsNotes),
     mainsNote: draft.mainsNote,
     sides: structuredClone(draft.sides),
+    sidesNotes: structuredClone(draft.sidesNotes),
     desserts: structuredClone(draft.desserts),
+    dessertsNotes: structuredClone(draft.dessertsNotes),
     extras: serializeExtras(draft.extras),
     custom: serializeCustom(draft.custom),
     lunch: serializeLunch(draft.lunch),
@@ -2167,7 +2211,11 @@ export function applyAIReviewToDraft(
         ...next,
         salads: {
           ...next.salads,
-          [target.name]: { ordered: quantity, gift: next.salads[target.name]?.gift ?? 0 },
+          [target.name]: {
+            ordered: quantity,
+            gift: next.salads[target.name]?.gift ?? 0,
+            note: next.salads[target.name]?.note ?? '',
+          },
         },
       }
     } else if (target.kind === 'first') next = { ...next, firsts: withQuantity(next.firsts, target.name, quantity) }

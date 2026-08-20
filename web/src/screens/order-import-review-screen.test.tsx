@@ -414,7 +414,7 @@ describe('OrderImportReviewScreen', () => {
     expect(draft.meals).toBe(1)
     expect(draft.challot).toBe(2)
     expect(draft.salads).toEqual(expect.objectContaining({
-      'כרוב לבן קלאסי': { ordered: 1, gift: 0 },
+      'כרוב לבן קלאסי': { ordered: 1, gift: 0, note: '' },
     }))
     expect(draft.extras).not.toEqual(expect.objectContaining({ משלוח: expect.anything() }))
     expect(review.warnings[0]?.message).toContain('קוד ההזמנה המובנה')
@@ -479,12 +479,14 @@ describe('OrderImportReviewScreen', () => {
         variantKey: 'family',
         sides: { 'אורז לבן': 2, 'פסטה אדומה': 2 },
         addonQuantity: 0,
+        note: '',
       },
       couscous: {
         quantity: 1,
         variantKey: '',
         sides: {},
         addonQuantity: 1,
+        note: '',
       },
     })
     expect(fetchSpy).not.toHaveBeenCalled()

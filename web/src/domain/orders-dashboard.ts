@@ -503,13 +503,16 @@ function summaryChips(
 function positiveSelectionLines(
   record: Readonly<Record<string, unknown>> | undefined,
   nestedKey: string | null = null,
+  notes?: Readonly<Record<string, unknown>>,
 ): string[] {
   if (record === undefined) return []
   const lines: string[] = []
   for (const [name, value] of boundedEntries(record)) {
     const rawQuantity = nestedKey === null ? value : isRecord(value) ? value[nestedKey] : undefined
     const quantity = displayQuantity(rawQuantity)
-    if (quantity > 0) lines.push(`${safeKey(name)}${quantity > 1 ? ` ×${quantity}` : ''}`)
+    if (quantity === 0) continue
+    const note = isRecord(value) && text(value.note) ? text(value.note) : notes ? text(notes[name]) : ''
+    lines.push(`${safeKey(name)}${quantity > 1 ? ` ×${quantity}` : ''}${note ? ` (${note})` : ''}`)
   }
   return lines
 }
@@ -558,6 +561,7 @@ function lunchTextLines(order: Readonly<LegacyOrder>): string[] {
     if (sides.length > 0) line += ` — תוספות: ${sides.join(', ')}`
     const addon = displayQuantity(value.addon)
     if (addon > 0) line += ` — מנת מפרום ביתי ×${addon}`
+    if (text(value.note)) line += ` (${text(value.note)})`
     lines.push(line)
   }
   return lines
@@ -586,13 +590,13 @@ export function formatLegacyOrderText(order: Readonly<LegacyOrder>, locale = DEF
   }
 
   const categories = [
-    ['ראשונה', order.firsts],
-    ['עיקרית', order.mains],
-    ['תוספת', order.sides],
-    ['קינוח', order.desserts],
+    ['ראשונה', order.firsts, order.firstsNotes],
+    ['עיקרית', order.mains, order.mainsNotes],
+    ['תוספת', order.sides, order.sidesNotes],
+    ['קינוח', order.desserts, order.dessertsNotes],
   ] as const
-  for (const [label, values] of categories) {
-    const selected = positiveSelectionLines(values)
+  for (const [label, values, notes] of categories) {
+    const selected = positiveSelectionLines(values, null, notes)
     if (selected.length > 0) lines.push(`${label}: ${selected.join(', ')}`)
   }
   if (text(order.heat)) lines.push(`חריפות הדג: ${text(order.heat)}`)
@@ -728,13 +732,13 @@ export function buildBonFields(order: Readonly<LegacyOrder>): readonly BonField[
     ...positiveSelectionLines(order.salads, 'o'),
     ...positiveSelectionLines(order.salads, 'p').map((line) => `${line} — פינוק`),
   ].join(', '))
-  push('מנה ראשונה', positiveSelectionLines(order.firsts).join(', '), [
+  push('מנה ראשונה', positiveSelectionLines(order.firsts, null, order.firstsNotes).join(', '), [
     text(order.heat) ? `חריפות הדג: ${text(order.heat)}` : '',
     text(order.firstsNote),
   ])
-  push('מנה עיקרית', positiveSelectionLines(order.mains).join(', '), [text(order.mainsNote)])
-  push('תוספת', positiveSelectionLines(order.sides).join(', '))
-  push('קינוח', positiveSelectionLines(order.desserts).join(', '))
+  push('מנה עיקרית', positiveSelectionLines(order.mains, null, order.mainsNotes).join(', '), [text(order.mainsNote)])
+  push('תוספת', positiveSelectionLines(order.sides, null, order.sidesNotes).join(', '))
+  push('קינוח', positiveSelectionLines(order.desserts, null, order.dessertsNotes).join(', '))
   push('אקסטרות', extraLines(order).join(', '))
   push('תפריט צהריים', lunchTextLines(order).join(', '))
   push('הערות', text(order.notes))

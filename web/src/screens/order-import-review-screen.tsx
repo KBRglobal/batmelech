@@ -248,6 +248,7 @@ function decodeBM1Lunch(
       variantKey,
       sides: structuredClone(selection.sides),
       addonQuantity: selection.addon,
+      note: '',
     }]
   }))
 }
@@ -311,7 +312,7 @@ function decodeBM1Draft(
       pickup: parsed.pickup,
       meals: parsed.meals,
       challot: parsed.challot,
-      salads: Object.fromEntries(Object.entries(parsed.salads).map(([name, ordered]) => [name, { ordered, gift: 0 }])),
+      salads: Object.fromEntries(Object.entries(parsed.salads).map(([name, ordered]) => [name, { ordered, gift: 0, note: '' }])),
       firsts: structuredClone(parsed.firsts),
       heat: parsed.heat,
       mains: structuredClone(parsed.mains),

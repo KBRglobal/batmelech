@@ -179,7 +179,7 @@ describe('order editor menu and drafts', () => {
 
     expect(fresh).toMatchObject({ date: '2026-08-14', meals: 1, challot: 2, status: 'חדשה', paid: 'לא' })
     expect(edited).toMatchObject({ id: 'live-1', meals: 2, challot: 5 })
-    expect(edited.salads['טחינה']).toEqual({ ordered: 1, gift: 2 })
+    expect(edited.salads['טחינה']).toEqual({ ordered: 1, gift: 2, note: '' })
     expect(edited.unknownProductionField).toEqual({ keep: true })
     expect(original).toEqual({
       id: 'live-1',
@@ -227,10 +227,10 @@ describe('order editor menu and drafts', () => {
       lunch: { baguette: { q: 1, v: '', sides: {}, addon: 0, future: 'lunch' } },
     }, menu)
 
-    expect(edited.salads.טחינה).toEqual({ ordered: 2, gift: 1, future: 'salad' })
+    expect(edited.salads.טחינה).toEqual({ ordered: 2, gift: 1, note: '', future: 'salad' })
     expect(edited.extras.יין).toEqual({ quantity: 1, note: 'קר', future: 'extra' })
     expect(edited.custom[0]).toEqual({ name: 'מיוחד', quantity: 1, unitPrice: '0.10', note: '', future: 'custom' })
-    expect(edited.lunch.baguette).toEqual({ quantity: 1, variantKey: '', sides: {}, addonQuantity: 0, future: 'lunch' })
+    expect(edited.lunch.baguette).toEqual({ quantity: 1, variantKey: '', sides: {}, addonQuantity: 0, note: '', future: 'lunch' })
     expect(createOrderDraftFromLegacy({
       salads: { עתידי: { o: 0, p: 0, future: 'salad' } },
       extras: { עתידי: { q: 0, future: 'extra' } },
@@ -630,7 +630,7 @@ describe('deterministic draft pricing and allowances', () => {
   it('prices lunch-only without the default couple meal and blocks mixed orders until explicit confirmation', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const lunch = {
-      baguette: { quantity: 1, variantKey: '', sides: {}, addonQuantity: 0 },
+      baguette: { quantity: 1, variantKey: '', sides: {}, addonQuantity: 0, note: '' },
     }
     const lunchOnly = draftWith({ meals: 0, challot: 0, lunch })
     const accidentalMixed = draftWith({ lunch })
@@ -691,7 +691,7 @@ describe('deterministic draft pricing and allowances', () => {
         meals: 0,
         challot: 0,
         firsts: { 'קציצות דגים ברוטב מרוקאי': 1 },
-        salads: { 'טחינה': { ordered: 9, gift: 4 } },
+        salads: { 'טחינה': { ordered: 9, gift: 4, note: '' } },
         custom: [{ name: 'פריט', quantity: 2, unitPrice: '0.10', note: '' }],
       }),
       menu,
@@ -714,8 +714,9 @@ describe('deterministic draft pricing and allowances', () => {
             variantKey: 'family',
             sides: { 'אורז לבן': 3, 'פסטה אדומה': 2 },
             addonQuantity: 0,
+            note: '',
           },
-          couscous: { quantity: 1, variantKey: '', sides: {}, addonQuantity: 2 },
+          couscous: { quantity: 1, variantKey: '', sides: {}, addonQuantity: 2, note: '' },
         },
       }),
       menu,
@@ -737,7 +738,7 @@ describe('deterministic draft pricing and allowances', () => {
       draftWith({
         date: '2026-08-12',
         lunch: {
-          'schnitzel-roll': { quantity: 1, variantKey: 'challah', sides: {}, addonQuantity: 0 },
+          'schnitzel-roll': { quantity: 1, variantKey: 'challah', sides: {}, addonQuantity: 0, note: '' },
         },
         custom: [{ name: 'פריט', quantity: 1, unitPrice: '1,2,3', note: '' }],
       }),
@@ -785,6 +786,7 @@ describe('deterministic draft pricing and allowances', () => {
             variantKey: 'single',
             addonQuantity: 0,
             sides: { 'אורז לבן': 3 },
+            note: '',
             plates: [
               { variantKey: 'single', sides: { 'אורז לבן': 1 } },
               { variantKey: 'family', sides: { 'אורז לבן': 2 } },
@@ -822,6 +824,7 @@ describe('deterministic draft pricing and allowances', () => {
             variantKey: 'single',
             addonQuantity: 0,
             sides: {},
+            note: '',
             plates: [{ variantKey: 'family', sides: {} }],
           },
         },

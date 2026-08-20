@@ -586,11 +586,12 @@ describe('buildBonFields', () => {
       id: 'bon-1', date: '2099-08-14', name: 'לקוחה', phone: '050-1234567',
       place: 'מלון אמיתי', address: 'קומה 7', time: '12:30', group: 'משפחות לוי',
       meals: 2, aricha: 4, challot: 4,
-      salads: { מטבוחה: { o: 2, p: 1 } }, firsts: { 'פילה מרוקאי': 2 }, heat: 'חריף',
-      firstsNote: 'בלי כוסברה', mains: { 'עוף ביתי': 1 }, mainsNote: 'לחתוך',
+      salads: { מטבוחה: { o: 2, p: 1, note: 'חריף בבקשה' } },
+      firsts: { 'פילה מרוקאי': 2 }, firstsNotes: { 'פילה מרוקאי': 'בלי עצמות' }, heat: 'חריף',
+      firstsNote: 'בלי כוסברה', mains: { 'עוף ביתי': 1 }, mainsNotes: { 'עוף ביתי': 'בלי רוטב' }, mainsNote: 'לחתוך',
       sides: { קוסקוס: 1 }, desserts: { סופלה: 2 },
       extras: { אורז: { q: 2, note: 'בנפרד' } },
-      lunch: { 'schnitzel-plate': { q: 1, v: 'family' } },
+      lunch: { 'schnitzel-plate': { q: 1, v: 'family', note: 'בלי חרדל' } },
       notes: 'להתקשר בהגעה', total: '500', deposit: '100', paid: 'מקדמה',
     })
 
@@ -608,9 +609,12 @@ describe('buildBonFields', () => {
     expect(value('עריכה')?.value).toBe('4 סועדים')
     expect(buildBonFields({ id: 'one', aricha: 1 }).find((field) => field.label === 'עריכה')?.value)
       .toBe('סועד אחד')
-    expect(value('סלטים')?.value).toBe('מטבוחה ×2, מטבוחה — פינוק')
+    expect(value('סלטים')?.value).toBe('מטבוחה ×2 (חריף בבקשה), מטבוחה (חריף בבקשה) — פינוק')
+    expect(value('מנה ראשונה')?.value).toBe('פילה מרוקאי ×2 (בלי עצמות)')
     expect(value('מנה ראשונה')?.notes).toEqual(['חריפות הדג: חריף', 'בלי כוסברה'])
+    expect(value('מנה עיקרית')?.value).toBe('עוף ביתי (בלי רוטב)')
     expect(value('אקסטרות')?.value).toBe('אורז ×2 (בנפרד)')
+    expect(value('תפריט צהריים')?.value).toBe('שניצל בצלחת (משפחתית) ×1 (בלי חרדל)')
     // Money never appears twice: the bon prints the amount as its own block.
     expect(fields.some((field) => field.label.includes('תשלום'))).toBe(false)
   })
