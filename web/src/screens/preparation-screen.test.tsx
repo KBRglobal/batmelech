@@ -137,6 +137,16 @@ describe('PreparationScreen', () => {
     expect(screen.getByText(/להתקשר בלובי/)).toBeTruthy()
     expect(screen.getByText(/אקסטרה אמיתית ×1 — לארוז בנפרד/)).toBeTruthy()
     expect(screen.getByText(/צהריים אמיתי ×1 — תוספת למנה ×2/)).toBeTruthy()
+    // Hovering a prep item reveals who ordered it.
+    expect(screen.getByText('דג אמיתי').getAttribute('title')).toBe('לקוחה אמיתית ×2')
+    const saladTooltip = screen.getByText('מטבוחה אמיתית').closest('div')?.getAttribute('title')
+    expect(saladTooltip).toContain('לקוחה אמיתית ×3')
+    expect(saladTooltip).toContain('לקוחה אמיתית ×1 (פינוק)')
+    // Every dish category — not just extras/lunch — shows up per customer below.
+    expect(screen.getByText(/ראשונה · דג אמיתי ×2/)).toBeTruthy()
+    expect(screen.getByText(/עיקרית · עיקרית אמיתית ×2/)).toBeTruthy()
+    expect(screen.getByText(/תוספת · תוספת אמיתית ×2/)).toBeTruthy()
+    expect(screen.getByText(/קינוח · קינוח אמיתי ×2/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'רשימת קניות לתאריך' }).getAttribute('href')).toBe(
       '/shopping-list?date=2099-08-14',
     )

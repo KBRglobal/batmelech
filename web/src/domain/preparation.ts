@@ -146,6 +146,13 @@ export interface PreparationExtraDetail extends CustomerSpecificDetail {
   readonly unitPrice?: string | number
 }
 
+export interface PreparationDishDetail extends CustomerSpecificDetail {
+  readonly category: 'salads' | 'firsts' | 'mains' | 'sides' | 'desserts'
+  readonly itemName: string
+  readonly quantity: number
+  readonly gift: boolean
+}
+
 export interface PreparationLunchSide {
   readonly itemName: string
   readonly quantity: number
@@ -212,6 +219,7 @@ export interface PreparationDateGroup {
   readonly categories: PreparationCategoryGroups
   readonly extraDetails: readonly PreparationExtraDetail[]
   readonly lunchDetails: readonly PreparationLunchDetail[]
+  readonly dishDetails: readonly PreparationDishDetail[]
   readonly heatNotes: readonly PreparationHeatNote[]
   readonly generalNotes: readonly PreparationGeneralNote[]
   readonly itemDemands: readonly PreparationItemDemand[]
@@ -290,6 +298,7 @@ interface MutableDateGroup {
   demands: Map<string, MutableDemand>
   extraDetails: PreparationExtraDetail[]
   lunchDetails: PreparationLunchDetail[]
+  dishDetails: PreparationDishDetail[]
   heatNotes: PreparationHeatNote[]
   generalNotes: PreparationGeneralNote[]
 }
@@ -799,6 +808,7 @@ function addStandardCategory(
     const quantity = readCount(rawQuantity, context, path, false)
     if (itemName === '' || quantity === null || quantity === 0) continue
     if (!addNumber(group.categories[category], itemName, quantity, context, path)) continue
+    group.dishDetails.push({ ...detailBase(context), category, itemName, quantity, gift: false })
     const selection = selectionFor(catalog, category, itemName, context, path)
     if (selection !== null) addDemand(group, category, selection, quantity, context, path)
   }
@@ -829,6 +839,8 @@ function addSalads(
     const orderTotal = checkedCountAdd(ordered, gift, context, `${path}.total`)
     if (orderTotal === null) continue
     group.categories.salads.set(itemName, { ordered: nextOrdered, gift: nextGift })
+    if (ordered > 0) group.dishDetails.push({ ...detailBase(context), category: 'salads', itemName, quantity: ordered, gift: false })
+    if (gift > 0) group.dishDetails.push({ ...detailBase(context), category: 'salads', itemName, quantity: gift, gift: true })
 
     const selection = selectionFor(catalog, 'salads', itemName, context, path)
     if (selection !== null) {
@@ -1232,6 +1244,7 @@ function createMutableDateGroup(serviceDate: string): MutableDateGroup {
     demands: new Map(),
     extraDetails: [],
     lunchDetails: [],
+    dishDetails: [],
     heatNotes: [],
     generalNotes: [],
   }
@@ -1314,6 +1327,14 @@ function finalizeGroup(group: MutableDateGroup): PreparationDateGroup {
         compareText(left.variantKey ?? '', right.variantKey ?? '') ||
         compareText(JSON.stringify(left.sides), JSON.stringify(right.sides)) ||
         compareNumbers(left.addonQuantity, right.addonQuantity),
+    ),
+    dishDetails: [...group.dishDetails].sort(
+      (left, right) =>
+        compareCustomerDetails(left, right) ||
+        compareText(left.category, right.category) ||
+        compareText(left.itemName, right.itemName) ||
+        compareNumbers(left.quantity, right.quantity) ||
+        (left.gift === right.gift ? 0 : left.gift ? 1 : -1),
     ),
     heatNotes: [...group.heatNotes].sort(
       (left, right) => compareCustomerDetails(left, right) || compareText(left.text, right.text),

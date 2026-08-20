@@ -250,6 +250,23 @@ describe('buildPreparationPlan', () => {
       },
     })
 
+    expect(group.dishDetails).toHaveLength(13)
+    expect(group.dishDetails).toEqual(expect.arrayContaining([
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'firsts', itemName: 'Fish', quantity: 2, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'mains', itemName: 'Chicken', quantity: 1, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'sides', itemName: 'Rice', quantity: 1, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'desserts', itemName: 'Souffle', quantity: 2, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Matbucha', quantity: 2, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Matbucha', quantity: 1, gift: true },
+      { serviceDate: '2026-08-15', orderId: 'full-a', orderGroup: 'family-a', customerName: 'Ada', category: 'salads', itemName: 'Tahini', quantity: 2, gift: true },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'firsts', itemName: 'Fish', quantity: 1, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'mains', itemName: 'Chicken', quantity: 2, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'sides', itemName: 'Rice', quantity: 2, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'desserts', itemName: 'Souffle', quantity: 1, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'salads', itemName: 'Matbucha', quantity: 1, gift: false },
+      { serviceDate: '2026-08-15', orderId: 'full-b', orderGroup: 'family-b', customerName: 'Ben', category: 'salads', itemName: 'Matbucha', quantity: 2, gift: true },
+    ]))
+
     expect(group.extraDetails).toEqual([
       {
         serviceDate: '2026-08-15',

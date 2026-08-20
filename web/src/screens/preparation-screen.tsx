@@ -20,6 +20,7 @@ import {
   buildPreparationPlan,
   type PreparationCategoryGroups,
   type PreparationDateGroup,
+  type PreparationDishDetail,
   type PreparationPlan,
   type PreparationWarning,
 } from '../domain/preparation.ts'
@@ -226,10 +227,34 @@ function CompletionControl({
   )
 }
 
+// Groups any per-order detail list by its item name, so a row can look up
+// "who ordered this" in O(1) instead of filtering the whole list per row.
+function groupByItemName<T extends { itemName: string }>(details: readonly T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>()
+  for (const detail of details) {
+    const list = map.get(detail.itemName)
+    if (list) list.push(detail)
+    else map.set(detail.itemName, [detail])
+  }
+  return map
+}
+
+// Native title attribute: no extra popover component, works on hover and
+// on mobile long-press, and never needs its own positioning/z-index logic.
+function customerTooltip(
+  entries: readonly { customerName: string; quantity: number; gift?: boolean }[] | undefined,
+): string | undefined {
+  if (!entries || entries.length === 0) return undefined
+  return entries
+    .map((entry) => `${entry.customerName || 'ללא שם'} ×${entry.quantity}${entry.gift ? ' (פינוק)' : ''}`)
+    .join('\n')
+}
+
 function NumberCategory({
   title,
   category,
   values,
+  details,
   serviceDate,
   store,
   onToggle,
@@ -239,6 +264,7 @@ function NumberCategory({
   title: string
   category: Exclude<PreparationCompletionCategory, 'salads'>
   values: Readonly<Record<string, number>>
+  details?: ReadonlyMap<string, readonly { customerName: string; quantity: number }[]>
   serviceDate: string
   store: Readonly<LegacyStore>
   onToggle?: ToggleCompletion
@@ -256,7 +282,12 @@ function NumberCategory({
       <ul className="mt-4 divide-y divide-border">
         {entries.map(([name, quantity]) => (
           <li key={name} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <span className="min-w-0 flex-1 text-sm font-bold text-foreground">{name}</span>
+            <span
+              className="min-w-0 flex-1 text-sm font-bold text-foreground"
+              title={customerTooltip(details?.get(name))}
+            >
+              {name}
+            </span>
             <strong className="rounded-full bg-secondary px-3 py-1 text-sm font-black text-primary">{quantity}</strong>
             <CompletionControl
               serviceDate={serviceDate}
@@ -276,6 +307,7 @@ function NumberCategory({
 
 function SaladCategory({
   values,
+  details,
   serviceDate,
   store,
   onToggle,
@@ -283,6 +315,7 @@ function SaladCategory({
   saveBlocked,
 }: {
   values: PreparationCategoryGroups['salads']
+  details?: ReadonlyMap<string, readonly { customerName: string; quantity: number; gift?: boolean }[]>
   serviceDate: string
   store: Readonly<LegacyStore>
   onToggle?: ToggleCompletion
@@ -300,7 +333,7 @@ function SaladCategory({
       <ul className="mt-4 divide-y divide-border">
         {entries.map(([name, quantity]) => (
           <li key={name} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1" title={customerTooltip(details?.get(name))}>
               <span className="text-sm font-bold text-foreground">{name}</span>
               {quantity.gift > 0 && (
                 <span className="mt-0.5 block text-[0.6875rem] font-bold text-muted-foreground">
@@ -325,12 +358,21 @@ function SaladCategory({
   )
 }
 
+const DISH_CATEGORY_LABELS: Record<PreparationDishDetail['category'], string> = {
+  salads: 'סלט',
+  firsts: 'ראשונה',
+  mains: 'עיקרית',
+  sides: 'תוספת',
+  desserts: 'קינוח',
+}
+
 function Notes({ group }: { group: PreparationDateGroup }) {
   const hasNotes =
     group.heatNotes.length > 0 ||
     group.generalNotes.length > 0 ||
     group.extraDetails.length > 0 ||
-    group.lunchDetails.length > 0
+    group.lunchDetails.length > 0 ||
+    group.dishDetails.length > 0
   if (!hasNotes) return null
 
   return (
@@ -348,6 +390,12 @@ function Notes({ group }: { group: PreparationDateGroup }) {
         {group.generalNotes.map((note, index) => (
           <li key={`general-${String(note.orderId)}-${note.source}-${index}`} className="rounded-2xl bg-secondary/60 p-4 text-sm leading-6">
             <strong className="text-primary">{note.customerName || 'ללא שם'}:</strong> {note.text}
+          </li>
+        ))}
+        {group.dishDetails.map((detail, index) => (
+          <li key={`dish-${String(detail.orderId)}-${detail.category}-${detail.itemName}-${detail.gift}-${index}`} className="rounded-2xl bg-secondary/60 p-4 text-sm leading-6">
+            <strong className="text-primary">{detail.customerName || 'ללא שם'}:</strong>{' '}
+            {DISH_CATEGORY_LABELS[detail.category]} · {detail.itemName} ×{detail.quantity}{detail.gift ? ' — פינוק' : ''}
           </li>
         ))}
         {group.extraDetails.map((detail, index) => (
@@ -424,14 +472,14 @@ function DatePreparation({
       </div>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <SaladCategory values={categories.salads} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="מנות ראשונות" category="firsts" values={categories.firsts} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="מנות עיקריות" category="mains" values={categories.mains} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="תוספות" category="sides" values={categories.sides} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="קינוחים" category="desserts" values={categories.desserts} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="אקסטרות" category="extras" values={categories.extras} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="פריטים מותאמים" category="custom" values={categories.custom} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
-        <NumberCategory title="תפריט צהריים" category="lunch" values={categories.lunch} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <SaladCategory values={categories.salads} details={groupByItemName(group.dishDetails.filter((detail) => detail.category === 'salads'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="מנות ראשונות" category="firsts" values={categories.firsts} details={groupByItemName(group.dishDetails.filter((detail) => detail.category === 'firsts'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="מנות עיקריות" category="mains" values={categories.mains} details={groupByItemName(group.dishDetails.filter((detail) => detail.category === 'mains'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="תוספות" category="sides" values={categories.sides} details={groupByItemName(group.dishDetails.filter((detail) => detail.category === 'sides'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="קינוחים" category="desserts" values={categories.desserts} details={groupByItemName(group.dishDetails.filter((detail) => detail.category === 'desserts'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="אקסטרות" category="extras" values={categories.extras} details={groupByItemName(group.extraDetails.filter((detail) => detail.source === 'extra'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="פריטים מותאמים" category="custom" values={categories.custom} details={groupByItemName(group.extraDetails.filter((detail) => detail.source === 'custom'))} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
+        <NumberCategory title="תפריט צהריים" category="lunch" values={categories.lunch} details={groupByItemName(group.lunchDetails)} serviceDate={group.serviceDate} store={store} onToggle={onToggle} saveStates={saveStates} saveBlocked={saveBlocked} />
       </div>
 
       <Notes group={group} />
