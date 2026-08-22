@@ -460,6 +460,30 @@ test('actual lunch pricing scales included sides and charges every paid side and
   assert.deepEqual(decodeBM1(api).lunch.couscous, { q: 1, v: '', sides: {}, addon: 2 });
 });
 
+test('actual schnitzel plate includes the side choice it requires and charges only beyond it', t => {
+  const { api } = orderFormFixture(t);
+  // The plate REQUIRES a side choice and the price already covers it
+  // (docs/menu-source-of-truth-2026-08-14.md) — charging for the first side
+  // billed customers for something the menu says they had coming.
+  for (const [variant, platePrice, sidePrice] of [['single', 35, 15], ['couple', 60, 25]]) {
+    resetSelections(api);
+    api.state.lunch = {
+      'schnitzel-plate': { q: 1, v: variant, sides: { 'אורז לבן': 1 }, addon: 0 },
+    };
+    assert.equal(api.estLines().total, platePrice, `${variant}: the included side is not a charge`);
+
+    api.state.lunch['schnitzel-plate'].sides = { 'אורז לבן': 1, 'פסטה אדומה': 1 };
+    assert.equal(api.estLines().total, platePrice + sidePrice, `${variant}: the second side is`);
+  }
+
+  // Two plates carry two included sides, and the allowance pools across them.
+  resetSelections(api);
+  api.state.lunch = {
+    'schnitzel-plate': { q: 2, v: 'single', sides: { 'אורז לבן': 2 }, addon: 0 },
+  };
+  assert.equal(api.estLines().total, 70);
+});
+
 test('actual customer path supports a lunch-only midweek pickup without hidden couple or challah', t => {
   const { dom, api } = orderFormFixture(t);
   const document = dom.window.document;

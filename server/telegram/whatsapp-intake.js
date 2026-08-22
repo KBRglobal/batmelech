@@ -14,6 +14,7 @@ const crypto = require('node:crypto');
 const { normalizeWhatsAppInput } = require('../ai/whatsapp-chat');
 const { isWritesFrozen, recordOrderCreated } = require('./mey-audited-actions');
 const { resolveReviewItemQuantities } = require('../domain/resolve-review-items');
+const { LUNCH_MENU } = require('../domain/lunch-menu');
 
 const MAX_ATTEMPTS = 5;
 const MAX_CONVERSATION_LENGTH = 24000;
@@ -46,13 +47,25 @@ function usd(value) {
 
 // A server-side projection of the live menu into the intake catalog shape.
 // Mirrors the id scheme of the panel's buildAIOrderCatalog so reviews read
-// the same either way; weekday-lunch structures are omitted here (they have
-// no reliable names in the stored overrides) — those requests surface as
-// unknownItems for Lin to place in the panel.
+// the same either way — including the weekday lunch menu, whose names come
+// from server/domain/lunch-menu.js when the stored overrides carry none.
+// Leaving lunch out used to drop a whole weekday order on the floor: a
+// customer asking for קובה matched nothing, landed in unknownItems, and the
+// saved order carried the dish only as prose in the notes — unpriced.
 function buildIntakeCatalog(state) {
   const menu = isRecord(state.menu) ? state.menu : {};
   const items = [];
   const priceById = new Map();
+  // Which draft field a catalog id writes to. The intake catalog rows
+  // themselves are sent to the model under a strict schema, so the lunch
+  // key/variant a row stands for is kept here instead of on the row.
+  const lunchTargetById = new Map();
+  // How many rows actually came from the stored menu. The built-in lunch
+  // names are a fallback for missing labels, never evidence that the live
+  // menu loaded — the caller's "is there a menu at all?" guard has to count
+  // real menu data or a state outage would quietly take orders at
+  // hardcoded prices.
+  let liveItemCount = 0;
   const add = (id, name, category, options = {}) => {
     items.push({
       id,
@@ -85,6 +98,7 @@ function buildIntakeCatalog(state) {
       const cleaned = text(name);
       if (cleaned === '') return;
       add(`${category}:${index}`, cleaned, category);
+      liveItemCount += 1;
     });
   }
 
@@ -94,9 +108,57 @@ function buildIntakeCatalog(state) {
     const cleaned = text(row.name);
     if (cleaned === '') return;
     add(`extra:${index}`, cleaned, 'extra', { paid: true, price: usd(row.price) });
+    liveItemCount += 1;
   });
 
-  return { items, priceById };
+  const lunchRows = Array.isArray(menu.lunch) ? menu.lunch : [];
+  const lunchRowByKey = new Map(
+    lunchRows.filter(isRecord).map((row) => [text(row.key), row]),
+  );
+  LUNCH_MENU.forEach((item, index) => {
+    const row = lunchRowByKey.get(item.key);
+    if (isRecord(row)) liveItemCount += 1;
+    const itemName = (isRecord(row) ? text(row.name) : '') || item.name;
+    const variantRows = isRecord(row) && Array.isArray(row.variants) ? row.variants : [];
+    const variantRowByKey = new Map(
+      variantRows.filter(isRecord).map((variant) => [text(variant.k) || text(variant.key), variant]),
+    );
+
+    if (item.variants.length === 0) {
+      const id = `lunch:${index}`;
+      add(id, itemName, 'lunch', {
+        aliases: item.aliases,
+        paid: true,
+        price: (isRecord(row) ? usd(row.price) : null) ?? item.priceUsd,
+      });
+      lunchTargetById.set(id, { key: item.key, variantKey: '' });
+    } else {
+      item.variants.forEach((variant, variantIndex) => {
+        const variantRow = variantRowByKey.get(variant.key);
+        const label = (isRecord(variantRow) ? text(variantRow.label) : '') || variant.label;
+        const id = `lunch:${index}:${variantIndex}`;
+        add(id, `${itemName} (${label})`, 'lunch', {
+          aliases: variant.aliases,
+          paid: true,
+          price: (isRecord(variantRow) ? usd(variantRow.price) : null) ?? variant.priceUsd,
+        });
+        lunchTargetById.set(id, { key: item.key, variantKey: variant.key });
+      });
+    }
+
+    if (item.addon) {
+      const addonRow = isRecord(row) && isRecord(row.addon) ? row.addon : null;
+      const id = `lunch-addon:${index}`;
+      add(id, (addonRow ? text(addonRow.name) : '') || item.addon.name, 'lunch_addon', {
+        aliases: item.addon.aliases,
+        paid: true,
+        price: (addonRow ? usd(addonRow.price) : null) ?? item.addon.priceUsd,
+      });
+      lunchTargetById.set(id, { key: item.key, variantKey: '' });
+    }
+  });
+
+  return { items, priceById, lunchTargetById, liveItemCount };
 }
 
 function isoDateFrom(value) {
@@ -132,8 +194,14 @@ function summaryLines(review, resolvedQuantities) {
 // serializeOrderDraft produces for the panel — so an order מיי creates
 // looks, to every other reader of the store, exactly like one the panel
 // or the public site created.
-function buildStructuredOrderFields(catalogById, resolvedQuantities) {
-  const fields = { meals: 0, challot: 0, salads: {}, firsts: {}, mains: {}, sides: {}, desserts: {}, extras: {} };
+function buildStructuredOrderFields(catalogById, resolvedQuantities, lunchTargetById = new Map()) {
+  const fields = {
+    meals: 0, challot: 0, salads: {}, firsts: {}, mains: {}, sides: {}, desserts: {},
+    extras: {}, lunch: {},
+  };
+  // A lunch add-on (מפרום) only counts once its dish is in the order, so
+  // the dishes are written first regardless of catalog order.
+  const lunchAddonEntries = [];
   for (const [catalogItemId, quantity] of resolvedQuantities) {
     const catalogItem = catalogById.get(catalogItemId);
     if (!catalogItem) continue;
@@ -145,6 +213,26 @@ function buildStructuredOrderFields(catalogById, resolvedQuantities) {
     else if (catalogItem.category === 'side') fields.sides[catalogItem.name] = quantity;
     else if (catalogItem.category === 'dessert') fields.desserts[catalogItem.name] = quantity;
     else if (catalogItem.category === 'extra') fields.extras[catalogItem.name] = { q: quantity, note: '' };
+    else if (catalogItem.category === 'lunch') {
+      const target = lunchTargetById.get(catalogItemId);
+      if (!target) continue;
+      const current = fields.lunch[target.key];
+      fields.lunch[target.key] = {
+        q: quantity,
+        v: target.variantKey,
+        sides: {},
+        addon: current ? current.addon : 0,
+      };
+    } else if (catalogItem.category === 'lunch_addon') {
+      lunchAddonEntries.push([catalogItemId, quantity]);
+    }
+  }
+  for (const [catalogItemId, quantity] of lunchAddonEntries) {
+    const target = lunchTargetById.get(catalogItemId);
+    if (!target) continue;
+    const current = fields.lunch[target.key];
+    if (!current || current.q <= 0) continue;
+    fields.lunch[target.key] = { ...current, addon: quantity };
   }
   return fields;
 }
@@ -224,8 +312,8 @@ function createWhatsAppIntake({
       if (isWritesFrozen(settings)) {
         return { ok: false, error: 'frozen' };
       }
-      const { items } = buildIntakeCatalog(current.data);
-      if (items.length < 5) {
+      const { items, lunchTargetById, liveItemCount } = buildIntakeCatalog(current.data);
+      if (liveItemCount < 5) {
         return { ok: false, error: 'menu_unavailable' };
       }
       const catalogById = new Map(items.map((item) => [item.id, item]));
@@ -241,7 +329,7 @@ function createWhatsAppIntake({
       // "new order" draft — the resolver treats a selection with no meal
       // count yet as "at least one meal" the moment a dish is named.
       const resolvedQuantities = resolveReviewItemQuantities(review.draft.items, catalogById, 0);
-      const structuredFields = buildStructuredOrderFields(catalogById, resolvedQuantities);
+      const structuredFields = buildStructuredOrderFields(catalogById, resolvedQuantities, lunchTargetById);
 
       const now = new Date();
       const orderId = `mey-${now.getTime()}-${crypto.randomBytes(4).toString('hex')}`;

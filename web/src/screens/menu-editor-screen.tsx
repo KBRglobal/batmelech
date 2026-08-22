@@ -584,7 +584,7 @@ function LunchEditor({
                   />
                   <CostLine cost={dishCosts.get(variant.itemId)} salePriceMinorUnits={variant.priceMinorUnits} />
                   {variant.weekendOnly && <p className="text-xs font-black text-amber-800">זמין בסוף שבוע בלבד</p>}
-                  {variant.includedSides > 0 && <p className="text-xs font-bold text-muted-foreground">כולל {variant.includedSides} תוספות</p>}
+                  {variant.includedSides > 0 && <p className="text-xs font-bold text-muted-foreground">{variant.includedSides === 1 ? 'כולל תוספת אחת' : `כולל ${variant.includedSides} תוספות`}</p>}
                   {variant.extraSideMinorUnits !== null && (
                     <PriceField
                       label={`תוספת בחירה — ${variant.name}`}

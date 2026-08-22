@@ -206,14 +206,14 @@ const DEFAULT_LUNCH: readonly LunchItem[] = [
         key: 'single',
         label: 'אישית',
         priceMinorUnits: 3_500,
-        includedSides: 0,
+        includedSides: 1,
         sidePriceMinorUnits: 1_500,
       },
       {
         key: 'couple',
         label: 'זוגית',
         priceMinorUnits: 6_000,
-        includedSides: 0,
+        includedSides: 1,
         sidePriceMinorUnits: 2_500,
       },
       {
@@ -2098,7 +2098,11 @@ export function resolveReviewItemQuantities(
       return defaultDessertPortionsForMeals(classifyDessertKind(target.name), assumedMeals)
     }
     if (target.kind === 'extra') return 1
-    return null // challahs follow the meal count automatically; lunch stays explicit
+    // A weekday lunch dish is a standalone plate: naming it IS ordering one
+    // of it. Leaving it unresolved dropped the dish out of the order
+    // entirely and the customer was never charged for it.
+    if (target.kind === 'lunch' || target.kind === 'lunch-addon') return 1
+    return null // challahs follow the meal count automatically
   }
 
   const resolved = new Map<string, number>()

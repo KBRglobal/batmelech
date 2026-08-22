@@ -240,8 +240,8 @@ const LUNCH=[
   ], sideChoice:false, addon:null},
   {key:'kubeh', name:'מנת קובה סלק ביתית', price:35, variants:[], sideChoice:false, addon:null},
   {key:'schnitzel-plate', name:'שניצל בצלחת', price:null, variants:[
-    {key:'single', label:'אישית', price:35, includedSides:0, sidePrice:15},
-    {key:'couple', label:'זוגית', price:60, includedSides:0, sidePrice:25},
+    {key:'single', label:'אישית', price:35, includedSides:1, sidePrice:15},
+    {key:'couple', label:'זוגית', price:60, includedSides:1, sidePrice:25},
     {key:'family', label:'משפחתית — כולל 2 תוספות', price:145, includedSides:2, sidePrice:25}
   ], sideChoice:true, addon:null},
   {key:'couscous', name:'ספיישל קוסקוס', price:35, variants:[], sideChoice:false, addon:{name:'מנת מפרום ביתי', price:20}}
@@ -312,7 +312,7 @@ function renderLunch(){
       </label>`).join('')}
     </div>`:'';
     const sideRows=item.sideChoice&&variant?`<div style="margin-top:4px">
-      <div class="hint" style="margin-bottom:2px">תוספות לבחירה${variant.includedSides?` — ${variant.includedSides} כלולות בכל מנה, מעבר לכך ${variant.sidePrice}$ לתוספת`:` — ${variant.sidePrice}$ לתוספת`}:</div>
+      <div class="hint" style="margin-bottom:2px">תוספות לבחירה${variant.includedSides?` — ${variant.includedSides===1?'תוספת אחת כלולה':`${variant.includedSides} תוספות כלולות`} בכל מנה, מעבר לכך ${variant.sidePrice}$ לתוספת`:` — ${variant.sidePrice}$ לתוספת`}:</div>
       ${LUNCH_SIDES.map((name,sideIndex)=>`<div class="item-row"><span class="item-name">${esc(name)}</span>${stepper('lunchSides',i,entry.sides[name]||0,'s'+sideIndex)}</div>`).join('')}
     </div>`:'';
     const addonRow=item.addon?`<div class="item-row" style="margin-top:4px"><span class="item-name">+ ${esc(item.addon.name)} <span class="item-price">${item.addon.price}$</span></span>${stepper('lunchAddon',i,entry.addon||0)}</div>`:'';

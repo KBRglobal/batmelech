@@ -91,6 +91,119 @@ test('buildIntakeCatalog projects the live menu with the panel id scheme', () =>
   assert.equal(priceById.get('extra:0'), 120);
 });
 
+test('buildIntakeCatalog carries the weekday lunch menu so a kubbeh order can be priced', () => {
+  const { items, priceById, lunchTargetById, liveItemCount } = buildIntakeCatalog(menuState());
+  const kubeh = items.find((item) => item.id === 'lunch:2');
+  assert.equal(kubeh.name, 'מנת קובה סלק ביתית');
+  assert.equal(kubeh.category, 'lunch');
+  assert.equal(kubeh.price, 35);
+  assert.ok(kubeh.aliases.includes('קובה'), 'the word a customer actually types must reach the catalog');
+  assert.equal(priceById.get('lunch:2'), 35);
+  assert.deepEqual(lunchTargetById.get('lunch:2'), { key: 'kubeh', variantKey: '' });
+
+  const familyPlate = items.find((item) => item.id === 'lunch:3:2');
+  assert.equal(familyPlate.name, 'שניצל בצלחת (משפחתית — כולל 2 תוספות)');
+  assert.equal(familyPlate.price, 145);
+  assert.deepEqual(lunchTargetById.get('lunch:3:2'), { key: 'schnitzel-plate', variantKey: 'family' });
+
+  const mafrum = items.find((item) => item.id === 'lunch-addon:4');
+  assert.equal(mafrum.category, 'lunch_addon');
+  assert.equal(mafrum.price, 20);
+  // The lunch fallback must never make an empty menu look loaded.
+  assert.ok(liveItemCount >= 5);
+  assert.equal(buildIntakeCatalog({ menu: {} }).liveItemCount, 0);
+});
+
+test('a stored lunch price and name override the built-in weekday fallback', () => {
+  const state = menuState();
+  state.menu.lunch = [
+    { key: 'kubeh', name: 'מנת קובה סלק — מהדורת חורף', price: 39 },
+    { key: 'schnitzel-plate', variants: [{ k: 'single', price: 38, sidePrice: 15 }] },
+  ];
+  const { items } = buildIntakeCatalog(state);
+  const kubeh = items.find((item) => item.id === 'lunch:2');
+  assert.equal(kubeh.name, 'מנת קובה סלק — מהדורת חורף');
+  assert.equal(kubeh.price, 39);
+  const singlePlate = items.find((item) => item.id === 'lunch:3:0');
+  assert.equal(singlePlate.price, 38);
+  assert.equal(singlePlate.name, 'שניצל בצלחת (אישית)');
+});
+
+test('a lunch dish named with no digit is saved as one portion, not dropped', async () => {
+  const repository = fakeRepository(menuState());
+  const intake = createWhatsAppIntake({
+    repository,
+    reviewOrderIntake: async () => reviewFixture({
+      draft: {
+        ...reviewFixture().draft,
+        items: [
+          {
+            catalogItemId: 'lunch:2',
+            catalogItemName: 'מנת קובה סלק ביתית',
+            category: 'lunch',
+            quantity: null,
+            sourceText: 'קובה',
+            confidence: 0.9,
+          },
+          {
+            catalogItemId: 'lunch-addon:4',
+            catalogItemName: 'מנת מפרום ביתי',
+            category: 'lunch_addon',
+            quantity: null,
+            sourceText: 'מפרום',
+            confidence: 0.8,
+          },
+          {
+            catalogItemId: 'lunch:4',
+            catalogItemName: 'ספיישל קוסקוס',
+            category: 'lunch',
+            quantity: 2,
+            sourceText: '2 קוסקוס',
+            confidence: 0.9,
+          },
+        ],
+      },
+    }),
+    logger: silentLogger,
+  });
+
+  const result = await intake.intake('היי, אני רוצה קובה ו2 קוסקוס עם מפרום');
+  assert.equal(result.ok, true);
+  const saved = repository._current().orders[0];
+  assert.deepEqual(saved.lunch.kubeh, { q: 1, v: '', sides: {}, addon: 0 });
+  assert.deepEqual(saved.lunch.couscous, { q: 2, v: '', sides: {}, addon: 1 });
+  // The dish is a real order line now, not just prose in the notes.
+  assert.match(saved.notes, /מנת קובה סלק ביתית x1/u);
+  // Naming a weekday plate must not invent a Shabbat couple meal.
+  assert.equal(saved.meals, 0);
+});
+
+test('a lunch add-on is dropped when its dish was never ordered', async () => {
+  const repository = fakeRepository(menuState());
+  const intake = createWhatsAppIntake({
+    repository,
+    reviewOrderIntake: async () => reviewFixture({
+      draft: {
+        ...reviewFixture().draft,
+        items: [
+          {
+            catalogItemId: 'lunch-addon:4',
+            catalogItemName: 'מנת מפרום ביתי',
+            category: 'lunch_addon',
+            quantity: null,
+            sourceText: 'מפרום',
+            confidence: 0.8,
+          },
+        ],
+      },
+    }),
+    logger: silentLogger,
+  });
+
+  assert.equal((await intake.intake('אפשר מפרום?')).ok, true);
+  assert.deepEqual(repository._current().orders[0].lunch, {});
+});
+
 test('isoDateFrom parses customer date formats and rejects junk', () => {
   assert.equal(isoDateFrom('2026-08-22'), '2026-08-22');
   assert.equal(isoDateFrom('22.8.2026'), '2026-08-22');

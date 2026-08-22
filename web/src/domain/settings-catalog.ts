@@ -288,7 +288,7 @@ const DEFAULT_LUNCH: readonly LunchItem[] = [
         name: 'אישית',
         priceMinorUnits: 3_500,
         weekendOnly: false,
-        includedSides: 0,
+        includedSides: 1,
         extraSideMinorUnits: 1_500,
       },
       {
@@ -297,7 +297,7 @@ const DEFAULT_LUNCH: readonly LunchItem[] = [
         name: 'זוגית',
         priceMinorUnits: 6_000,
         weekendOnly: false,
-        includedSides: 0,
+        includedSides: 1,
         extraSideMinorUnits: 2_500,
       },
       {
