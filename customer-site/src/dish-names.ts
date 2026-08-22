@@ -6,6 +6,13 @@ import type { Locale } from './locale-context'
 // names only. Written the way each community actually talks about this food
 // (matbucha, chraime, kubbeh — not dictionary translations), per the
 // localization rule: native copy, never word-by-word.
+//
+// A few keys are LEGACY spellings the site used before its Hebrew keys were
+// unified with the panel's menu (e.g. 'סיר קובה סלק עבודת יד' alongside the
+// canonical 'סיר קובה סלק בתוספת אורז (ל־4 אנשים)'). They are kept so an
+// order placed under the old name still renders in English and French — new
+// cards must use the canonical name, which
+// src/canonical-dish-names.test.ts enforces.
 
 interface DishTranslation {
   readonly en: string

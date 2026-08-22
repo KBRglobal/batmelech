@@ -69,12 +69,12 @@ const MAIN_COURSES: Option[] = [
 
 const SIDES: Option[] = [
   { id: 'side-rice-white', name: 'אורז לבן', img: '' },
-  { id: 'side-rice-persian', name: 'אורז פרסי עם עשבי תיבול', img: '' },
+  { id: 'side-rice-persian', name: 'אורז מתובל / פרסי עם עשבי תיבול', img: '' },
   { id: 'side-couscous', name: 'קוסקוס עננים', img: '' },
 ]
 
 const DESSERTS: Option[] = [
-  { id: 'dessert-baklava', name: 'סוכריות בקלאווה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/JCOJo8pP96p.jpeg' },
+  { id: 'dessert-baklava', name: 'סוכריות בקלוואה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/JCOJo8pP96p.jpeg' },
   { id: 'dessert-souffle', name: 'סופלה שוקולד', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/MmM6NDYjm66.jpeg' },
 ]
 

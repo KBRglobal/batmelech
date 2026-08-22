@@ -42,17 +42,17 @@ const FIRST_COURSES: Choice[] = [
 ]
 
 const ROYAL: Royal[] = [
-  { id: 'up-roast-beef', name: 'צלי בקר פרוס ברוטב פטריות וערמונים', price: 150, note: '4 אנשים' },
-  { id: 'special-kubbe-selek', name: 'סיר קובה סלק עבודת יד', price: 125, note: '4 אנשים' },
-  { id: 'up-roulade', name: 'רולדת בשר פריך לצד רוטב פטריות עשיר', price: 100 },
-  { id: 'up-schnitzel-tray', name: 'מגש שניצלים של בית', price: 100, note: "כ-15 יח'" },
-  { id: 'up-tabkha-red', name: 'טבחה בשר אדומה עם אפונה ותפו"א', price: 100, note: '2-3 אנשים' },
+  { id: 'up-roast-beef', name: 'צלי בקר פרוס ברוטב פטריות וערמונים (ל־4 אנשים)', price: 150, note: '4 אנשים' },
+  { id: 'special-kubbe-selek', name: 'סיר קובה סלק בתוספת אורז (ל־4 אנשים)', price: 125, note: '4 אנשים' },
+  { id: 'up-roulade', name: 'רולדת בשר פריך ברוטב פטריות עשיר', price: 100 },
+  { id: 'up-schnitzel-tray', name: "מגש שניצלים (זוגי, כ־13–15 יח')", price: 100, note: "כ-15 יח'" },
+  { id: 'up-tabkha-red', name: 'טבחה בשר אדומה עם אפונה ותפו"א (ל־2־3 אנשים)', price: 100, note: '2-3 אנשים' },
   { id: 'main-meat-red', name: 'קציצות בשר ברוטב אדום עשיר', price: MAIN_PRICE },
   { id: 'main-meat-pea', name: 'קציצות בשר עם אפונה וארטישוק', price: MAIN_PRICE },
   { id: 'main-chicken-morocco', name: 'תבשיל עוף מרוקאי עם חומוסים', price: MAIN_PRICE },
   { id: 'main-chicken-yellow', name: 'טבחה עוף צהובה עם תפו"א', price: MAIN_PRICE },
   { id: 'up-mafrum', name: 'מפרום ביתי של אמא (זוגי)', price: 40 },
-  { id: 'special-kids', name: 'מנת ילדים — פסטה ושניצלונים', price: 35 },
+  { id: 'special-kids', name: 'מנת ילדים — פסטה אדומה ושניצלונים', price: 35 },
   { id: 'up-potato-tray', name: 'מגש תפו"א קריספיים', price: 30 },
   { id: 'up-carb-tray', name: 'מגש אורז / קוסקוס / פסטה אדומה', price: 25 },
   { id: 'up-extra-salads', name: 'תוספת 4 סלטים לבחירה', price: 25 },
@@ -64,8 +64,8 @@ const ROYAL: Royal[] = [
 ]
 
 const DESSERTS = [
-  { id: 'dessert-baklava', name: 'סוכריות בקלאווה מלכותיות', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/JCOJo8pP96p.jpeg' },
-  { id: 'dessert-souffle', name: 'סופלה שוקולד פרימיום (פרווה)', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/MmM6NDYjm66.jpeg' },
+  { id: 'dessert-baklava', name: 'סוכריות בקלוואה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/JCOJo8pP96p.jpeg' },
+  { id: 'dessert-souffle', name: 'סופלה שוקולד', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/MmM6NDYjm66.jpeg' },
 ]
 
 const LOGO_URL = 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/bat-removebg-preview1-jKe7guxvdXt.png'
