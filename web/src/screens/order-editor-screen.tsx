@@ -1974,7 +1974,7 @@ function OrderEditorContent({
               const selection = draft.extras[extra.name] ?? { quantity: 0, note: '' }
               return (
                 <div key={extra.name} className="rounded-2xl border border-border bg-background/60 p-3">
-                  <QuantityStepper label={`${extra.name} · ${formatUsdMinorUnits(extra.priceMinorUnits)}`} value={selection.quantity} onChange={(quantity) => patch({ extras: updateExtraRecord(draft.extras, extra.name, { ...selection, quantity }) })} />
+                  <QuantityStepper label={`${extra.name} · ${extra.priceMinorUnits === null ? 'ללא מחיר בתפריט' : formatUsdMinorUnits(extra.priceMinorUnits)}`} value={selection.quantity} onChange={(quantity) => patch({ extras: updateExtraRecord(draft.extras, extra.name, { ...selection, quantity }) })} />
                   {selection.quantity > 0 && <input aria-label={`הערה ל${extra.name}`} value={selection.note} onChange={(event) => patch({ extras: updateExtraRecord(draft.extras, extra.name, { ...selection, note: event.currentTarget.value }) })} placeholder={extra.name === 'תוספת מנת דג' ? 'איזה דג?' : 'הערה'} className={`${inputClassName} mt-2`} />}
                 </div>
               )

@@ -731,6 +731,51 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pricing.result?.totalMinorUnits).toBe(39_000)
   })
 
+  it('prices a stored extra whose saved price is not a plain number', () => {
+    // A legacy store keeps a price as the string the operator typed. The
+    // menu editor already reads that; the pricing engine used to fall
+    // straight through to 0, so a $125 סיר קובה סלק joined the order as a
+    // $0.00 line and the suggested total was quietly short by its price.
+    const kubeh = 'סיר קובה סלק בתוספת אורז (ל־4 אנשים)'
+    for (const storedPrice of [125, '125', '$125', null, undefined]) {
+      const menu = buildOrderEditorMenu({
+        orders: [],
+        menu: { extras: [{ name: kubeh, price: storedPrice }] },
+      } as unknown as LegacyStore)
+      expect(menu.extras.find((extra) => extra.name === kubeh)?.priceMinorUnits)
+        .toBe(12_500)
+
+      const pricing = calculateOrderDraftPricing(
+        draftWith({ meals: 1, extras: { [kubeh]: { quantity: 1, note: '' } } }),
+        menu,
+      )
+      expect(pricing.issues.filter((issue) => issue.blocking)).toEqual([])
+      expect(pricing.result?.lines).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: kubeh, amountMinorUnits: 12_500 })]),
+      )
+    }
+  })
+
+  it('refuses to save an ordered extra it cannot price instead of charging nothing', () => {
+    const unknownDish = 'מנה שאינה בתפריט'
+    const menu = buildOrderEditorMenu({
+      orders: [],
+      menu: { extras: [{ name: unknownDish }] },
+    } as unknown as LegacyStore)
+    expect(menu.extras.find((extra) => extra.name === unknownDish)?.priceMinorUnits).toBeNull()
+
+    const pricing = calculateOrderDraftPricing(
+      draftWith({ meals: 1, extras: { [unknownDish]: { quantity: 1, note: '' } } }),
+      menu,
+    )
+    expect(pricing.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'UNPRICED_EXTRA', blocking: true })]),
+    )
+    expect(pricing.result?.lines).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: unknownDish })]),
+    )
+  })
+
   it('gives every schnitzel plate the side choice its price already covers', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     // The plate requires a side and the menu price includes it
