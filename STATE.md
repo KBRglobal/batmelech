@@ -1,24 +1,27 @@
-# STATE — batmelech (updated: 2026-08-24 07:00)
+# STATE — batmelech (updated: 2026-08-24 19:00)
 
 ## Now (in progress)
-- ROOT DOMAIN TLS BROKEN (found 2026-08-24): batmelech.ae serves Railway's
-  wildcard cert — every browser shows a security warning on the root domain
-  (www.batmelech.ae is fine, cert valid). Cause: Railway custom domain never
-  verified — DNS at registrar AEserver (rrpproxy NS) has apex A 69.46.46.44
-  instead of the required CNAME 80xdnueu.up.railway.app. Plan: move DNS to
-  Cloudflare (Moshe's standard) — needs AEserver client-area login (account
-  email Linasulin07@gmail.com, saved in Chrome; Moshe must click Login).
-  DNS inventory to replicate: apex A (-> proxied CNAME flattening), www CNAME
-  cgzhau1p.up.railway.app, TXT _railway-verify=6fa4...; no MX.
-- Remote-session merge landed (ca5c68d): Aug-22 cloud work (billing fixes —
-  schnitzel side charged, kubbeh; dish-key unification; Mey full-business
-  read) merged into local main with Aug-20 order-editor/prep work. One test
-  fixture conflict resolved; 888 web + 637 server tests green. NOT yet
-  deployed — prod still runs the Aug-20 build; needs Moshe's OK + railway up.
+- ROOT DOMAIN FIXED + LIVE (2026-08-24 ~18:50): batmelech.ae serves with a
+  valid cert (CN=batmelech.ae via Cloudflare edge; root + www 200, catalog
+  200, http->https ok). What was done: DNS zone moved to Cloudflare (zone
+  57fd1884... in the KBR account; NS arushi/quentin.ns.cloudflare.com set at
+  registrar AEserver from the client Lin Asulin's client-area, Moshe logged
+  in), all records replicated (www CNAME cgzhau1p.up.railway.app, MX/TXT
+  Resend set, _railway-verify TXT), SSL mode Full, always-https on. The
+  stuck Railway custom domain was deleted and re-added — new apex target
+  CNAME m75al0mj.up.railway.app (proxied/flattened at Cloudflare); domain
+  now Verified: yes, cert VALID. NOTE: _dmarc/resend._domainkey TXT values
+  look swapped (replicated as-is from old DNS) — untangle with a Resend
+  dashboard check some day.
+- Remote-session merge DEPLOYED (2026-08-24 ~18:41 UTC+4 SUCCESS): Aug-22
+  cloud billing fixes + dish-key unification + Mey full-business read are
+  live, merged with Aug-20 order-editor/prep work. tsc -b caught two merged
+  test fixtures missing the required note field (vitest alone missed it) —
+  fixed. 888 web + 637 server tests green.
 - Old unmerged cloud branch claude/meal-orders-management-system-vdi81y
   (Aug 6): QR codes on vouchers/stickers/flyer + hebcal calendar. Calendar
-  exists on main; QR feature does not. 18 days stale, unmergeable as-is —
-  re-implement if Moshe wants it, then delete the branch.
+  exists on main; QR does not. 18 days stale, unmergeable — awaiting Moshe:
+  re-implement or drop; then delete the branch.
 - Octypo fleet monitor no longer uses the batmelech Telegram bot (secrets
   deleted from that repo) — Mey's chat gets Bat Melech notifications only.
 
