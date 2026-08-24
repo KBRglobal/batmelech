@@ -34,6 +34,7 @@ export const LOCAL_ICON_PATHS = {
   'ph:list-checks-bold': `${PUBLIC_BASE}icons/ph-list-checks-bold.svg`,
   'ph:map-pin-bold': `${PUBLIC_BASE}icons/ph-map-pin-bold.svg`,
   'ph:package-bold': `${PUBLIC_BASE}icons/ph-package-bold.svg`,
+  'ph:printer-bold': `${PUBLIC_BASE}icons/ph-printer-bold.svg`,
   'ph:pencil-simple-bold': `${PUBLIC_BASE}icons/ph-pencil-simple-bold.svg`,
   'ph:plus-bold': `${PUBLIC_BASE}icons/ph-plus-bold.svg`,
   'ph:plus-circle-bold': `${PUBLIC_BASE}icons/ph-plus-circle-bold.svg`,

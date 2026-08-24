@@ -6,6 +6,7 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { OrderBon } from '../components/order-bon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
+import { bonQrTargets } from '../domain/bon-qr.ts'
 import { CANONICAL_ORDER_ID_PATTERN } from '../domain/order-editor.ts'
 import {
   loadSettingsCatalog,
@@ -134,7 +135,7 @@ export function OrderBonScreen() {
       <BonMediaPicker value={media} onChange={selectMedia} />
 
       <div className="bm-bon-sheet">
-        <OrderBon order={order} />
+        <OrderBon order={order} qr={bonQrTargets(order, storeQuery.data?.data ?? { orders: [] })} />
         {hasKitchenNotes && <KitchenBon orderId={orderId} notes={kitchenNotes} />}
       </div>
     </div>

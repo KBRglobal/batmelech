@@ -74,6 +74,8 @@ ${scope} .bm-bon-value { overflow-wrap:anywhere; }
 ${scope} .bm-bon-note { font-size:7.5pt; line-height:1.25; }
 ${scope} .bm-bon-total { font-size:11pt; margin:2mm 0 0; padding-top:1.5mm; border-top-width:.5mm; }
 ${scope} .bm-bon-payment { font-size:7.5pt; margin:1mm 0 0; gap:0 2.5mm; }
+${scope} .bm-bon-qrs { margin-top:2mm; padding-top:1.5mm; gap:4mm; }
+${scope} .bm-bon-qr { width:20mm; font-size:6pt; }
 ${scope} .bm-bon-foot { font-size:8pt; margin-top:2mm; padding-top:1.5mm; }
 `
 }

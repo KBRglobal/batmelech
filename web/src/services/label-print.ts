@@ -51,6 +51,8 @@ ${scope} .bm-label-name { font-size:10pt; margin:.8mm 0 .3mm; line-height:1.12; 
 ${scope} .bm-label-meta { font-size:7.5pt; line-height:1.18; overflow-wrap:anywhere; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 ${scope} .bm-label-guidance { margin-top:.8mm; padding-top:.8mm; border-top:.2mm dashed #333; font-size:5.5pt; line-height:1.15; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 ${scope} .bm-label-prep-details { font-size:6pt; line-height:1.12; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+/* 29mm leaves no room for a scannable code — text only. */
+${scope} .bm-label-qr { display:none; }
 `
     : `
 ${scope} .bm-label-brand { font-size:11pt; line-height:1.15; }
@@ -59,6 +61,7 @@ ${scope} .bm-label-name { font-size:15pt; margin:2.5mm 0 1.5mm; line-height:1.15
 ${scope} .bm-label-meta { font-size:10pt; line-height:1.35; overflow-wrap:anywhere; }
 ${scope} .bm-label-guidance { margin-top:2.5mm; padding-top:2mm; border-top:.3mm dashed #333; font-size:8pt; line-height:1.3; }
 ${scope} .bm-label-prep-details { font-size:9pt; line-height:1.3; }
+${scope} .bm-label-qr { width:16mm; margin-top:1.5mm; font-size:6pt; }
 `
 }
 

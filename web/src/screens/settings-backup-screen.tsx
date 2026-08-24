@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
+import { QrCode } from '../components/qr-code.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { StaffLoginSection } from '../components/staff-login-section.tsx'
 import { StoragePlanSection } from '../components/storage-plan-section.tsx'
@@ -10,6 +11,9 @@ import { MeyAuditSection } from '../components/mey-audit-section.tsx'
 import { DeliveryWindowsSection } from '../components/delivery-windows-section.tsx'
 import { HolidayMenusSection } from '../components/holiday-menus-section.tsx'
 import { isSameVersionedStateEnvelope } from '../data/versioned-screen-save.tsx'
+import { validHttpUrl } from '../domain/bon-qr.ts'
+import { upcomingShabbat } from '../domain/flyer-shabbat.ts'
+import { printFlyer } from '../services/flyer-print.ts'
 import { useStore } from '../data/use-store.ts'
 import { buildDishCostIndex } from '../domain/cost-lookup.ts'
 import {
@@ -355,6 +359,43 @@ export function SettingsBackupScreen({ onSave, onRestore }: SettingsBackupScreen
               />
             </label>
           </div>
+          {(validHttpUrl(currentDraft.paymentLink) || validHttpUrl(currentDraft.customerOrderFormUrl)) && (
+            <div className="mt-6 flex flex-wrap items-start justify-center gap-10">
+              {validHttpUrl(currentDraft.paymentLink) && (
+                <QrCode
+                  caption="סריקה לתשלום"
+                  className="w-32 text-xs text-muted-foreground"
+                  value={currentDraft.paymentLink.trim()}
+                />
+              )}
+              {validHttpUrl(currentDraft.customerOrderFormUrl) && (
+                <QrCode
+                  caption="להזמנה הבאה — סורקים"
+                  className="w-32 text-xs text-muted-foreground"
+                  value={currentDraft.customerOrderFormUrl.trim()}
+                />
+              )}
+            </div>
+          )}
+          {validHttpUrl(currentDraft.customerOrderFormUrl) && (
+            <div className="mt-5 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!printFlyer(currentDraft.customerOrderFormUrl.trim(), upcomingShabbat())) {
+                    window.alert('הדפדפן חסם את חלון ההדפסה — לאפשר חלונות קופצים ולנסות שוב.')
+                  }
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90"
+              >
+                <LocalIcon name="ph:printer-bold" className="text-lg" />
+                <span>הדפסת פלייר עם QR</span>
+              </button>
+              <p className="mt-2 text-xs font-bold text-muted-foreground">
+                פלייר ממותג לפרסום בקהילה — עם הפרשה וזמן הדלקת נרות של השבת הקרובה.
+              </p>
+            </div>
+          )}
         </section>
 
         <section className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm sm:p-8">

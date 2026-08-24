@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
+import { QrCode } from '../components/qr-code.tsx'
+import { orderFormQrTarget } from '../domain/bon-qr.ts'
 import { useStore } from '../data/use-store.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder } from '../domain/store.ts'
@@ -229,7 +231,10 @@ function preparationGroups(order: Readonly<LegacyOrder>, orderId: string): Prepa
   return invalid ? { ok: false } : { ok: true, groups }
 }
 
-function BagLabel({ order }: { readonly order: Readonly<LegacyOrder> }) {
+function BagLabel({ order, qrTarget }: {
+  readonly order: Readonly<LegacyOrder>
+  readonly qrTarget: string | null
+}) {
   const date = text(order.date)
   return (
     <article className="bm-label-card" data-label-kind="bag" dir="rtl">
@@ -247,6 +252,9 @@ function BagLabel({ order }: { readonly order: Readonly<LegacyOrder> }) {
         לשמור בקירור עד החימום · חימום בכלי מכוסה
         {realDate(date) ? ` · הוכן בתאריך ${dateLabel(date, true)}` : ''}
       </span>
+      {qrTarget !== null && (
+        <QrCode caption="סרקו להזמנה הבאה" className="bm-label-qr mx-auto w-20 text-[10px] text-muted-foreground" value={qrTarget} />
+      )}
     </article>
   )
 }
@@ -275,6 +283,7 @@ export function LabelsScreen() {
   const [media, setMedia] = useState<LabelMedia>(rememberedLabelMedia())
 
   const orders = storeQuery.data?.data?.orders ?? EMPTY_ORDERS
+  const labelQrTarget = orderFormQrTarget(storeQuery.data?.data ?? { orders: [] })
   const dates = useMemo(() => [...new Set(orders.filter(active).map((order) => order.date).filter(realDate))].sort(), [orders])
   const requestedDate = searchParams.get('date') ?? ''
   const selectedDate = realDate(requestedDate) ? requestedDate : (upcomingServiceDate(dates) ?? '')
@@ -479,7 +488,7 @@ export function LabelsScreen() {
         <section aria-labelledby="bag-preview-title">
           <h2 id="bag-preview-title" className="bm-label-screen-only mb-4 text-lg font-black text-primary">תצוגה מקדימה — שקיות ({bagLabels.length})</h2>
           {bagLabels.length > 0 ? (
-            <div className="bm-label-sheet bm-bag-labels">{bagLabels.map(({ order, key }) => <BagLabel key={key} order={order} />)}</div>
+            <div className="bm-label-sheet bm-bag-labels">{bagLabels.map(({ order, key }) => <BagLabel key={key} order={order} qrTarget={labelQrTarget} />)}</div>
           ) : <p className="bm-label-screen-only rounded-2xl bg-card p-5 text-sm font-bold text-muted-foreground">אין מדבקות לשקיות בתצוגה.</p>}
         </section>
         <section aria-labelledby="prep-preview-title">

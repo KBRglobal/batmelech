@@ -6,6 +6,7 @@ import { LocalIcon } from '../components/local-icon.tsx'
 import { OrderBon } from '../components/order-bon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
 import { useStore } from '../data/use-store.ts'
+import { bonQrTargets } from '../domain/bon-qr.ts'
 import { upcomingServiceDate } from '../domain/service-dates.ts'
 import type { LegacyOrder } from '../domain/store.ts'
 import {
@@ -160,7 +161,13 @@ export function OrderBonsBatchScreen() {
           <div className="mt-8">
             <BonMediaPicker value={media} onChange={selectMedia} />
             <div className="bm-bon-sheet space-y-8">
-              {scopedOrders.map((order) => <OrderBon key={String(order.id)} order={order} />)}
+              {scopedOrders.map((order) => (
+                <OrderBon
+                  key={String(order.id)}
+                  order={order}
+                  qr={bonQrTargets(order, storeQuery.data?.data ?? { orders: [] })}
+                />
+              ))}
             </div>
           </div>
         )}

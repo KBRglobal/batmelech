@@ -1,4 +1,6 @@
 import { BrandLogo } from './brand-logo.tsx'
+import { QrCode } from './qr-code.tsx'
+import type { BonQrTargets } from '../domain/bon-qr.ts'
 import { parseUsdInputMinorUnits } from '../domain/order-editor.ts'
 import { type BonField, bonPaymentFields, bonServiceDate, buildBonFields } from '../domain/orders-dashboard.ts'
 import type { LegacyOrder } from '../domain/store.ts'
@@ -36,7 +38,10 @@ function BonRow({ field }: { readonly field: Readonly<BonField> }) {
  * One printable bon. The `bm-bon-*` hooks are what the print stylesheet sizes
  * for the QL-800 roll, so they must stay on these elements.
  */
-export function OrderBon({ order }: { readonly order: Readonly<LegacyOrder> }) {
+export function OrderBon({ order, qr }: {
+  readonly order: Readonly<LegacyOrder>
+  readonly qr?: Readonly<BonQrTargets>
+}) {
   const orderId = String(order.id)
   const status = typeof order.status === 'string' && order.status.trim() ? order.status.trim() : 'לא צוין'
   const fields = buildBonFields(order)
@@ -86,6 +91,25 @@ export function OrderBon({ order }: { readonly order: Readonly<LegacyOrder> }) {
           </div>
         ))}
       </dl>
+
+      {qr !== undefined && (qr.payment !== null || qr.orderForm !== null) && (
+        <div className="bm-bon-qrs mt-5 flex items-start justify-center gap-8 border-t border-dashed border-border pt-4">
+          {qr.payment !== null && (
+            <QrCode
+              caption={total !== null ? `סריקה לתשלום · ${total}` : 'סריקה לתשלום'}
+              className="bm-bon-qr w-28 text-xs text-primary"
+              value={qr.payment}
+            />
+          )}
+          {qr.orderForm !== null && (
+            <QrCode
+              caption="להזמנה הבאה — סורקים"
+              className="bm-bon-qr w-28 text-xs text-muted-foreground"
+              value={qr.orderForm}
+            />
+          )}
+        </div>
+      )}
 
       <footer className="bm-bon-foot mt-6 border-t border-dashed border-border pt-5 text-center text-sm font-black text-primary">
         בשם השם נעשה ונצליח!
