@@ -18,10 +18,12 @@
   live, merged with Aug-20 order-editor/prep work. tsc -b caught two merged
   test fixtures missing the required note field (vitest alone missed it) —
   fixed. 888 web + 637 server tests green.
-- Old unmerged cloud branch claude/meal-orders-management-system-vdi81y
-  (Aug 6): QR codes on vouchers/stickers/flyer + hebcal calendar. Calendar
-  exists on main; QR does not. 18 days stale, unmergeable — awaiting Moshe:
-  re-implement or drop; then delete the branch.
+- QR feature REBUILT on main (2026-08-24, Moshe approved): bons carry
+  order-form + unpaid-payment QRs, bag stickers a small QR (hidden on 29mm),
+  settings has live QR previews + A5 community flyer (parasha + Dubai candle
+  lighting via @hebcal/core in web). 908 web tests green. The stale Aug-6
+  branch claude/meal-orders-management-system-vdi81y is now fully superseded
+  — delete it once Moshe confirms the printed QRs scan well.
 - Octypo fleet monitor no longer uses the batmelech Telegram bot (secrets
   deleted from that repo) — Mey's chat gets Bat Melech notifications only.
 
