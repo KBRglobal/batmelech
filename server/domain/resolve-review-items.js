@@ -36,7 +36,11 @@ function resolveReviewItemQuantities(reviewItems, catalogById, currentMeals) {
     if (category === 'salad' || category === 'main' || category === 'side') return 1;
     if (category === 'dessert') return defaultDessertPortionsForMeals(classifyDessertKind(name), assumedMeals);
     if (category === 'extra') return 1;
-    return null; // challahs follow the meal count automatically; anything else stays explicit
+    // A weekday lunch dish is a standalone plate: naming it IS ordering one
+    // of it. Leaving it unresolved dropped the dish out of the order
+    // entirely and the customer was never charged for it.
+    if (category === 'lunch' || category === 'lunch_addon') return 1;
+    return null; // challahs follow the meal count automatically
   };
 
   const resolved = new Map();

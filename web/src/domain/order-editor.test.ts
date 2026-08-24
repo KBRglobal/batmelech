@@ -732,6 +732,99 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pricing.result?.totalMinorUnits).toBe(39_000)
   })
 
+  it('prices a stored extra whose saved price is not a plain number', () => {
+    // A legacy store keeps a price as the string the operator typed. The
+    // menu editor already reads that; the pricing engine used to fall
+    // straight through to 0, so a $125 סיר קובה סלק joined the order as a
+    // $0.00 line and the suggested total was quietly short by its price.
+    const kubeh = 'סיר קובה סלק בתוספת אורז (ל־4 אנשים)'
+    for (const storedPrice of [125, '125', '$125', null, undefined]) {
+      const menu = buildOrderEditorMenu({
+        orders: [],
+        menu: { extras: [{ name: kubeh, price: storedPrice }] },
+      } as unknown as LegacyStore)
+      expect(menu.extras.find((extra) => extra.name === kubeh)?.priceMinorUnits)
+        .toBe(12_500)
+
+      const pricing = calculateOrderDraftPricing(
+        draftWith({ meals: 1, extras: { [kubeh]: { quantity: 1, note: '' } } }),
+        menu,
+      )
+      expect(pricing.issues.filter((issue) => issue.blocking)).toEqual([])
+      expect(pricing.result?.lines).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: kubeh, amountMinorUnits: 12_500 })]),
+      )
+    }
+  })
+
+  it('refuses to save an ordered extra it cannot price instead of charging nothing', () => {
+    const unknownDish = 'מנה שאינה בתפריט'
+    const menu = buildOrderEditorMenu({
+      orders: [],
+      menu: { extras: [{ name: unknownDish }] },
+    } as unknown as LegacyStore)
+    expect(menu.extras.find((extra) => extra.name === unknownDish)?.priceMinorUnits).toBeNull()
+
+    const pricing = calculateOrderDraftPricing(
+      draftWith({ meals: 1, extras: { [unknownDish]: { quantity: 1, note: '' } } }),
+      menu,
+    )
+    expect(pricing.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'UNPRICED_EXTRA', blocking: true })]),
+    )
+    expect(pricing.result?.lines).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: unknownDish })]),
+    )
+  })
+
+  it('gives every schnitzel plate the side choice its price already covers', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    // The plate requires a side and the menu price includes it
+    // (docs/menu-source-of-truth-2026-08-14.md); only sides beyond the
+    // allowance are a charge.
+    const oneSide = calculateOrderDraftPricing(
+      draftWith({
+        meals: 0,
+        challot: 0,
+        lunch: {
+          'schnitzel-plate': {
+            quantity: 1,
+            variantKey: 'single',
+            sides: { 'אורז לבן': 1 },
+            addonQuantity: 0,
+          },
+        },
+      }),
+      menu,
+    )
+    expect(oneSide.result?.totalMinorUnits).toBe(3_500)
+    expect(oneSide.result?.lines).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'תוספות לשניצל בצלחת' })]),
+    )
+
+    const twoSides = calculateOrderDraftPricing(
+      draftWith({
+        meals: 0,
+        challot: 0,
+        lunch: {
+          'schnitzel-plate': {
+            quantity: 1,
+            variantKey: 'couple',
+            sides: { 'אורז לבן': 1, 'פסטה אדומה': 1 },
+            addonQuantity: 0,
+          },
+        },
+      }),
+      menu,
+    )
+    expect(twoSides.result?.lines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'תוספות לשניצל בצלחת', amountMinorUnits: 2_500 }),
+      ]),
+    )
+    expect(twoSides.result?.totalMinorUnits).toBe(8_500)
+  })
+
   it('flags weekday challah without blocking and rejects malformed custom money', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const pricing = calculateOrderDraftPricing(
@@ -785,11 +878,11 @@ describe('deterministic draft pricing and allowances', () => {
             quantity: 2,
             variantKey: 'single',
             addonQuantity: 0,
-            sides: { 'אורז לבן': 3 },
+            sides: { 'אורז לבן': 4 },
             note: '',
             plates: [
               { variantKey: 'single', sides: { 'אורז לבן': 1 } },
-              { variantKey: 'family', sides: { 'אורז לבן': 2 } },
+              { variantKey: 'family', sides: { 'אורז לבן': 3 } },
             ],
           },
         },
@@ -803,8 +896,9 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
       name: 'שניצל בצלחת (משפחתית — כולל 2 תוספות)', quantity: 1, amountMinorUnits: 14_500,
     }))
-    // 3 sides selected, 2 included by the family plate → 1 excess, charged at
-    // the highest side price among the chosen variants (the family's $25).
+    // 4 sides selected, 3 included (1 with the single plate, 2 with the
+    // family one) → 1 excess, charged at the highest side price among the
+    // chosen variants (the family's $25).
     expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
       name: 'תוספות לשניצל בצלחת', quantity: 1, amountMinorUnits: 2_500,
     }))
@@ -1103,6 +1197,43 @@ describe('validation and AI review application', () => {
     expect(calculateOrderDraftPricing(applied, menu).result?.lines).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ name: expect.stringContaining('מפרום') })]),
     )
+  })
+
+  it('applies a lunch dish the customer named without a digit as one portion', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const catalog = buildAIOrderCatalog(menu)
+    const kubeh = catalog.items.find((item) => item.name === 'מנת קובה סלק ביתית')!
+    // Customers say "אני רוצה קובה", never "קובה x1". Leaving the quantity
+    // unresolved dropped the dish out of the order and off the bill.
+    const applied = applyAIReviewToDraft(
+      draftWith({ meals: 0, challot: 0, lunch: {} }),
+      reviewWith({
+        draft: {
+          customerName: null,
+          customerPhone: null,
+          serviceDate: null,
+          serviceTime: null,
+          fulfillmentMethod: 'pickup',
+          deliveryLocation: null,
+          items: [{
+            catalogItemId: kubeh.id,
+            catalogItemName: kubeh.name,
+            category: kubeh.category,
+            quantity: null,
+            sourceText: 'קובה',
+            confidence: 0.9,
+          }],
+          notes: [],
+        },
+      }),
+      catalog.targetsById,
+      menu,
+    )
+
+    expect(applied.lunch.kubeh).toMatchObject({ quantity: 1 })
+    // A weekday plate is not evidence of a Shabbat couple meal.
+    expect(applied.meals).toBe(0)
+    expect(calculateOrderDraftPricing(applied, menu).result?.totalMinorUnits).toBe(3_500)
   })
 
   it('applies a paid lunch add-on after its parent regardless of review item order', () => {

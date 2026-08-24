@@ -34,7 +34,7 @@ const ALLERGY_ICON: Record<MenuItem['allergies'][number], string> = {
 const MENU: MenuItem[] = [
   {
     id: 'schnitzel-baguette',
-    name: 'בגט / חלת שניצל ישראלי',
+    name: 'בגט/חלת שניצל ישראלי',
     img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7VXcb8xTxLR.jpeg',
     allergies: ['gluten', 'egg'],
     variants: [
@@ -55,7 +55,7 @@ const MENU: MenuItem[] = [
   },
   {
     id: 'kubbe-selek',
-    name: 'קובה סלק ביתית',
+    name: 'מנת קובה סלק ביתית',
     img: '/site/assets/kubbe-selek-real.jpg',
     allergies: ['gluten-free'],
     price: 35,

@@ -1,0 +1,187 @@
+{
+  "note": "Shared by tests/recipe-cost.test.js (server) and web/src/domain/recipe-cost-parity.test.ts (panel). Both engines must produce `expected` exactly. Edit the numbers only when the costing rules themselves change, and make both suites green.",
+  "productLibrary": [
+    {
+      "id": "prod-beef",
+      "name": "בשר בקר טחון",
+      "category": "meat",
+      "kosherOnly": true,
+      "supplierOverride": null,
+      "insignificant": false,
+      "listings": {
+        "nesto": { "packSize": "1", "packUnit": "ק\"ג", "packPriceMinorUnits": 1000, "updatedAt": 1, "manualPrice": null },
+        "rimon": { "packSize": "2", "packUnit": "ק\"ג", "packPriceMinorUnits": 9000, "updatedAt": 1, "manualPrice": null }
+      }
+    },
+    {
+      "id": "prod-onion",
+      "name": "בצל",
+      "category": "vegetable",
+      "kosherOnly": false,
+      "supplierOverride": null,
+      "insignificant": false,
+      "listings": {
+        "nesto": { "packSize": "5", "packUnit": "ק\"ג", "packPriceMinorUnits": 1500, "updatedAt": 1, "manualPrice": null },
+        "lulu": { "packSize": "1", "packUnit": "ק\"ג", "packPriceMinorUnits": 250, "updatedAt": 1, "manualPrice": null }
+      }
+    },
+    {
+      "id": "prod-oil",
+      "name": "שמן",
+      "category": "pantry",
+      "kosherOnly": false,
+      "supplierOverride": "lulu",
+      "insignificant": false,
+      "listings": {
+        "nesto": { "packSize": "1", "packUnit": "ליטר", "packPriceMinorUnits": 800, "updatedAt": 1, "manualPrice": null },
+        "lulu": { "packSize": "5", "packUnit": "ליטר", "packPriceMinorUnits": 6000, "updatedAt": 1, "manualPrice": null }
+      }
+    },
+    {
+      "id": "prod-egg",
+      "name": "ביצים",
+      "category": "dairy",
+      "kosherOnly": false,
+      "supplierOverride": null,
+      "insignificant": false,
+      "listings": {
+        "nesto": { "packSize": "30", "packUnit": "יחידה", "packPriceMinorUnits": 1200, "updatedAt": 1, "manualPrice": { "minorUnitsPerBaseUnit": 55, "updatedAt": 2 } }
+      }
+    },
+    {
+      "id": "prod-salt",
+      "name": "מלח",
+      "category": "pantry",
+      "kosherOnly": false,
+      "supplierOverride": null,
+      "insignificant": true,
+      "listings": {}
+    }
+  ],
+  "cases": [
+    {
+      "name": "kosherOnly forces rimon even though nesto is cheaper, and waste raises the quantity",
+      "recipe": {
+        "itemId": "dish-meatballs",
+        "name": "קציצות בשר",
+        "yield": 10,
+        "ingredients": [
+          { "ingredientId": "prod-beef", "ingredientName": "בשר בקר טחון", "quantity": "2", "unit": "ק\"ג", "wastePercent": "10" }
+        ]
+      },
+      "expected": {
+        "complete": true,
+        "totalMinorUnits": 9900,
+        "perYieldUnitMinorUnits": 990,
+        "totalWeightGrams": 2200,
+        "minorUnitsPer100g": 450,
+        "supplierByIngredient": { "prod-beef": "rimon" },
+        "warningCodes": []
+      }
+    },
+    {
+      "name": "cheapest listing wins, grams convert to the kilogram pack base",
+      "recipe": {
+        "itemId": "dish-onion",
+        "name": "בצל מטוגן",
+        "yield": 4,
+        "ingredients": [
+          { "ingredientId": "prod-onion", "ingredientName": "בצל", "quantity": "500", "unit": "גרם" }
+        ]
+      },
+      "expected": {
+        "complete": true,
+        "totalMinorUnits": 125,
+        "perYieldUnitMinorUnits": 31,
+        "totalWeightGrams": 500,
+        "minorUnitsPer100g": 25,
+        "supplierByIngredient": { "prod-onion": "lulu" },
+        "warningCodes": []
+      }
+    },
+    {
+      "name": "supplierOverride beats the cheaper listing; millilitres convert to the litre pack base",
+      "recipe": {
+        "itemId": "dish-oil",
+        "name": "טיגון",
+        "yield": 2,
+        "ingredients": [
+          { "ingredientId": "prod-oil", "ingredientName": "שמן", "quantity": "250", "unit": "מ\"ל" }
+        ]
+      },
+      "expected": {
+        "complete": true,
+        "totalMinorUnits": 300,
+        "perYieldUnitMinorUnits": 150,
+        "totalWeightGrams": null,
+        "minorUnitsPer100g": null,
+        "supplierByIngredient": { "prod-oil": "lulu" },
+        "warningCodes": []
+      }
+    },
+    {
+      "name": "a manual price overrides the pack maths, per piece",
+      "recipe": {
+        "itemId": "dish-eggs",
+        "name": "סלט ביצים",
+        "yield": 5,
+        "ingredients": [
+          { "ingredientId": "prod-egg", "ingredientName": "ביצים", "quantity": "12", "unit": "יחידה" }
+        ]
+      },
+      "expected": {
+        "complete": true,
+        "totalMinorUnits": 660,
+        "perYieldUnitMinorUnits": 132,
+        "totalWeightGrams": null,
+        "minorUnitsPer100g": null,
+        "supplierByIngredient": { "prod-egg": "nesto" },
+        "warningCodes": []
+      }
+    },
+    {
+      "name": "finishedYieldGrams beats summed raw weight for the per-100g figure",
+      "recipe": {
+        "itemId": "dish-cooked",
+        "name": "תבשיל מצטמצם",
+        "yield": 4,
+        "finishedYieldGrams": 1000,
+        "ingredients": [
+          { "ingredientId": "prod-beef", "ingredientName": "בשר בקר טחון", "quantity": "2", "unit": "ק\"ג" }
+        ]
+      },
+      "expected": {
+        "complete": true,
+        "totalMinorUnits": 9000,
+        "perYieldUnitMinorUnits": 2250,
+        "totalWeightGrams": 1000,
+        "minorUnitsPer100g": 900,
+        "supplierByIngredient": { "prod-beef": "rimon" },
+        "warningCodes": []
+      }
+    },
+    {
+      "name": "every gap is named and the priced part still totals",
+      "recipe": {
+        "itemId": "dish-gaps",
+        "name": "מנה עם חורים",
+        "yield": 2,
+        "ingredients": [
+          { "ingredientId": "prod-onion", "ingredientName": "בצל", "quantity": "1", "unit": "ק\"ג" },
+          { "ingredientId": "prod-missing", "ingredientName": "תבלין נעלם", "quantity": "50", "unit": "גרם" },
+          { "ingredientId": "prod-salt", "ingredientName": "מלח", "quantity": "20", "unit": "גרם" },
+          { "ingredientId": "prod-egg", "ingredientName": "ביצים", "quantity": "100", "unit": "גרם" }
+        ]
+      },
+      "expected": {
+        "complete": false,
+        "totalMinorUnits": 250,
+        "perYieldUnitMinorUnits": 125,
+        "totalWeightGrams": 1170,
+        "minorUnitsPer100g": 21,
+        "supplierByIngredient": { "prod-onion": "lulu", "prod-missing": null, "prod-salt": null, "prod-egg": "nesto" },
+        "warningCodes": ["MISSING_PRODUCT", "UNPRICED_PRODUCT", "INCOMPARABLE_UNIT"]
+      }
+    }
+  ]
+}

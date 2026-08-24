@@ -10,6 +10,7 @@ import {
   SOUFFLE_HALF_UNITS_PER_PORTION,
   defaultDessertPortionsForMeals,
 } from './package-rules.ts'
+import { parseLegacyUsdAmount } from './customers-finance.ts'
 import { checkedAdd, checkedMultiply, requireNonNegativeSafeInteger } from './money.ts'
 import {
   DELIVERY_EXTRA_NAME,
@@ -116,7 +117,8 @@ function isDeliveryZone(value: unknown): value is DeliveryZone {
 
 export interface MenuExtra {
   readonly name: string
-  readonly priceMinorUnits: number
+  /** null when neither the store nor the kitchen's own table can price it. */
+  readonly priceMinorUnits: number | null
 }
 
 export interface LunchVariant {
@@ -206,14 +208,14 @@ const DEFAULT_LUNCH: readonly LunchItem[] = [
         key: 'single',
         label: 'אישית',
         priceMinorUnits: 3_500,
-        includedSides: 0,
+        includedSides: 1,
         sidePriceMinorUnits: 1_500,
       },
       {
         key: 'couple',
         label: 'זוגית',
         priceMinorUnits: 6_000,
-        includedSides: 0,
+        includedSides: 1,
         sidePriceMinorUnits: 2_500,
       },
       {
@@ -802,6 +804,23 @@ function normalizeLunchMenu(value: unknown): readonly LunchItem[] {
   })
 }
 
+const DEFAULT_EXTRA_PRICE_MINOR_UNITS: ReadonlyMap<string, number> = new Map(
+  DEFAULT_EXTRAS_DOLLARS.map(([name, price]) => [name, price * 100]),
+)
+
+// A stored extra's price is whatever the legacy store happens to hold, and
+// it is not always a JS number — a legacy row keeps it as the string the
+// operator once typed ("125"). Read it the way the menu editor already
+// does (parseLegacyUsdAmount), then fall back to the kitchen's own price
+// for that dish. The old code went straight to 0 on anything that was not
+// a number, which is how a $125 סיר קובה סלק reached a saved order as a
+// $0.00 line: silently priced, silently folded into the suggested total.
+function menuExtraPriceMinorUnits(rawPrice: unknown, name: string): number | null {
+  const parsed = parseLegacyUsdAmount(rawPrice)
+  if (parsed.state === 'valid' && Number.isSafeInteger(parsed.minorUnits)) return parsed.minorUnits
+  return DEFAULT_EXTRA_PRICE_MINOR_UNITS.get(name) ?? null
+}
+
 export function buildOrderEditorMenu(store: LegacyStore): OrderEditorMenu {
   const rawMenu = isPlainRecord(store.menu) ? store.menu : {}
   const rawExtras = Array.isArray(rawMenu.extras) ? rawMenu.extras : []
@@ -813,7 +832,7 @@ export function buildOrderEditorMenu(store: LegacyStore): OrderEditorMenu {
     return [
       {
         name: rawExtra.name,
-        priceMinorUnits: dollarsNumberToMinorUnits(rawExtra.price, 0),
+        priceMinorUnits: menuExtraPriceMinorUnits(rawExtra.price, rawExtra.name),
       },
     ]
   })
@@ -1154,6 +1173,7 @@ export interface DraftIssue {
     | 'MIXED_LUNCH_SHABBAT_UNCONFIRMED'
     | 'DESSERT_OVERAGE'
     | 'DESSERT_UNCLASSIFIED'
+    | 'UNPRICED_EXTRA'
     | 'PRICING_ERROR'
   readonly message: string
   readonly blocking: boolean
@@ -1271,14 +1291,24 @@ export function calculateOrderDraftPricing(
 
   for (const extra of menu.extras) {
     const selection = draft.extras[extra.name]
-    if (selection && selection.quantity > 0) {
-      chargeLines.push({
-        source: 'legacy-extra',
-        name: extra.name,
-        quantity: selection.quantity,
-        unitPriceMinorUnits: extra.priceMinorUnits,
+    if (!selection || selection.quantity <= 0) continue
+    // An extra nobody can price must never quietly contribute $0 to the
+    // total — that reads as "this dish is free", and the suggested total
+    // the operator saves is simply short by its price.
+    if (extra.priceMinorUnits === null) {
+      issues.push({
+        code: 'UNPRICED_EXTRA',
+        message: `אין מחיר מאושר ל${extra.name} בתפריט. יש לקבוע לו מחיר בעורך התפריט לפני השמירה.`,
+        blocking: true,
       })
+      continue
     }
+    chargeLines.push({
+      source: 'legacy-extra',
+      name: extra.name,
+      quantity: selection.quantity,
+      unitPriceMinorUnits: extra.priceMinorUnits,
+    })
   }
 
   draft.custom.forEach((item, index) => {
@@ -2146,7 +2176,11 @@ export function resolveReviewItemQuantities(
       return defaultDessertPortionsForMeals(classifyDessertKind(target.name), assumedMeals)
     }
     if (target.kind === 'extra') return 1
-    return null // challahs follow the meal count automatically; lunch stays explicit
+    // A weekday lunch dish is a standalone plate: naming it IS ordering one
+    // of it. Leaving it unresolved dropped the dish out of the order
+    // entirely and the customer was never charged for it.
+    if (target.kind === 'lunch' || target.kind === 'lunch-addon') return 1
+    return null // challahs follow the meal count automatically
   }
 
   const resolved = new Map<string, number>()

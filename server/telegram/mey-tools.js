@@ -32,6 +32,8 @@ const {
   updateOrderDetails,
 } = require('./mey-audited-actions');
 const { buildSiteKnowledge, displayNamesByItemId } = require('../ai/site-knowledge');
+const { createMeyReadTools } = require('./mey-read-tools');
+const { orderDishes, orderMoney } = require('../domain/business-queries');
 
 const MAX_SEARCH_RESULTS = 15;
 const MAX_ORDERS_IN_CONTEXT = 200;
@@ -489,7 +491,13 @@ function orderMatchesQuery(order, query) {
   return haystack.includes(query);
 }
 
+// A list row, not a full order — but it still carries the two things every
+// question is actually about: WHAT was ordered and WHAT it is worth. The old
+// shape dropped the dish list, so "מה היא הזמינה" could not be answered from a
+// search at all and מיי had to guess or go quiet. get_order_full has the rest.
 function summarizeOrder(order) {
+  const money = orderMoney(order);
+  const dishes = orderDishes(order);
   return {
     id: order.id,
     date: order.date,
@@ -498,7 +506,12 @@ function summarizeOrder(order) {
     email: order.email,
     address: order.address,
     status: order.status,
+    source: typeof order.source === 'string' ? order.source : null,
+    coupleMeals: Number(order.meals) || 0,
+    dishes: dishes.map((dish) => ({ name: dish.name, quantity: dish.quantity, course: dish.course })),
     total: order.total,
+    depositMinorUnits: money.depositMinorUnits,
+    outstandingMinorUnits: money.outstandingMinorUnits,
     paid: order.paid,
     payMethod: order.payMethod,
     notes: order.notes,
@@ -550,6 +563,11 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
   if (!repository || typeof repository.loadState !== 'function') {
     throw new TypeError('A state repository is required');
   }
+
+  // Read-only tools live in their own module and are merged in here. They can
+  // reach anything in the state; none of them can change it.
+  const readTools = createMeyReadTools({ repository });
+  const READ_ONLY_TOOLS = new Set(readTools.names);
 
   async function loadOrders() {
     const current = await repository.loadState();
@@ -812,15 +830,17 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
     return isWritesFrozen(settings);
   }
 
+  const allHandlers = { ...readTools.handlers, ...handlers };
+
   return {
-    definitions: TOOL_DEFINITIONS,
+    definitions: [...TOOL_DEFINITIONS, ...readTools.definitions],
     async execute(name, args) {
-      const handler = handlers[name];
+      const handler = allHandlers[name];
       if (!handler) {
         return { error: `unknown tool: ${name}` };
       }
       try {
-        if (WRITE_TOOLS.has(name) && (await writesAreFrozen())) {
+        if (WRITE_TOOLS.has(name) && !READ_ONLY_TOOLS.has(name) && (await writesAreFrozen())) {
           return { error: 'מצב הקפאה פעיל — כל הכתיבות שלך חסומות. שחרור רק מהפאנל (הגדרות). אפשר עדיין לבטל שינויים עם undo_last_change.' };
         }
         return await handler(args || {});

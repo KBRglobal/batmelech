@@ -5,6 +5,7 @@ const test = require('node:test');
 
 const { createMeyTools } = require('../server/telegram/mey-tools');
 const { dubaiDateString } = require('../server/telegram/delivery-day');
+const { READ_TOOL_DEFINITIONS } = require('../server/telegram/mey-read-tools');
 
 function fakeRepository(initialState) {
   let state = initialState;
@@ -190,10 +191,12 @@ test('set_delivery_checkin rejects an unknown state and an unknown order', async
   assert.equal(missing.error, 'order not found');
 });
 
-test('the tool surface exposes twenty-two well-formed definitions', async () => {
+test('the tool surface exposes twenty-nine well-formed definitions', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
 
-  assert.equal(tools.definitions.length, 22);
+  // 22 action/lookup tools plus the 7 read-only ones in mey-read-tools.js.
+  assert.equal(tools.definitions.length, 22 + READ_TOOL_DEFINITIONS.length);
+  assert.equal(tools.definitions.length, 29);
   for (const definition of tools.definitions) {
     assert.equal(definition.type, 'function', `${definition.name} must be a function tool`);
     assert.equal(typeof definition.name, 'string');
@@ -214,6 +217,23 @@ test('the tool surface exposes twenty-two well-formed definitions', async () => 
   assert.ok(names.includes('get_business_knowledge'));
   assert.ok(names.includes('get_dish_recipe'));
   assert.ok(names.includes('search_products'));
+
+  // The read surface Lin asked for: any fact in the system is reachable.
+  for (const readTool of READ_TOOL_DEFINITIONS) {
+    assert.ok(names.includes(readTool.name), `${readTool.name} must stay exposed`);
+  }
+  assert.deepEqual(
+    READ_TOOL_DEFINITIONS.map((definition) => definition.name).sort(),
+    [
+      'get_customer',
+      'get_dish_cost',
+      'get_dish_demand',
+      'get_financial_summary',
+      'get_order_full',
+      'list_customers',
+      'read_state',
+    ],
+  );
 });
 
 // --- full business knowledge -------------------------------------------------
