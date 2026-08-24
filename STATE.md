@@ -1,13 +1,26 @@
-# STATE — batmelech (updated: 2026-08-19 05:10)
+# STATE — batmelech (updated: 2026-08-24 07:00)
 
 ## Now (in progress)
-- ALL DEPLOYED AND LIVE-VERIFIED (2026-08-19 ~06:30): full-knowledge
-  assistants, chat UX round, mobile polish sweep, clean root domain.
-  Live checks passed: concierge answered fish/Five Palm/peanuts correctly;
-  root serves the site (200), /site/checkout 301->/checkout, sitemap clean,
-  /api/state still decoy-404. Remaining known items: PageSpeed performance
-  (NO_LCP error on lab run — likely Reveal opacity-gating + heavy Supabase
-  JPEGs; hero img now fetchPriority=high), real dish photos still pending.
+- ROOT DOMAIN TLS BROKEN (found 2026-08-24): batmelech.ae serves Railway's
+  wildcard cert — every browser shows a security warning on the root domain
+  (www.batmelech.ae is fine, cert valid). Cause: Railway custom domain never
+  verified — DNS at registrar AEserver (rrpproxy NS) has apex A 69.46.46.44
+  instead of the required CNAME 80xdnueu.up.railway.app. Plan: move DNS to
+  Cloudflare (Moshe's standard) — needs AEserver client-area login (account
+  email Linasulin07@gmail.com, saved in Chrome; Moshe must click Login).
+  DNS inventory to replicate: apex A (-> proxied CNAME flattening), www CNAME
+  cgzhau1p.up.railway.app, TXT _railway-verify=6fa4...; no MX.
+- Remote-session merge landed (ca5c68d): Aug-22 cloud work (billing fixes —
+  schnitzel side charged, kubbeh; dish-key unification; Mey full-business
+  read) merged into local main with Aug-20 order-editor/prep work. One test
+  fixture conflict resolved; 888 web + 637 server tests green. NOT yet
+  deployed — prod still runs the Aug-20 build; needs Moshe's OK + railway up.
+- Old unmerged cloud branch claude/meal-orders-management-system-vdi81y
+  (Aug 6): QR codes on vouchers/stickers/flyer + hebcal calendar. Calendar
+  exists on main; QR feature does not. 18 days stale, unmergeable as-is —
+  re-implement if Moshe wants it, then delete the branch.
+- Octypo fleet monitor no longer uses the batmelech Telegram bot (secrets
+  deleted from that repo) — Mey's chat gets Bat Melech notifications only.
 
 ## Recently done (last ~10, newest first)
 - 2026-08-19 Clean root domain (ee1e607): site serves at batmelech.ae/* via
