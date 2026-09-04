@@ -323,6 +323,8 @@ const HOTEL_ROWS = [
   ['Grand Hyatt Dubai', 'דובאי', 'Oud Metha Rd, Dubai'],
   ['W Dubai – Mina Seyahi', 'דובאי', 'Dubai Marina, Mina Seyahi'],
   ['Five Palm Jumeirah', 'דובאי', 'Palm Jumeirah, Dubai'],
+  ['FIVE LUXE JBR', 'דובאי', 'JBR, The Walk, Dubai'],
+  ['Paramount Hotel Dubai', 'דובאי', 'Business Bay, Al Abraj St, Dubai'],
   ['Rixos Premium Dubai JBR', 'דובאי', 'JBR, The Walk, Dubai'],
   ['Sofitel Dubai The Palm', 'דובאי', 'East Crescent, Palm Jumeirah, Dubai'],
   ['Fairmont The Palm', 'דובאי', 'Palm Jumeirah, Dubai'],
