@@ -194,7 +194,12 @@ function buildQuestions(state, { today }) {
       id: 'ambiguous-best-customer',
       ask: 'מי הלקוח הכי טוב שלי?',
       sender: LIN,
-      check: (r) => (/\?/u.test(r) && /כסף|סכום|פעמים|הזמנות/u.test(r) ? lacks(r, '$') : 'should ask money vs. frequency before answering'),
+      // either ask which measure, or give BOTH readings labelled — never pick one silently
+      check: (r) => {
+        const asks = /\?/u.test(r) && /כסף|סכום|פעמים|הזמנות/u.test(r) && !r.includes('$');
+        const both = /כסף|סכום/u.test(r) && /פעמים|הזמנות/u.test(r) && (topBilled ? r.includes(topBilled.name.split(' ')[0]) : true);
+        return asks || both ? true : 'should ask money vs. frequency, or answer both labelled';
+      },
     },
     {
       id: 'ambiguous-name',
