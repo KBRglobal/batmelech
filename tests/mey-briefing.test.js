@@ -50,3 +50,17 @@ test('an empty business still produces a coherent briefing', () => {
   assert.match(briefing, /פלטות בחוץ: אין/u);
   assert.match(briefing, /ארוחה זוגית 230\$ \/ 844\.68 דירהם/u, 'default prices when the menu has none');
 });
+
+test('debtors in the briefing are ranked by what they owe, not by what they paid', () => {
+  const briefing = buildBriefing(
+    {
+      orders: [
+        { id: 'a', date: '2026-08-01', name: 'קטן', total: '100', paid: 'לא', phone: '0501' },
+        { id: 'b', date: '2026-08-01', name: 'גדול', total: '900', paid: 'לא', phone: '0502' },
+        { id: 'c', date: '2026-08-01', name: 'שילם', total: '500', paid: 'כן', phone: '0503' },
+      ],
+    },
+    { today: '2026-09-07' },
+  );
+  assert.match(briefing, /הגדולים: גדול 900\.00\$, קטן 100\.00\$/u);
+});

@@ -114,6 +114,49 @@ function verifierInstruction(problems) {
   );
 }
 
+// "Who is the biggest / who ordered the most / the latest" — a ranking
+// question. Its answer is the FIRST row of a sorted list, and only that.
+// This is a code check, not a model check: if the person asked for a
+// superlative, a sorted tool result must exist and the name it ranked first
+// must be the name in the reply. Shiri David was once named the top customer
+// from a one-row list sorted by the wrong field — this is the guard for that.
+const SUPERLATIVE_PATTERN = /הכי|הגדול|הגדולה|הקטן|הקטנה|האחרון|האחרונה|הראשון|הראשונה|הכי הרבה|הכי מעט|biggest|largest|most|top/u;
+
+function firstNameOf(value) {
+  return typeof value === 'string' ? value.trim().split(/\s+/u)[0] : '';
+}
+
+// Which sort the words of the question call for. "paid" is money collected,
+// "owes" is what is open, "ordered / spent / biggest" is what was billed.
+function expectedSorts(userMessage) {
+  if (/שילם|שילמה|שילמו|נגבה|הכנסתי/u.test(userMessage)) return ['collected'];
+  if (/חייב|חייבת|חוב|פתוח/u.test(userMessage)) return ['outstanding'];
+  if (/פעמים|הכי הרבה הזמנות|מזמין הכי|מזמינה הכי/u.test(userMessage)) return ['orders'];
+  if (/אחרון|אחרונה|לאחרונה|חדש/u.test(userMessage)) return ['recent', 'date'];
+  if (/הזמין|הזמינה|הזמינו|כסף|גדול|גדולה|קנה|קנתה|שווה/u.test(userMessage)) return ['billed', 'total'];
+  return null;
+}
+
+function rankingViolation(userMessage, reply, toolOutputs) {
+  if (!SUPERLATIVE_PATTERN.test(userMessage)) return null;
+  if (/לא מצאתי|אין לי|לא נמצא|אין הזמנות|אין לקוחות/u.test(reply)) return null;
+  const sorted = toolOutputs.filter((record) => record.result && (record.result.sortedBy || record.result.sortBy) && Array.isArray(record.result.customers || record.result.orders));
+  const wanted = expectedSorts(userMessage);
+  const ranked = wanted ? sorted.filter((record) => wanted.includes(record.result.sortedBy || record.result.sortBy)) : sorted;
+  if (ranked.length === 0) {
+    const hint = wanted ? ` (לשאלה הזאת המיון הנכון הוא sortBy=${wanted[0]})` : '';
+    return `שאלת "הכי" נענית רק מרשימה ממוינת לפי מה שנשאל${hint} — תקראי ל-list_customers או list_orders עם המיון הנכון ותעני לפי השורה הראשונה.`;
+  }
+  const winners = ranked
+    .map((record) => (record.result.customers || record.result.orders)[0])
+    .filter(Boolean)
+    .map((row) => firstNameOf(row.name))
+    .filter((name) => name !== '');
+  if (winners.length === 0) return null;
+  if (winners.some((name) => reply.includes(name))) return null;
+  return `הרשימה הממוינת מדרגת ראשון את ${winners.join(' / ')}, אבל התשובה שלך לא מזכירה את השם הזה. תשובה ל"הכי" היא השורה הראשונה ברשימה הממוינת — תעני לפיה.`;
+}
+
 // A reply that states nothing checkable (a greeting, a clarifying question)
 // does not need the truth check; anything with a digit, or produced after a
 // tool call, does.
@@ -291,6 +334,26 @@ function createMeyAgent({
         }
       }
 
+      // 1b. ranking guard — deterministic: "the most" must be the first row
+      // of a sorted list. One correction round with the tools, then the
+      // honest fallback.
+      let ranking = text && text !== UNGROUNDED_REPLY ? rankingViolation(userMessage, text, toolOutputs) : null;
+      if (ranking) {
+        logger.error(`mey ranking guard: ${ranking}`);
+        input.push({ role: 'assistant', content: text });
+        input.push({ role: 'system', content: `תיקון מהמערכת: ${ranking}` });
+        const retried = await converse(session);
+        if (retried === null) return FALLBACK_REPLY;
+        ranking = rankingViolation(userMessage, retried, toolOutputs);
+        const retriedInvented = ungroundedNumbers(retried, evidence);
+        if (ranking || retriedInvented.length > 0) {
+          logger.error(`mey ranking guard still failing: ${ranking || `numbers ${retriedInvented.join(', ')}`}`);
+          text = UNGROUNDED_REPLY;
+        } else {
+          text = retried;
+        }
+      }
+
       // 2. truth check — every claim against the evidence, not just numbers.
       // An unsupported claim first goes BACK to the model with the tools in
       // hand ("the proof is in the system — go get it"); only if the second
@@ -340,6 +403,7 @@ module.exports = {
   createMeyAgent,
   needsVerification,
   nowBlock,
+  rankingViolation,
   replyIsGrounded,
   ungroundedNumbers,
 };

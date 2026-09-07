@@ -42,7 +42,7 @@ function buildQuestions(state, { today }) {
   const orders = ordersOf(state);
   const byTotalDesc = [...orders].filter((o) => orderMoney(o).totalMinorUnits !== null && o.status !== 'בוטלה').sort((a, b) => orderMoney(b).totalMinorUnits - orderMoney(a).totalMinorUnits);
   const ledger = customerLedger(state);
-  const debtors = ledger.filter((c) => c.outstandingMinorUnits > 0);
+  const debtors = ledger.filter((c) => c.outstandingMinorUnits > 0).sort((a, b) => b.outstandingMinorUnits - a.outstandingMinorUnits);
   const friday = comingFriday(today);
   const tomorrow = isoDaysFrom(today, 1);
   const fridayOrders = ordersOn(state, friday);

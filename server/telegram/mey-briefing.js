@@ -121,7 +121,9 @@ function buildBriefing(state, { today = dubaiDateString() } = {}) {
   }
 
   const summary = financialSummary(data, { fromDate: null, toDate: null });
-  const debtors = customerLedger(data).filter((customer) => customer.outstandingMinorUnits > 0);
+  const debtors = customerLedger(data)
+    .filter((customer) => customer.outstandingMinorUnits > 0)
+    .sort((a, b) => b.outstandingMinorUnits - a.outstandingMinorUnits);
   if (debtors.length === 0) lines.push('- חובות פתוחים: אין.');
   else {
     const top = debtors.slice(0, 5).map((customer) => `${customer.name || customer.phone} ${usdLabel(customer.outstandingMinorUnits)}$`);

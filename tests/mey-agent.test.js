@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { createMeyAgent, needsVerification, nowBlock, replyIsGrounded, UNGROUNDED_REPLY } = require('../server/telegram/mey-agent');
+const { createMeyAgent, needsVerification, nowBlock, rankingViolation, replyIsGrounded, UNGROUNDED_REPLY } = require('../server/telegram/mey-agent');
 
 const silentLogger = { error() {} };
 const repository = { loadState: async () => ({ ok: true, data: {} }) };
@@ -264,4 +264,57 @@ test('tools learn who is talking, so a stored note is signed', async () => {
   });
   await agent.reply('תזכרי ש-x', { firstName: 'F', username: 'balmin55' });
   assert.equal(seenSender, 'F @balmin55');
+});
+
+test('ranking guard: "the most" must be the first row of a sorted list', () => {
+  const sorted = [{ tool: 'list_customers', result: { sortedBy: 'billed', customers: [{ name: 'רוני מועלם' }, { name: 'שירי דויד' }] } }];
+  assert.equal(rankingViolation('מי הלקוח שהזמין בהכי הרבה כסף אי פעם?', 'רוני מועלם — 1744.00$', sorted), null);
+  assert.match(rankingViolation('מי הלקוח שהזמין בהכי הרבה כסף אי פעם?', 'שירי דויד — 328.00$', sorted), /רוני/u);
+  assert.match(rankingViolation('מי הלקוח שהזמין בהכי הרבה כסף?', 'שירי דויד — 328.00$', []), /list_customers/u);
+  assert.equal(rankingViolation('כמה יצא לטוני?', 'טוני — 148.00$', []), null, 'not a ranking question');
+  assert.equal(rankingViolation('מי הזמין הכי הרבה?', 'לא מצאתי הזמנות בכלל', []), null, 'an honest "none" is fine');
+});
+
+test('the Shiri David answer cannot happen again: the wrong first row is sent back, the right one goes out', async () => {
+  const client = scriptedClient([
+    toolCallResponse('list_customers', { sortBy: 'collected', limit: 1 }),
+    textResponse('שירי דויד — 328.00$ / 1204.58 דירהם'),
+    toolCallResponse('list_customers', { sortBy: 'billed', limit: 5 }),
+    textResponse('רוני מועלם — 1744.00$ / 6404.84 דירהם'),
+    textResponse(JSON.stringify({ ok: true, problems: [], corrected: 'רוני מועלם — 1744.00$ / 6404.84 דירהם' })),
+  ]);
+  const agent = createMeyAgent({
+    repository,
+    clientFactory: () => client,
+    env: { OPENAI_MODEL: 'test-model', OPENAI_API_KEY: 'k' },
+    logger: silentLogger,
+    toolsFactory: () => ({
+      definitions: [],
+      execute: async (_name, args) =>
+        args.sortBy === 'billed'
+          ? { sortedBy: 'billed', customers: [{ name: 'רוני מועלם', totalBilledUsd: '1744.00', totalBilledAed: '6404.84' }, { name: 'שירי דויד' }] }
+          : { sortedBy: 'collected', customers: [{ name: 'שירי דויד', totalCollectedUsd: '328.00', totalCollectedAed: '1204.58' }] },
+    }),
+  });
+  const reply = await agent.reply('מי הלקוח שהזמין בהכי הרבה כסף אי פעם?', { firstName: 'לין' });
+  assert.equal(reply, 'רוני מועלם — 1744.00$ / 6404.84 דירהם');
+});
+
+test('a ranking answer that stays wrong after the correction never reaches the chat', async () => {
+  const client = scriptedClient([
+    toolCallResponse('list_customers', { sortBy: 'billed', limit: 5 }),
+    textResponse('שירי דויד — 328.00$'),
+    textResponse('שירי דויד — 328.00$'),
+  ]);
+  const agent = createMeyAgent({
+    repository,
+    clientFactory: () => client,
+    env: { OPENAI_MODEL: 'test-model', OPENAI_API_KEY: 'k', OPENAI_MEY_VERIFY: 'off' },
+    logger: silentLogger,
+    toolsFactory: () => ({
+      definitions: [],
+      execute: async () => ({ sortedBy: 'billed', customers: [{ name: 'רוני מועלם', totalBilledUsd: '1744.00' }, { name: 'שירי דויד', totalBilledUsd: '328.00' }] }),
+    }),
+  });
+  assert.equal(await agent.reply('מי הזמין הכי הרבה?', { firstName: 'לין' }), UNGROUNDED_REPLY);
 });
