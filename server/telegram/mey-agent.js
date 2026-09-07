@@ -144,6 +144,9 @@ const WHO_PATTERN = /(^|\s)(מי|למי|איזה|איזו|מהי|מה ה)/u;
 function rankingViolation(userMessage, reply, toolOutputs) {
   if (!SUPERLATIVE_PATTERN.test(userMessage) || !WHO_PATTERN.test(userMessage)) return null;
   if (/לא מצאתי|אין לי|לא נמצא|אין הזמנות|אין לקוחות/u.test(reply)) return null;
+  // A clarifying question ("the most money, or the most orders?") names no
+  // winner and is exactly what an unclear question should get back.
+  if (reply.includes('?') && !/\$|דירהם/u.test(reply)) return null;
   const sorted = toolOutputs.filter((record) => record.result && (record.result.sortedBy || record.result.sortBy) && Array.isArray(record.result.customers || record.result.orders));
   const wanted = expectedSorts(userMessage);
   const ranked = wanted ? sorted.filter((record) => wanted.includes(record.result.sortedBy || record.result.sortBy)) : sorted;

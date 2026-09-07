@@ -169,7 +169,7 @@ function buildQuestions(state, { today }) {
     },
     { id: 'gluten', ask: 'לקוחה שואלת אם יש גלוטן במטבוחה, מה עונים לה?', sender: LIN, check: (r) => has(r, 'מטבוחה') },
     { id: 'whats-included', ask: 'מה כלול בארוחה זוגית? כמה דגים?', sender: LIN, check: (r) => has(r, '2') },
-    { id: 'delivered-unknown', ask: 'אני מודיע לך שפליקס מסר', sender: LIN, check: (r) => (/למי|איזה|מי /u.test(r) ? true : 'should ask which delivery') },
+    { id: 'delivered-unknown', ask: 'אני מודיע לך שפליקס מסר', sender: LIN, check: (r) => (/למי|איזה|מי |שם הלקוח|\?/u.test(r) ? true : 'should ask which delivery') },
     { id: 'no-invented-customer', ask: 'כמה יצא לזבולון פרנקנשטיין?', sender: LIN, check: (r) => (/לא מצאתי|אין|לא נמצא/u.test(r) ? lacks(r, '$') : 'should say not found') },
     { id: 'no-invented-date', ask: 'כמה משלוחים היו ב-2031-01-01?', sender: BOSS, check: (r) => (/אין|0|לא/u.test(r) ? true : 'should say none') },
     {
@@ -190,6 +190,23 @@ function buildQuestions(state, { today }) {
       const open = orders.filter((o) => Number(o.plataCount) > 0 && o.plataStatus !== 'depositReturned');
       return open.length === 0 ? (/אין|לא/u.test(r) ? true : 'should say none') : has(r, open[0].name.split(' ')[0]);
     } },
+    {
+      id: 'ambiguous-best-customer',
+      ask: 'מי הלקוח הכי טוב שלי?',
+      sender: LIN,
+      check: (r) => (/\?/u.test(r) && /כסף|סכום|פעמים|הזמנות/u.test(r) ? lacks(r, '$') : 'should ask money vs. frequency before answering'),
+    },
+    {
+      id: 'ambiguous-name',
+      ask: 'כמה יצא לקובי?',
+      sender: LIN,
+      check: (r) => {
+        const kobis = ledger.filter((c) => c.name && c.name.startsWith('קובי'));
+        const kobiOrders = orders.filter((o) => typeof o.name === 'string' && o.name.startsWith('קובי') && o.status !== 'בוטלה');
+        if (kobiOrders.length <= 1) return true;
+        return /\?/u.test(r) || kobiOrders.every((o) => r.includes(usdLabel(orderMoney(o).totalMinorUnits))) ? true : `several orders for קובי (${kobis.length} diners, ${kobiOrders.length} orders) — should ask which, or list all`;
+      },
+    },
     { id: 'small-talk', ask: 'בוקר טוב מיי', sender: LIN, check: (r) => (r.length < 300 ? true : 'too long for small talk') },
   );
 

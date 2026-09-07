@@ -276,6 +276,8 @@ test('ranking guard: "the most" must be the first row of a sorted list', () => {
   assert.equal(rankingViolation('כמה הזמנות היו ביום המשלוחים האחרון?', 'היו 7 הזמנות', []), null);
   assert.match(rankingViolation('מה ההזמנה הכי גדולה שהייתה לי?', 'של דנה', []), /list_/u, 'which-order questions are gated');
   assert.equal(rankingViolation('מי הזמין הכי הרבה?', 'לא מצאתי הזמנות בכלל', []), null, 'an honest "none" is fine');
+  assert.equal(rankingViolation('מי הלקוח הכי טוב שלי?', 'הכי טוב לפי כסף או לפי מספר הזמנות?', []), null, 'a clarifying question is the right answer to an unclear one');
+  assert.match(rankingViolation('מי הלקוח הכי טוב שלי?', 'שירי דויד, 328.00$ — נכון?', []), /list_/u, 'a question that still names a winner with money is a claim');
 });
 
 test('the Shiri David answer cannot happen again: the wrong first row is sent back, the right one goes out', async () => {
