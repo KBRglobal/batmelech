@@ -66,6 +66,7 @@ function nowBlock(now = new Date()) {
   return [
     `עכשיו (שעון דובאי): יום ${weekday}, ${dubaiDateFormatter.format(now)}, ${dubaiTimeFormatter.format(now)}.`,
     `יום המשלוחים הקרוב (שישי): ${comingFriday(now)}. "היום", "מחר" ו"שישי" — תחשבי מהתאריך הזה.`,
+    `"החודש" = מה-1 בחודש הנוכחי עד היום (${dubaiDateFormatter.format(now).slice(0, 7)}-01 עד ${dubaiDateFormatter.format(now)}); "השבוע" = שבעת הימים האחרונים; "השישי האחרון" = יום המשלוחים האחרון שעבר. אלה מוגדרים — לא שואלים עליהם.`,
     `מטבע: המחירים בדולרים. השער קבוע, 1$ = ${USD_TO_AED} דירהם, אבל אל תמירי בעצמך — כל סכום שכלי מחזיר מגיע גם`,
     'בדולרים (שדה Usd) וגם בדירהם (שדה Aed). כשמבקשים דירהם, תצטטי את שדה Aed כפי שהוא.',
   ].join('\n');
@@ -120,7 +121,9 @@ function verifierInstruction(problems) {
 // superlative, a sorted tool result must exist and the name it ranked first
 // must be the name in the reply. Shiri David was once named the top customer
 // from a one-row list sorted by the wrong field — this is the guard for that.
-const SUPERLATIVE_PATTERN = /הכי|הגדול|הגדולה|הקטן|הקטנה|האחרון|האחרונה|הראשון|הראשונה|הכי הרבה|הכי מעט|biggest|largest|most|top/u;
+// Magnitude superlatives only. "The last delivery day" / "the first order"
+// are date words, not rankings, and were gating day sums by mistake.
+const SUPERLATIVE_PATTERN = /הכי|ביותר|הגדול|הגדולה|הקטן|הקטנה|biggest|largest|most|top/u;
 
 function firstNameOf(value) {
   return typeof value === 'string' ? value.trim().split(/\s+/u)[0] : '';
@@ -129,6 +132,7 @@ function firstNameOf(value) {
 // Which sort the words of the question call for. "paid" is money collected,
 // "owes" is what is open, "ordered / spent / biggest" is what was billed.
 function expectedSorts(userMessage) {
+  if (/נמכר|נמכרה|מבוקש|מבוקשת|פופולרי|פופולרית|מזמינים הכי|הזמינו הכי/u.test(userMessage)) return ['quantity'];
   if (/שילם|שילמה|שילמו|נגבה|הכנסתי/u.test(userMessage)) return ['collected'];
   if (/חייב|חייבת|חוב|פתוח/u.test(userMessage)) return ['outstanding'];
   if (/פעמים|הכי הרבה הזמנות|מזמין הכי|מזמינה הכי/u.test(userMessage)) return ['orders'];
@@ -139,7 +143,7 @@ function expectedSorts(userMessage) {
 
 // The guard is about WHO or WHICH is first — "how much came in on the last
 // delivery day" is a sum over a day, not a ranking, and must not be gated.
-const WHO_PATTERN = /(^|\s)(מי|למי|איזה|איזו|מהי|מה ה)/u;
+const WHO_PATTERN = /(^|\s)(מי|למי|איזה|איזו|מהי|מה ההזמנה|מה הלקוח|מה המנה|איזו מנה|איזה לקוח)/u;
 
 function rankingViolation(userMessage, reply, toolOutputs) {
   if (!SUPERLATIVE_PATTERN.test(userMessage) || !WHO_PATTERN.test(userMessage)) return null;
@@ -147,15 +151,16 @@ function rankingViolation(userMessage, reply, toolOutputs) {
   // A clarifying question ("the most money, or the most orders?") names no
   // winner and is exactly what an unclear question should get back.
   if (reply.includes('?') && !/\$|דירהם/u.test(reply)) return null;
-  const sorted = toolOutputs.filter((record) => record.result && (record.result.sortedBy || record.result.sortBy) && Array.isArray(record.result.customers || record.result.orders));
+  const rowsOf = (result) => result.customers || result.orders || result.dishes;
+  const sorted = toolOutputs.filter((record) => record.result && (record.result.sortedBy || record.result.sortBy) && Array.isArray(rowsOf(record.result)));
   const wanted = expectedSorts(userMessage);
   const ranked = wanted ? sorted.filter((record) => wanted.includes(record.result.sortedBy || record.result.sortBy)) : sorted;
   if (ranked.length === 0) {
-    const hint = wanted ? ` (לשאלה הזאת המיון הנכון הוא sortBy=${wanted[0]})` : '';
-    return `שאלת "הכי" נענית רק מרשימה ממוינת לפי מה שנשאל${hint} — תקראי ל-list_customers או list_orders עם המיון הנכון ותעני לפי השורה הראשונה.`;
+    const hint = wanted ? ` (לשאלה הזאת המיון הנכון הוא ${wanted[0]})` : '';
+    return `שאלת "הכי" נענית רק מרשימה ממוינת לפי מה שנשאל${hint} — תקראי ל-list_customers / list_orders / get_dish_demand עם המיון הנכון ותעני לפי השורה הראשונה.`;
   }
   const winners = ranked
-    .map((record) => (record.result.customers || record.result.orders)[0])
+    .map((record) => rowsOf(record.result)[0])
     .filter(Boolean)
     .map((row) => firstNameOf(row.name))
     .filter((name) => name !== '');

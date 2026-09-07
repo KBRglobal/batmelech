@@ -372,6 +372,8 @@ function createMeyReadTools({ repository }) {
       return {
         ...demand,
         dishes,
+        sortedBy: 'quantity',
+        note: 'המנות ממוינות מהמבוקשת ביותר ומטה — הראשונה היא הנמכרת ביותר בטווח.',
         returned: dishes.length,
         truncated: demand.dishes.length > dishes.length,
       };

@@ -5,7 +5,7 @@
 // never rots when the data changes. Run with scripts/mey-eval.js. Each check
 // returns true when the reply is right, or a short string saying what is wrong.
 
-const { customerLedger, financialSummary, orderMoney, ordersOf } = require('../../server/domain/business-queries');
+const { customerLedger, dishDemand, financialSummary, orderDishes, orderMoney, ordersOf } = require('../../server/domain/business-queries');
 const { aedLabel, usdLabel } = require('../../server/domain/money-labels');
 const { comingFriday } = require('../../server/telegram/mey-briefing');
 
@@ -207,6 +207,91 @@ function buildQuestions(state, { today }) {
         return /\?/u.test(r) || kobiOrders.every((o) => r.includes(usdLabel(orderMoney(o).totalMinorUnits))) ? true : `several orders for קובי (${kobis.length} diners, ${kobiOrders.length} orders) — should ask which, or list all`;
       },
     },
+    // --- the questions Lin and Felix actually asked in the chat, the ones that went wrong ---
+    {
+      id: 'dish-who',
+      ask: 'למי היה בהזמנה קובה סלק?',
+      sender: BOSS,
+      check: (r) => {
+        const withKubeh = orders.filter((o) => o.status !== 'בוטלה' && orderDishes(o).some((d) => /קובה/u.test(d.name)));
+        return withKubeh.length === 0 ? (/אין|לא מצאתי|אף/u.test(r) ? true : 'should say nobody') : has(r, ...withKubeh.slice(0, 3).map((o) => o.name.split(' ')[0]));
+      },
+    },
+    {
+      id: 'day-what-they-ate',
+      ask: 'מה היה בכל ההזמנות של יום המשלוחים האחרון? מה אכלו?',
+      sender: BOSS,
+      check: (r) => {
+        if (lastDayOrders.length === 0) return true;
+        const names = lastDayOrders.slice(0, 3).map((o) => o.name.split(' ')[0]);
+        const dishes = lastDayOrders.flatMap((o) => orderDishes(o).map((d) => d.name)).slice(0, 2);
+        return has(r, ...names, ...dishes);
+      },
+    },
+    {
+      id: 'phones-all',
+      ask: 'מספרי טלפון של כולם מיום המשלוחים האחרון',
+      sender: FELIX,
+      check: (r) => {
+        const phones = lastDayOrders.map((o) => (typeof o.phone === 'string' ? o.phone.replace(/\D/gu, '') : '')).filter((p) => p.length >= 7).slice(0, 3);
+        return phones.length === 0 ? true : has(r.replace(/[\s-]/gu, ''), ...phones);
+      },
+    },
+    {
+      id: 'exclude-one',
+      ask: lastDayOrders.length > 1 ? `תעשי לי חוץ מ${lastDayOrders[0].name.split(' ')[0]} כל מי שהיה ביום המשלוחים האחרון כולל מיקומים` : 'מי היה ביום המשלוחים האחרון?',
+      sender: FELIX,
+      check: (r) => {
+        if (lastDayOrders.length <= 1) return true;
+        const excluded = lastDayOrders[0].name.split(' ')[0];
+        const others = lastDayOrders.slice(1, 4).map((o) => o.name.split(' ')[0]).filter((n) => n !== excluded);
+        const ok = has(r, ...others);
+        if (ok !== true) return ok;
+        const mentions = r.split(excluded).length - 1;
+        return mentions <= 1 ? true : `${excluded} should be left out`;
+      },
+    },
+    {
+      id: 'follow-up-aed',
+      ask: single ? `כמה יצא ל${singleFirst}?` : 'כמה עולה ארוחה זוגית?',
+      sender: LIN,
+      check: (r) => (single ? has(r, usdLabel(singleMoney.totalMinorUnits)) : has(r, '230')),
+    },
+    {
+      id: 'follow-up-aed-2',
+      ask: 'ובדירהם?',
+      sender: LIN,
+      check: (r) => (single ? has(r, aedLabel(singleMoney.totalMinorUnits)) : has(r, '844.68')),
+    },
+    {
+      id: 'collected-this-month',
+      ask: 'כמה נגבה בפועל החודש?',
+      sender: LIN,
+      check: (r) => {
+        const month = today.slice(0, 7);
+        const summary = financialSummary(state, { fromDate: `${month}-01`, toDate: `${month}-31` });
+        return has(r, usdLabel(summary.collectedMinorUnits));
+      },
+    },
+    {
+      id: 'unpaid-last-service-day',
+      ask: 'מי מיום המשלוחים האחרון עוד לא שילם?',
+      sender: LIN,
+      check: (r) => {
+        const unpaid = lastDayOrders.filter((o) => (orderMoney(o).outstandingMinorUnits ?? 0) > 0);
+        return unpaid.length === 0 ? (/כולם שילמו|אין|לא/u.test(r) ? true : 'should say everyone paid') : has(r, ...unpaid.slice(0, 3).map((o) => o.name.split(' ')[0]));
+      },
+    },
+    {
+      id: 'best-selling-dish',
+      ask: 'מה המנה שהכי נמכרה אי פעם?',
+      sender: LIN,
+      check: (r) => {
+        const top = dishDemand(state, { fromDate: null, toDate: null }).dishes[0];
+        return top ? has(r, top.name) : true;
+      },
+    },
+    { id: 'customer-count', ask: 'כמה לקוחות יש לי בסך הכל?', sender: LIN, check: (r) => has(r, String(ledger.length)) },
     { id: 'small-talk', ask: 'בוקר טוב מיי', sender: LIN, check: (r) => (r.length < 300 ? true : 'too long for small talk') },
   );
 

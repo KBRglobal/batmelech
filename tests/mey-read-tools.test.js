@@ -376,3 +376,10 @@ test('list_customers sorts by what was asked: ordered-most is not paid-most', as
   const fallback = await mey.execute('list_customers', { sortBy: 'nonsense' });
   assert.equal(fallback.sortedBy, 'billed');
 });
+
+test('search_orders finds an order by a dish name and says where it goes', async () => {
+  const result = await tools().execute('search_orders', { query: 'קובה' });
+  assert.equal(result.count, 1);
+  assert.equal(result.orders[0].id, 'o-1');
+  assert.equal(typeof result.orders[0].place === 'string' || result.orders[0].place === null, true);
+});

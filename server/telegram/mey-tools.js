@@ -44,7 +44,10 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     name: 'search_orders',
-    description: 'חיפוש הזמנות לפי שם לקוח, טלפון, אימייל, כתובת או מזהה הזמנה. מחזיר את כל הפרטים של ההזמנות התואמות.',
+    description:
+      'חיפוש הזמנות לפי שם לקוח, טלפון, אימייל, כתובת, מלון, מזהה הזמנה — או שם מנה ("קובה", "מטבוחה"): ' +
+      '"למי היה קובה בהזמנה" = search_orders עם "קובה". מחזיר את ההזמנות התואמות עם המנות, היעד, השעה והכסף. ' +
+      'לעולם לא לעבור הזמנה-הזמנה עם read_state כשאפשר לחפש כאן.',
     parameters: {
       type: 'object',
       properties: {
@@ -504,9 +507,27 @@ function similarMenuItemNames(requested, knownNames) {
     .map((entry) => entry.name);
 }
 
+// Where an order goes, by the name people use: the hotel first, then the
+// free-text place, then the address.
+function orderDestination(order) {
+  return destinationLabel(order) || (typeof order.place === 'string' && order.place.trim()) || (typeof order.address === 'string' && order.address.trim()) || null;
+}
+
+// "Who ordered kubeh?" is a search too — dish names and destinations are in
+// the haystack alongside name, phone, email, address and notes.
 function orderMatchesQuery(order, query) {
   if (query === '') return false;
-  const haystack = [order.id, order.name, order.phone, order.email, order.address, order.notes]
+  const haystack = [
+    order.id,
+    order.name,
+    order.phone,
+    order.email,
+    order.address,
+    order.place,
+    order.hotelName,
+    order.notes,
+    ...orderDishes(order).map((dish) => dish.name),
+  ]
     .filter((value) => typeof value === 'string')
     .join(' ')
     .toLowerCase();
@@ -527,6 +548,9 @@ function summarizeOrder(order) {
     phone: order.phone,
     email: order.email,
     address: order.address,
+    place: order.pickup === true ? 'איסוף עצמי' : orderDestination(order),
+    time: typeof order.time === 'string' && order.time !== '' ? order.time : null,
+    pickup: order.pickup === true,
     status: order.status,
     source: typeof order.source === 'string' ? order.source : null,
     coupleMeals: Number(order.meals) || 0,
