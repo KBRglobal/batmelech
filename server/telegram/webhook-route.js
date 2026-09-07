@@ -19,6 +19,8 @@ const { sendTelegramMessage, whileTyping } = require('./send-message');
 const VOICE_FAILED_TEXT = 'לא הצלחתי להבין את ההקלטה, אפשר לכתוב?';
 const CHAT_FILE_FAILED_TEXT = 'לא הצלחתי לקרוא את קובץ השיחה 😔 אפשר לנסות שוב, או להדביק את הטקסט ישירות.';
 const MAX_CHAT_FILE_BYTES = 300_000;
+const THINKING_TEXT = 'רגע, בודקת במערכת 🔎';
+const THINKING_NOTICE_MS = 5_000;
 
 const INTAKE_ERROR_TEXTS = {
   frozen: 'מצב הקפאה פעיל — אני לא יוצרת הזמנות כרגע. שחרור מהפאנל, בהגדרות.',
@@ -81,6 +83,7 @@ function createTelegramWebhookRouter({
   callbackHandler = null,
   telegramFiles = null,
   whatsappIntake = null,
+  thinkingNoticeMs = THINKING_NOTICE_MS,
 }) {
   if (typeof webhookSecret !== 'string' || !webhookSecret.trim()) {
     throw new TypeError('A webhook secret is required');
@@ -103,7 +106,19 @@ function createTelegramWebhookRouter({
 
   // The group sees "typing…" from the moment the message lands until the
   // answer is sent — the model takes seconds, and silence reads as "dead".
-  const thinking = (work) => whileTyping({ botToken, chatId: ordersChatId, logger }, work);
+  // When the answer needs real checking (more than a few seconds), מיי says so
+  // once, in words, before it arrives (Moshe's ask).
+  const thinking = (work) =>
+    whileTyping({ botToken, chatId: ordersChatId, logger }, async () => {
+      const notice = setTimeout(() => {
+        say(THINKING_TEXT).catch(() => {});
+      }, thinkingNoticeMs);
+      try {
+        return await work();
+      } finally {
+        clearTimeout(notice);
+      }
+    });
 
   async function answerText(text, sender) {
     const replyText = await thinking(() => agent.reply(text, sender));
@@ -206,6 +221,7 @@ function createTelegramWebhookRouter({
 
 module.exports = {
   CHAT_FILE_FAILED_TEXT,
+  THINKING_TEXT,
   VOICE_FAILED_TEXT,
   chatFileReplyText,
   createTelegramWebhookRouter,

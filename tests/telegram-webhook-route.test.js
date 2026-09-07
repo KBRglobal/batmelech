@@ -344,3 +344,24 @@ test('the group sees "typing…" while מיי works on a text message', async (t
     assert.ok(endpoints.indexOf('sendChatAction') < endpoints.indexOf('sendMessage'), 'typing comes before the answer');
   });
 });
+
+test('a slow answer is preceded by "checking in the system", a quick one is not', async (t) => {
+  const { THINKING_TEXT } = require('../server/telegram/webhook-route');
+  const slow = stubTelegram();
+  t.after(() => slow.restore());
+  const slowAgent = { reply: () => new Promise((resolve) => setTimeout(() => resolve('תשובה איטית'), 60)) };
+  await withRoute({ agent: slowAgent, thinkingNoticeMs: 20 }, async (post) => {
+    await post({ message: { chat: { id: CHAT_ID }, text: 'שאלה קשה', from: { first_name: 'Lin' } } });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(slow.texts(), [THINKING_TEXT, 'תשובה איטית']);
+  });
+  slow.restore();
+
+  const quick = stubTelegram();
+  t.after(() => quick.restore());
+  await withRoute({ agent: { reply: async () => 'מהר' }, thinkingNoticeMs: 200 }, async (post) => {
+    await post({ message: { chat: { id: CHAT_ID }, text: 'היי', from: { first_name: 'Lin' } } });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.deepEqual(quick.texts(), ['מהר']);
+  });
+});
