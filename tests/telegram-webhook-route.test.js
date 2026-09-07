@@ -107,7 +107,8 @@ test('a text message still reaches מיי and her reply is sent back to the grou
   });
 
   assert.deepEqual(agent.seen, ['כמה הזמנות יש היום?']);
-  assert.deepEqual(telegram.sent[0].body, { chat_id: CHAT_ID, text: 'היי לין' });
+  const reply = telegram.sent.find((call) => call.endpoint === 'sendMessage');
+  assert.deepEqual(reply.body, { chat_id: CHAT_ID, text: 'היי לין' });
 });
 
 test('text still works with none of the optional collaborators wired', async (t) => {
@@ -329,4 +330,17 @@ test('a collaborator that throws is logged and never crashes the request', async
   assert.equal(logged.length, 1);
   assert.match(String(logged[0][0]), /mey webhook handling failed/u);
   assert.deepEqual(agent.seen, ['הכל בסדר?']);
+});
+
+test('the group sees "typing…" while מיי works on a text message', async (t) => {
+  const telegram = stubTelegram();
+  t.after(() => telegram.restore());
+  const agent = { reply: async () => 'תשובה' };
+  await withRoute({ agent }, async (post) => {
+    await post({ message: { chat: { id: CHAT_ID }, text: 'היי', from: { first_name: 'Lin' } } });
+    const endpoints = telegram.sent.map((call) => call.endpoint);
+    assert.ok(endpoints.includes('sendChatAction'), 'typing indicator sent');
+    assert.equal(telegram.sent.find((call) => call.endpoint === 'sendChatAction').body.action, 'typing');
+    assert.ok(endpoints.indexOf('sendChatAction') < endpoints.indexOf('sendMessage'), 'typing comes before the answer');
+  });
 });

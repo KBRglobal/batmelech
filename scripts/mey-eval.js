@@ -86,7 +86,7 @@ const agent = createMeyAgent({
   let passed = 0;
   let totalSeconds = 0;
   const failures = [];
-  console.log(`model=${process.env.OPENAI_MEY_MODEL || process.env.OPENAI_MODEL} effort=${process.env.OPENAI_MEY_EFFORT || 'medium'} verify=${process.env.OPENAI_MEY_VERIFY || 'on'} today=${today} questions=${questions.length}\n`);
+  console.log(`model=${process.env.OPENAI_MEY_MODEL || process.env.OPENAI_MODEL} effort=${process.env.OPENAI_MEY_EFFORT || 'low'} verify=${process.env.OPENAI_MEY_VERIFY || 'on'} today=${today} questions=${questions.length}\n`);
   for (const question of questions) {
     const startedTools = toolCalls.length;
     const startedLogs = logLines.length;

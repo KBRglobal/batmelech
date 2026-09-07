@@ -383,3 +383,8 @@ test('search_orders finds an order by a dish name and says where it goes', async
   assert.equal(result.orders[0].id, 'o-1');
   assert.equal(typeof result.orders[0].place === 'string' || result.orders[0].place === null, true);
 });
+
+test('search_orders finds every order of a date in one call', async () => {
+  const result = await tools().execute('search_orders', { query: '2026-08-21' });
+  assert.deepEqual(result.orders.map((row) => row.id).sort(), ['o-2', 'o-3']);
+});

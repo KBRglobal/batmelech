@@ -14,7 +14,7 @@
 
 const express = require('express');
 const { setCourierLocation } = require('../business-actions');
-const { sendTelegramMessage } = require('./send-message');
+const { sendTelegramMessage, whileTyping } = require('./send-message');
 
 const VOICE_FAILED_TEXT = 'לא הצלחתי להבין את ההקלטה, אפשר לכתוב?';
 const CHAT_FILE_FAILED_TEXT = 'לא הצלחתי לקרוא את קובץ השיחה 😔 אפשר לנסות שוב, או להדביק את הטקסט ישירות.';
@@ -101,8 +101,12 @@ function createTelegramWebhookRouter({
     return { username: from.username, firstName: from.first_name };
   };
 
+  // The group sees "typing…" from the moment the message lands until the
+  // answer is sent — the model takes seconds, and silence reads as "dead".
+  const thinking = (work) => whileTyping({ botToken, chatId: ordersChatId, logger }, work);
+
   async function answerText(text, sender) {
-    const replyText = await agent.reply(text, sender);
+    const replyText = await thinking(() => agent.reply(text, sender));
     await say(replyText);
   }
 
@@ -123,7 +127,7 @@ function createTelegramWebhookRouter({
       return;
     }
     // Echoing what was heard is the only way Felix can catch a misheard word.
-    const replyText = await agent.reply(transcript.trim(), senderOf(message));
+    const replyText = await thinking(() => agent.reply(transcript.trim(), senderOf(message)));
     await say(`🎤 "${transcript.trim()}"\n\n${replyText}`);
   }
 

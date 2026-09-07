@@ -519,6 +519,7 @@ function orderMatchesQuery(order, query) {
   if (query === '') return false;
   const haystack = [
     order.id,
+    order.date,
     order.name,
     order.phone,
     order.email,

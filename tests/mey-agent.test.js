@@ -114,7 +114,7 @@ test('Mey has her own model and reasoning knobs, with sane defaults', async () =
   const shared = scriptedClient([textResponse('היי')]);
   await agentWith(shared).reply('היי', {});
   assert.equal(shared.requests[0].model, 'test-model');
-  assert.deepEqual(shared.requests[0].reasoning, { effort: 'medium' });
+  assert.deepEqual(shared.requests[0].reasoning, { effort: 'low' });
 
   const own = scriptedClient([textResponse('היי')]);
   await agentWith(own, { OPENAI_MEY_MODEL: 'big-model', OPENAI_MEY_EFFORT: 'high' }).reply('היי', {});
@@ -123,7 +123,7 @@ test('Mey has her own model and reasoning knobs, with sane defaults', async () =
 
   const junk = scriptedClient([textResponse('היי')]);
   await agentWith(junk, { OPENAI_MEY_EFFORT: 'turbo' }).reply('היי', {});
-  assert.deepEqual(junk.requests[0].reasoning, { effort: 'medium' }, 'an unknown effort falls back');
+  assert.deepEqual(junk.requests[0].reasoning, { effort: 'low' }, 'an unknown effort falls back');
 });
 
 test('the system prompt carries the live business briefing', async () => {
@@ -322,4 +322,23 @@ test('a ranking answer that stays wrong after the correction never reaches the c
     }),
   });
   assert.equal(await agent.reply('מי הזמין הכי הרבה?', { firstName: 'לין' }), UNGROUNDED_REPLY);
+});
+
+test('the truth check runs on its own (small, fast) model at low effort; the answer stays on the big one', async () => {
+  const client = scriptedClient([
+    textResponse('יש 7 משלוחים'),
+    textResponse(JSON.stringify({ ok: true, problems: [], corrected: 'יש 7 משלוחים' })),
+  ]);
+  await agentWith(client, { OPENAI_MEY_VERIFY: 'on', OPENAI_MEY_MODEL: 'big-model', OPENAI_MODEL: 'mini-model' }).reply('כמה משלוחים?', {});
+  assert.equal(client.requests[0].model, 'big-model');
+  assert.equal(client.requests[1].model, 'mini-model');
+  assert.deepEqual(client.requests[1].reasoning, { effort: 'low' });
+
+  const own = scriptedClient([
+    textResponse('יש 7 משלוחים'),
+    textResponse(JSON.stringify({ ok: true, problems: [], corrected: 'יש 7 משלוחים' })),
+  ]);
+  await agentWith(own, { OPENAI_MEY_VERIFY: 'on', OPENAI_MEY_VERIFY_MODEL: 'check-model', OPENAI_MEY_VERIFY_EFFORT: 'minimal' }).reply('כמה משלוחים?', {});
+  assert.equal(own.requests[1].model, 'check-model');
+  assert.deepEqual(own.requests[1].reasoning, { effort: 'minimal' });
 });

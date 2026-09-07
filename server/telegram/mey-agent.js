@@ -12,7 +12,7 @@ const { USD_TO_AED } = require('../domain/money-labels');
 const OPENAI_CLIENT_OPTIONS = Object.freeze({ maxRetries: 1, timeout: 60_000 });
 const MAX_TOOL_ROUNDS = 8;
 const REASONING_EFFORTS = Object.freeze(['minimal', 'low', 'medium', 'high']);
-const DEFAULT_REASONING_EFFORT = 'medium';
+const DEFAULT_REASONING_EFFORT = 'low';
 const FALLBACK_REPLY = 'משהו השתבש אצלי, נסי לשלוח שוב עוד רגע 🙏';
 
 // What goes out when the model, corrected once, still quotes a number that
@@ -211,6 +211,22 @@ function createMeyAgent({
     return env.OPENAI_MEY_VERIFY !== 'off';
   }
 
+  // The truth check reads evidence that is already in hand — a small, fast
+  // model at low effort does it well, and it runs on every answer, so its
+  // latency is Mey's latency. Knobs: OPENAI_MEY_VERIFY_MODEL (default: the
+  // shared OPENAI_MODEL, i.e. the mini) and OPENAI_MEY_VERIFY_EFFORT.
+  function resolveVerifierModel(mainModel) {
+    const own = env.OPENAI_MEY_VERIFY_MODEL;
+    if (typeof own === 'string' && own.trim()) return own.trim();
+    const shared = env.OPENAI_MODEL;
+    return typeof shared === 'string' && shared.trim() ? shared.trim() : mainModel;
+  }
+
+  function resolveVerifierEffort() {
+    const selected = env.OPENAI_MEY_VERIFY_EFFORT;
+    return REASONING_EFFORTS.includes(selected) ? selected : 'low';
+  }
+
   function resolveClient() {
     if (client) return client;
     const apiKey = env.OPENAI_API_KEY;
@@ -374,7 +390,8 @@ function createMeyAgent({
         const check = () =>
           verifyReply({
             client: selectedClient,
-            model,
+            model: resolveVerifierModel(model),
+            effort: resolveVerifierEffort(),
             evidence: { briefing, toolOutputs },
             userTurn,
             draft: text,
