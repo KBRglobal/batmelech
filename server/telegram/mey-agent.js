@@ -137,8 +137,12 @@ function expectedSorts(userMessage) {
   return null;
 }
 
+// The guard is about WHO or WHICH is first — "how much came in on the last
+// delivery day" is a sum over a day, not a ranking, and must not be gated.
+const WHO_PATTERN = /(^|\s)(מי|למי|איזה|איזו|מהי|מה ה)/u;
+
 function rankingViolation(userMessage, reply, toolOutputs) {
-  if (!SUPERLATIVE_PATTERN.test(userMessage)) return null;
+  if (!SUPERLATIVE_PATTERN.test(userMessage) || !WHO_PATTERN.test(userMessage)) return null;
   if (/לא מצאתי|אין לי|לא נמצא|אין הזמנות|אין לקוחות/u.test(reply)) return null;
   const sorted = toolOutputs.filter((record) => record.result && (record.result.sortedBy || record.result.sortBy) && Array.isArray(record.result.customers || record.result.orders));
   const wanted = expectedSorts(userMessage);

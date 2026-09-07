@@ -272,6 +272,9 @@ test('ranking guard: "the most" must be the first row of a sorted list', () => {
   assert.match(rankingViolation('מי הלקוח שהזמין בהכי הרבה כסף אי פעם?', 'שירי דויד — 328.00$', sorted), /רוני/u);
   assert.match(rankingViolation('מי הלקוח שהזמין בהכי הרבה כסף?', 'שירי דויד — 328.00$', []), /list_customers/u);
   assert.equal(rankingViolation('כמה יצא לטוני?', 'טוני — 148.00$', []), null, 'not a ranking question');
+  assert.equal(rankingViolation('כמה נכנס לי בפועל ביום המשלוחים האחרון?', 'נכנסו 328.00$', []), null, 'a sum over "the last day" is not a ranking');
+  assert.equal(rankingViolation('כמה הזמנות היו ביום המשלוחים האחרון?', 'היו 7 הזמנות', []), null);
+  assert.match(rankingViolation('מה ההזמנה הכי גדולה שהייתה לי?', 'של דנה', []), /list_/u, 'which-order questions are gated');
   assert.equal(rankingViolation('מי הזמין הכי הרבה?', 'לא מצאתי הזמנות בכלל', []), null, 'an honest "none" is fine');
 });
 

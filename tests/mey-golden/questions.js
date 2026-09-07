@@ -119,7 +119,7 @@ function buildQuestions(state, { today }) {
       ask: 'כמה כסף יוצא לי בשישי הקרוב סה"כ?',
       sender: LIN,
       check: (r) => {
-        if (fridayOrders.length === 0) return has(r, 'אין');
+        if (fridayOrders.length === 0) return /אין|0 הזמנות|0\.00\$|אפס/u.test(r) ? true : 'should say none';
         const billed = fridayOrders.reduce((s, o) => s + (orderMoney(o).totalMinorUnits ?? 0), 0);
         return has(r, usdLabel(billed));
       },
