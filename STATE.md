@@ -1,8 +1,7 @@
 # STATE — batmelech (updated: 2026-09-07 12:30)
 
 ## Now (in progress)
-- MEY HALLUCINATED NUMBERS — fixed in code 2026-09-07, UNCOMMITTED, NOT
-  DEPLOYED (Moshe decides). Evidence from the live mey_conversation table:
+- MEY HALLUCINATED NUMBERS — fixed 2026-09-07, committed 731f12d, deployed. Evidence from the live mey_conversation table:
   Toni's 148$ order was answered "143 dirhams" then "39$"; 289$ became
   "about 105 dirhams"; "tomorrow" was answered for the wrong date. Root
   causes and fixes: (1) no clock in the prompt → mey-agent now prepends a
@@ -20,8 +19,7 @@
   correct, zero corrections fired; gpt-5.4 asked "delivered to whom?" where
   mini listed everything. DEPLOYED 2026-09-07 via `railway up` from the local
   tree with OPENAI_MEY_MODEL=gpt-5.4 (Mey only; the rest stays on
-  OPENAI_MODEL=gpt-5.4-mini). STILL UNCOMMITTED — Railway auto-deploys from
-  GitHub main, so the next push without this commit would revert Mey's fix.
+  OPENAI_MODEL=gpt-5.4-mini). Committed + pushed to main 2026-09-07 (731f12d).
 - MEY INTELLIGENCE ROUND 2 (2026-09-07, Moshe: "build all five in order"):
   (1) mey-briefing.js — live business snapshot in the system prompt every
   turn (today + coming Friday orders, debts, platas, out-of-stock, ordering
