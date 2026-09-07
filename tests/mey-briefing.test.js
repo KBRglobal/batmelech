@@ -36,9 +36,9 @@ test('the briefing carries today, the coming Friday, debts, platas, prices and s
   assert.match(briefing, /דנה — Five Palm, בלי שעה, 460\.00\$ .* שולם/u);
   assert.match(briefing, /חובות פתוחים: 2 לקוחות, סה"כ 378\.00\$/u);
   assert.match(briefing, /פלטות בחוץ: 1 \(טוני\)/u);
-  assert.match(briefing, /ארוחה זוגית 230\$/u);
-  assert.match(briefing, /מארז הבדלה 20\$/u);
-  assert.match(briefing, /בגט\/חלת שניצל ישראלי: בבגט 25\$/u);
+  assert.match(briefing, /ארוחה זוגית 230\$ \/ 844\.68 דירהם/u);
+  assert.match(briefing, /מארז הבדלה 20\$ \/ 73\.45 דירהם/u);
+  assert.match(briefing, /בגט\/חלת שניצל ישראלי: בבגט 25\$ \/ 91\.81 דירהם/u);
   assert.match(briefing, /קטי תמיד רוצה חריף \(לין, 2026-09-01\)/u);
   assert.match(briefing, /הערות אישיות על 1 לקוחות/u);
 });
@@ -48,5 +48,5 @@ test('an empty business still produces a coherent briefing', () => {
   assert.match(briefing, /היום \(2026-09-07\): אין משלוחים/u);
   assert.match(briefing, /חובות פתוחים: אין/u);
   assert.match(briefing, /פלטות בחוץ: אין/u);
-  assert.match(briefing, /ארוחה זוגית 230\$/u, 'default prices when the menu has none');
+  assert.match(briefing, /ארוחה זוגית 230\$ \/ 844\.68 דירהם/u, 'default prices when the menu has none');
 });

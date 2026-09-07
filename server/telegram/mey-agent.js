@@ -105,6 +105,15 @@ function correctionInstruction(invented) {
   );
 }
 
+function verifierInstruction(problems) {
+  return (
+    `בדיקת האמת של המערכת מצאה בתשובה שלך טענות בלי מקור בנתונים:\n- ${problems.join('\n- ')}\n` +
+    'הנתונים קיימים במערכת — תבדקי בכלים המתאימים (למשל list_customers עם sortBy, list_orders, get_customer, ' +
+    'get_order_full) ותני תשובה חדשה שכל טענה בה נשענת על תוצאת כלי. בלי "אין לי הוכחה" ובלי הסתייגויות — ' +
+    'או עובדה מבוססת, או שתגידי מה בדיוק לא נמצא.'
+  );
+}
+
 // A reply that states nothing checkable (a greeting, a clarifying question)
 // does not need the truth check; anything with a digit, or produced after a
 // tool call, does.
@@ -282,19 +291,35 @@ function createMeyAgent({
         }
       }
 
-      // 2. truth check — every claim against the evidence, not just numbers
+      // 2. truth check — every claim against the evidence, not just numbers.
+      // An unsupported claim first goes BACK to the model with the tools in
+      // hand ("the proof is in the system — go get it"); only if the second
+      // draft still fails does the verifier's own rewrite go out.
       if (text && text !== UNGROUNDED_REPLY && verificationEnabled() && needsVerification(text, toolOutputs)) {
-        const verdict = await verifyReply({
-          client: selectedClient,
-          model,
-          evidence: { briefing, toolOutputs },
-          userTurn,
-          draft: text,
-          logger,
-        });
-        if (verdict && !verdict.ok && verdict.corrected) {
-          logger.error(`mey verifier corrected the reply: ${verdict.problems.join(' | ')}`);
-          text = replyIsGrounded(verdict.corrected, evidence) ? verdict.corrected : UNGROUNDED_REPLY;
+        const check = () =>
+          verifyReply({
+            client: selectedClient,
+            model,
+            evidence: { briefing, toolOutputs },
+            userTurn,
+            draft: text,
+            toolNames: tools.definitions.map((definition) => definition.name),
+            logger,
+          });
+        let verdict = await check();
+        if (verdict && !verdict.ok) {
+          logger.error(`mey verifier flagged the reply: ${verdict.problems.join(' | ')}`);
+          input.push({ role: 'assistant', content: text });
+          input.push({ role: 'system', content: verifierInstruction(verdict.problems) });
+          const retried = await converse(session);
+          if (retried && replyIsGrounded(retried, evidence)) {
+            text = retried;
+            verdict = await check();
+            if (verdict && !verdict.ok) logger.error(`mey verifier flagged the retry: ${verdict.problems.join(' | ')}`);
+          }
+          if (verdict && !verdict.ok && verdict.corrected) {
+            text = replyIsGrounded(verdict.corrected, evidence) ? verdict.corrected : UNGROUNDED_REPLY;
+          }
         }
       }
 

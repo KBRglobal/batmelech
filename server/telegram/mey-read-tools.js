@@ -28,6 +28,21 @@ const { withCurrencyLabels } = require('../domain/money-labels');
 const { orderPriceBreakdown } = require('../domain/order-pricing');
 const { customerMetaFor } = require('./mey-audited-actions');
 
+const CUSTOMER_SORTS = Object.freeze({
+  billed: (a, b) => b.totalBilledMinorUnits - a.totalBilledMinorUnits,
+  collected: (a, b) => b.totalCollectedMinorUnits - a.totalCollectedMinorUnits,
+  outstanding: (a, b) => b.outstandingMinorUnits - a.outstandingMinorUnits,
+  orders: (a, b) => b.orderCount - a.orderCount,
+  recent: (a, b) => String(b.lastOrderDate ?? '').localeCompare(String(a.lastOrderDate ?? '')),
+});
+const CUSTOMER_SORT_LABELS = Object.freeze({
+  billed: 'סך ההזמנות (כמה הוזמן)',
+  collected: 'כמה שולם בפועל',
+  outstanding: 'כמה עוד חייב',
+  orders: 'מספר הזמנות',
+  recent: 'תאריך ההזמנה האחרונה',
+});
+
 const MAX_ORDERS = 40;
 const MAX_CUSTOMERS = 50;
 const MAX_DISHES = 120;
@@ -76,11 +91,18 @@ const READ_TOOL_DEFINITIONS = [
     type: 'function',
     name: 'list_customers',
     description:
-      'כל הסועדים של העסק, מהמשלם הגדול ביותר ומטה: כמה הזמנות, כמה שילם, כמה עוד חייב, מתי הזמין לאחרונה ' +
-      'ומה המנות שהוא הכי מזמין. לשאלות "מי הלקוחות הכי טובים" או "מי חייב לי כסף".',
+      'כל הסועדים של העסק, ממוינים: לכל אחד כמה הזמנות, כמה הוזמן בסך הכל (totalBilled), כמה שילם בפועל (totalCollected), ' +
+      'כמה עוד חייב (outstanding), מתי הזמין לראשונה ולאחרונה ומה המנות שהוא הכי מזמין. ' +
+      'sortBy=billed → "מי הזמין הכי הרבה כסף אי פעם"; sortBy=collected → "מי שילם הכי הרבה"; sortBy=outstanding → "מי חייב הכי הרבה"; ' +
+      'sortBy=orders → "מי מזמין הכי הרבה פעמים"; sortBy=recent → "מי הזמין לאחרונה". הראשון ברשימה הוא התשובה ל"הכי".',
     parameters: {
       type: 'object',
       properties: {
+        sortBy: {
+          type: 'string',
+          enum: ['billed', 'collected', 'outstanding', 'orders', 'recent'],
+          description: 'לפי מה למיין, מהגבוה לנמוך. ברירת מחדל billed',
+        },
         limit: { type: 'number', description: `כמה סועדים להחזיר, ברירת מחדל 20, מקסימום ${MAX_CUSTOMERS}` },
         withDebtOnly: { type: 'boolean', description: 'רק מי שנשאר לו תשלום פתוח' },
       },
@@ -287,10 +309,12 @@ function createMeyReadTools({ repository }) {
       return { count: matches.length, customers };
     },
 
-    async list_customers({ limit, withDebtOnly }) {
+    async list_customers({ sortBy, limit, withDebtOnly }) {
       const state = await loadState();
       let customers = customerLedger(state);
       if (withDebtOnly === true) customers = customers.filter((c) => c.outstandingMinorUnits > 0);
+      const order = CUSTOMER_SORTS[sortBy] ? sortBy : 'billed';
+      customers = [...customers].sort(CUSTOMER_SORTS[order]);
       const count = customers.length;
       const requested = Number.isFinite(limit) && limit > 0 ? Math.min(limit, MAX_CUSTOMERS) : 20;
       const page = customers.slice(0, requested).map(({ orderIds: _ids, ...customer }) => customer);
@@ -298,6 +322,8 @@ function createMeyReadTools({ repository }) {
         count,
         returned: page.length,
         truncated: count > page.length,
+        sortedBy: order,
+        note: `הרשימה ממוינת לפי ${CUSTOMER_SORT_LABELS[order]}, מהגבוה לנמוך — הראשון הוא ה"הכי".`,
         customers: page,
       };
     },

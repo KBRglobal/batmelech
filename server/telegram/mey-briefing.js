@@ -31,9 +31,12 @@ function money(minorUnits) {
   return `${usdLabel(minorUnits)}$ / ${aedLabel(minorUnits)} דירהם`;
 }
 
+// "230$ / 844.68 דירהם" — both currencies on every price, so the model never
+// has to convert (and the number guard never has to catch it converting).
 function dollars(value, fallbackMinorUnits) {
   const parsed = parseMoneyMinorUnits(value);
-  return usdLabel(parsed === null ? fallbackMinorUnits : parsed).replace(/\.00$/u, '');
+  const minor = parsed === null ? fallbackMinorUnits : parsed;
+  return `${usdLabel(minor).replace(/\.00$/u, '')}$ / ${aedLabel(minor)} דירהם`;
 }
 
 function comingFriday(todayIso) {
@@ -57,21 +60,21 @@ function orderLine(order) {
 function priceLines(menu) {
   const m = isRecord(menu) ? menu : {};
   const lines = [
-    `ארוחה זוגית ${dollars(m.couplePrice, 23_000)}$ (כוללת 4 סלטים, 2 פילה דג, עיקרית, תוספת, קינוח, ${Number.isInteger(m.includedChallot) ? m.includedChallot : 2} חלות); ` +
-      `חלה נוספת ${dollars(m.challahPrice, 1_000)}$; סלט נוסף ${dollars(m.saladUnitPrice, 700)}$ או רביעייה ${dollars(m.saladBlockPrice, 2_500)}$; ` +
-      `פילה דג נוסף ${dollars(m.fishExtraPrice, 3_000)}$; עיקרית נוספת ${dollars(m.mainExtraPrice, 10_000)}$; ` +
-      `משלוח דובאי ${usdLabel(DELIVERY_PRICE_MINOR_UNITS.dubai).replace(/\.00$/u, '')}$, אבו דאבי ${usdLabel(DELIVERY_PRICE_MINOR_UNITS['abu-dhabi']).replace(/\.00$/u, '')}$, איסוף עצמי חינם.`,
+    `ארוחה זוגית ${dollars(m.couplePrice, 23_000)} (כוללת 4 סלטים, 2 פילה דג, עיקרית, תוספת, קינוח, ${Number.isInteger(m.includedChallot) ? m.includedChallot : 2} חלות); ` +
+      `חלה נוספת ${dollars(m.challahPrice, 1_000)}; סלט נוסף ${dollars(m.saladUnitPrice, 700)} או רביעייה ${dollars(m.saladBlockPrice, 2_500)}; ` +
+      `פילה דג נוסף ${dollars(m.fishExtraPrice, 3_000)}; עיקרית נוספת ${dollars(m.mainExtraPrice, 10_000)}; ` +
+      `משלוח דובאי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS.dubai)}, אבו דאבי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS['abu-dhabi'])}, איסוף עצמי חינם.`,
   ];
   const extras = (Array.isArray(m.extras) ? m.extras : [])
     .filter((row) => isRecord(row) && text(row.name) !== '')
-    .map((row) => `${text(row.name)} ${dollars(row.price, 0)}$`);
+    .map((row) => `${text(row.name)} ${dollars(row.price, 0)}`);
   if (extras.length > 0) lines.push(`תוספות שבת: ${extras.join('; ')}.`);
   const lunch = LUNCH_MENU.map((item) => {
     const saved = (Array.isArray(m.lunch) ? m.lunch : []).find((row) => isRecord(row) && row.key === item.key);
-    if (item.variants.length === 0) return `${item.name} ${dollars(saved?.price, item.priceUsd * 100)}$`;
+    if (item.variants.length === 0) return `${item.name} ${dollars(saved?.price, item.priceUsd * 100)}`;
     const variants = item.variants.map((variant) => {
       const savedVariant = (Array.isArray(saved?.variants) ? saved.variants : []).find((row) => row.k === variant.key);
-      return `${variant.label} ${dollars(savedVariant?.price, variant.priceUsd * 100)}$`;
+      return `${variant.label} ${dollars(savedVariant?.price, variant.priceUsd * 100)}`;
     });
     return `${item.name}: ${variants.join(', ')}`;
   });

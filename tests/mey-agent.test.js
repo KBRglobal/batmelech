@@ -172,11 +172,41 @@ test('verification is needed after a tool call or when the reply states a number
   assert.equal(needsVerification('בטח', [{ tool: 'x' }]), true);
 });
 
-test('the truth check rewrites a reply whose claim has no source, and the corrected text goes out', async () => {
+test('a flagged claim goes back to the model with its tools; a grounded retry that passes goes out', async () => {
+  const client = scriptedClient([
+    toolCallResponse('search_orders', { query: 'טוני' }),
+    textResponse('טוני הזמינה ל-Atlantis The Royal, 148.00$.'),
+    textResponse(JSON.stringify({ ok: false, problems: ['המלון בראיות הוא Atlantis The Palm'], corrected: 'x' })),
+    toolCallResponse('get_order_full', { orderId: 'o-1' }),
+    textResponse('טוני הזמינה ל-Atlantis The Palm, 148.00$.'),
+    textResponse(JSON.stringify({ ok: true, problems: [], corrected: 'טוני הזמינה ל-Atlantis The Palm, 148.00$.' })),
+  ]);
+  const agent = createMeyAgent({
+    repository,
+    clientFactory: () => client,
+    env: { OPENAI_MODEL: 'test-model', OPENAI_API_KEY: 'k' },
+    logger: silentLogger,
+    toolsFactory: () => ({
+      definitions: [{ type: 'function', name: 'search_orders' }],
+      execute: async () => ({ count: 1, orders: [{ name: 'טוני', place: 'Atlantis The Palm', totalUsd: '148.00' }] }),
+    }),
+  });
+  const reply = await agent.reply('לאן טוני הזמינה?', { firstName: 'לין' });
+  assert.equal(reply, 'טוני הזמינה ל-Atlantis The Palm, 148.00$.');
+  assert.equal(client.requests.length, 6);
+  const retryInstruction = [...client.requests[3].input].reverse().find((item) => item.role === 'system');
+  assert.ok(retryInstruction, 'the retry carries a system instruction');
+  assert.match(retryInstruction.content, /Atlantis The Palm/u, 'the retry carries the verifier findings');
+  assert.match(client.requests[2].input[1].content, /search_orders/u, 'the verifier knows her tools');
+});
+
+test('when the retry still fails the check, the verifier rewrite goes out', async () => {
   const client = scriptedClient([
     toolCallResponse('search_orders', { query: 'טוני' }),
     textResponse('טוני הזמינה ל-Atlantis The Royal, 148.00$.'),
     textResponse(JSON.stringify({ ok: false, problems: ['המלון בראיות הוא Atlantis The Palm'], corrected: 'טוני הזמינה ל-Atlantis The Palm, 148.00$.' })),
+    textResponse('טוני הזמינה ל-Atlantis The Royal, 148.00$.'),
+    textResponse(JSON.stringify({ ok: false, problems: ['עדיין Royal'], corrected: 'טוני הזמינה ל-Atlantis The Palm, 148.00$.' })),
   ]);
   const agent = createMeyAgent({
     repository,
@@ -211,6 +241,7 @@ test('a corrected reply still has to pass the number guard', async () => {
   const client = scriptedClient([
     textResponse('יש 7 משלוחים'),
     textResponse(JSON.stringify({ ok: false, problems: ['x'], corrected: 'יש 7 משלוחים בסך 999.99$' })),
+    textResponse('יש 7 משלוחים בסך 888.88$'), // retry invents too -> not grounded -> ignored
   ]);
   assert.equal(await agentWith(client, { OPENAI_MEY_VERIFY: 'on' }).reply('כמה משלוחים?', {}), UNGROUNDED_REPLY);
 });

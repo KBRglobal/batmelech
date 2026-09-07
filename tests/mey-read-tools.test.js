@@ -364,3 +364,15 @@ test('list_orders answers "the biggest ever" and "the latest" in one call, cance
   const byDate = await mey.execute('list_orders', { sortBy: 'date', limit: null, fromDate: '2026-08-21', toDate: '2026-08-21', includeCancelled: true });
   assert.deepEqual(byDate.orders.map((row) => row.id).sort(), ['o-2', 'o-3']);
 });
+
+test('list_customers sorts by what was asked: ordered-most is not paid-most', async () => {
+  const mey = tools();
+  const billed = await mey.execute('list_customers', { sortBy: 'billed', limit: 1 });
+  assert.equal(billed.customers[0].name, 'רותי לוי');
+  assert.equal(billed.sortedBy, 'billed');
+  assert.match(billed.note, /ממוינת/u);
+  const recent = await mey.execute('list_customers', { sortBy: 'recent', limit: 1 });
+  assert.equal(recent.customers[0].lastOrderDate, '2026-08-22');
+  const fallback = await mey.execute('list_customers', { sortBy: 'nonsense' });
+  assert.equal(fallback.sortedBy, 'billed');
+});

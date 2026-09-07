@@ -63,6 +63,7 @@ function buildQuestions(state, { today }) {
 
   const biggest = byTotalDesc[0];
   const topDebtor = debtors[0];
+  const topBilled = [...ledger].sort((a, b) => b.totalBilledMinorUnits - a.totalBilledMinorUnits)[0];
 
   const questions = [];
 
@@ -134,6 +135,12 @@ function buildQuestions(state, { today }) {
       ask: 'מה ההזמנה הכי גדולה שהייתה לי אי פעם?',
       sender: LIN,
       check: (r) => (biggest ? has(r, biggest.name.split(' ')[0], usdLabel(orderMoney(biggest).totalMinorUnits)) : true),
+    },
+    {
+      id: 'top-customer-billed',
+      ask: 'מי הלקוח שהזמין בהכי הרבה כסף אי פעם?',
+      sender: BOSS,
+      check: (r) => (topBilled ? (has(r, topBilled.name.split(' ')[0], usdLabel(topBilled.totalBilledMinorUnits)) === true ? lacks(r, 'הוכחה', 'לא ניתן לאמת') : has(r, topBilled.name.split(' ')[0], usdLabel(topBilled.totalBilledMinorUnits))) : true),
     },
     {
       id: 'last-service-income',
