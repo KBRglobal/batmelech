@@ -19,6 +19,7 @@
 // must never cost Lin the answer to a question about all of them.
 
 const { costRecipe, marginMinorUnits, productLibraryMap } = require('./recipe-cost');
+const { LUNCH_MENU } = require('./lunch-menu');
 
 const CANCELLED_STATUS = 'בוטלה';
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
@@ -128,12 +129,18 @@ function orderDishes(order) {
     const quantity = countOf(value.q ?? value.quantity);
     if (quantity <= 0) continue;
     const sides = isRecord(value.sides) ? value.sides : {};
+    // Lunch items are stored by catalog key ("schnitzel-roll"); people know
+    // them by name, so the name is what a reader gets, the key rides along.
+    const catalogItem = LUNCH_MENU.find((item) => item.key === key) || null;
+    const variantKey = text(value.v ?? value.variantKey);
+    const variant = catalogItem?.variants?.find((candidate) => candidate.key === variantKey) || null;
     dishes.push({
       course: 'תפריט צהריים',
       courseKey: 'lunch',
-      name: text(key),
+      name: catalogItem ? catalogItem.name : text(key),
+      key: text(key),
       quantity,
-      variant: text(value.v ?? value.variantKey) || null,
+      variant: variant ? variant.label : variantKey || null,
       sides: Object.entries(sides)
         .map(([sideName, sideValue]) => ({ name: text(sideName), quantity: countOf(sideValue) }))
         .filter((side) => side.quantity > 0),

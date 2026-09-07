@@ -1,6 +1,48 @@
-# STATE — batmelech (updated: 2026-08-24 19:00)
+# STATE — batmelech (updated: 2026-09-07 12:30)
 
 ## Now (in progress)
+- MEY HALLUCINATED NUMBERS — fixed in code 2026-09-07, UNCOMMITTED, NOT
+  DEPLOYED (Moshe decides). Evidence from the live mey_conversation table:
+  Toni's 148$ order was answered "143 dirhams" then "39$"; 289$ became
+  "about 105 dirhams"; "tomorrow" was answered for the wrong date. Root
+  causes and fixes: (1) no clock in the prompt → mey-agent now prepends a
+  Dubai date/time/weekday + coming-Friday line every turn; (2) no currency
+  facility → server/domain/money-labels.js adds `<x>Usd`/`<x>Aed` strings
+  (fixed 3.6725 peg, integer math) next to every `<x>MinorUnits` leaving a
+  read tool / search_orders; (3) no number guard → every reply is checked
+  against tool outputs + what people wrote (integers ≤31 free); an invented
+  number gets one correction round, a second failure returns UNGROUNDED_REPLY
+  instead of a wrong amount; (4) knobs OPENAI_MEY_MODEL / OPENAI_MEY_EFFORT
+  (default effort medium) so Mey can run on a stronger model than the rest.
+  Also: lunch items now carry their Hebrew catalog name (was "schnitzel-roll").
+  Verified: 651 server tests green + live smoke with both models on a
+  production state snapshot (scratchpad mey-smoke*.js) — every answer
+  correct, zero corrections fired; gpt-5.4 asked "delivered to whom?" where
+  mini listed everything. DEPLOYED 2026-09-07 via `railway up` from the local
+  tree with OPENAI_MEY_MODEL=gpt-5.4 (Mey only; the rest stays on
+  OPENAI_MODEL=gpt-5.4-mini). STILL UNCOMMITTED — Railway auto-deploys from
+  GitHub main, so the next push without this commit would revert Mey's fix.
+- MEY INTELLIGENCE ROUND 2 (2026-09-07, Moshe: "build all five in order"):
+  (1) mey-briefing.js — live business snapshot in the system prompt every
+  turn (today + coming Friday orders, debts, platas, out-of-stock, ordering
+  state, full price list, standing notes); (2) domain/order-pricing.js —
+  server twin of the panel pricing, line-by-line `pricing` on get_order_full
+  / get_customer orders, reproduces 27/33 prod totals exactly and shows the
+  rest as a "manual adjustment" line; (3) mey-verifier.js — second model pass
+  (json_schema) checks every claim in the draft against tool outputs +
+  briefing, rewrites unsupported ones; OPENAI_MEY_VERIFY=off disables;
+  (4) remember_note tool — permanent memory: business notes in
+  settings.meyNotes (shown in the briefing), customer notes appended to
+  customerMeta (same card as the panel), audited + undoable; get_customer now
+  returns vip/notes; (5) scripts/mey-eval.js + tests/mey-golden/questions.js
+  — ~29 real questions with expectations computed from the snapshot,
+  `npm run mey:eval -- --state <snapshot>` under `railway run` (needs the
+  key). Lunch dishes now carry their Hebrew name + key. Also list_orders
+  read tool ("biggest order ever" went from 37 read_state calls / 73s to one
+  call / 13s). Golden eval on the 2026-09-07 prod snapshot: 28/29 (the one
+  miss was a check bug, fixed), avg 11s/question with the truth check on.
+  Deployed 2026-09-07 evening via `railway up --path-as-root` (plain
+  `railway up` from the repo packs /Users/me and fails: "./Documents/").
 - ROOT DOMAIN FIXED + LIVE (2026-08-24 ~18:50): batmelech.ae serves with a
   valid cert (CN=batmelech.ae via Cloudflare edge; root + www 200, catalog
   200, http->https ok). What was done: DNS zone moved to Cloudflare (zone

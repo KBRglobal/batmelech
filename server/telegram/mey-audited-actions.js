@@ -343,8 +343,117 @@ async function unfreezeWrites(repository) {
   return { ok: false, error: 'save failed after retries' };
 }
 
+// ---- Standing memory -------------------------------------------------------
+// What people tell מיי to remember, kept forever in state (not in the 48-hour
+// chat memory): business-wide notes in settings.meyNotes, per-diner notes in
+// customerMeta — the same record the panel's customers screen shows, keyed the
+// way the panel keys it (raw phone digits, else "שם:<name>").
+
+const NOTES_KEY = 'meyNotes';
+const MAX_NOTES = 200;
+const MAX_NOTE_CHARS = 400;
+
+function customerMetaKey(order) {
+  const digits = typeof order.phone === 'string' ? order.phone.replace(/\D/gu, '') : '';
+  if (digits !== '') return digits;
+  const name = typeof order.name === 'string' ? order.name.trim() : '';
+  return name === '' ? null : `שם:${name}`;
+}
+
+/** Every customerMeta key the panel might have used for this order's diner. */
+function customerMetaCandidates(order) {
+  const keys = [];
+  const digits = typeof order.phone === 'string' ? order.phone.replace(/\D/gu, '') : '';
+  if (digits !== '') {
+    // "0542016970" and "+971 54 201 6970" are one phone; the panel may have
+    // keyed the card by either spelling.
+    const local = digits.startsWith('971') ? `0${digits.slice(3)}` : digits;
+    const international = local.startsWith('0') ? `971${local.slice(1)}` : local;
+    keys.push(digits, local, international, `phone:${international}`);
+  }
+  const name = typeof order.name === 'string' ? order.name.trim() : '';
+  if (name !== '') keys.push(`שם:${name}`);
+  return [...new Set(keys)];
+}
+
+function customerMetaFor(state, order) {
+  const meta = isRecord(state.customerMeta) ? state.customerMeta : {};
+  const found = { vip: false, notes: '' };
+  for (const key of customerMetaCandidates(order)) {
+    const record = meta[key];
+    if (!isRecord(record)) continue;
+    if (record.vip === true) found.vip = true;
+    const notes = typeof record.notes === 'string' ? record.notes.trim() : '';
+    if (notes !== '' && !found.notes.includes(notes)) found.notes = found.notes === '' ? notes : `${found.notes} · ${notes}`;
+  }
+  return found;
+}
+
+function todayIso() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+async function rememberNote(repository, { scope, text, by, customerQuery } = {}) {
+  const note = typeof text === 'string' ? text.trim().replace(/\s+/gu, ' ') : '';
+  if (note === '' || note.length > MAX_NOTE_CHARS) return { ok: false, error: `ההערה חייבת להיות בין תו אחד ל-${MAX_NOTE_CHARS} תווים` };
+  const author = typeof by === 'string' && by.trim() !== '' ? by.trim() : 'לא ידוע';
+  if (scope === 'business') {
+    return withAuditedState(repository, (state) => {
+      const settings = settingsOf(state);
+      const previous = Array.isArray(settings[NOTES_KEY]) ? settings[NOTES_KEY] : [];
+      const record = { id: crypto.randomBytes(4).toString('hex'), text: note, by: author, date: todayIso(), at: Date.now() };
+      const next = [...previous, record].slice(-MAX_NOTES);
+      const entry = newAuditEntry('remember_note', `זיכרון קבוע: ${note}`, { kind: 'notes-replace', previous });
+      return { state: { ...state, settings: { ...settings, [NOTES_KEY]: next } }, entry, result: { note: record, count: next.length } };
+    });
+  }
+  if (scope === 'customer') {
+    const query = typeof customerQuery === 'string' ? customerQuery.trim().toLowerCase() : '';
+    if (query === '') return { ok: false, error: 'צריך שם או טלפון של הלקוח/ה' };
+    return withAuditedState(repository, (state) => {
+      const orders = Array.isArray(state.orders) ? state.orders.filter(isRecord) : [];
+      const digits = query.replace(/\D/gu, '');
+      const matches = orders.filter((order) => {
+        const name = typeof order.name === 'string' ? order.name.trim().toLowerCase() : '';
+        const phone = typeof order.phone === 'string' ? order.phone.replace(/\D/gu, '') : '';
+        return (digits.length >= 4 && phone.includes(digits)) || (name !== '' && name.includes(query));
+      });
+      const keys = [...new Set(matches.map(customerMetaKey).filter(Boolean))];
+      if (keys.length === 0) return { error: `לא מצאתי לקוח/ה שמתאים ל"${customerQuery}"` };
+      if (keys.length > 1) {
+        const names = [...new Set(matches.map((order) => order.name).filter(Boolean))];
+        return { error: `יש כמה לקוחות שמתאימים ל"${customerQuery}": ${names.join(', ')} — תדייקי בשם או בטלפון` };
+      }
+      const key = keys[0];
+      const meta = isRecord(state.customerMeta) ? state.customerMeta : {};
+      const previous = isRecord(meta[key]) ? meta[key] : null;
+      const existing = previous && typeof previous.notes === 'string' ? previous.notes.trim() : '';
+      const nextNotes = existing === '' ? note : `${existing} · ${note}`;
+      const record = { ...(previous || {}), notes: nextNotes };
+      const customerName = matches[0].name || key;
+      const entry = newAuditEntry('remember_note', `הערה על ${customerName}: ${note}`, { kind: 'customer-meta-replace', key, previous });
+      return {
+        state: { ...state, customerMeta: { ...meta, [key]: record } },
+        entry,
+        result: { customer: customerName, notes: nextNotes },
+      };
+    });
+  }
+  return { ok: false, error: 'scope חייב להיות business או customer' };
+}
+
 function applyUndo(state, entry) {
   const undo = entry.undo || {};
+  if (undo.kind === 'notes-replace') {
+    const settings = settingsOf(state);
+    return { state: { ...state, settings: { ...settings, [NOTES_KEY]: Array.isArray(undo.previous) ? undo.previous : [] } } };
+  }
+  if (undo.kind === 'customer-meta-replace') {
+    const meta = isRecord(state.customerMeta) ? { ...state.customerMeta } : {};
+    if (undo.previous === null || undo.previous === undefined) delete meta[undo.key];
+    else meta[undo.key] = undo.previous;
+    return { state: { ...state, customerMeta: meta } };
+  }
   if (undo.kind === 'order-replace' || undo.kind === 'order-deleted') {
     const orders = Array.isArray(state.orders) ? state.orders : [];
     const index = orders.findIndex((order) => String(order.id) === undo.orderId);
@@ -444,8 +553,11 @@ module.exports = {
   AUDIT_LOG_KEY,
   FROZEN_KEY,
   MAX_AUDIT_ENTRIES,
+  NOTES_KEY,
   ORDER_FIELD_VALIDATORS,
+  customerMetaFor,
   deleteOrder,
+  rememberNote,
   editMenuItem,
   freezeWrites,
   isWritesFrozen,

@@ -21,8 +21,12 @@ const {
   financialSummary,
   fullOrder,
   orderDishes,
+  orderMoney,
   ordersOf,
 } = require('../domain/business-queries');
+const { withCurrencyLabels } = require('../domain/money-labels');
+const { orderPriceBreakdown } = require('../domain/order-pricing');
+const { customerMetaFor } = require('./mey-audited-actions');
 
 const MAX_ORDERS = 40;
 const MAX_CUSTOMERS = 50;
@@ -40,7 +44,8 @@ const READ_TOOL_DEFINITIONS = [
     description:
       'מחזיר הזמנה אחת במלואה: כל מנה עם הכמות שלה (סלטים, ראשונות, עיקריות, תוספות, קינוחים, אקסטרות, ' +
       'תפריט צהריים ופריטים חופשיים), כמה ארוחות זוגיות וחלות, הכסף (סה"כ, מקדמה, כמה נגבה, כמה עוד פתוח, ' +
-      'אמצעי תשלום, חשבונית), פלטה, משלוח, הערות והשיחה המקורית. זה הכלי לשאלה "מה בדיוק היא הזמינה".',
+      'אמצעי תשלום, חשבונית), פירוט המחיר שורה-שורה מול המחירון (pricing — למה הסכום הוא מה שהוא), פלטה, משלוח, ' +
+      'הערות, השיחה המקורית והערות קבועות על הלקוח/ה. זה הכלי לשאלה "מה בדיוק היא הזמינה" ו"למה זה יצא ככה".',
     parameters: {
       type: 'object',
       properties: { orderId: { type: 'string', description: 'מזהה ההזמנה' } },
@@ -53,8 +58,9 @@ const READ_TOOL_DEFINITIONS = [
     type: 'function',
     name: 'get_customer',
     description:
-      'כל ההיסטוריה של סועד אחד לפי שם או טלפון: כל ההזמנות שלו, כמה הוזמן בסך הכל, כמה שילם בפועל, ' +
-      'כמה עוד פתוח, מתי הזמין לראשונה ולאחרונה, וכמה הזמנות בוטלו. זה הכלי לשאלה "כמה היא שילמה לי עד היום".',
+      'כל ההיסטוריה של סועד אחד לפי שם או טלפון: כל ההזמנות שלו (כל אחת עם פירוט המחיר שורה-שורה), כמה הוזמן בסך הכל, ' +
+      'כמה שילם בפועל, כמה עוד פתוח, מתי הזמין לראשונה ולאחרונה, כמה הזמנות בוטלו, והערות קבועות של לין עליו (VIP, העדפות). ' +
+      'זה הכלי לשאלה "כמה היא שילמה לי עד היום" ו"מה אני יודעת על הלקוח הזה".',
     parameters: {
       type: 'object',
       properties: {
@@ -82,6 +88,27 @@ const READ_TOOL_DEFINITIONS = [
       additionalProperties: false,
     },
     strict: false,
+  },
+  {
+    type: 'function',
+    name: 'list_orders',
+    description:
+      'רשימת הזמנות ממוינת, לשאלות של "הכי": ההזמנה הכי גדולה, ההזמנות האחרונות, כל ההזמנות בטווח תאריכים. ' +
+      'sortBy=total ממיין מהסכום הגבוה ומטה, sortBy=date מהחדשה ומטה. לכל הזמנה: מזהה, שם, תאריך, סכום, סטטוס, יעד. ' +
+      `מקסימום ${MAX_ORDERS} בכל פעם, ותמיד נאמר אם נחתך. הזמנות שבוטלו לא נכללות אלא אם includeCancelled=true.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        sortBy: { type: 'string', enum: ['total', 'date'], description: 'total = לפי סכום, date = לפי תאריך' },
+        limit: { type: ['number', 'null'], description: `כמה להחזיר, ברירת מחדל 10, מקסימום ${MAX_ORDERS}` },
+        fromDate: { type: ['string', 'null'], description: 'תאריך התחלה YYYY-MM-DD, או null' },
+        toDate: { type: ['string', 'null'], description: 'תאריך סיום YYYY-MM-DD, או null' },
+        includeCancelled: { type: ['boolean', 'null'], description: 'לכלול הזמנות שבוטלו, ברירת מחדל false' },
+      },
+      required: ['sortBy', 'limit', 'fromDate', 'toDate', 'includeCancelled'],
+      additionalProperties: false,
+    },
+    strict: true,
   },
   {
     type: 'function',
@@ -229,7 +256,12 @@ function createMeyReadTools({ repository }) {
       const state = await loadState();
       const order = ordersOf(state).find((candidate) => String(candidate.id ?? '') === wanted);
       if (!order) return { error: `לא נמצאה הזמנה עם מזהה ${wanted}` };
-      return { order: withheldStripped(fullOrder(order)) };
+      return {
+        order: withheldStripped(fullOrder(order)),
+        // why the total is what it is, line by line, against the price list
+        pricing: orderPriceBreakdown(order, state.menu),
+        customerNotes: customerMetaFor(state, order),
+      };
     },
 
     async get_customer({ query, includeOrders }) {
@@ -242,12 +274,15 @@ function createMeyReadTools({ repository }) {
       const wantOrders = includeOrders !== false;
       const allOrders = ordersOf(state);
       const customers = matches.slice(0, MAX_CUSTOMERS).map((customer) => {
-        if (!wantOrders) return { ...customer, orderIds: customer.orderIds.slice(0, MAX_ORDERS) };
-        const orders = allOrders
-          .filter((order) => customerKey(order) === customer.key)
+        const own = allOrders.filter((order) => customerKey(order) === customer.key);
+        // Lin's standing notes about this diner (panel customers screen + remember_note)
+        const meta = own.length > 0 ? customerMetaFor(state, own[own.length - 1]) : { vip: false, notes: '' };
+        const base = { ...customer, vip: meta.vip, notes: meta.notes || null };
+        if (!wantOrders) return { ...base, orderIds: customer.orderIds.slice(0, MAX_ORDERS) };
+        const orders = own
           .slice(-MAX_ORDERS)
-          .map((order) => withheldStripped(fullOrder(order)));
-        return { ...customer, orders, ordersTruncated: customer.orderIds.length > orders.length };
+          .map((order) => ({ ...withheldStripped(fullOrder(order)), pricing: orderPriceBreakdown(order, state.menu) }));
+        return { ...base, orders, ordersTruncated: customer.orderIds.length > orders.length };
       });
       return { count: matches.length, customers };
     },
@@ -265,6 +300,43 @@ function createMeyReadTools({ repository }) {
         truncated: count > page.length,
         customers: page,
       };
+    },
+
+    async list_orders({ sortBy, limit, fromDate, toDate, includeCancelled }) {
+      const state = await loadState();
+      const from = typeof fromDate === 'string' && fromDate.trim() !== '' ? fromDate.trim() : null;
+      const to = typeof toDate === 'string' && toDate.trim() !== '' ? toDate.trim() : null;
+      const rows = ordersOf(state)
+        .filter((order) => includeCancelled === true || String(order.status ?? '') !== 'בוטלה')
+        .filter((order) => {
+          const date = typeof order.date === 'string' ? order.date : '';
+          if (from && date < from) return false;
+          if (to && date > to) return false;
+          return true;
+        })
+        .map((order) => {
+          const money = orderMoney(order);
+          return {
+            id: order.id ?? null,
+            name: typeof order.name === 'string' ? order.name : null,
+            date: typeof order.date === 'string' ? order.date : null,
+            time: typeof order.time === 'string' && order.time !== '' ? order.time : null,
+            status: typeof order.status === 'string' ? order.status : null,
+            place: order.pickup === true ? 'איסוף עצמי' : (typeof order.hotelName === 'string' && order.hotelName) || (typeof order.place === 'string' && order.place) || null,
+            totalMinorUnits: money.totalMinorUnits,
+            collectedMinorUnits: money.collectedMinorUnits,
+            outstandingMinorUnits: money.outstandingMinorUnits,
+            paid: money.paid || null,
+          };
+        });
+      rows.sort((a, b) =>
+        sortBy === 'total'
+          ? (b.totalMinorUnits ?? -1) - (a.totalMinorUnits ?? -1)
+          : String(b.date ?? '').localeCompare(String(a.date ?? '')),
+      );
+      const requested = Number.isFinite(limit) && limit > 0 ? Math.min(limit, MAX_ORDERS) : 10;
+      const page = rows.slice(0, requested);
+      return { count: rows.length, returned: page.length, truncated: rows.length > page.length, sortBy, orders: page };
     },
 
     async get_dish_demand({ fromDate, toDate }) {
@@ -334,7 +406,13 @@ function createMeyReadTools({ repository }) {
     },
   };
 
-  return { definitions: READ_TOOL_DEFINITIONS, handlers, names: Object.keys(handlers) };
+  // Every amount leaves with its dollar and dirham strings attached, so the
+  // model quotes money instead of converting it in its head.
+  const labelled = Object.fromEntries(
+    Object.entries(handlers).map(([name, handler]) => [name, async (args) => withCurrencyLabels(await handler(args))]),
+  );
+
+  return { definitions: READ_TOOL_DEFINITIONS, handlers: labelled, names: Object.keys(labelled) };
 }
 
 module.exports = {

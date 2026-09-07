@@ -156,7 +156,9 @@ test('a full order carries every dish, gift portions and notes included', () => 
   assert.equal(byName['מטבוחה פיקנטית'].giftPortions, 1);
   assert.equal(byName['קציצות בשר ברוטב אדום עשיר'].quantity, 2);
   assert.equal(byName['מארז הבדלה'].note, 'לאריזה בנפרד');
-  assert.equal(byName.kubeh.course, 'תפריט צהריים');
+  const kubeh = order.dishes.find((dish) => dish.key === 'kubeh');
+  assert.equal(kubeh.course, 'תפריט צהריים');
+  assert.equal(kubeh.name, 'מנת קובה סלק ביתית');
 });
 
 test('the courier token never leaves the system through a read tool', async () => {
@@ -291,4 +293,74 @@ test('the write freeze silences writes but never the answers', async () => {
   const read = await mey.execute('get_financial_summary', { fromDate: null, toDate: null });
   assert.equal(read.error, undefined);
   assert.equal(read.collectedMinorUnits, 43_000);
+});
+
+test('every amount a read tool hands out comes with ready-made dollar and dirham strings', async () => {
+  const mey = tools();
+  const customer = await mey.execute('get_customer', { query: 'רותי' });
+  const ruti = customer.customers[0];
+  assert.equal(ruti.totalCollectedMinorUnits, 43_000);
+  assert.equal(ruti.totalCollectedUsd, '430.00');
+  assert.equal(ruti.totalCollectedAed, '1579.18');
+  assert.equal(ruti.orders[0].money.totalUsd, '520.00');
+  assert.equal(ruti.orders[0].money.totalAed, '1909.70');
+
+  const summary = await mey.execute('get_financial_summary', { fromDate: null, toDate: null });
+  assert.equal(summary.collectedUsd, '430.00');
+  assert.equal(summary.collectedAed, '1579.18');
+
+  const search = await mey.execute('search_orders', { query: 'רותי' });
+  const first = search.orders.find((order) => order.id === 'o-1');
+  assert.equal(first.totalUsd, '520.00');
+  assert.equal(first.totalAed, '1909.70');
+  assert.equal(first.outstandingUsd, '320.00');
+});
+
+test('lunch items are named the way people know them, not by catalog key', async () => {
+  const state = stateFixture();
+  state.orders.push({
+    id: 'o-lunch',
+    date: '2026-08-21',
+    name: 'טוני',
+    phone: '0501119999',
+    status: 'נמסרה',
+    total: '148',
+    lunch: { 'schnitzel-roll': { q: 2, v: 'challah', sides: {}, addon: 0 } },
+  });
+  const mey = createMeyTools({ repository: fakeRepository(state), logger: silentLogger });
+  const result = await mey.execute('get_order_full', { orderId: 'o-lunch' });
+  const dish = result.order.dishes.find((entry) => entry.courseKey === 'lunch');
+  assert.equal(dish.name, 'בגט/חלת שניצל ישראלי');
+  assert.equal(dish.key, 'schnitzel-roll');
+  assert.match(dish.variant, /בחלה/u);
+});
+
+test('an order answers "why this price" with a line-by-line breakdown, and carries the diner\'s standing notes', async () => {
+  const state = stateFixture();
+  state.customerMeta = { '0501112233': { vip: true, notes: 'אוהבת לא חריף' } };
+  const mey = createMeyTools({ repository: fakeRepository(state), logger: silentLogger });
+  const result = await mey.execute('get_order_full', { orderId: 'o-1' });
+  assert.ok(Array.isArray(result.pricing.lines) && result.pricing.lines.length > 0);
+  assert.equal(typeof result.pricing.computedTotalUsd, 'string', 'pricing amounts carry currency labels too');
+  assert.equal(result.customerNotes.vip, true);
+  assert.equal(result.customerNotes.notes, 'אוהבת לא חריף');
+
+  const customer = await mey.execute('get_customer', { query: 'רותי' });
+  assert.equal(customer.customers[0].vip, true);
+  assert.equal(customer.customers[0].notes, 'אוהבת לא חריף');
+  assert.ok(customer.customers[0].orders[0].pricing.lines.length > 0);
+});
+
+test('list_orders answers "the biggest ever" and "the latest" in one call, cancelled orders excluded', async () => {
+  const mey = tools();
+  const byTotal = await mey.execute('list_orders', { sortBy: 'total', limit: 2, fromDate: null, toDate: null, includeCancelled: null });
+  assert.equal(byTotal.count, 3, 'the cancelled order is out');
+  assert.equal(byTotal.returned, 2);
+  assert.equal(byTotal.truncated, true);
+  assert.equal(byTotal.orders[0].id, 'o-1');
+  assert.equal(byTotal.orders[0].totalUsd, '520.00');
+  assert.equal(byTotal.orders[1].id, 'o-2');
+
+  const byDate = await mey.execute('list_orders', { sortBy: 'date', limit: null, fromDate: '2026-08-21', toDate: '2026-08-21', includeCancelled: true });
+  assert.deepEqual(byDate.orders.map((row) => row.id).sort(), ['o-2', 'o-3']);
 });

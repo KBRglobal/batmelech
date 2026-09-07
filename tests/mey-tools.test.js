@@ -191,12 +191,12 @@ test('set_delivery_checkin rejects an unknown state and an unknown order', async
   assert.equal(missing.error, 'order not found');
 });
 
-test('the tool surface exposes twenty-nine well-formed definitions', async () => {
+test('the tool surface exposes thirty-one well-formed definitions', async () => {
   const tools = toolsFor({ orders: [], settings: {} });
 
-  // 22 action/lookup tools plus the 7 read-only ones in mey-read-tools.js.
-  assert.equal(tools.definitions.length, 22 + READ_TOOL_DEFINITIONS.length);
-  assert.equal(tools.definitions.length, 29);
+  // 23 action/lookup tools plus the 8 read-only ones in mey-read-tools.js.
+  assert.equal(tools.definitions.length, 23 + READ_TOOL_DEFINITIONS.length);
+  assert.equal(tools.definitions.length, 31);
   for (const definition of tools.definitions) {
     assert.equal(definition.type, 'function', `${definition.name} must be a function tool`);
     assert.equal(typeof definition.name, 'string');
@@ -231,6 +231,7 @@ test('the tool surface exposes twenty-nine well-formed definitions', async () =>
       'get_financial_summary',
       'get_order_full',
       'list_customers',
+      'list_orders',
       'read_state',
     ],
   );

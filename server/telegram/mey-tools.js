@@ -26,6 +26,7 @@ const {
   editMenuItem,
   freezeWrites,
   isWritesFrozen,
+  rememberNote,
   setBasePrices,
   setExtraPrice,
   undoMeyChange,
@@ -34,6 +35,7 @@ const {
 const { buildSiteKnowledge, displayNamesByItemId } = require('../ai/site-knowledge');
 const { createMeyReadTools } = require('./mey-read-tools');
 const { orderDishes, orderMoney } = require('../domain/business-queries');
+const { withCurrencyLabels } = require('../domain/money-labels');
 
 const MAX_SEARCH_RESULTS = 15;
 const MAX_ORDERS_IN_CONTEXT = 200;
@@ -327,6 +329,26 @@ const TOOL_DEFINITIONS = [
   },
   {
     type: 'function',
+    name: 'remember_note',
+    description:
+      'זיכרון קבוע, לתמיד (לא נמחק אחרי יומיים כמו זיכרון השיחה). כשלין, פליקס או הבוס הטכני אומרים לך "תזכרי ש..." או ' +
+      'מוסרים עובדה קבועה על העסק או על לקוח ("קטי תמיד רוצה חריף", "טוני זו הדודה של פליקס", "בחגים לא עושים צהריים") — ' +
+      'תשמרי אותה כאן. scope=customer שומר על כרטיס הלקוח/ה (מופיע גם בפאנל, ב-get_customer ובתמונת המצב); scope=business ' +
+      'שומר הערה כללית שתראי בכל שיחה. נרשם ביומן וניתן לביטול.',
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['customer', 'business'], description: 'customer = על לקוח/ה מסוימ/ת, business = על העסק בכלל' },
+        customerQuery: { type: ['string', 'null'], description: 'שם או טלפון של הלקוח/ה (ל-scope=customer), אחרת null' },
+        text: { type: 'string', description: 'ההערה עצמה, קצרה וברורה, בלשון עובדה' },
+      },
+      required: ['scope', 'customerQuery', 'text'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
     name: 'undo_last_change',
     description:
       'מבטלת את הפעולה האחרונה שלך (או פעולה ספציפית לפי מזהה מהיומן): מחזירה הזמנה ששונתה למצבה הקודם, ' +
@@ -498,7 +520,7 @@ function orderMatchesQuery(order, query) {
 function summarizeOrder(order) {
   const money = orderMoney(order);
   const dishes = orderDishes(order);
-  return {
+  return withCurrencyLabels({
     id: order.id,
     date: order.date,
     name: order.name,
@@ -510,12 +532,13 @@ function summarizeOrder(order) {
     coupleMeals: Number(order.meals) || 0,
     dishes: dishes.map((dish) => ({ name: dish.name, quantity: dish.quantity, course: dish.course })),
     total: order.total,
+    totalMinorUnits: money.totalMinorUnits,
     depositMinorUnits: money.depositMinorUnits,
     outstandingMinorUnits: money.outstandingMinorUnits,
     paid: order.paid,
     payMethod: order.payMethod,
     notes: order.notes,
-  };
+  });
 }
 
 // What Felix needs to hear about one stop, and what Mey needs to know to answer
@@ -568,6 +591,11 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
   // reach anything in the state; none of them can change it.
   const readTools = createMeyReadTools({ repository });
   const READ_ONLY_TOOLS = new Set(readTools.names);
+
+  // Who is talking, for tools that sign what they store (remember_note).
+  // Set per execute() call by the agent; empty when unknown.
+  let senderLabel = '';
+  const currentSender = () => senderLabel;
 
   async function loadOrders() {
     const current = await repository.loadState();
@@ -786,6 +814,10 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
       return setBasePrices(repository, { couplePriceUsd, challahPriceUsd });
     },
 
+    async remember_note({ scope, customerQuery, text }) {
+      return rememberNote(repository, { scope, customerQuery, text, by: currentSender() });
+    },
+
     async undo_last_change({ entryId }) {
       return undoMeyChange(repository, entryId || undefined);
     },
@@ -823,6 +855,7 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
     'edit_menu_item',
     'set_extra_price',
     'set_base_prices',
+    'remember_note',
   ]);
 
   async function writesAreFrozen() {
@@ -834,7 +867,8 @@ function createMeyTools({ repository, logger = console, whatsappIntake = null })
 
   return {
     definitions: [...TOOL_DEFINITIONS, ...readTools.definitions],
-    async execute(name, args) {
+    async execute(name, args, { sender = '' } = {}) {
+      senderLabel = typeof sender === 'string' ? sender : '';
       const handler = allHandlers[name];
       if (!handler) {
         return { error: `unknown tool: ${name}` };
