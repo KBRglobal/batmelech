@@ -293,3 +293,26 @@
 }
 @media(prefers-reduced-motion:reduce) { .festive-package { transition: none; } }
 .festive-page { background: #F7ECE6; color: #3B151A; font-family: var(--font-sans); }
+
+/* Mobile keeps the package identity and its included choices in one surface. */
+.festive-mobile-only, .festive-package-guide { display: none; }
+@media(max-width:1023px) {
+  .festive-mobile-only { display: block; }
+  .festive-package-label { flex: 1; font-size: .75rem; font-weight: 800; color: #8D182C; }
+  .festive-package-price small { font-size: .7rem; line-height: 1.4; font-weight: 600; color: #65434a; max-width: 110px; }
+  .festive-sections { gap: 0; border: 1px solid #d7a0a9; border-radius: 24px; overflow: hidden; background: white; }
+  .festive-sections > .festive-section { border: 0; border-radius: 0; border-top: 1px solid #edb2c180; }
+  .festive-package-guide { display: block; padding: 24px 20px 0; background: #fff7ee; }
+  .festive-guide-title { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+  .festive-guide-title h2 { font-size: 1.45rem; line-height: 1.35; font-weight: 900; }
+  .festive-guide-title strong { flex-shrink: 0; font-size: 1.75rem; color: #8D182C; line-height: 1.2; }
+  .festive-guide-title small { display: block; font-size: .7rem; font-weight: 600; margin-top: 6px; color: #65434a; }
+  .festive-guide-included { margin-top: 24px; font-size: .9rem; font-weight: 900; }
+  .festive-package-guide ul { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin: 16px 0 24px; }
+  .festive-package-guide li { display: flex; align-items: baseline; gap: 6px; font-size: .825rem; line-height: 1.6; }
+  .festive-package-guide li svg { width: 12px; flex-shrink: 0; color: #8D182C; }
+  .festive-guide-next { border-top: 1px solid #d7a0a9; padding: 20px 0; }
+  .festive-guide-next h3 { font-size: 1rem; font-weight: 900; }
+  .festive-guide-next p { margin-top: 8px; font-size: .8rem; line-height: 1.7; color: #65434a; }
+  .festive-mobile-package-name { display: block; font-size: .75rem; font-weight: 900; }
+}

@@ -57,6 +57,24 @@ export function RoshHashanah() {
   }
   const p = packageOptions[selection.packageId]
   const result = quote(selection)
+  const packageContents = locale === 'he' ? [
+    'צלחת ברכות אחת',
+    p.salads === 1 ? 'מארז של 12 סלטי הבית' : '2 מארזים של 12 סלטי הבית',
+    p.fish === 2 ? '2 פילה דג או מנת קציצות דגים' : '4 יחידות דג לבחירה',
+    p.mains === 1 ? 'מנה עיקרית אחת' : '2 מנות עיקריות',
+    p.sides === 1 ? 'תוספת אחת לעיקרית' : '2 תוספות לעיקרית',
+    `${p.challah} חלות`, 'ריבות ביתיות ללא הגבלה', ...(p.children ? ['2 מארזי ילדים מלאים'] : []),
+  ] : locale === 'fr' ? [
+    'Une assiette de simanim', `${p.salads} ${p.salads === 1 ? 'coffret' : 'coffrets'} de 12 salades`,
+    p.fish === 2 ? '2 filets ou une portion de boulettes de poisson' : '4 unités de poisson au choix',
+    `${p.mains} ${p.mains === 1 ? 'plat principal' : 'plats principaux'}`, `${p.sides} ${p.sides === 1 ? 'accompagnement' : 'accompagnements'}`,
+    `${p.challah} hallot`, 'Confitures maison à volonté', ...(p.children ? ['2 repas enfants complets'] : []),
+  ] : [
+    'One blessings plate', `${p.salads} ${p.salads === 1 ? 'set' : 'sets'} of 12 house salads`,
+    p.fish === 2 ? '2 fish fillets or one fish-ball portion' : '4 fish units of your choice',
+    `${p.mains} main ${p.mains === 1 ? 'dish' : 'dishes'}`, `${p.sides} ${p.sides === 1 ? 'side dish' : 'side dishes'}`,
+    `${p.challah} challahs`, 'Unlimited homemade jams', ...(p.children ? ['2 complete children’s meals'] : []),
+  ]
   useEffect(() => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(selection)) } catch { /* Cart remains usable without storage. */ } }, [selection])
   const update = (field: 'salads'|'challah'|'jam', n: number) => setSelection(s => ({ ...s, [field]: n }))
   const updateDish = (category: 'fish'|'mains'|'sides', id: string, n: number) => setSelection(s => ({ ...s, [category]: { ...s[category], [id]: n } }))
@@ -89,15 +107,22 @@ export function RoshHashanah() {
           const pack = packageOptions[id]
           return <label className={`festive-package ${selection.packageId === id ? 'is-selected' : ''}`} key={id}>
             <input type="radio" name="festive-package" value={id} checked={selection.packageId === id} onChange={() => setSelection(initialSelection(id))} />
-            <div className="flex items-center justify-between gap-3"><Icon icon={id === 'family' ? 'ph:users-three' : id === 'four' ? 'ph:users-four' : 'ph:users'} className="text-3xl" /><span className="festive-radio-dot" aria-hidden="true" /></div>
+            <div className="flex items-center justify-between gap-3"><Icon icon={id === 'family' ? 'ph:users-three' : id === 'four' ? 'ph:users-four' : 'ph:users'} className="text-3xl" /><span className="festive-mobile-only festive-package-label">{locale === 'he' ? 'חבילת חג מלאה' : locale === 'fr' ? 'Un repas de fête complet' : 'A complete holiday meal'}</span><span className="festive-radio-dot" aria-hidden="true" /></div>
             <h3>{pack.name[locale]}</h3><p>{locale === 'he' ? `${pack.adults} מבוגרים${pack.children ? ' + 2 ילדים' : ''}` : locale === 'fr' ? `${pack.adults} adultes${pack.children ? ' + 2 enfants' : ''}` : `${pack.adults} adults${pack.children ? ' + 2 children' : ''}`}</p>
-            <strong className="festive-package-price"><bdi>${pack.price}</bdi></strong>
+            <strong className="festive-package-price"><bdi>${pack.price}</bdi><small className="festive-mobile-only">{locale === 'he' ? 'לכל החבילה' : locale === 'fr' ? 'le coffret complet' : 'for the whole package'}</small></strong>
             <div className="festive-package-foot">{locale === 'he' ? <>{pack.salads} מארזי סלטים · {pack.fish} יחידות דג<br />{pack.mains} עיקריות · {pack.sides} תוספות · {pack.challah} חלות</> : locale === 'fr' ? <>{pack.salads} coffret(s) de salades · {pack.fish} unités de poisson<br />{pack.mains} plat(s) · {pack.sides} accompagnement(s) · {pack.challah} hallot</> : <>{pack.salads} salad set(s) · {pack.fish} fish units<br />{pack.mains} main(s) · {pack.sides} side(s) · {pack.challah} challahs</>}</div>
           </label>
         })}
       </div>
       <div className="festive-layout">
         <div className="festive-sections">
+          <div className="festive-package-guide">
+            <p className="festive-eyebrow">{locale === 'he' ? 'החבילה שבחרתם' : locale === 'fr' ? 'Votre coffret' : 'Your selected package'}</p>
+            <div className="festive-guide-title"><h2>{p.name[locale]}</h2><strong><bdi>${p.price}</bdi><small>{locale === 'he' ? 'מחיר החבילה' : locale === 'fr' ? 'prix du coffret' : 'package price'}</small></strong></div>
+            <p className="festive-guide-included">{locale === 'he' ? 'כל זה כלול בחבילה:' : locale === 'fr' ? 'Tout ceci est inclus :' : 'All of this is included:'}</p>
+            <ul>{packageContents.map(text => <li key={text}><Icon icon="ph:check-bold" aria-hidden="true" /><span>{text}</span></li>)}</ul>
+            <div className="festive-guide-next"><h3>{locale === 'he' ? 'עכשיו בוחרים את המנות שבחבילה' : locale === 'fr' ? 'Choisissez les plats de votre coffret' : 'Now choose the dishes in your package'}</h3><p>{locale === 'he' ? 'הבחירות בהמשך כלולות במחיר. משלמים יותר רק אם מוסיפים מעבר לכמות הכלולה.' : locale === 'fr' ? 'Les choix ci-dessous sont compris dans le prix. Seules les quantités supplémentaires sont facturées en plus.' : 'The choices below are covered by the package price. You only pay extra for quantities above the included amounts.'}</p></div>
+          </div>
           <Section number="01" title={locale === 'he' ? 'פותחים בברכה' : locale === 'fr' ? 'Les simanim de la fête' : 'Start with the blessings'} description={locale === 'he' ? 'צלחת ברכות אחת מצורפת אוטומטית לכל חבילה. התכולה קבועה ואינה ניתנת לשינוי.' : locale === 'fr' ? 'Une assiette de simanim est ajoutée automatiquement à chaque coffret. Sa composition est fixe.' : 'One blessings plate is automatically included with every package. Its contents are fixed.'} total={extra(0)}><Contents items={catalog.blessings} /></Section>
           <Section number="02" title={locale === 'he' ? '12 סלטי הבית' : locale === 'fr' ? 'Les 12 salades maison' : 'All 12 house salads'} description={locale === 'he' ? `כל מארז מיועד לזוג מבוגרים וכולל את כל הסלטים, ללא החלפות. ${p.salads} מארזים כלולים; כל מארז נוסף $60.` : locale === 'fr' ? `Chaque coffret pour deux adultes contient les 12 salades, sans substitution. ${p.salads} coffret(s) inclus ; $60 par coffret supplémentaire.` : `Each set serves two adults and contains all 12 salads, with no substitutions. ${p.salads} set(s) included; $60 per extra set.`} total={extra(result.extras.salads)}>
             <Contents items={catalog.salads} /><div className="festive-quantity-row"><span>{locale === 'he' ? 'כמות מארזי סלטים' : locale === 'fr' ? 'Nombre de coffrets' : 'Number of salad sets'}</span><Counter name={locale === 'he' ? 'מארזי סלטים' : locale === 'fr' ? 'Coffrets de salades' : 'Salad sets'} value={selection.salads} min={p.salads} onChange={n => update('salads',n)} /></div>
@@ -137,6 +162,6 @@ export function RoshHashanah() {
       </div>
     </main>
     <Footer />
-    <div className="festive-mobile-bar"><div><small>{locale === 'he' ? 'סה״כ לחבילה' : locale === 'fr' ? 'Total du coffret' : 'Package total'}</small><strong><bdi>${result.total}</bdi></strong></div><button type="button" disabled={!canAdd} onClick={add}>{locale === 'he' ? 'הוספה להזמנה' : locale === 'fr' ? 'Ajouter' : 'Add to order'}<Icon icon="ph:basket-bold" /></button></div>
+    <div className="festive-mobile-bar"><div><span className="festive-mobile-package-name">{p.name[locale]}</span><small>{locale === 'he' ? 'סה״כ לחבילה' : locale === 'fr' ? 'Total du coffret' : 'Package total'}</small><strong><bdi>${result.total}</bdi></strong></div><button type="button" disabled={!canAdd} onClick={add}>{locale === 'he' ? 'הוספה להזמנה' : locale === 'fr' ? 'Ajouter' : 'Add to order'}<Icon icon="ph:basket-bold" /></button></div>
   </div>
 }
