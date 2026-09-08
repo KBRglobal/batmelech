@@ -322,6 +322,7 @@ function buildSiteKnowledge(data, { today } = {}) {
   const todayIso = typeof today === 'string' && today !== '' ? today : dubaiTodayIso();
 
   const sections = [
+    require('../../shared/rosh-hashanah-knowledge.json'),
     `Business facts:\n- ${BUSINESS_FACTS}`,
     `Shabbat package (current prices, USD):\n- ${packageLines(menu).join('\n- ')}`,
     `Live menu (current names and prices, USD):\n- ${menuLines(menu).join('\n- ')}`,

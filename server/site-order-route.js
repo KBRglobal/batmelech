@@ -10,8 +10,10 @@ const { rateLimit } = require('express-rate-limit');
 const { z } = require('zod');
 const { checkSubmissionWindow } = require('./delivery-windows');
 const { getShabbatOrChagStatus } = require('./shabbat-calendar');
+const { orderingStatus } = require('./business-actions');
 
 const MAX_ATTEMPTS = 5;
+const isFestiveLine = line => line.festive !== undefined || line.id.startsWith('rh-') || /ראש השנה|rosh hashana|roch hachana/i.test(line.name);
 const CANONICAL_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 // Mirrors server/hotels/hotel-search-route.js: a checkout may only hand back a
@@ -33,6 +35,7 @@ const LineSchema = z.object({
   unitPrice: z.number().finite().nonnegative().max(100_000),
   qty: z.number().int().positive().max(999),
   note: z.string().trim().max(2_000).optional(),
+  festive: z.unknown().optional(),
 });
 
 const OrderSubmissionSchema = z.object({
@@ -97,8 +100,9 @@ function orderId(now) {
   return `site-${now.getTime()}-${crypto.randomBytes(4).toString('hex')}`;
 }
 
-function buildLegacyOrder(submission, now) {
-  const itemsText = submission.lines
+function buildLegacyOrder(submission, now, festiveRules) {
+  const festivePackages = submission.lines.filter(line => line.festive).map(line => ({ selection: line.festive, quantity: line.qty, unitPrice: line.unitPrice }));
+  const itemsText = submission.lines.filter(line => !line.festive)
     .map((line) => {
       const noteText = line.note ? ` (${line.note})` : '';
       return `${line.name} x${line.qty}${noteText} — $${(line.unitPrice * line.qty).toFixed(2)}`;
@@ -143,8 +147,9 @@ function buildLegacyOrder(submission, now) {
       : {}),
     status: 'חדשה',
     source: 'site',
-    notes,
+    notes: festivePackages.length ? festiveRules.withFestiveNotes(notes, festivePackages) : notes,
     total: submission.total,
+    ...(festivePackages.length ? { festivePackages, meals: 0, challot: 0, pickup: isPickup, custom: submission.lines.filter(line => !line.festive).map(line => ({name: line.name, qty: line.qty, price: line.unitPrice, note: line.note || ''})) } : {}),
     payMethod: '',
     paid: 'לא',
   };
@@ -202,10 +207,32 @@ function createSiteOrderRouter({ repository, logger = console, clock = () => new
       return response.status(400).json({ error: 'invalid order' });
     }
 
+    // Reprice festive configurations from the shared catalog, never a client note.
+    // Legacy lines keep their existing contract; mixed baskets still verify the sum.
+    let festiveRules;
+    if (parsed.data.lines.some(isFestiveLine)) {
+      try {
+        festiveRules = await import('../shared/rosh-hashanah.mjs');
+        const { quote, kitchenNote, packageOptions } = festiveRules;
+        for (const line of parsed.data.lines) {
+          if (!isFestiveLine(line)) continue;
+          const result = quote(line.festive);
+          if (!result.ready || result.total !== line.unitPrice) throw new Error('Invalid festive price or selection');
+          line.name = `ראש השנה · ${packageOptions[line.festive.packageId].name.he}`;
+          line.note = kitchenNote(line.festive);
+        }
+        const fee = parsed.data.customer.fulfillment === 'pickup' ? 0 : parsed.data.customer.zone === 'abu-dhabi' ? 55 : 15;
+        const expected = parsed.data.lines.reduce((sum, line) => sum + Math.round(line.unitPrice * 100) * line.qty, fee * 100);
+        if (Math.round(parsed.data.total * 100) !== expected) throw new Error('Invalid festive total');
+      } catch {
+        return response.status(400).json({ error: 'invalid festive order' });
+      }
+    }
+
     const now = clock();
     let legacyOrder;
     try {
-      legacyOrder = buildLegacyOrder(parsed.data, now);
+      legacyOrder = buildLegacyOrder(parsed.data, now, festiveRules);
     } catch (error) {
       logger.error('site order build failed', error);
       return response.status(500).json({ error: 'order could not be created' });
@@ -230,6 +257,12 @@ function createSiteOrderRouter({ repository, logger = console, clock = () => new
         }
         const totalMinorUnits = Math.round(parsed.data.total * 100);
         const settings = current.data.settings && typeof current.data.settings === 'object' ? current.data.settings : {};
+        if (festiveRules) {
+          if (!orderingStatus(settings, dubaiDateString(now)).open) return response.status(403).json({ error: 'ordering closed' });
+          if (parsed.data.lines.some(line => line.festive && festiveRules.unavailableSelections(line.festive, settings.out).length > 0)) {
+            return response.status(409).json({ error: 'festive item unavailable' });
+          }
+        }
         const minAbuDhabi = Number.isSafeInteger(settings.minOrderAbuDhabiMinorUnits)
           ? settings.minOrderAbuDhabiMinorUnits
           : null;

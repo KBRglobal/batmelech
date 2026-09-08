@@ -1,3 +1,4 @@
+import { FestiveOrderEditor } from '../components/festive-order-editor.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { APP_ROUTES } from '../app/routes.ts'
@@ -77,6 +78,7 @@ const PAID_OPTIONS = ['לא', 'מקדמה', 'כן', 'שת"פ'] as const
 const SECTIONS = [
   ['details', 'פרטים'],
   ['customer', 'לקוח'],
+  ['festive', 'ראש השנה'],
   ['salads', 'סלטים'],
   ['firsts', 'ראשונות'],
   ['mains', 'עיקריות'],
@@ -1309,17 +1311,24 @@ function OrderEditorContent({
     saveFeedback.kind === 'blocked'
   const orderedSalads = Object.values(draft.salads).reduce((total, item) => total + item.ordered, 0)
   const giftSalads = Object.values(draft.salads).reduce((total, item) => total + item.gift, 0)
-  const patch = (next: Partial<OrderDraft>) => onDraftChange({ ...draft, ...next })
+  const patch = (changes: Partial<OrderDraft>) => {
+    const next = { ...draft, ...changes }
+    if (draft.festivePackages?.length && !manualTotalEdited.current && draft.total === autoTotalRef.current && changes.total === undefined) {
+      const price = calculateOrderDraftPricing(next, menu, { allowMixedLunchAndShabbat: mixedOrderConfirmed }).result?.totalMinorUnits
+      if (price !== undefined) { next.total = formatUsdInputMinorUnits(price); autoTotalRef.current = next.total }
+    }
+    onDraftChange(next)
+  }
 
   // The suggested price is the DEFAULT (Moshe, 2026-08-18): the total field
   // follows the computed price on its own as long as the operator never
   // typed a different value. A manual total (or an edited order's saved
   // total) is left alone — only then does the mismatch warning ask for an
   // explicit confirmation.
-  const autoTotalRef = useRef<string | null>(null)
+  const autoTotalRef = useRef<string | null>(draft.festivePackages?.length && parseUsdInputMinorUnits(draft.total) === pricing.result?.totalMinorUnits ? draft.total : null)
   // Once the operator touches the total field it belongs to them — the
   // default stops refilling, even through a clear-and-retype.
-  const manualTotalEdited = useRef(false)
+  const manualTotalEdited = useRef(Boolean(draft.festivePackages?.length && draft.total.trim() !== '' && parseUsdInputMinorUnits(draft.total) !== pricing.result?.totalMinorUnits))
   const suggestedTotalMinorUnits = pricing.result?.totalMinorUnits ?? null
   useEffect(() => {
     if (suggestedTotalMinorUnits === null || isSaving) return
@@ -1860,6 +1869,20 @@ function OrderEditorContent({
               </Field>
             </div>
           )}
+        </Section>
+
+        <Section id="festive" title="תפריט חגיגי לראש השנה">
+          <FestiveOrderEditor packages={draft.festivePackages ?? []} onChange={festivePackages => {
+            const convertDefaultMeal = untouchedDefaultMeal.current && !(draft.festivePackages?.length) && festivePackages.length > 0
+            if (convertDefaultMeal) untouchedDefaultMeal.current = false
+            const next = { ...draft, festivePackages, ...(convertDefaultMeal ? { meals: 0, challot: 0 } : {}) }
+            const followsAutomaticPrice = !manualTotalEdited.current && (draft.total.trim() === '' || draft.total === autoTotalRef.current || parseUsdInputMinorUnits(draft.total) === suggestedTotalMinorUnits)
+            if (followsAutomaticPrice) {
+              const price = calculateOrderDraftPricing(next, menu, { allowMixedLunchAndShabbat: mixedOrderConfirmed }).result?.totalMinorUnits
+              if (price !== undefined) { next.total = formatUsdInputMinorUnits(price); autoTotalRef.current = next.total }
+            }
+            onDraftChange(next)
+          }} />
         </Section>
 
         <Section id="salads" title="סלטים" summary={`${orderedSalads}/${draft.meals * 4} כלולים · ${giftSalads} פינוק`} collapsible>

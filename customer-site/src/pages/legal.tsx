@@ -167,6 +167,11 @@ export function Legal() {
           <h2 className="text-2xl font-black font-heading mb-4 text-[#F5A83A]">{t.allergy.title}</h2>
           <p className="text-base md:text-lg font-medium leading-relaxed">{t.allergy.body}</p>
         </section>
+        <section id="accessibility" className="scroll-mt-24">
+          <h2 className="text-3xl font-black font-heading mb-6">{locale === 'he' ? 'נגישות' : locale === 'fr' ? 'Accessibilité' : 'Accessibility'}</h2>
+          <p className="text-base leading-relaxed">{locale === 'he' ? 'נתקלתם בקושי בשימוש באתר או בהשלמת הזמנה? פנו אל בת מלך בטלפון או בוואטסאפ ונעזור בהזמנה ובקבלת מידע על התפריט. ציינו את העמוד ואת הקושי כדי שנוכל לבדוק ולשפר.' : locale === 'fr' ? 'Vous rencontrez une difficulté sur le site ou pour commander ? Contactez Bat Melech par téléphone ou WhatsApp pour obtenir de l’aide et les informations du menu. Indiquez la page et la difficulté afin que nous puissions les examiner.' : 'Having difficulty using the site or completing an order? Contact Bat Melech by phone or WhatsApp for ordering assistance and menu information. Tell us which page and difficulty you encountered so we can investigate and improve.'}</p>
+          <a href="tel:+971586288776" className="inline-block mt-4 underline" dir="ltr">+971 58 628 8776</a>
+        </section>
       </main>
       <Footer />
     </div>

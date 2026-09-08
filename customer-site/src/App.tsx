@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Outlet, Routes, Route, useLocation } from 'react-router'
 import { ConciergeChat } from './components/concierge-chat'
 import { FloatingCartBar } from './components/floating-cart-bar'
@@ -6,6 +6,7 @@ import { SiteBanner } from './components/site-banner'
 import { ShabbatClosure } from './components/shabbat-closure'
 import { useSiteStatus } from './site-status-context'
 import { DeviceLocaleRedirect, LocaleLayout, canonicalPath, localizedHref, type Locale } from './locale-context'
+const RoshHashanah = lazy(() => import('./pages/rosh-hashanah').then(module => ({ default: module.RoshHashanah })))
 import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
 import { Story } from './pages/story'
@@ -33,6 +34,7 @@ interface PageMeta {
 // source of truth; English speaks to American Jews, French to French Jews).
 const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
   he: {
+    '/rosh-hashanah': { title: 'תפריט חגיגי לראש השנה | מטעמי בת מלך', description: 'חבילות ראש השנה לזוג, לארבעה ולמשפחה. צלחת ברכות, 12 סלטים, דגים, עיקריות ומארזי ילדים, עם חיוב על תוספות מעבר למכסה בלבד.' },
     '/': { title: 'מטעמי בת מלך | אוכל ביתי כשר בדובאי', description: 'מטבח ביתי כשר בדובאי. תפריט יום חול ומארזי שבת יוקרתיים, מבושל טרי ומגיע חם אליכם.' },
     '/weekdays': { title: 'מטעמי יום חול | מטעמי בת מלך', description: 'תפריט יום חול טרי - בגטים, קובה, סלטים ועוד. משלוח כשר בכל רחבי דובאי.' },
     '/shabbat-order': { title: 'מטעמי שבת קודש | מטעמי בת מלך', description: 'הרכיבו מארז שבת זוגי יוקרתי - סלטים, ראשונות, עיקריות ועוד. כשר וטרי, מגיע עד אליכם.' },
@@ -51,6 +53,7 @@ const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
     '/experiences/desert': { title: 'סעודת מדבר VIP | מטעמי בת מלך', description: 'סעודת גורמה כשרה בלב מדבר דובאי.' },
   },
   en: {
+    '/rosh-hashanah': { title: 'Rosh Hashanah Menu | Bat Melech Kitchen', description: 'Choose a Rosh Hashanah meal for two, four adults or the family. Blessings plate, 12 salads, fish, mains and children’s meals. Pay extra only above package allowances.' },
     '/': { title: 'Bat Melech Kitchen | Kosher Homemade Food in Dubai', description: 'A kosher home kitchen in Dubai. Fresh weekday menu and elegant Shabbat packages, cooked fresh and delivered hot to your hotel.' },
     '/weekdays': { title: 'Weekday Menu | Bat Melech Kitchen', description: 'Fresh weekday favorites - baguettes, kubbeh soup, salads and more. Kosher delivery across Dubai.' },
     '/shabbat-order': { title: 'Shabbat Menu | Bat Melech Kitchen', description: 'Build your Shabbat package for two - salads, fish courses, mains and more. Kosher, fresh, delivered to you.' },
@@ -69,6 +72,7 @@ const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
     '/experiences/desert': { title: 'VIP Desert Feast | Bat Melech Kitchen', description: 'A kosher gourmet feast in the heart of the Dubai desert.' },
   },
   fr: {
+    '/rosh-hashanah': { title: 'Menu de Roch Hachana | Bat Melech', description: 'Composez votre repas de Roch Hachana pour deux, quatre adultes ou en famille. Simanim, 12 salades, poissons et plats. Seuls les dépassements sont facturés.' },
     '/': { title: 'Bat Melech | Cuisine casher maison à Dubaï', description: 'Une cuisine familiale casher à Dubaï. Menu de semaine et coffrets de Chabbat raffinés, cuisinés frais et livrés chauds à votre hôtel.' },
     '/weekdays': { title: 'Menu de semaine | Bat Melech', description: 'Les plats frais de la semaine - baguettes, soupe de kubés, salades et plus. Livraison casher dans tout Dubaï.' },
     '/shabbat-order': { title: 'Menu de Chabbat | Bat Melech', description: 'Composez votre coffret de Chabbat pour deux - salades, poissons, plats et plus. Casher, frais, livré chez vous.' },
@@ -106,6 +110,7 @@ function localeRoutes() {
   return (
     <>
       <Route index element={<Home />} />
+      <Route path="rosh-hashanah" element={<Suspense fallback={<div role="status" className="p-12 text-center">…</div>}><RoshHashanah /></Suspense>} />
       <Route path="weekdays" element={<Weekdays />} />
       <Route path="story" element={<Story />} />
       <Route path="shabbat-order" element={<ShabbatOrder />} />
@@ -165,7 +170,7 @@ export default function App() {
       ?.setAttribute('content', path === '/checkout' ? 'noindex,nofollow' : 'index,follow,max-image-preview:large')
   }, [pathname, hash, locale, path])
 
-  const showFloatingCart = path !== '/checkout' && path !== '/shabbat-extras' && path !== '/shabbat-order'
+  const showFloatingCart = path !== '/checkout' && path !== '/shabbat-extras' && path !== '/shabbat-order' && path !== '/rosh-hashanah'
 
   // Every route at once, not a banner on top of a live menu: the site rests.
   // The status fetch defaults to open, so a failed or slow call never hides

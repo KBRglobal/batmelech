@@ -315,4 +315,25 @@
     <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/experiences/desert"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/experiences/desert"/>
   </url>
+  <url>
+    <loc>https://www.batmelech.ae/rosh-hashanah</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/rosh-hashanah"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/en/rosh-hashanah</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/rosh-hashanah"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/fr/rosh-hashanah</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/rosh-hashanah"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/rosh-hashanah"/>
+  </url>
 </urlset>

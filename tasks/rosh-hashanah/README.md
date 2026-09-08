@@ -1,0 +1,36 @@
+# Rosh Hashanah menu extension
+
+Approved: user specified all contents and prices, confirmed an additional festive menu, and required preserving the existing design. Bounded extension of the existing package/cart/checkout flow. No deployment requested for this change.
+
+Design: separate /rosh-hashanah route and localized siblings, existing PageHero/Nav/Footer, approved cream/burgundy/mustard identity and existing feast photograph. Package selection, category quotas, per-child selections, live excess-only breakdown, one complete configured package in the existing cart. Server recalculates festive prices and canonical kitchen contents. Existing weekday/Shabbat/holiday menus remain available.
+
+Source of truth: user's detailed menu in this conversation (2026-09-08). Fish overage is 30 USD per excess weighted unit, including a partial two-unit meatball portion crossing the allowance. No dates/cutoffs or new fees invented. Dessert has no business quantity cap, bounded only by safe integer representation. No external paid assets or services required.
+
+Scope gates / playbook applicability:
+1 Scope: approved commerce extension, local preview only.
+2 Materials: existing BRAND.md, PageHero, Nav, Footer, public logo and existing feast image reused; source repository and user's menu supply all new facts. No promised missing assets.
+3 Architecture: existing flow inspected; add distinct holiday URL. External product research unnecessary for extending this approved flow.
+4–10 Concept/colors/fonts/logo/assets/motion: preserve approved identity/components; no new visual concept, fonts, logo, asset generation or decorative motion. Existing components fit and avoid custom replacements.
+11 Homepage approval: existing homepage already approved in prior Bat Melech thread; additive link only.
+12–13 Controls and responsive behavior: browser verification across locales and requested viewport sizes.
+14 SEO/content: transactional menu, audience Jewish visitors/residents in Dubai in Hebrew/English/French; primary intent configure Rosh Hashanah meal. Exact owner-supplied contents and prices are unique evidence; no article or SERP-based marketing claims. Separate from weekday and Shabbat URLs; local metadata/sitemap/hreflang verified.
+15–18 Legal/analytics/forms/media: reuse unchanged footer/consent/checkout/delivery and CDN images; no new collection, tracking, legal claims or providers. New order data validated on server. No new tracking activated. Measurement after publication: owner Moshe, completed holiday orders; GSC query/CTR and GA4 baseline/access pending, not a launch claim.
+19 QA: pricing examples/boundaries, server tampering and persisted contents, existing tests/build, real browser responsive/user journey/screenshots; mock intake uses local repository only.
+20 Audit: inspect evidence and changed files before completion. Deployment/CDN activation and live analytics not applicable to local preview. No external messages, spending or publishing authorized.
+
+
+## Verification notes
+- Review by the requesting-code-review skill found and led to fixes for extreme numeric input, missing child-side/challah/jam stock checks, and canonical-name price-validation bypass. Regression tests cover them. Legacy anonymous/non-catalog lines retain their existing intake behavior; this does not claim a site-wide billing security rewrite.
+- Native Hebrew, Jewish-community English and French are authored in page context; semantic menu names are localized catalog fields. Checkout renders complete localized selections and sends canonical Hebrew kitchen details. Human review is the local preview handoff; not claimed before it occurs.
+- Hero: existing approved feast asset L5fzK0kRQ4N.jpeg, decorative table setting rather than a promised photo of the exact package, high-priority loading, existing CDN and logo. It is not new field proof. No new licensed assets needed. Share image remains the existing brand share image. No new Product/FAQ schema: configurable transactional utility, existing site entity markup preserved. No invented ratings, dates or claims.
+- Native number inputs and quota text keep the complete rules in HTML; no FAQ filler required. Extraction review: per-category allowance, excess-only fees and fish-unit equivalence remain together. Visibility, rankings and post-publication conversions are unmeasured. Owner Moshe can review holiday-order conversion counts during the first live ordering window; GSC/GA4 baseline pending actual publication/access.
+- Safari surfaced external Iconify API failures. The already-installed Phosphor icon data was reused as a 65-icon local subset, eliminating that dependency without changing the icon style.
+- The evidence runner originally errored on the declared directory scopes (IsADirectoryError). Its digest now recursively hashes names and contents without changing this contract or acceptance criteria. A regression verifies nested edits/additions/deletions invalidate results; all 17 runner tests pass. Backup: /tmp/gatekeeper-before-directory-scope.py. No gates were bypassed.
+- No production changes, external messages, new spending or new integrations. Test orders persist only in the local preview server's memory.
+
+
+## Production release and management integration
+
+User authorized production deployment after confirming management billing and prices. Added the same shared catalog/quota calculator to the management order editor and server price explanation. Site intake stores explicit zero regular meals/challah, pickup and ordinary mixed-cart custom rows, avoiding implicit Shabbat charges. Kitchen notes are regenerated inside bounded markers. Saved matching totals follow edits; explicit current-session and persisted staff overrides remain fixed. Fixed required footer accessibility/contact and KBR credit using existing styles. No new analytics, ads, consent-dependent storage, payment provider, or jurisdiction targeting was introduced; the existing UAE ordering surface remains. No claim of legal certification is made.
+
+Checks: `admin-tests.py`, `release-build.py`, `admin-browser.cjs`, `deploy-release.py`, `live-check.cjs`, under the registered `deploy-gates.json` contract. Local browser state is memory-only; live checks block order writes. Tested complete family450 +60 salads+30 fish+100 main+25 side+10 challah+49 child+15 child side =739; persistence, pickup/delivery, updates and manual overrides. Shared tests cover all three bases and weighted fish boundaries. Actual admin mobile screenshot inspected for readable labels, native design, no horizontal overflow, and visible total/save actions. Read-only peer review findings resolved and regression journeys added. Evidence is local under `evidence/`; screenshots are excluded from release commits.

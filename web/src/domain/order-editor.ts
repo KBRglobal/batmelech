@@ -1,3 +1,4 @@
+import { quote, quotePackages, withFestiveNotes, type FestivePackage } from '../../../shared/rosh-hashanah.mjs'
 import { z } from 'zod'
 import { EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS } from './fish-pricing.ts'
 import {
@@ -467,6 +468,7 @@ export interface LunchPlateDraft {
 }
 
 export interface OrderDraft extends Record<string, unknown> {
+  readonly festivePackages?: FestivePackage[]
   readonly id: string | number | null
   readonly date: string
   readonly name: string
@@ -599,6 +601,9 @@ function isSafeHttpsUrl(value: unknown): boolean {
 }
 
 export function legacyOrderEditIssue(order: LegacyOrder): string | null {
+  if (order.festivePackages !== undefined) {
+    try { quotePackages(order.festivePackages) } catch { return 'חבילות החג כוללות נתונים לא תקינים. אין לשנות את החיוב לפני תיקונם.' }
+  }
   if (![order.meals, order.aricha, order.challot].every((value) => value === undefined || isValidLegacyCount(value))) {
     return 'אחת מכמויות הבסיס נשמרה בפורמט שלא ניתן לערוך בלי לשנות אותה.'
   }
@@ -1048,9 +1053,9 @@ export function createOrderDraftFromLegacy(
     freeDelivery: raw.freeDelivery === true,
     status: text(order.status) || 'חדשה',
     group: text(order.group),
-    meals: countOrFallback(order.meals, defaults.meals),
+    meals: countOrFallback(order.meals, Array.isArray(raw.festivePackages) && raw.festivePackages.length ? 0 : defaults.meals),
     aricha: countOrFallback(order.aricha, defaults.aricha),
-    challot: countOrFallback(order.challot, defaults.challot),
+    challot: countOrFallback(order.challot, Array.isArray(raw.festivePackages) && raw.festivePackages.length ? 0 : defaults.challot),
     salads: normalizeSalads(order.salads),
     firsts: normalizeQuantityMap(order.firsts),
     firstsNotes: normalizeNoteMap(order.firstsNotes),
@@ -1235,6 +1240,8 @@ export interface DraftIssue {
     | 'DESSERT_OVERAGE'
     | 'DESSERT_UNCLASSIFIED'
     | 'UNPRICED_EXTRA'
+    | 'FESTIVE_INCOMPLETE'
+    | 'FESTIVE_INVALID'
     | 'PRICING_ERROR'
   readonly message: string
   readonly blocking: boolean
@@ -1322,6 +1329,11 @@ export function calculateOrderDraftPricing(
 ): DraftPricing {
   const issues: DraftIssue[] = []
   const chargeLines: ChargeLineInput[] = []
+  try {
+    const festive = quotePackages(draft.festivePackages)
+    for (const line of festive.lines) chargeLines.push({ source:'other', name:line.name, quantity:line.quantity, unitPriceMinorUnits:line.unitPrice * 100 })
+    if (!festive.ready) issues.push({code:'FESTIVE_INCOMPLETE',message:'יש להשלים את בחירת הדגים, העיקריות והתוספות בחג, ותוספת אחת לכל ילד.',blocking:true})
+  } catch { issues.push({code:'FESTIVE_INVALID',message:'אי אפשר לחשב את חבילות החג: בדקו את הכמויות והבחירות.',blocking:true}) }
 
   if (
     classifyDraftSelectionMode(draft) === 'mixed' &&
@@ -1668,6 +1680,7 @@ export function demotePriceAvailabilityIssues(
 
 export function orderPricingFingerprint(draft: OrderDraft): string {
   return JSON.stringify({
+    festivePackages: draft.festivePackages,
     meals: draft.meals,
     challot: draft.challot,
     pickup: draft.pickup,
@@ -1923,7 +1936,8 @@ export function serializeOrderDraft(draft: OrderDraft, orderId: string): LegacyO
     extras: serializeExtras(draft.extras),
     custom: serializeCustom(draft.custom),
     lunch: serializeLunch(draft.lunch),
-    notes: draft.notes,
+    ...(draft.festivePackages !== undefined ? { festivePackages: draft.festivePackages.map(entry => ({ ...structuredClone(entry), unitPrice: quote(entry.selection).total })) } : {}),
+    notes: draft.festivePackages !== undefined ? withFestiveNotes(draft.notes, draft.festivePackages) : draft.notes,
     total: canonicalOptionalUsd(draft.total, 'order total'),
     deposit: canonicalOptionalUsd(draft.deposit, 'order deposit'),
     payMethod: draft.payMethod,

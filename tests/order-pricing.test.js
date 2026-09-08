@@ -105,3 +105,13 @@ test('pickup has no delivery line; free delivery is a 0$ line', () => {
   const free = orderPriceBreakdown({ total: '0', pickup: false, freeDelivery: true }, MENU);
   assert.equal(free.lines.find((row) => row.kind === 'delivery').amountMinorUnits, 0);
 });
+
+test('festive packages use the shared price, multiply quantity, and preserve staff adjustments', async () => {
+  const {initialSelection}=await import('../shared/rosh-hashanah.mjs');
+  const s=initialSelection('family');s.fish.balls=1;s.fish.moroccan=1;s.mains.peas=1;s.sides.white=1;s.children.forEach(c=>c.rice=1);s.children[0].red=1;
+  const order={meals:0,challot:0,pickup:true,festivePackages:[{selection:s,quantity:2,unitPrice:1}],total:'980.00'};
+  const result=orderPriceBreakdown(order,{});
+  assert.equal(result.computedTotalMinorUnits,99000);
+  assert.equal(result.differenceMinorUnits,-1000);
+  assert.ok(result.lines.some(line=>line.name.includes('ראש השנה')));
+});

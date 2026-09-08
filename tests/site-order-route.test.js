@@ -493,3 +493,81 @@ test('intake accepts orders on Chanukah and on chol hamoed Sukkot', async () => 
     );
   }
 });
+
+test('festive checkout preserves fixed contents, per-child choices and one quota-based total alongside existing items', async () => {
+  const { initialSelection } = await import('../shared/rosh-hashanah.mjs');
+  const festive = initialSelection('family');
+  festive.fish.balls = 1; festive.fish.moroccan = 1;
+  festive.mains.peas = 1; festive.sides.white = 1;
+  festive.children = [{ rice: 1, red: 1, white: 0 }, { rice: 1, red: 0, white: 0 }, { rice: 0, red: 1, white: 0 }];
+  const repository = fakeRepository();
+  await withServer(repository, async origin => {
+    const body = submission({ fulfillment: 'pickup' });
+    body.lines.push({ id: 'rh-family-test', name: 'Holiday', unitPrice: 544, qty: 1, festive });
+    body.total = 568;
+    const response = await postOrder(origin, body);
+    assert.equal(response.status, 201);
+    const order = repository.saved.at(-1).orders[0];
+    assert.equal(order.total, 568);
+    assert.match(order.notes, /מארז משפחתי/);
+    assert.match(order.notes, /צלחת ברכות × 1/);
+    assert.match(order.notes, /ילד 3: שניצלונים/);
+    assert.equal(order.festivePackages[0].selection.children.length, 3);
+  });
+});
+
+test('festive checkout rejects tampered prices, totals, missing configuration, unknown choices and incomplete child packages', async () => {
+  const { initialSelection } = await import('../shared/rosh-hashanah.mjs');
+  for (const mutation of [
+    b => b.lines[0].unitPrice = 1,
+    b => b.total = 1,
+    b => delete b.lines[0].festive,
+    b => b.lines[0].festive.children.push({ rice: 1 }),
+    b => b.lines[0].festive.fish.unknown = 1,
+    b => b.lines[0].festive.mains = {},
+    b => b.lines[0].festive.jam = -1,
+  ]) {
+    const festive = initialSelection('couple');
+    festive.fish.moroccan = 2; festive.mains.peas = 1; festive.sides.white = 1;
+    const body = { ...submission({ fulfillment: 'pickup' }), lines: [{ id: 'rh-couple-test', name: 'Holiday', unitPrice: 350, qty: 1, festive }], total: 350 };
+    mutation(body);
+    const repository = fakeRepository();
+    await withServer(repository, async origin => {
+      assert.equal((await postOrder(origin, body)).status, 400);
+      assert.equal(repository.saved.length, 0);
+    });
+  }
+});
+
+test('a canonical holiday name cannot bypass festive validation by changing its id', async () => {
+  const body = submission({ fulfillment: 'pickup' });
+  body.lines = [{ id: 'legacy-1', name: 'ראש השנה · מארז משפחתי', unitPrice: 1, qty: 1 }];
+  body.total = 1;
+  const repository = fakeRepository();
+  await withServer(repository, async origin => {
+    assert.equal((await postOrder(origin,body)).status,400);
+    assert.equal(repository.saved.length,0);
+  });
+});
+
+test('festive intake rechecks kitchen closure and stock, including child sides and fixed contents', async () => {
+  const { initialSelection } = await import('../shared/rosh-hashanah.mjs');
+  const festive = initialSelection('family');festive.fish.balls=1;festive.mains.peas=1;festive.sides.white=1;festive.children=[{rice:0,red:1,white:0},{rice:1,red:0,white:0}];
+  for(const out of ['פסטה אדומה','חלה','ריבות ביתיות','תפוח ודבש','מטבוחה פיקנטית','closed']){
+    const repo=fakeRepository();repo.loadState=async()=>({data:{orders:[],settings:out === 'closed' ? {orderingOpen:false} : {out:[out]}},revision:1,hash:'h'});
+    await withServer(repo,async origin=>{
+      const body={...submission({fulfillment:'pickup'}),lines:[{id:'rh-family-stock',name:'Holiday',qty:1,unitPrice:450,festive}],total:450};
+      assert.equal((await postOrder(origin,body)).status,out === 'closed' ? 403 : 409,out);
+      assert.equal(repo.saved.length,0);
+    });
+  }
+});
+
+test('site festive order reaches management with explicit meal, pickup and mixed-cart fields', async()=>{
+ const {initialSelection}=await import('../shared/rosh-hashanah.mjs');const festive=initialSelection('couple');festive.fish.balls=1;festive.mains.peas=1;festive.sides.white=1;
+ const repo=fakeRepository();await withServer(repo,async origin=>{
+  const body={...submission({fulfillment:'pickup'}),lines:[{id:'rh-pair',name:'Holiday',unitPrice:350,qty:1,festive},{id:'other',name:'Extra item',unitPrice:12,qty:2}],total:374};
+  assert.equal((await postOrder(origin,body)).status,201);
+  const saved=repo.saved.at(-1).orders[0];assert.equal(saved.meals,0);assert.equal(saved.challot,0);assert.equal(saved.pickup,true);assert.deepEqual(saved.custom,[{name:'Extra item',qty:2,price:12,note:''}]);assert.match(saved.notes,/\[ROSH_HASHANAH\]/);
+ });
+});

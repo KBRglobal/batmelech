@@ -290,7 +290,7 @@ if (pool) {
 // site pages are claimed — every staff/hidden path stays untouched and
 // keeps falling through to the decoy gate.
 const SITE_PAGE_NAMES = [
-  'weekdays', 'story', 'shabbat-order', 'shabbat-extras', 'checkout',
+  'rosh-hashanah', 'weekdays', 'story', 'shabbat-order', 'shabbat-extras', 'checkout',
   'legal', 'kashrut', 'gallery', 'events', 'how-it-works', 'experiences',
 ];
 const SITE_PAGE_REGEX = new RegExp(

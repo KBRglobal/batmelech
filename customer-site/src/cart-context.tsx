@@ -1,3 +1,4 @@
+import { quote, type Selection } from '../../shared/rosh-hashanah.mjs'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export type CartLine = {
@@ -10,6 +11,7 @@ export type CartLine = {
   unitPrice: number
   qty: number
   note?: string
+  festive?: Selection
 }
 
 export type Fulfillment = 'delivery' | 'pickup'
@@ -85,7 +87,13 @@ function readStoredLines(): CartLine[] {
         Number.isFinite((l as CartLine).unitPrice) &&
         Number.isFinite((l as CartLine).qty) &&
         (l as CartLine).qty > 0,
-    )
+    ).filter(line => {
+      if (!line.festive) return !line.id.startsWith('rh-')
+      try {
+        const price = quote(line.festive)
+        return price.ready && price.total === line.unitPrice
+      } catch { return false }
+    })
   } catch {
     return []
   }

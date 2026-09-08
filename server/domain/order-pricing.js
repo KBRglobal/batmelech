@@ -27,6 +27,7 @@ const {
   SOUFFLE_HALF_UNITS_PER_PORTION,
   classifyDessertKind,
 } = require('./package-rules');
+const { quotePackages } = require('../../shared/rosh-hashanah.mjs');
 const { LUNCH_MENU } = require('./lunch-menu');
 const { parseMoneyMinorUnits } = require('./business-queries');
 
@@ -250,6 +251,12 @@ function orderPriceBreakdown(order, menu) {
   if (extraDessert > 0 && prices.dessertExtraPriceMinorUnits > 0) {
     lines.push(line('קינוח נוסף', extraDessert, prices.dessertExtraPriceMinorUnits, 'other'));
   }
+
+  try {
+    const festive = quotePackages(order.festivePackages);
+    lines.push(...festive.lines.map(row => line(row.name, row.quantity, row.unitPrice * 100, 'other')));
+    if (!festive.ready) warnings.push('בחירת חבילות החג אינה מלאה');
+  } catch { warnings.push('חבילות החג אינן תקינות ולא ניתן לחשב את מחירן'); }
 
   const computedTotalMinorUnits = lines.reduce((sum, row) => sum + row.amountMinorUnits, 0);
   const storedTotalMinorUnits = parseMoneyMinorUnits(order.total);

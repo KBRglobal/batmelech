@@ -15,6 +15,7 @@ const HE = {
   infoTitle: 'מידע',
   terms: 'תנאי שימוש',
   privacy: 'מדיניות פרטיות',
+  accessibility: 'נגישות',
   allergies: 'מידע על אלרגיות',
   kashrutLink: 'כשרות ואיכות',
   rights: 'מטעמי בת מלך דובאי. כל הזכויות שמורות.',
@@ -34,6 +35,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoTitle: 'Information',
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
+    accessibility: 'Accessibility',
     allergies: 'Allergy Information',
     kashrutLink: 'Kashrut & Quality',
     rights: 'Bat Melech Dubai. All rights reserved.',
@@ -50,6 +52,7 @@ export const COPY: Record<Locale, typeof HE> = {
     infoTitle: 'Informations',
     terms: 'Conditions d’utilisation',
     privacy: 'Politique de confidentialité',
+    accessibility: 'Accessibilité',
     allergies: 'Informations allergènes',
     kashrutLink: 'Cacherout et qualité',
     rights: 'Bat Melech Dubaï. Tous droits réservés.',
@@ -122,6 +125,7 @@ export function Footer({ className = '' }: { className?: string }) {
               <Icon icon="ph:warning-circle-bold" />
               {t.allergies}
             </Link>
+            <Link to={href('/legal') + '#accessibility'} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">{t.accessibility}</Link>
             <Link to={href('/kashrut')} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">
               {t.kashrutLink}
             </Link>
@@ -131,6 +135,7 @@ export function Footer({ className = '' }: { className?: string }) {
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-[#3B151A]/50 font-bold text-xs">
           <span>© {new Date().getFullYear()} {t.rights}</span>
           <span>{t.allergens}</span>
+          <span dir="ltr">Web Design, SEO &amp; Managed Hosting by <a href="https://kbr.global" className="underline">KBR Global</a></span>
         </div>
       </div>
     </footer>

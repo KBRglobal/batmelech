@@ -1,0 +1,15 @@
+export type PackageId = 'couple' | 'four' | 'family';
+export type LocalName = { he: string; en: string; fr: string };
+export type MenuItem = { id: string; name: LocalName; units: number };
+export type Selection = { packageId: PackageId; salads: number; fish: Record<string, number>; mains: Record<string, number>; sides: Record<string, number>; challah: number; jam: number; children: Record<string, number>[] };
+export const packageOptions: Record<PackageId, { price: number; adults: number; children: number; salads: number; fish: number; mains: number; sides: number; challah: number; name: LocalName }>;
+export const catalog: Record<'blessings'|'salads'|'fish'|'mains'|'sides'|'childSides'|'childFixed', MenuItem[]>;
+export function initialSelection(id?: PackageId): Selection;
+export function emptyChild(): Record<string, number>;
+export function quote(selection: Selection): { base: number; total: number; extras: Record<'salads'|'fish'|'mains'|'sides'|'challah'|'children'|'childSides', number>; counts: Record<'fish'|'mains'|'sides', number>; ready: boolean };
+export function kitchenNote(selection: Selection, locale?: 'he'|'en'|'fr'): string;
+export function selectionNames(selection: Selection): string[];
+export function unavailableSelections(selection: Selection, out: unknown): string[];
+export type FestivePackage = { selection: Selection; quantity: number; unitPrice?: number };
+export function quotePackages(packages?: unknown): { lines: {name:string;quantity:number;unitPrice:number;amount:number}[];total:number;ready:boolean };
+export function withFestiveNotes(notes: string, packages: readonly FestivePackage[]): string;

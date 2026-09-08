@@ -4,6 +4,7 @@ import { useCart } from '../cart-context'
 import { canonicalPath, localizedHref, rememberLocale, useLocale, type Locale } from '../locale-context'
 
 const LINKS: readonly { readonly to: string; readonly label: Record<Locale, string> }[] = [
+  { to: '/rosh-hashanah', label: { he: 'תפריט חגיגי', en: 'Holiday Menu', fr: 'Menu de fête' } },
   { to: '/weekdays', label: { he: 'יום חול', en: 'Weekdays', fr: 'Semaine' } },
   { to: '/shabbat-order', label: { he: 'שבת קודש', en: 'Shabbat', fr: 'Chabbat' } },
   { to: '/shabbat-extras', label: { he: 'חיזוקים לסופ״ש', en: 'Shabbat Extras', fr: 'Suppléments' } },
@@ -12,7 +13,7 @@ const LINKS: readonly { readonly to: string; readonly label: Record<Locale, stri
 export function Nav({ active }: { active: string }) {
   const { locale, href } = useLocale()
   return (
-    <nav className="flex items-center p-1 md:p-1.5 rounded-full shadow-2xl bg-black/20 backdrop-blur-xl border border-white/20 overflow-x-auto max-w-full">
+    <nav className="flex flex-wrap justify-center items-center p-1 md:p-1.5 rounded-3xl shadow-2xl bg-black/20 backdrop-blur-xl border border-white/20 max-w-full">
       {LINKS.map((link) => {
         const isActive = link.to === active
         return (

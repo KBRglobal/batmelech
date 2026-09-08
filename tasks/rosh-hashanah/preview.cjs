@@ -1,0 +1,16 @@
+const express = require('express');
+const path = require('path');
+const {createSiteOrderRouter} = require('../../server/site-order-route');
+const app = express();
+const root=path.resolve(__dirname,'../..');
+let orders=[];
+const repository={async loadState(){return {data:{orders,settings:{}},revision:1,hash:'local-preview'}},async saveState({localState}){orders=localState.orders;return {ok:true}}};
+app.use('/api/site/orders',createSiteOrderRouter({repository,clock:()=>new Date('2026-09-08T12:00:00Z')}));
+app.get('/__qa/orders',(_req,res)=>res.json(orders));
+app.get('/api/site/status',(_req,res)=>res.json({orderingOpen:true,outOfStockNames:[],closedDates:[],shabbatClosed:false}));
+app.get('/api/site/holidays',(_req,res)=>res.json({holidays:[],menus:[]}));
+app.get('/api/site/delivery-windows',(_req,res)=>res.json({windows:[]}));
+app.get('/api/site/catalog',async (_req,res)=>{try {const r=await fetch('https://www.batmelech.ae/api/site/catalog');res.json(await r.json())}catch {res.json({})}});
+app.use('/site',express.static(path.join(root,'site')));
+app.get('*',(_req,res)=>res.sendFile(path.join(root,'site/index.html')));
+app.listen(4186,'127.0.0.1',()=>console.log('Local preview http://127.0.0.1:4186/rosh-hashanah; orders are stored in memory only.'));

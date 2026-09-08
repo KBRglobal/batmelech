@@ -1,3 +1,4 @@
+import { packageOptions } from '../../../shared/rosh-hashanah.mjs'
 import { useEffect, useId, useRef, useState } from 'react'
 import { LocalIcon } from '../components/local-icon.tsx'
 import { ScreenState } from '../components/screen-state.tsx'
@@ -695,6 +696,12 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
         <h1 className="text-3xl font-black text-primary sm:text-4xl">מחירון ותפריט</h1>
         <p className="mt-2 text-sm font-bold text-muted-foreground">עריכת מחירים, שמות מנות, תמונות ותיאורים. שינויים נשמרים רק בלחיצה על "שמירת התפריט" למטה.</p>
       </header>
+      <section className="mt-6 rounded-3xl border border-border bg-card p-6">
+        <h2 className="text-xl font-black text-primary">תפריט חגיגי לראש השנה</h2>
+        <p className="mt-2 text-sm text-muted-foreground">מחירון החג מחובר אוטומטית לאתר ולעריכת הזמנה, באזור ״ראש השנה״. המחירים הבאים קבועים לתפריט החג.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">{Object.values(packageOptions).map(p => <div key={p.price} className="rounded-xl border border-border p-3"><strong>{p.name.he} · ${p.price}</strong><p className="mt-2 text-sm">צלחת ברכות אחת · {p.salads} מארזי סלטים · {p.fish} יחידות דגים · {p.mains} עיקריות · {p.sides} תוספות · {p.challah} חלות · ריבות חינם{p.children ? ' · 2 מארזי ילדים' : ''}</p></div>)}</div>
+        <p className="mt-4 text-sm">מעבר למכסה בלבד: סלטים $60 למארז · פילה $30 · מנת קציצות דגים $60 (2 יחידות) · עיקרית $100 · תוספת $25 · חלה $10 · ילד נוסף במשפחתי $49 · תוספת נוספת לאותו ילד $15.</p>
+      </section>
       {editError !== '' && (
         <p role="alert" className="mt-2 text-xs font-black text-destructive">{editError}</p>
       )}

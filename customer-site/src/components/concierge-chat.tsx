@@ -21,7 +21,7 @@ const STORAGE_KEY = 'bm-chat-v1'
 // Pages whose own fixed bottom bar (order summary / checkout submit) owns the
 // bottom of a phone screen — the floating chat toggle hides there on mobile so
 // it never covers the primary CTA. Desktop has room for both.
-const BOTTOM_BAR_PATHS = new Set(['/shabbat-order', '/shabbat-extras', '/checkout'])
+const BOTTOM_BAR_PATHS = new Set(['/rosh-hashanah', '/shabbat-order', '/shabbat-extras', '/checkout'])
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
