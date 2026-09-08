@@ -40,7 +40,7 @@ export function PageHero({
   const { locale } = useLocale()
   const t = COPY[locale]
   return (
-    <section className={`relative ${SIZE_CLASS[size]} flex flex-col overflow-hidden`}>
+    <section className={`page-hero relative ${SIZE_CLASS[size]} flex flex-col overflow-hidden`}>
       <div className="absolute inset-0">
         <img src={image} alt={imageAlt ?? `${title[0]} ${title[1]}`} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
         {/* Cream wordmark logo needs a guaranteed-dark upper half on ANY photo
@@ -68,7 +68,7 @@ export function PageHero({
               hero read as "blurred pixels + text". Mobile shows the text
               directly on the image (drop-shadows carry legibility, per
               BRAND.md); the glass card look starts at md. */}
-          <div className="max-w-4xl md:backdrop-blur-md md:bg-black/10 p-0 md:p-10 rounded-none md:rounded-[4rem] border-0 md:border md:border-white/10 md:shadow-2xl">
+          <div className="hero-panel max-w-4xl md:backdrop-blur-md md:bg-black/10 p-0 md:p-10 rounded-none md:rounded-[4rem] border-0 md:border md:border-white/10 md:shadow-2xl">
             {badge && (
               <div className="inline-flex items-center gap-3 px-5 md:px-6 py-2 bg-[#F5A83A] text-white rounded-full text-xs font-black mb-5 md:mb-8 shadow-xl tracking-widest uppercase">
                 <span>{badge}</span>

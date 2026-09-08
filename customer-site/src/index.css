@@ -174,3 +174,23 @@
 .chat-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
+
+/* Shared hero card proportions approved on the homepage. */
+.page-hero .hero-panel h1 { font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; }
+.page-hero .hero-panel > p { font-size: 1rem; line-height: 1.6; }
+.page-hero .hero-panel a { font-size: 1rem; padding: 12px 24px; min-height: 48px; }
+.page-hero .hero-panel a svg { font-size: 1.25rem; }
+@media (min-width: 768px) {
+  .page-hero .hero-panel {
+    max-width: 760px;
+    padding: 28px;
+    border-radius: 32px;
+  }
+  .page-hero .hero-panel > div:first-child { margin-bottom: 18px; padding: 6px 18px; }
+  .page-hero .hero-panel h1 { margin-bottom: 16px; }
+  .page-hero .hero-panel > p { font-size: 1.25rem; margin-bottom: 16px; }
+  .page-hero .hero-panel > div:last-child { gap: 14px; margin-top: 12px; }
+  .page-hero .hero-panel a { font-size: 1.125rem; padding: 14px 26px; }
+}
+
+.page-hero .hero-panel > h2 { font-size: clamp(1.25rem, 2.3vw, 1.75rem); margin-bottom: 16px; }
