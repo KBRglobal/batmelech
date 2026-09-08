@@ -316,3 +316,20 @@
   .festive-guide-next p { margin-top: 8px; font-size: .8rem; line-height: 1.7; color: #65434a; }
   .festive-mobile-package-name { display: block; font-size: .75rem; font-weight: 900; }
 }
+
+@media(max-width:1023px) {
+  #festive-choices, .festive-section { scroll-margin-top: 18px; }
+  .festive-package-guide { padding-bottom: 20px; border-top: 1px solid #d7a0a9; }
+  .festive-flow-title { font-size: 1.4rem; font-weight: 900; line-height: 1.4; }
+  .festive-flow-help { font-size: .9rem; line-height: 1.8; margin-top: 12px; }
+  .festive-package-guide .festive-flow-progress { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 18px 0; }
+  .festive-flow-progress li { display: block; }
+  .festive-flow-progress button { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; background: white; border: 1px solid #edb2c180; border-radius: 12px; text-align: start; cursor: pointer; }
+  .festive-flow-progress button > span:last-child { color: #8D182C; font-weight: 800; }
+  .festive-flow-status { font-size: .8rem; font-weight: 800; line-height: 1.6; }
+}
+/* The concierge switches to its desktop toggle at 768px, while this
+   page retains its checkout bar until 1024px. Keep both actions reachable. */
+@media(min-width:768px) and (max-width:1023px) {
+  body:has(.festive-page) [class~="z-[210]"] { bottom: calc(132px + env(safe-area-inset-bottom)); }
+}
