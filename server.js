@@ -296,6 +296,12 @@ const SITE_PAGE_NAMES = [
 const SITE_PAGE_REGEX = new RegExp(
   `^/(?:en|fr)?/?$|^/(?:(?:en|fr)/)?(?:${SITE_PAGE_NAMES.join('|')})(?:/|$)`
 );
+// Old bookmarked/shared links used '/kosher'; keep them working.
+app.get(/^\/(?:(en|fr)\/)?kosher\/?$/, (request, response) => {
+  const locale = request.params[0];
+  response.set('Cache-Control', 'no-store');
+  response.redirect(301, locale ? `/${locale}/kashrut` : '/kashrut');
+});
 app.use((request, response, next) => {
   if (request.method !== 'GET' && request.method !== 'HEAD') return next();
   if (request.path === '/' && hasValidSession(request, SESSION_SECRET)) {
