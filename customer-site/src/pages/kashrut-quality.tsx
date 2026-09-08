@@ -159,13 +159,18 @@ export function KashrutQuality() {
             <Icon icon="ph:certificate-fill" />
           </div>
           <p className="text-base md:text-xl font-bold text-[#3B151A]/70 leading-relaxed mb-8 md:mb-12">{t.intro}</p>
-          <div className="rounded-3xl md:rounded-[4rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white aspect-video mb-12 md:mb-20">
+          <a
+            href="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/kashrut-certificate-pk-2026.jpg"
+            target="_blank"
+            rel="noreferrer"
+            className="block rounded-3xl md:rounded-[4rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white mb-12 md:mb-20"
+          >
             <img
-              src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7zzOf0cSMJb.jpeg"
+              src="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/kashrut-certificate-pk-2026.jpg"
               alt={t.certificateAlt}
-              className="w-full h-full object-cover"
+              className="w-full h-auto"
             />
-          </div>
+          </a>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-start">
             <InfoCard icon="ph:seal-check-fill" title={t.cards[0].title}>
               {t.cards[0].body}
