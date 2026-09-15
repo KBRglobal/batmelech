@@ -1,4 +1,3 @@
-import { kitchenNote } from '../../../shared/rosh-hashanah.mjs'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { Link } from 'react-router'
@@ -308,7 +307,7 @@ function localizedOrderMessage(
   const itemRows = lines.map((l) => {
     const display = l.displayName ?? dishName(l.name, locale)
     const label = display === l.name ? l.name : `${display} (${l.name})`
-    return `• ${label} x${l.qty} — $${l.unitPrice * l.qty}${l.note ? ` (${l.festive ? kitchenNote(l.festive, locale) : l.note})` : ''}`
+    return `• ${label} x${l.qty} — $${l.unitPrice * l.qty}${l.note ? ` (${l.note})` : ''}`
   })
   const rows = [
     t.waHeader,
@@ -444,7 +443,7 @@ export function Checkout() {
                 }
               : {}),
           },
-          lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.festive ? undefined : line.note, festive: line.festive })),
+          lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
           total,
         }),
       })
@@ -499,7 +498,7 @@ export function Checkout() {
                   <h4 className="font-black">{line.displayName ?? line.name}</h4>
                   {line.note && (
                     <div className="text-xs text-[#3B151A]/50 font-bold mt-1 leading-relaxed space-y-0.5">
-                      {(line.festive ? kitchenNote(line.festive, locale) : line.note).split(' | ').map((part) => (
+                      {line.note.split(' | ').map((part) => (
                         <p key={part}>{part}</p>
                       ))}
                     </div>
