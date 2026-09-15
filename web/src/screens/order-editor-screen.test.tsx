@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1983,5 +1983,239 @@ describe('OrderEditorScreen delivery proof section', () => {
     await openMorePart(user, 'plata')
     await waitFor(() => expect(screen.getByText('אפשר לרשום פלטה אחרי ששומרים את ההזמנה.')).toBeTruthy())
     expect(screen.queryByLabelText('פיקדון פלטה')).toBeNull()
+  })
+
+  // The work in progress belongs on the server, not in this browser: Lin types,
+  // leaves the screen, and finds the order again from any device.
+  describe('server-side auto-save', () => {
+    const AUTO_SAVE_DEBOUNCE_MS = 3000
+    const AUTO_SAVE_ORDER_ID = 'order-123e4567-e89b-42d3-a456-426614174001'
+
+    interface AutoSaveHarness {
+      readonly posts: { readonly localState: LegacyStore; readonly baseRevision: number }[]
+      readonly fetchSpy: ReturnType<typeof vi.spyOn>
+      readonly failNextWrite: (fail: boolean) => void
+    }
+
+    // One live envelope: a confirmed write advances it, and a refetch hands back
+    // whatever the server holds now — the same loop the screen sees in production.
+    function harness(store: LegacyStore = { orders: [] }): AutoSaveHarness {
+      let envelope = { revision: 1, ts: 1, hash: 'a'.repeat(64), data: store }
+      let fail = false
+      const posts: { localState: LegacyStore; baseRevision: number }[] = []
+      const refetch = vi.fn(async () => ({ data: envelope, isError: false }))
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, request) => {
+        const command = JSON.parse(String(request?.body)) as {
+          localState: LegacyStore
+          baseRevision: number
+        }
+        if (fail) throw new TypeError('network')
+        posts.push(command)
+        envelope = {
+          revision: envelope.revision + 1,
+          ts: envelope.ts + 1,
+          hash: 'b'.repeat(64),
+          data: command.localState,
+        }
+        return new Response(JSON.stringify({ ok: true, idempotent: false, ...envelope }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      })
+      mockedUseStore.mockImplementation(() => ({
+        isPending: false,
+        isError: false,
+        data: envelope,
+        refetch,
+      }) as unknown as ReturnType<typeof useStore>)
+      return { posts, fetchSpy, failNextWrite: (value: boolean) => { fail = value } }
+    }
+
+    async function flush() {
+      for (let step = 0; step < 8; step += 1) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      }
+    }
+
+    async function passTypingPause() {
+      await act(async () => { await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 100) })
+      await flush()
+    }
+
+    // Testing Library only advances fake timers when it can see a jest-shaped
+    // clock; without this shim every await inside user-event hangs forever.
+    function startClock() {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+      vi.stubGlobal('jest', { advanceTimersByTime: (ms: number) => { vi.advanceTimersByTime(ms) } })
+      vi.setSystemTime(new Date(2026, 8, 15, 14, 32))
+      return userEvent.setup({ delay: null })
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('writes the work in progress as one draft order after the typing pause', async () => {
+      const user = startClock()
+      const uuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID')
+        .mockReturnValue('123e4567-e89b-42d3-a456-426614174001')
+      const { posts, fetchSpy } = harness()
+      renderEditor()
+
+      await user.type(screen.getByLabelText('שם מלא'), 'לין')
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      await passTypingPause()
+
+      expect(posts).toHaveLength(1)
+      expect(posts[0]!.localState.orders).toHaveLength(1)
+      expect(posts[0]!.localState.orders[0]).toMatchObject({
+        id: AUTO_SAVE_ORDER_ID,
+        name: 'לין',
+        draft: true,
+      })
+      expect(screen.getByText('נשמרת אוטומטית · 14:32')).toBeTruthy()
+      uuidSpy.mockRestore()
+    })
+
+    it('keeps updating the same row instead of opening a second order', async () => {
+      const user = startClock()
+      const uuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID')
+        .mockReturnValue('123e4567-e89b-42d3-a456-426614174001')
+      const { posts } = harness()
+      renderEditor()
+
+      const name = screen.getByLabelText('שם מלא')
+      await user.type(name, 'לין')
+      await passTypingPause()
+      await user.type(name, ' כהן')
+      await passTypingPause()
+
+      expect(posts).toHaveLength(2)
+      expect(posts[1]!.baseRevision).toBe(2)
+      expect(posts[1]!.localState.orders).toHaveLength(1)
+      expect(posts[1]!.localState.orders[0]).toMatchObject({
+        id: AUTO_SAVE_ORDER_ID,
+        name: 'לין כהן',
+        draft: true,
+      })
+      uuidSpy.mockRestore()
+    })
+
+    it('finishes the auto-saved row on the real save: same ID, no longer a draft', async () => {
+      const user = startClock()
+      const uuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID')
+        .mockReturnValue('123e4567-e89b-42d3-a456-426614174001')
+      const { posts } = harness()
+      renderEditor()
+
+      await user.type(screen.getByLabelText('שם מלא'), 'לין')
+      await passTypingPause()
+      expect(posts).toHaveLength(1)
+
+      const suggestedPrice = screen.queryByRole('button', { name: 'להשתמש במחיר המוצע' })
+      if (suggestedPrice !== null) await user.click(suggestedPrice)
+      await user.click(screen.getByRole('button', { name: 'שמירת ההזמנה' }))
+      await flush()
+
+      const last = posts[posts.length - 1]!
+      expect(last.localState.orders).toHaveLength(1)
+      expect(last.localState.orders[0]!.id).toBe(AUTO_SAVE_ORDER_ID)
+      expect(last.localState.orders[0]!.draft).toBeUndefined()
+      expect(screen.queryByText(/לא ניתן להכין שמירה בטוחה/)).toBeNull()
+      expect(screen.getByTestId('location').textContent).toBe(`${APP_ROUTES.orders}|null`)
+      uuidSpy.mockRestore()
+    })
+
+    it('flushes what is waiting when she leaves the screen mid-typing', async () => {
+      const user = startClock()
+      const uuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID')
+        .mockReturnValue('123e4567-e89b-42d3-a456-426614174001')
+      const { posts } = harness()
+      const view = renderEditor()
+
+      await user.type(screen.getByLabelText('שם מלא'), 'לין')
+      expect(posts).toHaveLength(0)
+
+      view.unmount()
+      await flush()
+
+      expect(posts).toHaveLength(1)
+      expect(posts[0]!.localState.orders[0]).toMatchObject({
+        id: AUTO_SAVE_ORDER_ID,
+        name: 'לין',
+        draft: true,
+      })
+      uuidSpy.mockRestore()
+    })
+
+    it('never opens a row for an untouched draft or one with nothing identifying', async () => {
+      const user = startClock()
+      const { fetchSpy } = harness()
+      renderEditor()
+
+      await passTypingPause()
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      const name = screen.getByLabelText('שם מלא')
+      await user.type(name, 'ל')
+      await user.clear(name)
+      await passTypingPause()
+
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(screen.queryByText(/נשמרת אוטומטית/)).toBeNull()
+    })
+
+    it('stays silent when an auto-save fails and still lets the real save through', async () => {
+      const user = startClock()
+      const uuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID')
+        .mockReturnValue('123e4567-e89b-42d3-a456-426614174001')
+      const { posts, fetchSpy, failNextWrite } = harness()
+      renderEditor()
+
+      failNextWrite(true)
+      await user.type(screen.getByLabelText('שם מלא'), 'לין')
+      await passTypingPause()
+
+      expect(fetchSpy).toHaveBeenCalled()
+      expect(posts).toHaveLength(0)
+      expect(screen.queryByText(/לא התקבל אישור שמירה מהשרת/)).toBeNull()
+      expect(screen.queryByText(/נמצאה התנגשות/)).toBeNull()
+      expect(screen.queryByText(/נשמרת אוטומטית/)).toBeNull()
+
+      failNextWrite(false)
+      const suggestedPrice = screen.queryByRole('button', { name: 'להשתמש במחיר המוצע' })
+      if (suggestedPrice !== null) await user.click(suggestedPrice)
+      await user.click(screen.getByRole('button', { name: 'שמירת ההזמנה' }))
+      await flush()
+
+      expect(posts).toHaveLength(1)
+      expect(posts[0]!.localState.orders).toHaveLength(1)
+      expect(posts[0]!.localState.orders[0]!.id).toBe(AUTO_SAVE_ORDER_ID)
+      expect(screen.getByTestId('location').textContent).toBe(`${APP_ROUTES.orders}|null`)
+      uuidSpy.mockRestore()
+    })
+
+    it('leaves a טיוטה the operator set by hand alone when she saves that order', async () => {
+      const user = startClock()
+      const { posts } = harness({
+        orders: [{ id: 'order-123e4567-e89b-42d3-a456-426614174777', name: 'לפני', date: '2099-08-20', total: '230.00', draft: true }],
+      })
+      renderEditor('/orders/order-123e4567-e89b-42d3-a456-426614174777/edit')
+
+      const name = screen.getByLabelText('שם מלא')
+      await user.clear(name)
+      await user.type(name, 'אחרי')
+      await passTypingPause()
+      // An order that already exists is never auto-saved: flagging a live order
+      // as a draft would pull it out of prep and off the delivery board.
+      expect(posts).toHaveLength(0)
+
+      await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }))
+      await flush()
+
+      expect(posts).toHaveLength(1)
+      expect(posts[0]!.localState.orders[0]).toMatchObject({ name: 'אחרי', draft: true })
+    })
   })
 })

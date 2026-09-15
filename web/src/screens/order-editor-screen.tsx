@@ -119,6 +119,54 @@ function isExactEnvelopeSnapshot(
     JSON.stringify(candidate.data) === JSON.stringify(captured.data)
 }
 
+// How long the screen waits after the last keystroke before it puts the work in
+// progress on the server. Long enough not to write on every letter, short enough
+// that walking away from the screen costs nothing.
+const AUTO_SAVE_DEBOUNCE_MS = 3000
+
+// A work in progress earns a row on the server only once it identifies itself:
+// a name, a phone, or a dish the operator actually chose. Meals, challot and the
+// salad box are already filled on a fresh draft, so they can never stand for
+// "she typed something" — an empty row must never be created.
+function autoSaveWorthKeeping(draft: OrderDraft): boolean {
+  if (draft.name.trim() !== '' || draft.phone.trim() !== '') return true
+  for (const group of [draft.firsts, draft.mains, draft.sides, draft.desserts]) {
+    if (Object.values(group).some((quantity) => quantity > 0)) return true
+  }
+  if (Object.values(draft.extras).some((selection) => selection.quantity > 0)) return true
+  if (Object.values(draft.lunch).some((selection) => selection.quantity > 0)) return true
+  return draft.custom.some((item) => item.name.trim() !== '' || item.quantity > 0)
+}
+
+// `draft` lives outside LegacyOrderSchema on purpose (passthrough keeps it); it is
+// what orders-dashboard.ts reads to hold a row out of prep, checklists, groups and
+// the delivery board, and what the orders list toggles as "טיוטה". `null` leaves
+// whatever the row already carries — that is what protects a טיוטה the operator
+// set by hand from being cleared by someone else's save.
+function withOrderDraftFlag(
+  state: LegacyStore,
+  orderId: string,
+  flag: boolean | null,
+): LegacyStore {
+  if (flag === null) return state
+  return {
+    ...state,
+    orders: state.orders.map((order) => {
+      if (order.id !== orderId) return order
+      if (flag) return { ...order, draft: true }
+      const cleared = { ...order }
+      delete cleared.draft
+      return cleared
+    }),
+  }
+}
+
+function autoSaveStatusLabel(at: Date): string {
+  const hours = String(at.getHours()).padStart(2, '0')
+  const minutes = String(at.getMinutes()).padStart(2, '0')
+  return `נשמרת אוטומטית · ${hours}:${minutes}`
+}
+
 function currentCatalogSignature(menu: OrderEditorMenu): string {
   return JSON.stringify(buildAIOrderCatalog(menu).items)
 }
@@ -1356,6 +1404,7 @@ function OrderEditorContent({
   onSavePlata,
   deleteState,
   onDelete,
+  autoSaveStatus,
 }: {
   readonly draft: OrderDraft
   readonly menu: OrderEditorMenu
@@ -1376,6 +1425,7 @@ function OrderEditorContent({
   readonly onSavePlata: ((values: PlataFormValues) => void) | null
   readonly deleteState: DeleteState
   readonly onDelete: (() => void) | null
+  readonly autoSaveStatus: string | null
 }) {
   const navigate = useNavigate()
   const [importText, setImportText] = useState('')
@@ -2468,6 +2518,9 @@ function OrderEditorContent({
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[0.65rem] font-black text-muted-foreground">{isSaving ? 'ממתינה לאישור שמירה מהשרת' : 'עד לאישור השמירה, הטיוטה לא משנה את מסד הנתונים'}</p>
+            {autoSaveStatus !== null && (
+              <p className="text-[0.65rem] font-black text-muted-foreground">{autoSaveStatus}</p>
+            )}
             {unresolvedManagerFindings.length > 0 && (
               <p className="mt-1 text-xs font-black text-amber-900">השמירה תיפתח אחרי סימון טופל בכל הבירורים.</p>
             )}
@@ -2543,6 +2596,18 @@ export function OrderEditorScreen() {
   const submissionLocked = useRef(false)
   const initialPricingFingerprint = useRef<string | null>(null)
   const initialDraftKind = useRef<'fresh' | 'other'>('other')
+  // Auto-save state. `autoSavedOrderId` is the row this session created on the
+  // server; once it is set, EVERY later write — auto-save and the real save
+  // alike — edits that one row, so an order can never be written twice.
+  const autoSaveMutation = useVersionedStateMutation()
+  const autoSavedOrderId = useRef<string | null>(null)
+  const autoSaveSetDraftFlag = useRef(false)
+  const lastAutoSaveSignature = useRef<string | null>(null)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSavePending = useRef<OrderDraft | null>(null)
+  const autoSaveRunning = useRef<Promise<void> | null>(null)
+  const runAutoSaveRef = useRef<() => Promise<void>>(async () => {})
+  const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null)
 
   const store = storeQuery.data?.data ?? null
   const menu = useMemo(() => buildOrderEditorMenu(store ?? { orders: [] }), [store])
@@ -2691,8 +2756,174 @@ export function OrderEditorScreen() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Auto-save. Lin types an order, leaves the screen, and comes back to find the
+  // work still there — because it lives on the SERVER as a draft:true order, not
+  // in this browser. It only ever touches a row this session created: an order
+  // that already existed is never flagged as a draft behind her back, since that
+  // would pull a live order out of prep and off the delivery board.
+  // ---------------------------------------------------------------------------
+  const autoSaveBlocked = () =>
+    submissionLocked.current ||
+    saveMutation.isPending ||
+    plataMutation.isPending ||
+    deleteMutation.isPending
+
+  const runAutoSave = async () => {
+    const pending = autoSavePending.current
+    if (mode !== 'new' || pending === null) return
+    if (autoSaveRunning.current !== null || autoSaveBlocked()) return
+    const loadedBase = baseEnvelope.current
+    if (loadedBase === null) return
+    const signature = JSON.stringify(pending)
+    if (signature === lastAutoSaveSignature.current) return
+    if (!autoSaveWorthKeeping(pending)) return
+
+    const run = (async () => {
+      // Every safety rule of a real write still applies: canonical IDs, an exact
+      // base, and the versioned pipeline. Only the blocking-validation gate is
+      // skipped — a work in progress is allowed to be incomplete.
+      let refreshed: VersionedStateEnvelope | null = null
+      try {
+        const result = await storeQuery.refetch()
+        refreshed = result.data !== undefined && isVersionedStateEnvelope(result.data)
+          ? result.data
+          : null
+      } catch {
+        refreshed = null
+      }
+      // Stale or unreachable: say nothing, change nothing, try again next tick.
+      // The base is deliberately NOT replaced with a foreign snapshot — that is
+      // what keeps the real save's "the data or the menu changed" guard honest.
+      if (refreshed === null || !isExactEnvelopeSnapshot(refreshed, loadedBase)) return
+
+      let targetOrderId: string
+      let change: PreparedVersionedStateChange
+      try {
+        targetOrderId = autoSavedOrderId.current ?? createCanonicalOrderId(loadedBase.data)
+        // The row exists from the moment the first auto-save was confirmed; from
+        // then on this is an edit, never a second 'new' write.
+        const writeMode = loadedBase.data.orders.some((order) => order.id === targetOrderId)
+          ? 'edit'
+          : 'new'
+        change = prepareVersionedStateChange(
+          loadedBase,
+          createVersionedRequestId('order-autosave'),
+          (baseStateCopy) => withOrderDraftFlag(
+            withIntakeConversation(
+              applyOrderDraftToStore(baseStateCopy, pending, {
+                mode: writeMode,
+                orderId: targetOrderId,
+              }),
+              targetOrderId,
+              managerSourceMessage,
+              mode,
+            ),
+            targetOrderId,
+            true,
+          ),
+        )
+      } catch {
+        return
+      }
+
+      try {
+        const result = await autoSaveMutation.mutateAsync(change)
+        if (!result.ok) return
+        autoSavedOrderId.current = targetOrderId
+        autoSaveSetDraftFlag.current = true
+        lastAutoSaveSignature.current = signature
+        // Adopt the confirmed envelope, exactly as savePlata does, so the open
+        // screen never goes stale and the real save still has an exact base.
+        baseEnvelope.current = {
+          revision: result.revision,
+          ts: result.ts,
+          hash: result.hash,
+          data: result.data,
+        }
+        setAutoSaveStatus(autoSaveStatusLabel(new Date()))
+      } catch {
+        // A failed auto-save is never the operator's problem. Silence, and the
+        // next tick tries again.
+      }
+    })()
+    autoSaveRunning.current = run
+    try {
+      await run
+    } finally {
+      autoSaveRunning.current = null
+    }
+  }
+
+  useEffect(() => {
+    runAutoSaveRef.current = runAutoSave
+  })
+
+  // A different order (or a different way in) starts its own auto-save history.
+  useEffect(() => {
+    autoSavedOrderId.current = null
+    autoSaveSetDraftFlag.current = false
+    lastAutoSaveSignature.current = null
+    autoSavePending.current = null
+    setAutoSaveStatus(null)
+  }, [initializationKey])
+
+  useEffect(() => {
+    if (mode !== 'new' || draft === null) return
+    const signature = JSON.stringify(draft)
+    // The draft the screen opened with is the baseline: an untouched draft — a
+    // blank one, a duplicate, a WhatsApp handoff — never writes anything.
+    if (lastAutoSaveSignature.current === null) {
+      lastAutoSaveSignature.current = signature
+      return
+    }
+    // Back to what the server already has, or nothing identifying left (she
+    // cleared the name she just typed): drop the scheduled write entirely, so a
+    // stale snapshot can never land after the fact.
+    if (signature === lastAutoSaveSignature.current || !autoSaveWorthKeeping(draft)) {
+      autoSavePending.current = null
+      if (autoSaveTimer.current !== null) {
+        clearTimeout(autoSaveTimer.current)
+        autoSaveTimer.current = null
+      }
+      return
+    }
+    autoSavePending.current = draft
+    if (autoSaveTimer.current !== null) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveTimer.current = null
+      void runAutoSaveRef.current()
+    }, AUTO_SAVE_DEBOUNCE_MS)
+  }, [draft, mode])
+
+  // She types and navigates away in the same breath: flush what is waiting.
+  useEffect(() => () => {
+    if (autoSaveTimer.current === null) return
+    clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = null
+    void runAutoSaveRef.current()
+  }, [])
+
+  const settleAutoSave = async () => {
+    if (autoSaveTimer.current !== null) {
+      clearTimeout(autoSaveTimer.current)
+      autoSaveTimer.current = null
+    }
+    const running = autoSaveRunning.current
+    if (running !== null) {
+      try {
+        await running
+      } catch {
+        // Already silent by design; never surfaces to the operator.
+      }
+    }
+  }
+
   const saveDraft = async (allowMixedLunchAndShabbat: boolean) => {
     if (!draft || submissionLocked.current || saveMutation.isPending) return
+    // An auto-save must never race the real save: drop the pending tick and let
+    // an in-flight one finish, so the base verified below is the confirmed one.
+    await settleAutoSave()
     const loadedBase = baseEnvelope.current
     if (!loadedBase) {
       setSaveFeedback({
@@ -2738,7 +2969,7 @@ export function OrderEditorScreen() {
       try {
         const targetOrderId =
           mode === 'new'
-            ? createdOrderId.current ?? createCanonicalOrderId(loadedBase.data)
+            ? autoSavedOrderId.current ?? createdOrderId.current ?? createCanonicalOrderId(loadedBase.data)
             : typeof draft.id === 'string'
               ? draft.id
               : ''
@@ -2746,6 +2977,13 @@ export function OrderEditorScreen() {
           throw new Error('Edited order identity is unsafe.')
         }
         if (mode === 'new') createdOrderId.current = targetOrderId
+        // The auto-save may already have created this row while she typed.
+        // Writing it again as 'new' would throw "Order ID already exists" — and,
+        // worse, a second row is exactly what must never happen.
+        const writeMode: 'new' | 'edit' =
+          mode === 'edit' || loadedBase.data.orders.some((order) => order.id === targetOrderId)
+            ? 'edit'
+            : 'new'
         const requestId = createVersionedRequestId(
           mode === 'new' ? 'order-create' : 'order-edit',
         )
@@ -2754,14 +2992,21 @@ export function OrderEditorScreen() {
           change: prepareVersionedStateChange(
             loadedBase,
             requestId,
-            (baseStateCopy) => withIntakeConversation(
-              applyOrderDraftToStore(baseStateCopy, draft, {
+            (baseStateCopy) => withOrderDraftFlag(
+              withIntakeConversation(
+                applyOrderDraftToStore(baseStateCopy, draft, {
+                  mode: writeMode,
+                  orderId: targetOrderId,
+                }),
+                targetOrderId,
+                managerSourceMessage,
                 mode,
-                orderId: targetOrderId,
-              }),
+              ),
               targetOrderId,
-              managerSourceMessage,
-              mode,
+              // The real save ends the work in progress — but only this session's
+              // own auto-save flag is cleared. A טיוטה the operator set by hand in
+              // the orders list is hers, and stays.
+              autoSaveSetDraftFlag.current ? false : null,
             ),
           ),
         }
@@ -3017,6 +3262,7 @@ export function OrderEditorScreen() {
       onSavePlata={loadedOrder === null ? null : (values) => { void savePlata(values) }}
       deleteState={deleteState}
       onDelete={loadedOrder === null ? null : () => { void deleteOrder() }}
+      autoSaveStatus={autoSaveStatus}
     />
   )
 }
