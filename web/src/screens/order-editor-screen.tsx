@@ -57,7 +57,7 @@ import {
   type OrderDraft,
   type OrderEditorMenu,
 } from '../domain/order-editor.ts'
-import { SALAD_BOX_ITEMS, SALAD_BOX_SIZE } from '../domain/package-rules.ts'
+import { HALF_UNITS_PER_MAIN, HALF_UNITS_PER_SIDE, SALAD_BOX_ITEMS, SALAD_BOX_SIZE } from '../domain/package-rules.ts'
 import { deliveryProofSummary } from '../domain/delivery-dashboard.ts'
 import {
   MAX_PLATA_NOTE_LENGTH,
@@ -691,19 +691,58 @@ function TrackingLinkButton({ orderId }: { readonly orderId: string }) {
   )
 }
 
+/**
+ * One part of the order form.
+ *
+ * A part that is FINISHED folds itself into a single quiet line with a check
+ * and what was chosen ("עיקריות ✓ קציצות בשר ברוטב אדום"); clicking the line
+ * opens it again. A part that still needs something stays open. So whatever
+ * is open on the screen is, by definition, what the order still needs — the
+ * form shrinks as the operator works instead of staying one long wall.
+ *
+ * `collapsible` is the older, unrelated behaviour for parts that are simply
+ * optional (lunch, plata, delivery proof): closed until asked for, no check.
+ */
 function Section({
   id,
   title,
   summary,
   collapsible = false,
+  done = false,
+  doneSummary,
+  open = false,
+  onToggle,
   children,
 }: {
   readonly id: string
   readonly title: string
   readonly summary?: string
   readonly collapsible?: boolean
+  /** The part has everything it needs. */
+  readonly done?: boolean
+  /** What to show on the folded line. Folding only happens when this is set. */
+  readonly doneSummary?: string
+  /** The operator opened this finished part to change something. */
+  readonly open?: boolean
+  readonly onToggle?: (open: boolean) => void
   readonly children: React.ReactNode
 }) {
+  // A part never folds while the operator is working inside it — she picks a
+  // main and the section would otherwise shut under her hand before she could
+  // add a second one. It folds the moment she moves on.
+  const [hasFocusWithin, setHasFocusWithin] = useState(false)
+  // `canFold` decides whether this part CAN fold at all (it is finished and has
+  // a one-line summary). Focus only decides WHEN: never while she is working
+  // inside it. Keeping the two apart matters — tying the close button to focus
+  // unmounts it under the very click that presses it.
+  const canFold = done && doneSummary !== undefined && onToggle !== undefined
+  const showFolded = canFold && !open && !hasFocusWithin
+  const focusWatchers = {
+    onFocusCapture: () => setHasFocusWithin(true),
+    onBlurCapture: (event: React.FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setHasFocusWithin(false)
+    },
+  }
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-3 border-r-4 border-primary pr-4">
       <h2 className="text-lg font-black text-primary">{title}</h2>
@@ -711,9 +750,27 @@ function Section({
     </div>
   )
 
+  if (showFolded) {
+    return (
+      <button
+        type="button"
+        id={`order-${id}`}
+        onClick={() => onToggle(true)}
+        aria-expanded={false}
+        data-folded="true"
+        className="flex w-full scroll-mt-24 items-center gap-3 rounded-[2rem] border border-border bg-card px-5 py-4 text-right shadow-sm hover:bg-secondary sm:px-7"
+      >
+        <LocalIcon name="ph:check-circle-bold" className="shrink-0 text-xl text-emerald-600" />
+        <span className="text-sm font-black text-primary">{title}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-bold text-muted-foreground">{doneSummary}</span>
+        <LocalIcon name="ph:caret-down-bold" className="shrink-0 text-base text-muted-foreground" />
+      </button>
+    )
+  }
+
   if (collapsible) {
     return (
-      <details id={`order-${id}`} className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
+      <details {...focusWatchers} id={`order-${id}`} className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{header}</summary>
         <div className="space-y-5 pt-1">{children}</div>
       </details>
@@ -721,8 +778,29 @@ function Section({
   }
 
   return (
-    <section id={`order-${id}`} className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
-      {header}
+    <section {...focusWatchers} id={`order-${id}`} className="scroll-mt-24 space-y-5 rounded-[2rem] border border-border bg-card p-5 shadow-sm sm:p-7">
+      {canFold ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {header}
+          <button
+            type="button"
+            onClick={(event) => {
+              // Closing from inside: drop focus first, or the "still working
+              // in here" rule would immediately keep the part open again.
+              event.currentTarget.blur()
+              setHasFocusWithin(false)
+              onToggle(false)
+            }}
+            aria-expanded
+            className="inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-xs font-black text-muted-foreground hover:bg-secondary"
+          >
+            <LocalIcon name="ph:check-circle-bold" className="text-base text-emerald-600" />
+            <span>סגירה</span>
+          </button>
+        </div>
+      ) : (
+        header
+      )}
       {children}
     </section>
   )
@@ -1370,6 +1448,44 @@ function OrderEditorContent({
   const allowances = draftAllowances(draft)
   const dinerMixWarnings = pricing.issues.filter((issue) => issue.code === 'DINER_MIX')
 
+  // --- The form folds as it fills ------------------------------------------
+  // A part that has everything it needs collapses into one line with a check
+  // and what was chosen; only what the order still NEEDS stays open. A part
+  // the operator re-opened stays open until she closes it, so nothing snaps
+  // shut under her hands while she is changing something.
+  const [reopenedSections, setReopenedSections] = useState<ReadonlySet<string>>(() => new Set<string>())
+  const fold = (id: string, done: boolean, doneSummary: string) => ({
+    done,
+    doneSummary,
+    open: reopenedSections.has(id),
+    onToggle: (open: boolean) =>
+      setReopenedSections((current) => {
+        const next = new Set(current)
+        if (open) next.add(id)
+        else next.delete(id)
+        return next
+      }),
+  })
+  const chosenNames = (record: Readonly<Record<string, number>>) =>
+    Object.entries(record)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([name, quantity]) => (quantity > 1 ? `${name} ×${quantity}` : name))
+      .join(' · ')
+  const deliveryPlace = draft.pickup ? 'איסוף עצמי' : draft.place.trim() || draft.address.trim()
+  const customerDone =
+    draft.name.trim() !== '' && draft.phone.trim() !== '' && draft.time.trim() !== '' && deliveryPlace !== ''
+  const dinerSummary = [
+    draft.meals > 0 ? `זוגית ×${draft.meals}` : '',
+    draft.addons > 0 ? `סועד נוסף ×${draft.addons}` : '',
+    draft.solos > 0 ? `סועד בודד ×${draft.solos}` : '',
+  ]
+    .filter((part) => part !== '')
+    .join(' + ')
+  const selectedFishUnits = pricing.result?.fish.selectedUnits ?? 0
+  const mainsDone = countRecord(draft.mains) * HALF_UNITS_PER_MAIN >= allowances.mainHalfUnits
+  const sidesDone = countRecord(draft.sides) * HALF_UNITS_PER_SIDE >= allowances.sideHalfUnits
+  const dessertsDone = pricing.dessert.selectedHalfUnits >= allowances.dessertHalfUnits
+
   const updateChallahs = (challot: number) => {
     markShabbatSelectionChanged()
     patch({ challot })
@@ -1666,7 +1782,7 @@ function OrderEditorContent({
           </section>
         )}
 
-        <Section id="details" title="פרטי ההזמנה">
+        <Section id="details" title="פרטי ההזמנה" {...fold('details', draft.date.trim() !== '', [draft.date.split('-').reverse().join('.'), draft.status, draft.group.trim()].filter((part) => part !== '').join(' · '))}>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <Field label="לאיזה תאריך ההזמנה?">
               <input aria-label="תאריך ההזמנה" type="date" value={draft.date} onChange={(event) => patch({ date: event.currentTarget.value })} className={inputClassName} />
@@ -1715,7 +1831,7 @@ function OrderEditorContent({
           </Field>
         </Section>
 
-        <Section id="customer" title="פרטי לקוח ומשלוח">
+        <Section id="customer" title="פרטי לקוח ומשלוח" {...fold('customer', customerDone, [draft.name.trim(), draft.time.trim(), deliveryPlace].filter((part) => part !== '').join(' · '))}>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <Field label="שם מלא">
               <input aria-label="שם מלא" value={draft.name} onChange={(event) => patch({ name: event.currentTarget.value })} className={inputClassName} />
@@ -1866,7 +1982,7 @@ function OrderEditorContent({
           )}
         </Section>
 
-        <Section id="meal" title="הרכב ההזמנה">
+        <Section id="meal" title="הרכב ההזמנה" {...fold('meal', allowances.diners > 0, `${dinerSummary} · ${draft.challot} חלות`)}>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <QuantityStepper label="ארוחות זוגיות" value={draft.meals} onChange={updateMeals} />
             <QuantityStepper label="סועד נוסף" value={draft.addons} onChange={updateAddons} />
@@ -1882,7 +1998,7 @@ function OrderEditorContent({
           ))}
         </Section>
 
-        <Section id="salads" title="סלטים" summary={`מארז ${SALAD_BOX_SIZE} סלטים · כלול`} collapsible>
+        <Section id="salads" title="סלטים" summary={`מארז ${SALAD_BOX_SIZE} סלטים · כלול`} {...fold('salads', true, `מארז ${SALAD_BOX_SIZE} סלטים · כלול`)}>
           <p className="text-xs font-bold text-muted-foreground">כל הזמנה כוללת מארז קבוע של {SALAD_BOX_SIZE} סלטים. אין בחירה ואין חיוב — הרשימה כאן היא מה שהמטבח מכין.</p>
           <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
             {saladLines.map(({ name, quantity }) => (
@@ -1897,7 +2013,7 @@ function OrderEditorContent({
           )}
         </Section>
 
-        <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${allowances.fishUnits} יחידות`} collapsible>
+        <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${allowances.fishUnits} יחידות`} {...fold('firsts', selectedFishUnits >= allowances.fishUnits, chosenNames(draft.firsts) || `${selectedFishUnits} יחידות`)}>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-bold leading-6 text-amber-900">
             בכל זוגית כלולות שתי יחידות פילה. מנת קציצות דגים שווה לשתי יחידות. כל יחידה מעבר לכלול מחויבת ב־30$.
           </div>
@@ -1912,16 +2028,16 @@ function OrderEditorContent({
           </div>
         </Section>
 
-        <Section id="mains" title="עיקריות" summary={`${countRecord(draft.mains)} נבחרו`} collapsible>
+        <Section id="mains" title="עיקריות" summary={`${countRecord(draft.mains)} נבחרו`} {...fold('mains', mainsDone, chosenNames(draft.mains))}>
           <QuantityCategory names={menu.mains} quantities={draft.mains} notes={draft.mainsNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('mains', name, quantity)} updateNote={(name, note) => updateCategoryNote('mains', name, note)} />
           <Field label="הערה לעיקריות"><input aria-label="הערה לעיקריות" value={draft.mainsNote} onChange={(event) => patch({ mainsNote: event.currentTarget.value })} className={inputClassName} /></Field>
         </Section>
 
-        <Section id="sides" title="תוספות" summary={`${countRecord(draft.sides)} נבחרו`} collapsible>
+        <Section id="sides" title="תוספות" summary={`${countRecord(draft.sides)} נבחרו`} {...fold('sides', sidesDone, chosenNames(draft.sides))}>
           <QuantityCategory names={menu.sides} quantities={draft.sides} notes={draft.sidesNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('sides', name, quantity)} updateNote={(name, note) => updateCategoryNote('sides', name, note)} />
         </Section>
 
-        <Section id="desserts" title="קינוחים" summary={`2 סופלה או בקלאווה אחת לזוגית`} collapsible>
+        <Section id="desserts" title="קינוחים" summary={`2 סופלה או בקלאווה אחת לזוגית`} {...fold('desserts', dessertsDone, chosenNames(draft.desserts))}>
           <QuantityCategory names={menu.desserts} quantities={draft.desserts} notes={draft.dessertsNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('desserts', name, quantity)} updateNote={(name, note) => updateCategoryNote('desserts', name, note)} />
         </Section>
 

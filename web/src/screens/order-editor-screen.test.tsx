@@ -66,6 +66,18 @@ function LocationProbe() {
   return <output data-testid="location">{`${location.pathname}|${JSON.stringify(location.state)}`}</output>
 }
 
+// A finished part of the form folds into one line with a check (that is the
+// point of the screen: only what the order still needs stays open). Tests that
+// drive a finished part open it first, exactly as the operator would.
+async function openFoldedSections(user: ReturnType<typeof userEvent.setup>) {
+  for (let guard = 0; guard < 20; guard += 1) {
+    const folded = document.querySelector('button[data-folded="true"]')
+    if (folded === null) return
+    await user.click(folded as HTMLElement)
+  }
+  throw new Error('folded sections did not settle')
+}
+
 function renderEditor(path: string = APP_ROUTES.newOrder, state?: unknown) {
   const questionMarkIndex = path.indexOf('?')
   const pathname = questionMarkIndex === -1 ? path : path.slice(0, questionMarkIndex)
@@ -128,9 +140,12 @@ describe('OrderEditorScreen', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 7, 12, 15, 0))
     mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     renderEditor()
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'הזמנה חדשה' })).toBeTruthy())
+    await openFoldedSections(user)
+
     expect((screen.getByLabelText('תאריך ההזמנה') as HTMLInputElement).value).toBe('2026-08-14')
     expect(screen.getByLabelText('כמות ארוחות זוגיות').textContent).toBe('1')
     expect(screen.getAllByRole('button', { name: /^(?:פרטים|לקוח|סלטים|ראשונות|עיקריות|תוספות|קינוח|צהריים|אקסטרות|תשלום)$/ })).toHaveLength(10)
@@ -353,6 +368,7 @@ describe('OrderEditorScreen', () => {
     const user = userEvent.setup()
     renderEditor()
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
+    await openFoldedSections(user)
     await user.click(screen.getByRole('button', { name: 'הוספה לקציצות בשר ברוטב אדום עשיר' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לקציצות בשר עם אפונה וארטישוק' }))
 
@@ -373,6 +389,7 @@ describe('OrderEditorScreen', () => {
     const user = userEvent.setup()
     renderEditor()
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
+    await openFoldedSections(user)
 
     await user.click(screen.getByRole('button', { name: 'הוספה לסועד נוסף' }))
     expect(screen.getByLabelText('כמות סועד נוסף').textContent).toBe('1')
@@ -395,6 +412,7 @@ describe('OrderEditorScreen', () => {
     renderEditor()
 
     await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    await openFoldedSections(user)
     expect(screen.getByLabelText('כמות חלות').textContent).toBe('2')
     await user.click(screen.getByRole('button', { name: 'הוספה לארוחות זוגיות' }))
     expect(screen.getByLabelText('כמות ארוחות זוגיות').textContent).toBe('2')
@@ -478,6 +496,7 @@ describe('OrderEditorScreen', () => {
     renderEditor()
 
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
+    await openFoldedSections(user)
     await user.click(screen.getByRole('button', { name: 'הוספה לבגט טוניסאי אותנטי' }))
     expect(screen.getByLabelText('כמות ארוחות זוגיות').textContent).toBe('0')
     expect(screen.getByLabelText('כמות חלות').textContent).toBe('0')
@@ -531,6 +550,7 @@ describe('OrderEditorScreen', () => {
     renderEditor(`${APP_ROUTES.newOrder}?duplicate=source-1`)
 
     await waitFor(() => expect((screen.getByLabelText('שם מלא') as HTMLInputElement).value).toBe('לקוחה חוזרת'))
+    await openFoldedSections(user)
     expect((screen.getByLabelText('תאריך ההזמנה') as HTMLInputElement).value).toBe('2026-08-14')
     expect((screen.getByLabelText('מקדמה') as HTMLInputElement).value).toBe('')
     expect((screen.getByLabelText('סטטוס תשלום') as HTMLSelectElement).value).toBe('לא')
@@ -578,6 +598,7 @@ describe('OrderEditorScreen', () => {
     renderEditor()
     await screen.findByRole('heading', { name: 'הזמנה חדשה' })
     await user.type(screen.getByLabelText('שם מלא'), 'לקוחה')
+    await openFoldedSections(user)
 
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
@@ -640,6 +661,7 @@ describe('OrderEditorScreen', () => {
     const user = userEvent.setup()
     renderEditor()
     await user.type(await screen.findByLabelText('שם מלא'), 'שם ידני')
+    await openFoldedSections(user)
     await user.type(screen.getByLabelText('כתובת מלאה'), 'הוראות ידניות לקבלה')
     await user.type(screen.getByLabelText('הערות כלליות'), 'הערה ידנית')
     await user.type(screen.getByLabelText('קבוצה / יעד משותף'), 'קבוצה ידנית')
@@ -1285,6 +1307,7 @@ describe('OrderEditorScreen', () => {
     })
 
     expect((await screen.findByLabelText('שם מלא') as HTMLInputElement).value).toBe('שם BM1')
+    await openFoldedSections(user)
     expect((screen.getByLabelText('קבוצה / יעד משותף') as HTMLInputElement).value).toBe('שדה מטיוטת הבסיס')
     expect((screen.getByLabelText('הערות כלליות') as HTMLTextAreaElement).value).toBe('הערה שנשמרה בטיוטת הבסיס')
     expect(screen.getByLabelText('כמות בגט טוניסאי אותנטי').textContent).toBe('1')
@@ -1357,10 +1380,50 @@ describe('OrderEditorScreen', () => {
     expect(screen.getByLabelText('כמות פילה דג ברוטב מרוקאי').textContent).toBe('1')
   })
 
-  it('shows the fixed salad box read-only, in its own section after the customer, with the meal make-up before it', async () => {
+  // The form is meant to shrink as it fills: whatever is still open on the
+  // screen is what the order still needs. Lin asked for this shape (2026-09-15).
+  it('folds a finished part into one line with a check, and reopens it on click', async () => {
     mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
     renderEditor()
     await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+
+    // Date, diners and the salad box are settled from the first moment: folded.
+    const folded = screen.getByRole('button', { name: /^פרטי ההזמנה/ })
+    expect(folded.getAttribute('data-folded')).toBe('true')
+    expect(folded.textContent).toContain('חדשה')
+    expect(screen.queryByLabelText('תאריך ההזמנה')).toBeNull()
+    // Nothing was chosen for the mains yet, so that part stays open and asks.
+    expect(screen.getByRole('button', { name: 'הוספה לקציצות בשר ברוטב אדום עשיר' })).toBeTruthy()
+
+    await user.click(folded)
+    expect(screen.getByLabelText('תאריך ההזמנה')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'סגירה' }))
+    expect(screen.queryByLabelText('תאריך ההזמנה')).toBeNull()
+  })
+
+  it('never folds a part while the operator is still choosing inside it', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+
+    // One main satisfies the couple meal — but she may want a second (paid)
+    // one, so the part must stay open under her hand.
+    await user.click(screen.getByRole('button', { name: 'הוספה לקציצות בשר ברוטב אדום עשיר' }))
+    expect(screen.getByRole('button', { name: 'הוספה לרולדת בשר — במקום עיקרית' })).toBeTruthy()
+
+    // Moving on to another field folds it.
+    await user.click(screen.getByLabelText('שם מלא'))
+    expect(document.querySelector('#order-mains')?.getAttribute('data-folded')).toBe('true')
+  })
+
+  it('shows the fixed salad box read-only, in its own section after the customer, with the meal make-up before it', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    await openFoldedSections(user)
     // Section order as Lin asked (2026-09-15): details, customer, meal make-up, salads.
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
     const at = (title: string) => headings.findIndex((text) => text === title)
