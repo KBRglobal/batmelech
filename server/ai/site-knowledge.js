@@ -170,7 +170,7 @@ function packageLines(menu) {
     `The premium Shabbat package for two (מארז שבת זוגי יוקרתי) costs $${couplePrice}.`,
     'Each package includes: the fixed box of 12 house salads (מארז 12 סלטים — the same 12 for everyone, no choosing: ' +
       `${SALAD_BOX_ITEMS.join(', ')}), one first course, one main course, one side, one dessert (pareve), and ` +
-      `${includedChallot} challot.`,
+      `${includedChallot} challot. The box is included with every package for two; an additional box, or a box ordered on its own without a package, costs $60 (menu extra "מארז 12 סלטים").`,
     'The first course of a package is a pair of fresh sea-bream fish fillets — 2 fillets, one per person — in chraime or Moroccan sauce, or a portion of Moroccan fish patties (קציצות דגים). So a package for two includes 2 fish fillets.',
     'The dessert portion of a package is two chocolate soufflés or one baklava portion.',
     `Beyond what is included: extra fish fillet unit $${SITE_EXTRA_FIRST_USD}, extra main course $${SITE_EXTRA_MAIN_USD}, extra challah $${challahPrice} each. Salads are not sold separately and cannot be swapped — the box is fixed.`,

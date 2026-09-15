@@ -220,6 +220,8 @@ const DEFAULT_EXTRA_ROWS: readonly [string, number][] = [
   ['צלחת חריפים', 1_500],
   ['תוספת חומוס ישראלי לניגוב', 1_500],
   ['מארז הבדלה', 2_000],
+  // An extra 12-salad box, or a box without a couple meal (the one inside a couple meal is included).
+  ['מארז 12 סלטים', 6_000],
   ['סיר קובה סלק בתוספת אורז (ל־4 אנשים)', 12_500],
   ['מנת ילדים — פסטה אדומה ושניצלונים', 3_500],
   ['חלת שניצל (ספיישל סופ"ש)', 2_800],

@@ -67,7 +67,7 @@ describe('RecipesScreen', () => {
     expect(screen.getByText('מנת מפרום ביתי')).toBeTruthy()
     expect(screen.getByText('מרק ירקות לקוסקוס ללא עוף')).toBeTruthy()
     expect(screen.queryByText('משלוח')).toBeNull()
-    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ })).toHaveLength(64)
+    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ })).toHaveLength(65)
     expect(screen.queryByLabelText('כמה מנות במוצר אחד?')).toBeNull()
     // The same dish sold in two sizes sits together under one group header.
     expect(screen.getByText('כמה גדלים של פסטה אדומה:')).toBeTruthy()
@@ -296,7 +296,7 @@ describe('RecipesScreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'רק בלי מתכון' }))
     expect(screen.queryByRole('button', { name: 'עריכת מתכון' })).toBeNull()
-    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ }).length).toBe(63)
+    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ }).length).toBe(64)
 
     await user.click(screen.getByRole('button', { name: 'רק בלי מתכון' }))
     expect(screen.getByRole('button', { name: 'עריכת מתכון' })).toBeTruthy()

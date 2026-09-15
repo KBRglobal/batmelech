@@ -60,6 +60,7 @@ const ROYAL: Royal[] = [
   { id: 'special-kids', name: 'מנת ילדים — פסטה אדומה ושניצלונים', price: 35 },
   { id: 'up-potato-tray', name: 'מגש תפו"א קריספיים', price: 30 },
   { id: 'up-carb-tray', name: 'מגש אורז / קוסקוס / פסטה אדומה', price: 25 },
+  { id: 'up-salad-box', name: 'מארז 12 סלטים', price: 60 },
   { id: 'up-olives', name: 'צלחת פתיחה (זיתים וחמוצים)', price: 15 },
   { id: 'up-spicy-plate', name: 'צלחת חריפים', price: 15 },
   { id: 'up-hummus', name: 'תוספת חומוס ישראלי לניגוב', price: 15 },
@@ -111,6 +112,7 @@ const HE = {
   statRoyalLabel: 'Presentation',
   saladsTitle: 'סלטי הבית הטריים',
   saladsQuote: '"וברכת את ה\' אלוהיך על הארץ הטובה" - פתיחה רעננה שמעוררת את החושים',
+  saladsNote: 'המארז כלול בכל ארוחה זוגית. מארז נוסף, או מארז בלי ארוחה זוגית — 60$.',
   firstsTitle: 'מנות ראשונות חגיגיות',
   firstsQuote: '"טעמו וראו כי טוב ה\'" - מנות פתיחה שיכניסו אתכם לאווירת המלכות',
   soldOut: 'אזל מהמלאי',
@@ -157,6 +159,7 @@ export const COPY: Record<Locale, typeof HE> = {
     statRoyalLabel: 'Presentation',
     saladsTitle: 'Our Fresh House Salads',
     saladsQuote: '"And you shall bless the Lord your God for the good land" — a fresh opening that awakens the senses',
+    saladsNote: 'The box is included with every package for two. An additional box, or a box on its own, is $60.',
     firstsTitle: 'Festive First Courses',
     firstsQuote: '"Taste and see that the Lord is good" — starters that usher in the royal spirit',
     soldOut: 'Sold out',
@@ -200,6 +203,7 @@ export const COPY: Record<Locale, typeof HE> = {
     statRoyalLabel: 'Présentation',
     saladsTitle: 'Nos salades maison fraîches',
     saladsQuote: '« Tu béniras l\'Éternel ton Dieu pour ce bon pays » — une ouverture fraîche qui éveille les sens',
+    saladsNote: 'Le coffret est inclus dans chaque formule pour deux. Un coffret supplémentaire, ou un coffret seul, coûte 60 $.',
     firstsTitle: 'Entrées de fête',
     firstsQuote: '« Goûtez et voyez que l\'Éternel est bon » — des entrées qui vous plongent dans une ambiance royale',
     soldOut: 'Épuisé',
@@ -321,7 +325,7 @@ export function ShabbatExtras() {
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-12 space-y-24 md:space-y-40">
         <div>
           <CurrencyNote className="mb-12 md:mb-16" />
-          <SectionIntro icon="ph:leaf-fill" iconBg="light" n={1} title={t.saladsTitle} quote={t.saladsQuote} />
+          <SectionIntro icon="ph:leaf-fill" iconBg="light" n={1} title={t.saladsTitle} quote={t.saladsQuote} note={t.saladsNote} />
         </div>
         <div className="bg-white rounded-[2.5rem] md:rounded-[4rem] p-6 md:p-12 shadow-xl border border-[#3B151A]/5 -mt-16 md:-mt-28">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
@@ -666,12 +670,14 @@ function SectionIntro({
   n,
   title,
   quote,
+  note,
 }: {
   icon: string
   iconBg: 'light' | 'dark'
   n: number
   title: string
   quote: string
+  note?: string
 }) {
   return (
     <div className="flex flex-col items-center text-center space-y-3 md:space-y-4">
@@ -687,6 +693,9 @@ function SectionIntro({
       </span>
       <h3 className="text-3xl md:text-6xl font-black font-heading">{title}</h3>
       <p className="text-base md:text-xl font-bold text-[#3B151A]/40 italic max-w-xl mx-auto">{quote}</p>
+      {note !== undefined && (
+        <p className="text-sm md:text-lg font-black text-[#8D182C] max-w-xl mx-auto">{note}</p>
+      )}
     </div>
   )
 }
