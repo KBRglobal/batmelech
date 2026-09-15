@@ -6,6 +6,7 @@ import {
   DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
   FISH_UNITS_INCLUDED_PER_MEAL,
   MAINS_INCLUDED_PER_MEAL,
+  SALAD_BOX_ITEMS,
   SIDES_INCLUDED_PER_MEAL,
   SOUFFLE_HALF_UNITS_PER_PORTION,
   defaultDessertPortionsForMeals,
@@ -967,6 +968,15 @@ export function nextFridayIso(now: Date = new Date()): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
+/**
+ * The fixed salad box every order carries (one of each item, no gifts, no
+ * notes). Stored on the order like any selection so prep tickets and the
+ * kitchen summary keep listing salads by name.
+ */
+export function saladBoxSelections(): Record<string, SaladDraftSelection> {
+  return Object.fromEntries(SALAD_BOX_ITEMS.map((name) => [name, { ordered: 1, gift: 0, note: '' }]))
+}
+
 export function createOrderDraft(menu: OrderEditorMenu, now: Date = new Date()): OrderDraft {
   return {
     id: null,
@@ -991,7 +1001,7 @@ export function createOrderDraft(menu: OrderEditorMenu, now: Date = new Date()):
     meals: 1,
     aricha: 0,
     challot: menu.includedChallahs,
-    salads: {},
+    salads: saladBoxSelections(),
     firsts: {},
     firstsNotes: {},
     heat: '',
@@ -1277,7 +1287,6 @@ export function classifyDraftSelectionMode(draft: OrderDraft): DraftSelectionMod
   const hasShabbat =
     draft.meals > 0 ||
     draft.challot > 0 ||
-    Object.values(draft.salads).some((selection) => selection.ordered > 0 || selection.gift > 0) ||
     recordHasPositiveQuantity(draft.firsts) ||
     recordHasPositiveQuantity(draft.mains) ||
     recordHasPositiveQuantity(draft.sides) ||
@@ -1566,14 +1575,19 @@ export function calculateOrderDraftPricing(
     })
   }
 
-  const orderedSalads = sumCounts(
+  // Salads stopped being priced on 2026-09-15: every order includes the fixed
+  // box (SALAD_BOX_ITEMS), so nothing counts as an extra salad any more. The
+  // counters are still validated so a corrupt record fails loudly.
+  sumCounts(
     Object.values(draft.salads).map((selection) => selection.ordered),
     'ordered salads',
   )
-  const giftSalads = sumCounts(
+  sumCounts(
     Object.values(draft.salads).map((selection) => selection.gift),
     'gift salads',
   )
+  const orderedSalads = 0
+  const giftSalads = 0
   const dessert = calculateDessertAllowance(draft)
   if (dessert.excessHalfUnits > 0) {
     chargeLines.push({

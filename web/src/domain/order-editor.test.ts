@@ -33,6 +33,7 @@ import {
   type OrderDraft,
 } from './order-editor.ts'
 import type { LegacyOrder, LegacyStore } from './store.ts'
+import { SALAD_BOX_ITEMS } from './package-rules.ts'
 import { buildDeliveryDashboard } from './delivery-dashboard.ts'
 
 const emptyStore: LegacyStore = { orders: [] }
@@ -684,7 +685,7 @@ describe('deterministic draft pricing and allowances', () => {
     expect(pricing.result?.totalMinorUnits).toBe(26_000)
   })
 
-  it('charges standalone fish, recurring salad blocks, gifts excluded, and precise custom money', () => {
+  it('charges standalone fish and precise custom money, never salads', () => {
     const menu = buildOrderEditorMenu(emptyStore)
     const pricing = calculateOrderDraftPricing(
       draftWith({
@@ -698,8 +699,24 @@ describe('deterministic draft pricing and allowances', () => {
     )
 
     expect(pricing.result?.fish.surchargeMinorUnits).toBe(6_000)
-    expect(pricing.result?.salads).toMatchObject({ extraBlocks: 2, extraSingles: 1, surchargeMinorUnits: 5_700, giftSalads: 4 })
-    expect(pricing.result?.totalMinorUnits).toBe(11_720)
+    // Salads are never priced since the fixed box (2026-09-15): nine ordered
+    // and four gifted cost nothing, whatever the meal count.
+    expect(pricing.result?.salads.surchargeMinorUnits).toBe(0)
+    expect(pricing.result?.totalMinorUnits).toBe(6_020)
+  })
+
+  it('gives every new order the fixed salad box, included and unpriced', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const draft = createOrderDraft(menu)
+    expect(Object.keys(draft.salads)).toEqual([...SALAD_BOX_ITEMS])
+    expect(Object.values(draft.salads).every((s) => s.ordered === 1 && s.gift === 0)).toBe(true)
+    expect(calculateOrderDraftPricing(draft, menu).result?.salads.surchargeMinorUnits).toBe(0)
+  })
+
+  it('does not treat the automatic salad box as a shabbat selection', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const lunchOnly = { ...createOrderDraft(menu), meals: 0, challot: 0, lunch: { 'מנה': { quantity: 1, variantKey: '', addonQuantity: 0, sides: {}, note: '' } } } as OrderDraft
+    expect(classifyDraftSelectionMode(lunchOnly)).toBe('lunch')
   })
 
   it('prices every lunch variant, family included sides, excess sides, and mafrum addon', () => {

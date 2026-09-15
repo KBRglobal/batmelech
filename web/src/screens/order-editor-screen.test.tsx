@@ -14,7 +14,9 @@ import {
   buildAIOrderCatalog,
   buildOrderEditorMenu,
   createOrderDraft,
+  saladBoxSelections,
 } from '../domain/order-editor.ts'
+import { SALAD_BOX_ITEMS } from '../domain/package-rules.ts'
 import { classifyDessertKind, defaultDessertPortionsForMeals } from '../domain/package-rules.ts'
 import type { LegacyStore } from '../domain/store.ts'
 import { OrderEditorScreen } from './order-editor-screen.tsx'
@@ -549,7 +551,7 @@ describe('OrderEditorScreen', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('shows authoritative fish, salad, dessert, and custom-item pricing without auto-writing Total', async () => {
+  it('shows authoritative fish, dessert, and custom-item pricing without auto-writing Total', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
     renderEditor()
@@ -559,25 +561,23 @@ describe('OrderEditorScreen', () => {
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
-    for (let index = 0; index < 5; index += 1) {
-      await user.click(screen.getByRole('button', { name: 'הוספה לטחינה הוזמן' }))
-    }
     await user.click(screen.getByRole('button', { name: 'הוספה לסופלה שוקולד' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לסוכריות בקלוואה' }))
 
-    expect(screen.getAllByText('$282.00').length).toBeGreaterThan(0)
+    // Salads are the fixed box now — nothing to click and nothing to pay.
+    expect(screen.getAllByText('$275.00').length).toBeGreaterThan(0)
     expect(screen.getByText('$30.00')).toBeTruthy()
     // The suggested price IS the default: the total follows the computed
     // price with no extra click, and saving opens immediately.
-    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.00')
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('275.00')
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
 
     // As long as the operator never typed a price, changes keep following.
     await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))
     await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט אמיתי')
     await user.type(screen.getByLabelText('מחיר פריט חופשי 1'), '0.10')
-    expect(screen.getAllByText('$282.10').length).toBeGreaterThan(0)
-    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('282.10')
+    expect(screen.getAllByText('$275.10').length).toBeGreaterThan(0)
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('275.10')
     expect(screen.queryByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeNull()
 
     // A typed manual price sticks and shows the mismatch note, still savable.
@@ -624,7 +624,6 @@ describe('OrderEditorScreen', () => {
     await user.type(screen.getByLabelText('מקדמה'), '20.00')
     await user.selectOptions(screen.getByLabelText('דרך תשלום'), 'ביט')
     await user.selectOptions(screen.getByLabelText('סטטוס תשלום'), 'כן')
-    await user.click(screen.getByRole('button', { name: 'הוספה לטחינה הוזמן' }))
     await user.click(screen.getByRole('button', { name: `הוספה למגש שניצלים (זוגי, כ־13–15 יח') · $100.00` }))
     await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))
     await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט ידני')
@@ -648,7 +647,7 @@ describe('OrderEditorScreen', () => {
       meals: 0,
       aricha: 0,
       challot: 0,
-      salads: {},
+      salads: saladBoxSelections(),
       firsts: {},
       heat: '',
       firstsNote: '',
@@ -1326,13 +1325,30 @@ describe('OrderEditorScreen', () => {
   })
 
   it('marks real configured out-of-stock items visually without disabling selection', async () => {
-    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [], settings: { out: ['טחינה'] } } }))
+    mockedUseStore.mockReturnValue(queryResult({ store: { orders: [], settings: { out: ['פילה דג ברוטב מרוקאי'] } } }))
     const user = userEvent.setup()
     renderEditor()
-    await screen.findByText('טחינה')
+    await screen.findByText('פילה דג ברוטב מרוקאי')
     expect(screen.getByText('אזל מהמלאי — הבחירה עדיין פתוחה')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'הוספה לטחינה הוזמן' }))
-    expect(screen.getByLabelText('כמות טחינה הוזמן').textContent).toBe('1')
+    await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
+    expect(screen.getByLabelText('כמות פילה דג ברוטב מרוקאי').textContent).toBe('1')
+  })
+
+  it('shows the fixed salad box read-only, in its own section after the customer, with the meal make-up before it', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    // Section order as Lin asked (2026-09-15): details, customer, meal make-up, salads.
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    const at = (title: string) => headings.findIndex((text) => text === title)
+    expect(at('פרטי ההזמנה')).toBeLessThan(at('פרטי לקוח ומשלוח'))
+    expect(at('פרטי לקוח ומשלוח')).toBeLessThan(at('הרכב ההזמנה'))
+    expect(at('הרכב ההזמנה')).toBeLessThan(at('סלטים'))
+    expect(screen.getByRole('button', { name: 'הוספה לחלות' })).toBeTruthy()
+    // Every box salad is listed, none has a stepper.
+    for (const name of SALAD_BOX_ITEMS) expect(screen.getByText(name)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /הוספה ל.* הוזמן/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /פינוק/ })).toBeNull()
   })
 
   it('creates once against the originally loaded version and navigates only after confirmed success', async () => {

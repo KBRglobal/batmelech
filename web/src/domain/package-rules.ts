@@ -13,6 +13,26 @@
 // Confirmed with Lin (2026-08-19). Changing a value here changes both the
 // price and what the AI assumes — that is the point: one place, one truth.
 
+// Salads changed on 2026-09-15 (Lin): no more choosing. Every order gets one
+// fixed box of 12 salads, included in the price regardless of how many
+// couple meals it holds. The list below IS the box — the kitchen's prep
+// tickets are built from it, so a change here changes what gets prepared.
+export const SALAD_BOX_ITEMS: readonly string[] = Object.freeze([
+  'מטבוחה פיקנטית',
+  'טחינה ביתית',
+  'גזר מרוקאי',
+  'צ׳ירשי',
+  'סלק מבושל',
+  'מסייר (חמוצים)',
+  'קולסלאו',
+  'כרוב סגול במיונז',
+  'כרוב לבן קלאסי',
+  'כרוב לבן עם תירס',
+  'סלט תפו״א',
+  'סלט ביצים',
+])
+export const SALAD_BOX_SIZE = SALAD_BOX_ITEMS.length
+
 export const FISH_UNITS_INCLUDED_PER_MEAL = 2 // 2 fillets (one per person), or the fish-cake portion counts the same
 export const SALADS_INCLUDED_PER_MEAL = 4
 export const MAINS_INCLUDED_PER_MEAL = 1

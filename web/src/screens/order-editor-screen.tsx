@@ -42,6 +42,7 @@ import {
   readLunchPlates,
   resizeLunchPlates,
   resolveReviewItemQuantities,
+  saladBoxSelections,
   parseHotelSearchResponse,
   serializeOrderDraft,
   validateOrderDraft,
@@ -53,6 +54,7 @@ import {
   type OrderDraft,
   type OrderEditorMenu,
 } from '../domain/order-editor.ts'
+import { SALAD_BOX_ITEMS, SALAD_BOX_SIZE } from '../domain/package-rules.ts'
 import { deliveryProofSummary } from '../domain/delivery-dashboard.ts'
 import {
   MAX_PLATA_NOTE_LENGTH,
@@ -77,6 +79,7 @@ const PAID_OPTIONS = ['לא', 'מקדמה', 'כן', 'שת"פ'] as const
 const SECTIONS = [
   ['details', 'פרטים'],
   ['customer', 'לקוח'],
+  ['meal', 'הרכב'],
   ['salads', 'סלטים'],
   ['firsts', 'ראשונות'],
   ['mains', 'עיקריות'],
@@ -1091,17 +1094,6 @@ function updateQuantityRecord(
   return next
 }
 
-function updateSaladRecord(
-  record: OrderDraft['salads'],
-  name: string,
-  selection: { readonly ordered: number; readonly gift: number; readonly note: string },
-): OrderDraft['salads'] {
-  const next = { ...record }
-  if (selection.ordered === 0 && selection.gift === 0 && selection.note.trim().length === 0) delete next[name]
-  else next[name] = selection
-  return next
-}
-
 function updateNoteRecord(
   record: Readonly<Record<string, string>>,
   name: string,
@@ -1197,7 +1189,7 @@ function createOrderImportBaseDraft(draft: OrderDraft): OrderDraft {
     meals: 0,
     aricha: 0,
     challot: 0,
-    salads: {},
+    salads: saladBoxSelections(),
     firsts: {},
     heat: '',
     firstsNote: '',
@@ -1307,8 +1299,13 @@ function OrderEditorContent({
     isSaving ||
     saveFeedback.kind === 'conflict' ||
     saveFeedback.kind === 'blocked'
-  const orderedSalads = Object.values(draft.salads).reduce((total, item) => total + item.ordered, 0)
-  const giftSalads = Object.values(draft.salads).reduce((total, item) => total + item.gift, 0)
+  // What the kitchen prepares for this order: the fixed box on new orders,
+  // whatever was saved on orders from before the box.
+  const saladLines = Object.entries(draft.salads)
+    .map(([name, selection]) => ({ name, quantity: selection.ordered + selection.gift }))
+    .filter((line) => line.quantity > 0)
+  const draftHasSaladBox =
+    saladLines.length === SALAD_BOX_ITEMS.length && SALAD_BOX_ITEMS.every((name) => draft.salads[name]?.ordered === 1)
   const patch = (next: Partial<OrderDraft>) => onDraftChange({ ...draft, ...next })
 
   // The suggested price is the DEFAULT (Moshe, 2026-08-18): the total field
@@ -1356,14 +1353,6 @@ function OrderEditorContent({
   const updateChallahs = (challot: number) => {
     markShabbatSelectionChanged()
     patch({ challot })
-  }
-
-  const updateSalad = (
-    name: string,
-    selection: { readonly ordered: number; readonly gift: number; readonly note: string },
-  ) => {
-    markShabbatSelectionChanged()
-    patch({ salads: updateSaladRecord(draft.salads, name, selection) })
   }
 
   const updateCategoryNote = (
@@ -1668,11 +1657,6 @@ function OrderEditorContent({
               </select>
             </Field>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <QuantityStepper label="ארוחות זוגיות" value={draft.meals} onChange={updateMeals} />
-            <QuantityStepper label="עריכה לכמה אנשים" value={draft.aricha} onChange={(aricha) => patch({ aricha })} />
-            <QuantityStepper label="חלות" value={draft.challot} onChange={updateChallahs} />
-          </div>
           <Field label="קבוצה / יעד משותף">
             <div className="relative">
               <input
@@ -1862,32 +1846,27 @@ function OrderEditorContent({
           )}
         </Section>
 
-        <Section id="salads" title="סלטים" summary={`${orderedSalads}/${draft.meals * 4} כלולים · ${giftSalads} פינוק`} collapsible>
-          <p className="text-xs font-bold text-muted-foreground">עמודת פינוק לא מקטינה את הזכאות ולא מחויבת.</p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {menu.salads.map((name) => {
-              const selection = draft.salads[name] ?? { ordered: 0, gift: 0, note: '' }
-              return (
-                <div key={name} className={`rounded-2xl border border-border bg-background/60 p-3 ${outOfStock.has(name) ? 'opacity-70' : ''}`}>
-                  <p className="mb-3 text-sm font-black text-primary">{name}</p>
-                  {outOfStock.has(name) && <p className="mb-2 text-xs font-black text-destructive">אזל מהמלאי — הבחירה עדיין פתוחה</p>}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><span className="mb-1 block text-center text-[0.65rem] font-black text-muted-foreground">הוזמן</span><QuantityStepper compact label={`${name} הוזמן`} value={selection.ordered} onChange={(ordered) => updateSalad(name, { ...selection, ordered })} /></div>
-                    <div><span className="mb-1 block text-center text-[0.65rem] font-black text-accent-foreground">פינוק</span><QuantityStepper compact label={`${name} פינוק`} value={selection.gift} onChange={(gift) => updateSalad(name, { ...selection, gift })} /></div>
-                  </div>
-                  {(selection.ordered > 0 || selection.gift > 0) && (
-                    <input
-                      aria-label={`הערה ל${name}`}
-                      value={selection.note}
-                      onChange={(event) => updateSalad(name, { ...selection, note: event.currentTarget.value })}
-                      placeholder="הערה"
-                      className={`${inputClassName} mt-2`}
-                    />
-                  )}
-                </div>
-              )
-            })}
+        <Section id="meal" title="הרכב ההזמנה">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <QuantityStepper label="ארוחות זוגיות" value={draft.meals} onChange={updateMeals} />
+            <QuantityStepper label="עריכה לכמה אנשים" value={draft.aricha} onChange={(aricha) => patch({ aricha })} />
+            <QuantityStepper label="חלות" value={draft.challot} onChange={updateChallahs} />
           </div>
+        </Section>
+
+        <Section id="salads" title="סלטים" summary={`מארז ${SALAD_BOX_SIZE} סלטים · כלול`} collapsible>
+          <p className="text-xs font-bold text-muted-foreground">כל הזמנה כוללת מארז קבוע של {SALAD_BOX_SIZE} סלטים. אין בחירה ואין חיוב — הרשימה כאן היא מה שהמטבח מכין.</p>
+          <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            {saladLines.map(({ name, quantity }) => (
+              <li key={name} className="flex min-h-10 items-center justify-between rounded-2xl border border-border bg-background/60 px-3 text-sm font-black text-primary">
+                <span>{name}</span>
+                {quantity !== 1 && <span className="text-xs font-bold text-muted-foreground">×{quantity}</span>}
+              </li>
+            ))}
+          </ul>
+          {!draftHasSaladBox && (
+            <p className="text-xs font-bold text-amber-900">ההזמנה הזאת נשמרה עם סלטים לפי בחירה (לפני המעבר למארז). הרשימה למעלה היא מה שנשמר בה.</p>
+          )}
         </Section>
 
         <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${draft.meals * 2} יחידות`} collapsible>
