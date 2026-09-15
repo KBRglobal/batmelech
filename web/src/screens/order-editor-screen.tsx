@@ -59,6 +59,7 @@ import {
 } from '../domain/order-editor.ts'
 import { HALF_UNITS_PER_MAIN, HALF_UNITS_PER_SIDE, SALAD_BOX_ITEMS, SALAD_BOX_SIZE } from '../domain/package-rules.ts'
 import { deliveryProofSummary } from '../domain/delivery-dashboard.ts'
+import { buildWhatsAppOrderHref, formatLegacyOrderText } from '../domain/orders-dashboard.ts'
 import {
   MAX_PLATA_NOTE_LENGTH,
   PLATA_STATUSES,
@@ -703,6 +704,45 @@ function TrackingLinkButton({ orderId }: { readonly orderId: string }) {
  * `collapsible` is the older, unrelated behaviour for parts that are simply
  * optional (lunch, plata, delivery proof): closed until asked for, no check.
  */
+/**
+ * The order, as a message to the customer. Same text the orders list already
+ * sends (formatLegacyOrderText), offered where she just finished typing it:
+ * WhatsApp when the number is usable, copy to the clipboard otherwise.
+ */
+function CustomerSummaryButton({ order }: { readonly order: LegacyOrder | null }) {
+  const [copied, setCopied] = useState(false)
+  if (order === null) return null
+  const summaryText = formatLegacyOrderText(order)
+  const href = buildWhatsAppOrderHref(typeof order.phone === 'string' ? order.phone : '', summaryText)
+  const className =
+    'inline-flex min-h-11 items-center gap-2 rounded-2xl border border-primary/20 bg-card px-5 text-sm font-black text-primary hover:bg-secondary'
+
+  if (href !== null) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        <LocalIcon name="ph:chat-circle-text-bold" className="text-lg" />
+        <span>סיכום ההזמנה ללקוח</span>
+      </a>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard
+          .writeText(summaryText)
+          .then(() => setCopied(true))
+          .catch(() => setCopied(false))
+      }}
+      className={className}
+    >
+      <LocalIcon name={copied ? 'ph:check-circle-bold' : 'ph:copy-bold'} className="text-lg" />
+      <span>{copied ? 'הסיכום הועתק — אפשר להדביק בוואטסאפ' : 'העתקת סיכום ההזמנה ללקוח'}</span>
+    </button>
+  )
+}
+
 function Section({
   id,
   title,
@@ -1481,10 +1521,54 @@ function OrderEditorContent({
   ]
     .filter((part) => part !== '')
     .join(' + ')
+  // The tail of the form — lunch, extras, the plata, the delivery proof — is
+  // empty on almost every Shabbat order. It waits behind one line instead of
+  // four large empty cards, and opens the moment it holds something.
+  const [openMoreParts, setOpenMoreParts] = useState<ReadonlySet<string>>(() => new Set<string>())
+  const revealMorePart = (id: string) => {
+    setOpenMoreParts((current) => (current.has(id) ? current : new Set(current).add(id)))
+    window.setTimeout(() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' }), 0)
+  }
   const selectedFishUnits = pricing.result?.fish.selectedUnits ?? 0
   const mainsDone = countRecord(draft.mains) * HALF_UNITS_PER_MAIN >= allowances.mainHalfUnits
   const sidesDone = countRecord(draft.sides) * HALF_UNITS_PER_SIDE >= allowances.sideHalfUnits
   const dessertsDone = pricing.dessert.selectedHalfUnits >= allowances.dessertHalfUnits
+  const lunchHasContent = Object.values(draft.lunch).some((selection) => selection.quantity > 0)
+  const extrasHasContent =
+    Object.values(draft.extras).some((selection) => selection.quantity > 0) || draft.custom.length > 0
+  const proofHasContent = loadedOrder !== null && (deliveryProofSummary(loadedOrder)?.present ?? false)
+  const plataHasContent = (() => {
+    if (loadedOrder === null) return false
+    const row = loadedOrder as Record<string, unknown>
+    const count = Number(row.plataCount ?? 0)
+    return (Number.isFinite(count) && count > 0) || String(row.plataStatus ?? '').trim() !== ''
+  })()
+  // Parts that are simply not part of this order until asked for. Each one is
+  // shown anyway when it already holds something, so nothing can hide.
+  const moreParts: readonly { readonly id: string; readonly label: string; readonly visible: boolean }[] = [
+    { id: 'lunch', label: 'תפריט צהריים', visible: openMoreParts.has('lunch') || lunchHasContent },
+    { id: 'extras', label: 'אקסטרות ופריטים חופשיים', visible: openMoreParts.has('extras') || extrasHasContent },
+    { id: 'proof', label: 'אישור מסירה', visible: openMoreParts.has('proof') || proofHasContent },
+    { id: 'plata', label: 'פלטה ופיקדון', visible: openMoreParts.has('plata') || plataHasContent },
+  ]
+  const isMorePartVisible = (id: string) => moreParts.find((part) => part.id === id)?.visible ?? true
+  // What each chip in the top strip says about its part: a check when it has
+  // what it needs, a dot when the order still waits on it.
+  const sectionStatus: Readonly<Record<string, 'done' | 'todo' | 'optional'>> = {
+    details: draft.date.trim() !== '' ? 'done' : 'todo',
+    customer: customerDone ? 'done' : 'todo',
+    meal: allowances.diners > 0 ? 'done' : 'todo',
+    salads: 'done',
+    firsts: selectedFishUnits >= allowances.fishUnits ? 'done' : 'todo',
+    mains: mainsDone ? 'done' : 'todo',
+    sides: sidesDone ? 'done' : 'todo',
+    desserts: dessertsDone ? 'done' : 'todo',
+    lunch: 'optional',
+    extras: 'optional',
+    payment: hasBlockingIssue ? 'todo' : 'done',
+    proof: 'optional',
+    plata: 'optional',
+  }
 
   const updateChallahs = (challot: number) => {
     markShabbatSelectionChanged()
@@ -1575,16 +1659,25 @@ function OrderEditorContent({
   return (
     <div className="pb-36" dir="rtl" aria-busy={isSaving || undefined}>
       <nav aria-label="מעבר בין חלקי ההזמנה" className="sticky top-0 z-20 flex gap-2 overflow-x-auto border-b border-border bg-card/95 px-5 py-3 backdrop-blur sm:px-8">
-        {SECTIONS.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' })}
-            className="min-h-10 shrink-0 rounded-full border border-border bg-card px-4 text-xs font-black text-primary hover:bg-secondary"
-          >
-            {label}
-          </button>
-        ))}
+        {SECTIONS.map(([id, label]) => {
+          const status = sectionStatus[id] ?? 'optional'
+          return (
+            <button
+              key={id}
+              type="button"
+              title={status === 'done' ? `${label} — מוכן` : status === 'todo' ? `${label} — חסר` : label}
+              onClick={() => {
+                if (moreParts.some((part) => part.id === id)) revealMorePart(id)
+                else document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' })
+              }}
+              className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-xs font-black text-primary hover:bg-secondary"
+            >
+              {status === 'done' && <LocalIcon name="ph:check-circle-bold" className="text-sm text-emerald-600" />}
+              {status === 'todo' && <span aria-hidden className="size-2 rounded-full bg-destructive" />}
+              <span>{label}</span>
+            </button>
+          )
+        })}
       </nav>
 
       <div className="mx-auto max-w-5xl space-y-7 px-5 py-8 sm:px-8 sm:py-10">
@@ -1756,6 +1849,7 @@ function OrderEditorContent({
                 <span>פענוח הודעת המשך</span>
               </button>
               <TrackingLinkButton orderId={draft.id} />
+              <CustomerSummaryButton order={loadedOrder} />
             </div>
           </section>
         )}
@@ -2041,6 +2135,27 @@ function OrderEditorContent({
           <QuantityCategory names={menu.desserts} quantities={draft.desserts} notes={draft.dessertsNotes} outOfStock={outOfStock} update={(name, quantity) => updateCategory('desserts', name, quantity)} updateNote={(name, note) => updateCategoryNote('desserts', name, note)} />
         </Section>
 
+        {moreParts.some((part) => !part.visible) && (
+          <div className="flex flex-wrap items-center gap-2 rounded-[2rem] border border-border bg-card px-5 py-4 shadow-sm sm:px-7">
+            <span className="text-sm font-black text-primary">עוד</span>
+            {moreParts
+              .filter((part) => !part.visible)
+              .map((part) => (
+                <button
+                  key={part.id}
+                  type="button"
+                  data-more={part.id}
+                  onClick={() => revealMorePart(part.id)}
+                  className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-black text-muted-foreground hover:bg-secondary"
+                >
+                  <LocalIcon name="ph:plus-bold" className="text-xs" />
+                  <span>{part.label}</span>
+                </button>
+              ))}
+          </div>
+        )}
+
+        {isMorePartVisible('lunch') && (
         <Section id="lunch" title="תפריט צהריים" collapsible>
           <div className="space-y-4">
             {menu.lunch.map((item) => {
@@ -2150,6 +2265,7 @@ function OrderEditorContent({
             })}
           </div>
         </Section>
+        )}
 
         {selectionMode === 'mixed' && (
           <label className="flex min-h-12 items-start gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-sm font-black text-amber-950 shadow-sm">
@@ -2163,6 +2279,7 @@ function OrderEditorContent({
           </label>
         )}
 
+        {isMorePartVisible('extras') && (
         <Section id="extras" title="אקסטרות ופריטים חופשיים" collapsible>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {menu.extras.map((extra) => {
@@ -2197,6 +2314,8 @@ function OrderEditorContent({
             </button>
           </div>
         </Section>
+
+        )}
 
         <Section id="payment" title="סיכום ותשלום">
           {pricing.result ? (
@@ -2271,7 +2390,7 @@ function OrderEditorContent({
           <Field label="הערות כלליות"><textarea aria-label="הערות כלליות" value={draft.notes} onChange={(event) => patch({ notes: event.currentTarget.value })} className={`${inputClassName} min-h-28 resize-y`} /></Field>
         </Section>
 
-        <DeliveryProofSection order={loadedOrder} />
+        {isMorePartVisible('proof') && <DeliveryProofSection order={loadedOrder} />}
 
         {typeof loadedOrder?.intakeConversation === 'string' && loadedOrder.intakeConversation.trim() !== '' && (
           <Section id="intake-conversation" title="השיחה המקורית מוואטסאפ" collapsible>
@@ -2281,7 +2400,9 @@ function OrderEditorContent({
           </Section>
         )}
 
-        <PlataSection order={loadedOrder} saveState={plataSaveState} onSave={onSavePlata} />
+        {isMorePartVisible('plata') && (
+          <PlataSection order={loadedOrder} saveState={plataSaveState} onSave={onSavePlata} />
+        )}
 
         {mode === 'edit' && onDelete !== null && (
           <DeleteOrderSection state={deleteState} onDelete={onDelete} />

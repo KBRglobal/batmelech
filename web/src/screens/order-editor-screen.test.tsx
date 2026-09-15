@@ -66,6 +66,13 @@ function LocationProbe() {
   return <output data-testid="location">{`${location.pathname}|${JSON.stringify(location.state)}`}</output>
 }
 
+// Lunch, extras, the plata and the delivery proof wait behind one "עוד" line
+// on a Shabbat order — tests that use them ask for them, as the operator does.
+async function openMorePart(user: ReturnType<typeof userEvent.setup>, id: string) {
+  const chip = document.querySelector(`button[data-more="${id}"]`)
+  if (chip !== null) await user.click(chip as HTMLElement)
+}
+
 // A finished part of the form folds into one line with a check (that is the
 // point of the screen: only what the order still needs stays open). Tests that
 // drive a finished part open it first, exactly as the operator would.
@@ -145,6 +152,8 @@ describe('OrderEditorScreen', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'הזמנה חדשה' })).toBeTruthy())
     await openFoldedSections(user)
+    await openMorePart(user, 'lunch')
+    await openMorePart(user, 'extras')
 
     expect((screen.getByLabelText('תאריך ההזמנה') as HTMLInputElement).value).toBe('2026-08-14')
     expect(screen.getByLabelText('כמות ארוחות זוגיות').textContent).toBe('1')
@@ -431,6 +440,7 @@ describe('OrderEditorScreen', () => {
     renderEditor()
 
     await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    await openMorePart(user, 'lunch')
     await user.click(screen.getByRole('button', { name: 'הוספה לשניצל בצלחת' }))
     let plate = screen.getByText('שניצל בצלחת').parentElement?.parentElement
     expect(plate).toBeTruthy()
@@ -465,6 +475,8 @@ describe('OrderEditorScreen', () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
     renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    await openMorePart(user, 'lunch')
 
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
     const rollLabel = 'בגט/חלת שניצל ישראלי'
@@ -497,6 +509,7 @@ describe('OrderEditorScreen', () => {
 
     await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
     await openFoldedSections(user)
+    await openMorePart(user, 'lunch')
     await user.click(screen.getByRole('button', { name: 'הוספה לבגט טוניסאי אותנטי' }))
     expect(screen.getByLabelText('כמות ארוחות זוגיות').textContent).toBe('0')
     expect(screen.getByLabelText('כמות חלות').textContent).toBe('0')
@@ -599,6 +612,7 @@ describe('OrderEditorScreen', () => {
     await screen.findByRole('heading', { name: 'הזמנה חדשה' })
     await user.type(screen.getByLabelText('שם מלא'), 'לקוחה')
     await openFoldedSections(user)
+    await openMorePart(user, 'extras')
 
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לפילה דג ברוטב מרוקאי' }))
@@ -662,6 +676,7 @@ describe('OrderEditorScreen', () => {
     renderEditor()
     await user.type(await screen.findByLabelText('שם מלא'), 'שם ידני')
     await openFoldedSections(user)
+    await openMorePart(user, 'extras')
     await user.type(screen.getByLabelText('כתובת מלאה'), 'הוראות ידניות לקבלה')
     await user.type(screen.getByLabelText('הערות כלליות'), 'הערה ידנית')
     await user.type(screen.getByLabelText('קבוצה / יעד משותף'), 'קבוצה ידנית')
@@ -1382,6 +1397,36 @@ describe('OrderEditorScreen', () => {
 
   // The form is meant to shrink as it fills: whatever is still open on the
   // screen is what the order still needs. Lin asked for this shape (2026-09-15).
+  it('marks every part in the top strip: a dot for what is missing, a check for what is ready', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+
+    // The customer is the one part a fresh order cannot know.
+    expect(screen.getByRole('button', { name: 'לקוח' }).getAttribute('title')).toBe('לקוח — חסר')
+    expect(screen.getByRole('button', { name: 'סלטים' }).getAttribute('title')).toBe('סלטים — מוכן')
+
+    await user.type(screen.getByLabelText('שם מלא'), 'רותי')
+    await user.type(screen.getByLabelText('מספר טלפון'), '0501234567')
+    await user.type(screen.getByLabelText('שעת הגעה'), '16:30')
+    await user.type(screen.getByLabelText('שם מלון / יעד'), 'Atlantis')
+    expect(screen.getByRole('button', { name: 'לקוח' }).getAttribute('title')).toBe('לקוח — מוכן')
+  })
+
+  it('keeps lunch, extras and the hotplate behind one line until they are asked for', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+
+    expect(screen.queryByRole('button', { name: 'הוספה לבגט טוניסאי אותנטי' })).toBeNull()
+    await openMorePart(user, 'lunch')
+    expect(screen.getByRole('button', { name: 'הוספה לבגט טוניסאי אותנטי' })).toBeTruthy()
+    // Once opened it stays: the chip for it is gone from the "עוד" line.
+    expect(document.querySelector('button[data-more="lunch"]')).toBeNull()
+  })
+
   it('folds a finished part into one line with a check, and reopens it on click', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
@@ -1816,13 +1861,18 @@ describe('OrderEditorScreen delivery proof section', () => {
     mockedUseStore.mockReturnValue(queryResult({
       store: { orders: [{ id: 'plain-1', date: '2099-08-20', name: 'לקוחה רגילה' }] },
     }))
+    const user = userEvent.setup()
     const edit = renderEditor('/orders/plain-1/edit')
+    await screen.findByRole('heading', { name: /עריכת הזמנה/ })
+    await openMorePart(user, 'proof')
     await waitFor(() => expect(screen.getByText('אין עדיין אישור מסירה')).toBeTruthy())
     expect(screen.queryByAltText('צילום מסירה')).toBeNull()
     edit.unmount()
 
     mockedUseStore.mockReturnValue(queryResult())
     renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    await openMorePart(user, 'proof')
     await waitFor(() => expect(screen.getByText('אין עדיין אישור מסירה')).toBeTruthy())
   })
 
@@ -1851,6 +1901,8 @@ describe('OrderEditorScreen delivery proof section', () => {
     const user = userEvent.setup()
     renderEditor('/orders/plata-1/edit')
 
+    await screen.findByRole('heading', { name: /עריכת הזמנה/ })
+    await openMorePart(user, 'plata')
     const saveButton = await screen.findByRole('button', { name: 'שמירת הפלטה' })
     expect(saveButton.hasAttribute('disabled')).toBe(true)
     expect(screen.getByText('אין פלטה בהזמנה הזאת.')).toBeTruthy()
@@ -1908,8 +1960,11 @@ describe('OrderEditorScreen delivery proof section', () => {
 
   it('offers no hotplate form until the order exists', async () => {
     mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
     renderEditor()
 
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+    await openMorePart(user, 'plata')
     await waitFor(() => expect(screen.getByText('אפשר לרשום פלטה אחרי ששומרים את ההזמנה.')).toBeTruthy())
     expect(screen.queryByLabelText('פיקדון פלטה')).toBeNull()
   })
