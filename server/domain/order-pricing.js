@@ -23,7 +23,6 @@ const {
   DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
   FISH_UNITS_INCLUDED_PER_MEAL,
   MAINS_INCLUDED_PER_MEAL,
-  SALADS_INCLUDED_PER_MEAL,
   SOUFFLE_HALF_UNITS_PER_PORTION,
   classifyDessertKind,
 } = require('./package-rules');
@@ -40,7 +39,6 @@ const DEFAULTS = Object.freeze({
   mainExtraPriceMinorUnits: 10_000,
   dessertExtraPriceMinorUnits: 0,
 });
-const SALAD_BLOCK_SIZE = 4;
 const FISH_CAKE_PORTION_NAME = 'קציצות דגים ברוטב מרוקאי';
 const DELIVERY_PRICE_MINOR_UNITS = Object.freeze({ dubai: 1_500, 'abu-dhabi': 5_500 });
 
@@ -189,14 +187,8 @@ function orderPriceBreakdown(order, menu) {
   const extraFish = Math.max(0, fishUnits - meals * FISH_UNITS_INCLUDED_PER_MEAL);
   if (extraFish > 0) lines.push(line('פילה דג אקסטרה', extraFish, prices.fishExtraPriceMinorUnits, 'fish-surcharge'));
 
-  // salads (ordered portions only; gift 'p' portions are free)
-  let orderedSalads = 0;
-  for (const value of Object.values(isRecord(order.salads) ? order.salads : {})) orderedSalads += dishCount(value);
-  const extraSalads = Math.max(0, orderedSalads - meals * SALADS_INCLUDED_PER_MEAL);
-  const saladBlocks = Math.floor(extraSalads / SALAD_BLOCK_SIZE);
-  const saladSingles = extraSalads % SALAD_BLOCK_SIZE;
-  if (saladBlocks > 0) lines.push(line('סלטים אקסטרה (רביעייה)', saladBlocks, prices.saladBlockPriceMinorUnits, 'salad-surcharge'));
-  if (saladSingles > 0) lines.push(line('סלט אקסטרה בודד', saladSingles, prices.saladUnitPriceMinorUnits, 'salad-surcharge'));
+  // Salads: since 2026-09-15 every order includes the fixed 12-salad box and
+  // nothing about salads is priced (see package-rules.js SALAD_BOX_ITEMS).
 
   // extras
   for (const [name, value] of Object.entries(isRecord(order.extras) ? order.extras : {})) {

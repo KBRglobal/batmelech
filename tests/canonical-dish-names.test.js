@@ -65,7 +65,6 @@ const KNOWN_UNRESOLVED = [
   // Reserved automatic-charge names (order-total.ts): the panel prices extra
   // salads and extra challahs itself and strips these from the menu, so an
   // order carrying them as extras can never be priced from them.
-  'תוספת 4 סלטים לבחירה',
   'תוספת חלה',
 ];
 

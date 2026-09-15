@@ -65,7 +65,7 @@ describe('MenuEditorScreen', () => {
     expect((screen.getByLabelText('מחיר בלוק סלטים נוסף (כל 4)') as HTMLInputElement).disabled).toBe(false)
     expect((screen.getByLabelText('מחיר סלט בודד נוסף') as HTMLInputElement).value).toBe('7')
     expect((screen.getByLabelText('מחיר סלט בודד נוסף') as HTMLInputElement).disabled).toBe(false)
-    expect(screen.getByText('סלטים (17)')).toBeTruthy()
+    expect(screen.getByText('סלטים (18)')).toBeTruthy()
     expect(screen.getByText('ראשונות (3)')).toBeTruthy()
     expect(screen.getByText('עיקריות (8)')).toBeTruthy()
     expect(screen.getByText('תוספות (6)')).toBeTruthy()

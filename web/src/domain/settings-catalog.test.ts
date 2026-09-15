@@ -47,7 +47,7 @@ describe('settings catalog', () => {
     expect(result.catalog.extraChallahMinorUnits).toBe(1_000)
     expect(result.catalog.includedChallahs).toBe(2)
     expect(Object.fromEntries(Object.entries(result.catalog.categories).map(([key, rows]) => [key, rows.length]))).toEqual({
-      salads: 17,
+      salads: 18,
       firsts: 3,
       mains: 8,
       sides: 6,

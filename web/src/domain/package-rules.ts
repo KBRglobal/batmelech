@@ -19,16 +19,16 @@
 // tickets are built from it, so a change here changes what gets prepared.
 export const SALAD_BOX_ITEMS: readonly string[] = Object.freeze([
   'מטבוחה פיקנטית',
-  'טחינה ביתית',
-  'גזר מרוקאי',
-  'צ׳ירשי',
+  'טחינה',
+  'גזר מרוקאי מבושל',
+  "צ'ירשי טריפוליטאי",
   'סלק מבושל',
   'מסייר (חמוצים)',
   'קולסלאו',
   'כרוב סגול במיונז',
   'כרוב לבן קלאסי',
   'כרוב לבן עם תירס',
-  'סלט תפו״א',
+  'סלט תפו"א',
   'סלט ביצים',
 ])
 export const SALAD_BOX_SIZE = SALAD_BOX_ITEMS.length

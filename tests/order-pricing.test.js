@@ -24,10 +24,10 @@ function amounts(breakdown) {
   return Object.fromEntries(breakdown.lines.map((row) => [row.name, row.amountMinorUnits]));
 }
 
-test("Toni's real order: two schnitzel challot, extras, one single salad, Dubai delivery = 148$", () => {
+test("Toni's real order: two schnitzel challot, extras, a salad (free since the box), Dubai delivery = 141$", () => {
   const breakdown = orderPriceBreakdown(
     {
-      total: '148.00',
+      total: '141.00',
       meals: 0,
       challot: 0,
       lunch: { 'schnitzel-roll': { q: 2, v: 'challah', sides: {}, addon: 0, plates: [{ sides: {}, variantKey: 'challah' }, { sides: {}, variantKey: 'challah' }] } },
@@ -43,9 +43,9 @@ test("Toni's real order: two schnitzel challot, extras, one single salad, Dubai 
   assert.equal(byName['בגט/חלת שניצל ישראלי (בחלה — סופ"ש בלבד)'], 5_600);
   assert.equal(byName['קוסקוס'], 2_500);
   assert.equal(byName['מנת מפרום ביתי (תוספת)'], 4_000);
-  assert.equal(byName['סלט אקסטרה בודד'], 700);
+  assert.equal(byName['סלט אקסטרה בודד'], undefined, 'salads are never priced since the fixed box');
   assert.equal(byName['משלוח בדובאי'], 1_500);
-  assert.equal(breakdown.computedTotalMinorUnits, 14_800);
+  assert.equal(breakdown.computedTotalMinorUnits, 14_100);
   assert.equal(breakdown.matchesStoredTotal, true);
   assert.deepEqual(breakdown.warnings, []);
 });
@@ -69,14 +69,14 @@ test('a couple meal with its included fish, salads and challot costs the couple 
   assert.equal(breakdown.matchesStoredTotal, true);
 });
 
-test('fish cakes count as two fillets, salad overage is priced in blocks then singles, Abu Dhabi costs 55$', () => {
+test('fish cakes count as two fillets, extra salads cost nothing, Abu Dhabi costs 55$', () => {
   const breakdown = orderPriceBreakdown(
     {
       total: '400',
       meals: 1,
       challot: 4,
       firsts: { 'קציצות דגים ברוטב מרוקאי': 1, 'פילה דג ברוטב מרוקאי': 1 },
-      salads: { 'טחינה': { o: 5 }, 'קולסלאו': { o: 4 } }, // 9 ordered, 4 included -> 5 extra = 1 block + 1 single
+      salads: { 'טחינה': { o: 5 }, 'קולסלאו': { o: 4 } }, // 9 salads: no surcharge, the box is included
       pickup: false,
       deliveryZone: 'abu-dhabi',
     },
@@ -84,11 +84,11 @@ test('fish cakes count as two fillets, salad overage is priced in blocks then si
   );
   const byName = amounts(breakdown);
   assert.equal(byName['פילה דג אקסטרה'], 3_000);
-  assert.equal(byName['סלטים אקסטרה (רביעייה)'], 2_500);
-  assert.equal(byName['סלט אקסטרה בודד'], 700);
+  assert.equal(byName['סלטים אקסטרה (רביעייה)'], undefined);
+  assert.equal(byName['סלט אקסטרה בודד'], undefined);
   assert.equal(byName['חלות נוספות'], 2_000);
   assert.equal(byName['משלוח לאבו דאבי'], 5_500);
-  assert.equal(breakdown.computedTotalMinorUnits, 23_000 + 3_000 + 2_500 + 700 + 2_000 + 5_500);
+  assert.equal(breakdown.computedTotalMinorUnits, 23_000 + 3_000 + 2_000 + 5_500);
   assert.equal(breakdown.differenceMinorUnits, 40_000 - breakdown.computedTotalMinorUnits);
   assert.equal(breakdown.lines.at(-1).kind, 'manual', 'the gap to the stored total is shown, never hidden');
 });

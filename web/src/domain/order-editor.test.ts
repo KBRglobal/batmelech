@@ -91,7 +91,7 @@ describe('order editor menu and drafts', () => {
   it('provides the complete legacy categories, authoritative extras, and lunch variants', () => {
     const menu = buildOrderEditorMenu(emptyStore)
 
-    expect(menu.salads).toHaveLength(17)
+    expect(menu.salads).toHaveLength(18)
     expect(menu.firsts).toEqual([
       'פילה דג ברוטב מרוקאי',
       'פילה דג ברוטב חריימה',

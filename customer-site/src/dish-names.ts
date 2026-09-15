@@ -21,7 +21,9 @@ interface DishTranslation {
 
 export const DISH_NAMES: Readonly<Record<string, DishTranslation>> = {
   // --- Shabbat salads ---
+  'מארז 12 סלטים': { en: 'Box of 12 Salads', fr: 'Coffret de 12 salades' },
   'כרוב לבן קלאסי': { en: 'Classic White Cabbage Salad', fr: 'Salade de chou blanc classique' },
+  'כרוב לבן עם תירס': { en: 'White Cabbage with Corn', fr: 'Chou blanc au maïs' },
   'כרוב סגול במיונז': { en: 'Purple Cabbage in Mayo', fr: 'Chou rouge à la mayonnaise' },
   'קולסלאו': { en: 'Coleslaw', fr: 'Coleslaw' },
   'מטבוחה פיקנטית': { en: 'Spicy Matbucha', fr: 'Matboukha piquante' },
@@ -97,7 +99,6 @@ export const DISH_NAMES: Readonly<Record<string, DishTranslation>> = {
   'מרק ירקות לקוסקוס ללא עוף': { en: 'Couscous Vegetable Soup (no chicken)', fr: 'Soupe de légumes pour couscous (sans poulet)' },
   'מרק ירקות לקוסקוס עם עוף': { en: 'Couscous Vegetable Soup with Chicken', fr: 'Soupe de légumes pour couscous avec poulet' },
   'תוספת חלה': { en: 'Extra Challah', fr: 'Halla supplémentaire' },
-  'תוספת 4 סלטים לבחירה': { en: 'Add-On: 4 Salads of Your Choice', fr: 'Supplément : 4 salades au choix' },
   'תוספת יין': { en: 'Wine Add-On', fr: 'Supplément vin' },
   'סט עריכה': { en: 'Table-Setting Set', fr: 'Set de dressage' },
 

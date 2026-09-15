@@ -10,7 +10,25 @@
 // it there too, and vice versa. Confirmed with Lin (2026-08-19).
 
 const FISH_UNITS_INCLUDED_PER_MEAL = 2; // 2 fillets (one per person), or the fish-cake portion counts the same
-const SALADS_INCLUDED_PER_MEAL = 4;
+// Salads changed on 2026-09-15 (Lin): every order carries one fixed box of
+// 12 salads, included in the price whatever the meal count. Salads are never
+// priced any more; the list mirrors web/src/domain/package-rules.ts.
+const SALAD_BOX_ITEMS = Object.freeze([
+  'מטבוחה פיקנטית',
+  'טחינה',
+  'גזר מרוקאי מבושל',
+  "צ'ירשי טריפוליטאי",
+  'סלק מבושל',
+  'מסייר (חמוצים)',
+  'קולסלאו',
+  'כרוב סגול במיונז',
+  'כרוב לבן קלאסי',
+  'כרוב לבן עם תירס',
+  'סלט תפו"א',
+  'סלט ביצים',
+]);
+const SALAD_BOX_SIZE = SALAD_BOX_ITEMS.length;
+const SALADS_INCLUDED_PER_MEAL = 4; // legacy allowance, no longer used for pricing
 const MAINS_INCLUDED_PER_MEAL = 1;
 const SIDES_INCLUDED_PER_MEAL = 1;
 const DESSERT_HALF_UNITS_INCLUDED_PER_MEAL = 2;
@@ -45,6 +63,8 @@ function defaultDessertPortionsForMeals(kind, meals) {
 }
 
 module.exports = {
+  SALAD_BOX_ITEMS,
+  SALAD_BOX_SIZE,
   FISH_UNITS_INCLUDED_PER_MEAL,
   SALADS_INCLUDED_PER_MEAL,
   MAINS_INCLUDED_PER_MEAL,

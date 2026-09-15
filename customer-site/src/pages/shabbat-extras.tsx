@@ -23,17 +23,22 @@ type Royal = { id: string; name: string; price: number; note?: string; dark?: bo
 // These hardcoded lists are ONLY the no-catalog fallback: when the live
 // catalog is present, the rendered lists ARE the catalog (photos, order,
 // admin-added dishes included) and these supply legacy ids/images by name.
+// The 12 salads of the fixed box every couple package includes, in the
+// kitchen's order. Shown here as a showcase; each is also sold on its own.
 const SALADS: Salad[] = [
   { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/cVEz0yFtGoP.jpeg' },
-  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg' },
   { id: 'salad-tahini', name: 'טחינה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7GjgJuaYjlq.jpeg' },
-  { id: 'salad-pepper-hot', name: 'פלפל חריף צלוי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/M6PCfCukw4f.jpeg' },
+  { id: 'salad-carrot', name: 'גזר מרוקאי מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ktV7lQAiCxj.jpeg' },
+  { id: 'salad-chirshi', name: "צ'ירשי טריפוליטאי", img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/LkkkAnY1xCn.jpeg' },
   { id: 'salad-beet', name: 'סלק מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/twpm8363MgJ.jpeg' },
-  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Vz9NyTP6CaJ.jpeg' },
+  { id: 'salad-msir', name: 'מסייר (חמוצים)', img: '/site/assets/pickles-real.jpg' },
+  { id: 'salad-coleslaw', name: 'קולסלאו', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/FV0qotWV27P.jpeg' },
+  { id: 'salad-cabbage-purple', name: 'כרוב סגול במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-381-bR993g9VsLN.jpeg' },
+  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg' },
+  // No photo yet — reuses the white-cabbage image for now.
+  { id: 'salad-cabbage-corn', name: 'כרוב לבן עם תירס', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg' },
   { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/yt88LuvAVmz.jpeg' },
-  { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/suiaqbglZMf.jpeg' },
-  { id: 'salad-eggplant-mayo', name: 'חציל במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ArFGA1BIJAz.jpeg' },
-  { id: 'salad-pepper-roasted', name: 'פלפלים קלויים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-371-liCX1e96i1L.jpeg' },
+  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Vz9NyTP6CaJ.jpeg' },
 ]
 
 const FIRST_COURSES: Choice[] = [
@@ -55,7 +60,6 @@ const ROYAL: Royal[] = [
   { id: 'special-kids', name: 'מנת ילדים — פסטה אדומה ושניצלונים', price: 35 },
   { id: 'up-potato-tray', name: 'מגש תפו"א קריספיים', price: 30 },
   { id: 'up-carb-tray', name: 'מגש אורז / קוסקוס / פסטה אדומה', price: 25 },
-  { id: 'up-extra-salads', name: 'תוספת 4 סלטים לבחירה', price: 25 },
   { id: 'up-olives', name: 'צלחת פתיחה (זיתים וחמוצים)', price: 15 },
   { id: 'up-spicy-plate', name: 'צלחת חריפים', price: 15 },
   { id: 'up-hummus', name: 'תוספת חומוס ישראלי לניגוב', price: 15 },
@@ -124,7 +128,7 @@ const HE = {
   } as { readonly [id: string]: string | undefined },
   addToRoyal: 'הוסף למלכות שלך',
   coupleTitle: 'תפריט זוגי לכבוד שבת קודש',
-  coupleSubtitle: 'חבילה שלמה הכוללת 4 סוגי סלטים, מנה ראשונה, עיקרית, תוספת וקינוח.',
+  coupleSubtitle: 'חבילה שלמה הכוללת מארז 12 סלטים, מנה ראשונה, עיקרית, תוספת וקינוח.',
   coupleCta: 'להזמנת החבילה המלכותית',
   dessertsTitle: 'סיווג מתוק וקדוש',
   dessertsQuote: '"דבש וחלב תחת לשונך" - הסיום המתוק שחותם את הסעודה',
@@ -170,7 +174,7 @@ export const COPY: Record<Locale, typeof HE> = {
     },
     addToRoyal: 'Add to your royal feast',
     coupleTitle: 'Shabbat Menu for Two',
-    coupleSubtitle: 'A complete package: 4 salads, a first course, a main, a side, and dessert.',
+    coupleSubtitle: 'A complete package: the box of 12 salads, a first course, a main, a side, and dessert.',
     coupleCta: 'Order the Royal Package',
     dessertsTitle: 'A Sweet & Holy Finish',
     dessertsQuote: '"Honey and milk are under your tongue" — the sweet finale that seals the meal',
@@ -213,7 +217,7 @@ export const COPY: Record<Locale, typeof HE> = {
     },
     addToRoyal: 'Ajouter à votre table royale',
     coupleTitle: 'Menu Chabbat pour deux',
-    coupleSubtitle: 'Une formule complète : 4 salades, une entrée, un plat, un accompagnement et un dessert.',
+    coupleSubtitle: 'Une formule complète : le coffret de 12 salades, une entrée, un plat, un accompagnement et un dessert.',
     coupleCta: 'Commander la formule royale',
     dessertsTitle: 'Une fin douce et sainte',
     dessertsQuote: '« Le miel et le lait sont sous ta langue » — la touche sucrée qui clôt le repas',
@@ -239,16 +243,15 @@ export function ShabbatExtras() {
 
   const qtyOf = (id: string) => lines.find((l) => l.id === id)?.qty ?? 0
 
-  const couplePrice = catalog?.couplePriceUsd ?? 230
+  const couplePrice = catalog?.couplePriceUsd ?? 299
 
   // When the live catalog has a category, its dishes (and their admin order)
   // ARE the rendered list — a dish added in the admin panel shows up here
   // with its photo and description with zero code changes. Hardcoded lists
   // survive only as the no-catalog fallback and as legacy id/image sources.
-  const orderedSalads = useMemo<Salad[]>(
-    () => catalogCards(catalog?.categories.salads, SALADS, 'catalog-salad'),
-    [catalog],
-  )
+  // The salad box is fixed, so the showcase always renders the 12 box
+  // salads; the live catalog only supplies photos/descriptions/prices.
+  const orderedSalads = SALADS
   const orderedFirstCourses = useMemo<Choice[]>(
     () =>
       catalogCards(catalog?.categories.firsts, FIRST_COURSES, 'catalog-first').map((card) => ({

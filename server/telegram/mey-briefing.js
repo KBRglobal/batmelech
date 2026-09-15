@@ -9,6 +9,7 @@
 
 const { customerLedger, financialSummary, orderMoney, ordersOf, parseMoneyMinorUnits } = require('../domain/business-queries');
 const { DELIVERY_PRICE_MINOR_UNITS } = require('../domain/order-pricing');
+const { SALAD_BOX_SIZE } = require('../domain/package-rules');
 const { LUNCH_MENU } = require('../domain/lunch-menu');
 const { aedLabel, usdLabel } = require('../domain/money-labels');
 const { orderingStatus } = require('../business-actions');
@@ -60,8 +61,8 @@ function orderLine(order) {
 function priceLines(menu) {
   const m = isRecord(menu) ? menu : {};
   const lines = [
-    `ארוחה זוגית ${dollars(m.couplePrice, 23_000)} (כוללת 4 סלטים, 2 פילה דג, עיקרית, תוספת, קינוח, ${Number.isInteger(m.includedChallot) ? m.includedChallot : 2} חלות); ` +
-      `חלה נוספת ${dollars(m.challahPrice, 1_000)}; סלט נוסף ${dollars(m.saladUnitPrice, 700)} או רביעייה ${dollars(m.saladBlockPrice, 2_500)}; ` +
+    `ארוחה זוגית ${dollars(m.couplePrice, 23_000)} (כוללת מארז קבוע של ${SALAD_BOX_SIZE} סלטים, 2 פילה דג, עיקרית, תוספת, קינוח, ${Number.isInteger(m.includedChallot) ? m.includedChallot : 2} חלות); ` +
+      `חלה נוספת ${dollars(m.challahPrice, 1_000)}; סלטים לא נמכרים בנפרד; ` +
       `פילה דג נוסף ${dollars(m.fishExtraPrice, 3_000)}; עיקרית נוספת ${dollars(m.mainExtraPrice, 10_000)}; ` +
       `משלוח דובאי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS.dubai)}, אבו דאבי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS['abu-dhabi'])}, איסוף עצמי חינם.`,
   ];

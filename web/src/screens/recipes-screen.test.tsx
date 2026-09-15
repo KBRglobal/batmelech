@@ -60,14 +60,14 @@ describe('RecipesScreen', () => {
     mockedUseStore.mockReturnValue(queryResult())
     render(<RecipesScreen />)
 
-    expect(screen.getByText('יש מתכון ל־0 מתוך 63 מנות')).toBeTruthy()
+    expect(screen.getByText('יש מתכון ל־0 מתוך 64 מנות')).toBeTruthy()
     expect(screen.getByText(/מנה בלי מתכון לא נכנסת לרשימת הקניות/)).toBeTruthy()
     expect(screen.getByText('קוסקוס עננים')).toBeTruthy()
     expect(screen.getByText('בגט טוניסאי אותנטי')).toBeTruthy()
     expect(screen.getByText('מנת מפרום ביתי')).toBeTruthy()
     expect(screen.getByText('מרק ירקות לקוסקוס ללא עוף')).toBeTruthy()
     expect(screen.queryByText('משלוח')).toBeNull()
-    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ })).toHaveLength(63)
+    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ })).toHaveLength(64)
     expect(screen.queryByLabelText('כמה מנות במוצר אחד?')).toBeNull()
     // The same dish sold in two sizes sits together under one group header.
     expect(screen.getByText('כמה גדלים של פסטה אדומה:')).toBeTruthy()
@@ -291,12 +291,12 @@ describe('RecipesScreen', () => {
     const user = userEvent.setup()
     render(<RecipesScreen autosaveDelayMs={NO_AUTOSAVE} />)
 
-    expect(screen.getByText('יש מתכון ל־1 מתוך 63 מנות')).toBeTruthy()
+    expect(screen.getByText('יש מתכון ל־1 מתוך 64 מנות')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'עריכת מתכון' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'רק בלי מתכון' }))
     expect(screen.queryByRole('button', { name: 'עריכת מתכון' })).toBeNull()
-    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ }).length).toBe(62)
+    expect(screen.getAllByRole('button', { name: /^יצירת מתכון/ }).length).toBe(63)
 
     await user.click(screen.getByRole('button', { name: 'רק בלי מתכון' }))
     expect(screen.getByRole('button', { name: 'עריכת מתכון' })).toBeTruthy()

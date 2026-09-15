@@ -11,9 +11,7 @@ import { useSiteCatalog, type CatalogDish } from '../catalog-context'
 import { useLocale, type Locale } from '../locale-context'
 import { dishName } from '../dish-names'
 
-const BASE_PRICE = 230
-const INCLUDED_SALADS = 4
-const SALAD_EXTRA_PRICE = 6.25
+const BASE_PRICE = 299
 const INCLUDED_FIRST = 1
 const FIRST_EXTRA_PRICE = 25
 const INCLUDED_MAIN = 1
@@ -21,6 +19,8 @@ const MAIN_EXTRA_PRICE = 45
 
 /** The canonical Hebrew name of the whole package — the cart/order key. */
 const PACKAGE_NAME_HE = 'מארז שבת זוגי יוקרתי'
+/** The fixed salad box every couple package includes — the kitchen's catalog name. */
+const SALAD_BOX_NAME_HE = 'מארז 12 סלטים'
 
 type Allergy = 'gluten' | 'gluten-free' | 'egg' | 'spicy'
 type Option = {
@@ -33,24 +33,22 @@ type Option = {
   description?: string
 }
 
+// The 12 salads of the fixed box, in the kitchen's order. Not chosen by the
+// customer — rendered as a read-only showcase.
 const SALADS: Option[] = [
-  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
-  { id: 'salad-cabbage-purple', name: 'כרוב סגול במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-381-bR993g9VsLN.jpeg', allergy: 'egg' },
-  { id: 'salad-coleslaw', name: 'קולסלאו', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/FV0qotWV27P.jpeg', allergy: 'egg' },
   { id: 'salad-matbucha', name: 'מטבוחה פיקנטית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/cVEz0yFtGoP.jpeg', allergy: 'spicy' },
-  { id: 'salad-chirshi', name: "צ'ירשי טריפוליטאי", img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/LkkkAnY1xCn.jpeg' },
-  { id: 'salad-meshwiya', name: 'משוויה מרוקאית', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/suiaqbglZMf.jpeg', allergy: 'spicy' },
-  { id: 'salad-msir', name: 'מסייר (חמוצים)', img: '/site/assets/pickles-real.jpg', realPhoto: true },
   { id: 'salad-tahini', name: 'טחינה', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/7GjgJuaYjlq.jpeg' },
-  { id: 'salad-beet', name: 'סלק מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/twpm8363MgJ.jpeg' },
   { id: 'salad-carrot', name: 'גזר מרוקאי מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ktV7lQAiCxj.jpeg', allergy: 'spicy' },
-  { id: 'salad-eggplant-mayo', name: 'חציל במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ArFGA1BIJAz.jpeg', allergy: 'egg' },
-  { id: 'salad-eggplant-fried', name: 'חציל מטוגן', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/oIpRFnfrVKc.jpeg' },
-  { id: 'salad-pepper-roasted', name: 'פלפלים קלויים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-371-liCX1e96i1L.jpeg' },
-  { id: 'salad-cherry-spicy', name: 'עגבניות שרי חריפות', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Cb9z6EshGnU.jpeg', allergy: 'spicy' },
-  { id: 'salad-pepper-hot', name: 'פלפל חריף צלוי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/M6PCfCukw4f.jpeg', allergy: 'spicy' },
-  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Vz9NyTP6CaJ.jpeg', allergy: 'egg' },
+  { id: 'salad-chirshi', name: "צ'ירשי טריפוליטאי", img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/LkkkAnY1xCn.jpeg' },
+  { id: 'salad-beet', name: 'סלק מבושל', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/twpm8363MgJ.jpeg' },
+  { id: 'salad-msir', name: 'מסייר (חמוצים)', img: '/site/assets/pickles-real.jpg', realPhoto: true },
+  { id: 'salad-coleslaw', name: 'קולסלאו', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/FV0qotWV27P.jpeg', allergy: 'egg' },
+  { id: 'salad-cabbage-purple', name: 'כרוב סגול במיונז', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-381-bR993g9VsLN.jpeg', allergy: 'egg' },
+  { id: 'salad-cabbage-white', name: 'כרוב לבן קלאסי', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
+  // No photo yet — reuses the white-cabbage image for now.
+  { id: 'salad-cabbage-corn', name: 'כרוב לבן עם תירס', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/WhatsAppImage2026-08-13at17-58-38-tn6OonVbOX3.jpeg', allergy: 'gluten-free' },
   { id: 'salad-potato', name: 'סלט תפו"א', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/yt88LuvAVmz.jpeg', allergy: 'egg' },
+  { id: 'salad-egg', name: 'סלט ביצים', img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/Vz9NyTP6CaJ.jpeg', allergy: 'egg' },
 ]
 
 const FIRST_COURSES: Option[] = [
@@ -109,14 +107,14 @@ const HE = {
   heroTitle: ['מארז שבת', 'זוגי יוקרתי'] as [string, string],
   heroSubtitle: 'הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם.',
   heroImageAlt: 'מארז שבת זוגי יוקרתי כשר בדובאי - מטעמי בת מלך',
-  intro: 'ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — סלטים, מנה ראשונה, עיקרית וקינוח למארז זוגי מלא.',
+  intro: 'ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — מארז 12 סלטים, מנה ראשונה, עיקרית, תוספת וקינוח למארז זוגי מלא.',
   extrasLink: 'לא רוצים חבילה שלמה? לחיזוקים לסופ״ש — מנות בודדות בלי התחייבות',
   infoTitle: 'שיטת הבחירה במארז',
   infoBody: (basePrice: number) =>
-    `המחיר הבסיסי ($${basePrice} USD) כולל: 4 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.`,
+    `המחיר הבסיסי ($${basePrice} USD) כולל: מארז 12 סלטים, מנה ראשונה אחת, עיקרית אחת, תוספת אחת וקינוח אחד.`,
   infoBody2: 'כל בחירה מעבר למכסה מתווספת אוטומטית למחיר למטה.',
-  saladsTitle: 'סלטים טריים',
-  saladsHint: `יש לבחור לפחות 4 (סלט חמישי ומעלה: $${SALAD_EXTRA_PRICE} ליחידה)`,
+  saladsTitle: 'מארז 12 סלטים',
+  saladsHint: 'כלול במחיר המארז — כל 12 הסלטים מגיעים עם כל חבילה זוגית, בלי צורך לבחור.',
   firstsTitle: 'מנות ראשונות',
   firstsHint: `מנה שניה ומעלה: $${FIRST_EXTRA_PRICE} ליחידה`,
   mainsTitle: 'עיקריות לשבת',
@@ -125,10 +123,8 @@ const HE = {
   sidesHint: 'יש לבחור תוספת אחת',
   dessertsTitle: 'סיום מתוק (פרווה)',
   dessertsHint: 'יש לבחור מנה אחת',
-  extraSalads: (amount: string, count: number) => `+$${amount} עבור ${count} סלטים נוספים`,
   extraFirsts: (amount: number, count: number) => `+$${amount} עבור ${count} מנות נוספות`,
   extraMains: (amount: number, count: number) => `+$${amount} עבור ${count} מנות נוספות`,
-  missingSalads: (left: number) => (left === 1 ? 'עוד סלט אחד' : `עוד ${left} סלטים`),
   missingFirst: 'מנה ראשונה',
   missingMain: 'מנה עיקרית',
   missingSide: 'תוספת',
@@ -154,14 +150,14 @@ export const COPY: Record<Locale, typeof HE> = {
     heroTitle: ['Premium Shabbat', 'Box for Two'],
     heroSubtitle: 'Build your perfect Shabbat table — kosher, freshly cooked, and delivered to your door.',
     heroImageAlt: 'Premium kosher Shabbat box for two in Dubai — Bat Melech Delights',
-    intro: 'A complete kosher Shabbat dinner in Dubai, cooked fresh and delivered to you — salads, a first course, a main, a side, and dessert in one full box for two.',
+    intro: 'A complete kosher Shabbat dinner in Dubai, cooked fresh and delivered to you — a box of 12 salads, a first course, a main, a side, and dessert in one full box for two.',
     extrasLink: 'Not looking for the full box? Weekend Boosters — individual dishes, no commitment',
     infoTitle: 'How the Box Works',
     infoBody: (basePrice: number) =>
-      `The base price ($${basePrice} USD) includes: 4 salads, 1 first course, 1 main course, 1 side, and 1 dessert.`,
+      `The base price ($${basePrice} USD) includes: the box of 12 salads, 1 first course, 1 main course, 1 side, and 1 dessert.`,
     infoBody2: 'Anything you choose beyond the included quota is automatically added to the total below.',
-    saladsTitle: 'Fresh Salads',
-    saladsHint: `Choose at least 4 (5th salad and up: $${SALAD_EXTRA_PRICE} each)`,
+    saladsTitle: 'The Box of 12 Salads',
+    saladsHint: 'Included in the price — all 12 salads come with every box for two. Nothing to choose.',
     firstsTitle: 'First Courses',
     firstsHint: `Second course and up: $${FIRST_EXTRA_PRICE} each`,
     mainsTitle: 'Shabbat Mains',
@@ -170,13 +166,10 @@ export const COPY: Record<Locale, typeof HE> = {
     sidesHint: 'Choose one side',
     dessertsTitle: 'A Sweet Finish (Pareve)',
     dessertsHint: 'Choose one dessert',
-    extraSalads: (amount: string, count: number) =>
-      `+$${amount} for ${count} extra salad${count === 1 ? '' : 's'}`,
     extraFirsts: (amount: number, count: number) =>
       `+$${amount} for ${count} extra course${count === 1 ? '' : 's'}`,
     extraMains: (amount: number, count: number) =>
       `+$${amount} for ${count} extra main${count === 1 ? '' : 's'}`,
-    missingSalads: (left: number) => (left === 1 ? '1 more salad' : `${left} more salads`),
     missingFirst: 'a first course',
     missingMain: 'a main course',
     missingSide: 'a side',
@@ -199,14 +192,14 @@ export const COPY: Record<Locale, typeof HE> = {
     heroTitle: ['Coffret Chabbat', 'Prestige pour deux'],
     heroSubtitle: 'Composez votre table de Chabbat idéale — casher, cuisinée le jour même et livrée jusque chez vous.',
     heroImageAlt: 'Coffret Chabbat prestige casher pour deux à Dubaï — Bat Melech',
-    intro: "Un dîner de Chabbat casher complet à Dubaï, cuisiné frais et livré chez vous — salades, entrée, plat, accompagnement et dessert dans un coffret pour deux.",
+    intro: "Un dîner de Chabbat casher complet à Dubaï, cuisiné frais et livré chez vous — un coffret de 12 salades, une entrée, un plat, un accompagnement et un dessert dans un coffret pour deux.",
     extrasLink: "Vous ne souhaitez pas le coffret complet ? Nos extras du week-end — plats à l'unité, sans engagement",
     infoTitle: 'Comment composer votre coffret',
     infoBody: (basePrice: number) =>
-      `Le prix de base ($${basePrice} USD) comprend : 4 salades, 1 entrée, 1 plat, 1 accompagnement et 1 dessert.`,
+      `Le prix de base ($${basePrice} USD) comprend : le coffret de 12 salades, 1 entrée, 1 plat, 1 accompagnement et 1 dessert.`,
     infoBody2: "Toute sélection au-delà du quota inclus s'ajoute automatiquement au total ci-dessous.",
-    saladsTitle: 'Salades fraîches',
-    saladsHint: `Choisissez-en au moins 4 (à partir de la 5e : $${SALAD_EXTRA_PRICE} l'unité)`,
+    saladsTitle: 'Le coffret de 12 salades',
+    saladsHint: 'Inclus dans le prix — les 12 salades accompagnent chaque coffret pour deux. Rien à choisir.',
     firstsTitle: 'Entrées',
     firstsHint: `À partir de la 2e : $${FIRST_EXTRA_PRICE} l'unité`,
     mainsTitle: 'Plats de Chabbat',
@@ -215,13 +208,10 @@ export const COPY: Record<Locale, typeof HE> = {
     sidesHint: 'Choisissez un accompagnement',
     dessertsTitle: 'Douceur finale (parvé)',
     dessertsHint: 'Choisissez un dessert',
-    extraSalads: (amount: string, count: number) =>
-      `+$${amount} pour ${count === 1 ? '1 salade supplémentaire' : `${count} salades supplémentaires`}`,
     extraFirsts: (amount: number, count: number) =>
       `+$${amount} pour ${count === 1 ? '1 entrée supplémentaire' : `${count} entrées supplémentaires`}`,
     extraMains: (amount: number, count: number) =>
       `+$${amount} pour ${count === 1 ? '1 plat supplémentaire' : `${count} plats supplémentaires`}`,
-    missingSalads: (left: number) => (left === 1 ? 'encore une salade' : `encore ${left} salades`),
     missingFirst: 'une entrée',
     missingMain: 'un plat',
     missingSide: 'un accompagnement',
@@ -287,25 +277,18 @@ export function ShabbatOrder() {
   const t = COPY[locale]
 
   const basePrice = catalog?.couplePriceUsd ?? BASE_PRICE
-  const saladOptions = useMemo(() => mergeOptions(SALADS, catalog?.categories.salads, dishByName, 'catalog-salad'), [catalog, dishByName])
+  // The box is fixed: the live catalog only supplies photos/descriptions,
+  // never the list itself.
+  const saladOptions = useMemo(() => mergeOptions(SALADS, undefined, dishByName, 'catalog-salad'), [dishByName])
   const firstOptions = useMemo(() => mergeOptions(FIRST_COURSES, catalog?.categories.firsts, dishByName, 'catalog-first'), [catalog, dishByName])
   const mainOptions = useMemo(() => mergeOptions(MAIN_COURSES, catalog?.categories.mains, dishByName, 'catalog-main'), [catalog, dishByName])
   const sideOptions = useMemo(() => mergeOptions(SIDES, catalog?.categories.sides, dishByName, 'catalog-side'), [catalog, dishByName])
   const dessertOptions = useMemo(() => mergeOptions(DESSERTS, catalog?.categories.desserts, dishByName, 'catalog-dessert'), [catalog, dishByName])
 
-  const [salads, setSalads] = useState<Set<string>>(new Set())
   const [firstQty, setFirstQty] = useState<Record<string, number>>({})
   const [mainQty, setMainQty] = useState<Record<string, number>>({})
   const [side, setSide] = useState<string>('')
   const [dessert, setDessert] = useState<string>('')
-
-  const toggleSalad = (id: string) =>
-    setSalads((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
 
   const bumpFirst = (id: string, delta: number) =>
     setFirstQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }))
@@ -315,22 +298,17 @@ export function ShabbatOrder() {
   const firstCount = Object.values(firstQty).reduce((a, b) => a + b, 0)
   const mainCount = Object.values(mainQty).reduce((a, b) => a + b, 0)
 
-  const { total, saladExtra, firstExtra, mainExtra } = useMemo(() => {
-    const saladExtraN = Math.max(0, salads.size - INCLUDED_SALADS) * SALAD_EXTRA_PRICE
+  const { total, firstExtra, mainExtra } = useMemo(() => {
     const firstExtraN = Math.max(0, firstCount - INCLUDED_FIRST) * FIRST_EXTRA_PRICE
     const mainExtraN = Math.max(0, mainCount - INCLUDED_MAIN) * MAIN_EXTRA_PRICE
     return {
-      saladExtra: saladExtraN,
       firstExtra: firstExtraN,
       mainExtra: mainExtraN,
-      total: basePrice + saladExtraN + firstExtraN + mainExtraN,
+      total: basePrice + firstExtraN + mainExtraN,
     }
-  }, [salads, firstCount, mainCount, basePrice])
+  }, [firstCount, mainCount, basePrice])
 
   const missing: string[] = []
-  if (salads.size < INCLUDED_SALADS) {
-    missing.push(t.missingSalads(INCLUDED_SALADS - salads.size))
-  }
   if (firstCount < INCLUDED_FIRST) missing.push(t.missingFirst)
   if (mainCount < INCLUDED_MAIN) missing.push(t.missingMain)
   if (!side) missing.push(t.missingSide)
@@ -340,7 +318,6 @@ export function ShabbatOrder() {
   // second tab marks it). The picks stay put — the builder just refuses to
   // continue until they are swapped out.
   const soldOutPicks = [
-    ...saladOptions.filter((s) => salads.has(s.id)),
     ...firstOptions.filter((c) => (firstQty[c.id] ?? 0) > 0),
     ...mainOptions.filter((c) => (mainQty[c.id] ?? 0) > 0),
     ...sideOptions.filter((s) => s.id === side),
@@ -355,13 +332,12 @@ export function ShabbatOrder() {
     // canonical Hebrew name — localized display names go in parentheses-free
     // form for Hebrew, and as "Display (עברית)" for other locales.
     const noteDish = (name: string) => (locale === 'he' ? name : `${displayDish(name, locale)} (${name})`)
-    const saladNames = saladOptions.filter((s) => salads.has(s.id)).map((s) => noteDish(s.name))
     const firstNames = firstOptions.filter((c) => (firstQty[c.id] ?? 0) > 0).map((c) => `${noteDish(c.name)} x${firstQty[c.id]}`)
     const mainNames = mainOptions.filter((c) => (mainQty[c.id] ?? 0) > 0).map((c) => `${noteDish(c.name)} x${mainQty[c.id]}`)
     const sideName = sideOptions.find((s) => s.id === side)?.name
     const dessertName = dessertOptions.find((d) => d.id === dessert)?.name
     const note = [
-      `${t.noteLabels.salads}: ${saladNames.join(', ')}`,
+      `${t.noteLabels.salads}: ${noteDish(SALAD_BOX_NAME_HE)}`,
       `${t.noteLabels.first}: ${firstNames.join(', ')}`,
       `${t.noteLabels.main}: ${mainNames.join(', ')}`,
       `${t.noteLabels.side}: ${sideName !== undefined ? noteDish(sideName) : sideName}`,
@@ -413,17 +389,11 @@ export function ShabbatOrder() {
         <SectionHeader n={1} title={t.saladsTitle} hint={t.saladsHint} />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 -mt-12">
           {saladOptions.map((s) => {
-            const picked = salads.has(s.id)
             const soldOut = isOutOfStock(s.name)
             return (
-              <button
+              <div
                 key={s.id}
-                type="button"
-                // A sold-out salad that is already picked stays clickable so it
-                // can be removed — it just cannot be picked again.
-                disabled={soldOut && !picked}
-                onClick={() => toggleSalad(s.id)}
-                className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all text-start enabled:hover:shadow-xl disabled:cursor-not-allowed"
+                className="group relative bg-white rounded-[2.5rem] overflow-hidden border-2 border-transparent transition-all text-start hover:shadow-xl"
               >
                 <div className="aspect-square overflow-hidden relative">
                   {s.img === '' ? (
@@ -444,12 +414,8 @@ export function ShabbatOrder() {
                     </span>
                   )}
                   {soldOut && <OutOfStockBadge className="absolute bottom-3 end-3" />}
-                  <span
-                    className={`absolute bottom-3 start-3 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${
-                      picked ? 'bg-[#3B151A] text-white' : 'bg-white text-[#3B151A]'
-                    }`}
-                  >
-                    <Icon icon={picked ? 'ph:check-bold' : 'ph:plus-bold'} className="text-xl" />
+                  <span className="absolute bottom-3 start-3 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-[#3B151A] text-white">
+                    <Icon icon="ph:check-bold" className="text-xl" />
                   </span>
                 </div>
                 <div className="p-4">
@@ -458,13 +424,10 @@ export function ShabbatOrder() {
                     <p className="text-xs font-bold text-[#3B151A]/50 mt-1 leading-snug">{s.description}</p>
                   )}
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
-        {saladExtra > 0 && (
-          <p className="text-[#8D182C] font-black text-center -mt-12">{t.extraSalads(saladExtra.toFixed(2), salads.size - INCLUDED_SALADS)}</p>
-        )}
 
         <SectionHeader n={2} title={t.firstsTitle} hint={t.firstsHint} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 -mt-12">

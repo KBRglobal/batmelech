@@ -182,6 +182,7 @@ const DEFAULT_CATEGORY_NAMES: Readonly<Record<MenuCategoryKey, readonly string[]
     'פלפל חריף צלוי',
     'סלט ביצים',
     'סלט תפו"א',
+    'כרוב לבן עם תירס',
   ],
   firsts: AUTHORITATIVE_FIRST_COURSE_ITEMS.map((item) => item.name),
   mains: [
