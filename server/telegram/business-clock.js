@@ -6,7 +6,7 @@
 // Same discipline as delivery-scheduler.js: claim-before-send (a restarted
 // process stays quiet), Dubai time only, deterministic Hebrew templates.
 
-const { claimDailyMarker, withSettingsUpdate } = require('../business-actions');
+const { claimDailyMarker, recordStoreBackup, withSettingsUpdate } = require('../business-actions');
 const { dubaiDateString, dubaiMinutesOfDay, parseClockMinutes } = require('./delivery-day');
 const { sendTelegramMessage } = require('./send-message');
 const { encryptSecret } = require('../business-data/secret-box');
@@ -172,7 +172,14 @@ function createBusinessClock({
         dateString: today,
         encryptedBody: JSON.stringify(encrypted),
       });
-      if (stored === null) logger.error('business-clock: nightly backup upload failed');
+      if (stored === null) {
+        logger.error('business-clock: nightly backup upload failed');
+        return;
+      }
+      // Write the backup down, or the panel keeps asking Lin to make one by
+      // hand while the server has been making one every night.
+      const recorded = await recordStoreBackup(repository, nowDate.getTime());
+      if (!recorded.ok) logger.error('business-clock: nightly backup stored but the marker was not recorded');
     } catch (error) {
       logger.error('business-clock: nightly backup failed', error);
     }

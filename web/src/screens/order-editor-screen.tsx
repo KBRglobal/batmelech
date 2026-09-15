@@ -1525,6 +1525,9 @@ function OrderEditorContent({
   // empty on almost every Shabbat order. It waits behind one line instead of
   // four large empty cards, and opens the moment it holds something.
   const [openMoreParts, setOpenMoreParts] = useState<ReadonlySet<string>>(() => new Set<string>())
+  // Most orders are typed by hand, so the paste box waits on one line instead
+  // of opening the screen with the largest thing on it.
+  const [pasteOpen, setPasteOpen] = useState(false)
   const revealMorePart = (id: string) => {
     setOpenMoreParts((current) => (current.has(id) ? current : new Set(current).add(id)))
     window.setTimeout(() => document.getElementById(`order-${id}`)?.scrollIntoView({ block: 'start' }), 0)
@@ -1758,7 +1761,23 @@ function OrderEditorContent({
           />
         )}
 
-        {mode === 'new' && (
+        {mode === 'new' && !pasteOpen && importText.trim() === '' && (
+          <button
+            type="button"
+            data-paste-line="true"
+            onClick={() => setPasteOpen(true)}
+            className="flex w-full items-center gap-3 rounded-[2rem] border border-border bg-secondary px-5 py-4 text-right hover:bg-card sm:px-7"
+          >
+            <LocalIcon name="ph:chat-dots-bold" className="shrink-0 text-xl text-primary" />
+            <span className="text-sm font-black text-primary">יש הודעה מוואטסאפ?</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-muted-foreground">
+              להדביק אותה כאן ולקבל הזמנה פתוחה לעריכה
+            </span>
+            <LocalIcon name="ph:caret-down-bold" className="shrink-0 text-base text-muted-foreground" />
+          </button>
+        )}
+
+        {mode === 'new' && (pasteOpen || importText.trim() !== '') && (
           <section className="rounded-[2rem] border border-border bg-secondary p-5 sm:p-7">
             <div className="flex items-center gap-3 text-primary">
               <LocalIcon name="ph:plus-circle-bold" className="text-2xl" />
@@ -1985,6 +2004,42 @@ function OrderEditorContent({
                     }}
                     className={inputClassName}
                   />
+                  {(() => {
+                    // Typing beats the dropdown: three letters and the hotel's
+                    // address and emirate are already filled, with no network
+                    // call. The OpenStreetMap search below stays for the
+                    // destinations the curated list does not know.
+                    const query = hotelQuery.trim().toLocaleLowerCase('he-IL')
+                    // hotelAddress is filled only once a real hotel was picked;
+                    // hotelName mirrors whatever she is typing, so it cannot
+                    // decide whether to keep suggesting.
+                    // ...and never alongside the OpenStreetMap results, so she
+                    // is not offered two lists of the same hotel.
+                    if (query.length < 2 || draft.hotelAddress.trim() !== '') return null
+                    if (hotelResults.length > 0 || hotelSearchState.kind === 'loading') return null
+                    const matches = HOTEL_OPTIONS.filter((hotel) =>
+                      hotel.name.toLocaleLowerCase('he-IL').includes(query),
+                    ).slice(0, 6)
+                    if (matches.length === 0) return null
+                    return (
+                      <ul aria-label="מלונות מוכרים" className="mt-2 space-y-1 rounded-2xl border border-border bg-card p-2">
+                        {matches.map((hotel) => (
+                          <li key={hotel.name}>
+                            <button
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => selectHotel(hotel)}
+                              className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-right text-sm font-bold text-primary hover:bg-secondary"
+                            >
+                              <LocalIcon name="ph:map-pin-bold" className="text-base" />
+                              <span className="truncate">{hotel.name}</span>
+                              <span className="shrink-0 text-xs font-black text-muted-foreground">{hotel.city}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  })()}
                   <button
                     type="button"
                     disabled={hotelSearchState.kind === 'loading'}

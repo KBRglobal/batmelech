@@ -72,6 +72,34 @@ async function withSettingsUpdate(repository, mutate) {
   return { ok: false };
 }
 
+/**
+ * Record that a backup of the whole store exists as of `timestamp`.
+ *
+ * The nightly encrypted upload to R2 has been running for months, but nothing
+ * wrote it down, so the panel kept telling Lin "35 days since the last backup"
+ * and asking her to do by hand what the server already does every night. The
+ * banner reads `store.lastBackup`, a top-level field, so this is the same
+ * load-mutate-save retry as withSettingsUpdate with a wider reach.
+ */
+async function recordStoreBackup(repository, timestamp) {
+  if (!Number.isSafeInteger(timestamp) || timestamp < 0) return { ok: false };
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const current = await repository.loadState();
+    const existing = current.data.lastBackup;
+    // Never move the marker backwards: a hand-made backup is still the latest.
+    if (Number.isSafeInteger(existing) && existing >= timestamp) return { ok: true, skipped: true };
+    const saved = await repository.saveState({
+      baseState: current.data,
+      localState: { ...current.data, lastBackup: timestamp },
+      baseRevision: current.revision,
+      baseHash: current.hash,
+      requestId: crypto.randomUUID(),
+    });
+    if (saved.ok) return { ok: true };
+  }
+  return { ok: false };
+}
+
 // Same load-mutate-save retry, scoped to a single order. mutate(order) returns
 // the replacement order object, or null to skip the save. Because mutate runs
 // again on every retry against a freshly loaded order, a mutate that inspects a
@@ -431,6 +459,7 @@ module.exports = {
   orderingStatus,
   upcomingSundayDubai,
   withSettingsUpdate,
+  recordStoreBackup,
   setOrderingOpen,
   setSiteBanner,
   setItemStock,

@@ -177,6 +177,9 @@ test('nightly backup uploads an encrypted snapshot once per day', async () => {
   assert.doesNotMatch(uploads[0].encryptedBody, /סודי מאוד|971500000001/u);
   const decrypted = JSON.parse(decryptSecret(JSON.parse(uploads[0].encryptedBody), KEY));
   assert.equal(decrypted.orders[0].name, 'סודי מאוד');
+  // The backup is written down, so the panel stops asking Lin to make one by
+  // hand while the server makes one every night.
+  assert.equal(repository._current().lastBackup, new Date('2026-08-19T04:00:00Z').getTime());
 
   // Without a secrets key or storage, the backup never claims the marker.
   const bare = fakeRepository({ orders: [], settings: {} });
@@ -188,6 +191,34 @@ test('nightly backup uploads an encrypted snapshot once per day', async () => {
     restore2();
   }
   assert.equal(bare._current().settings.meyBackupFor, undefined);
+  assert.equal(bare._current().lastBackup, undefined);
+});
+
+test('a nightly backup never moves the marker back behind a newer hand-made one', async () => {
+  const later = new Date('2026-08-19T06:00:00Z').getTime();
+  const repository = fakeRepository({ orders: [], settings: {}, lastBackup: later });
+  const storage = {
+    enabled: true,
+    async putStateBackup({ dateString }) {
+      return { key: `backups/${dateString}.json.enc` };
+    },
+  };
+  const restore = stubTelegram([]);
+  try {
+    const clock = createBusinessClock({
+      repository,
+      botToken: 't',
+      chatId: '-1',
+      storage,
+      env: { BM_SECRETS_KEY: KEY },
+      logger: silentLogger,
+      now: () => new Date('2026-08-19T04:00:00Z'),
+    });
+    await clock.tick();
+  } finally {
+    restore();
+  }
+  assert.equal(repository._current().lastBackup, later);
 });
 
 test('weekly email backup fires once on Sunday at 08:00 Dubai and records the send', async () => {

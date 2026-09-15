@@ -687,6 +687,7 @@ describe('OrderEditorScreen', () => {
     await user.click(screen.getByRole('button', { name: `הוספה למגש שניצלים (זוגי, כ־13–15 יח') · $100.00` }))
     await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))
     await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט ידני')
+    await user.click(document.querySelector('button[data-paste-line="true"]') as HTMLElement)
     await user.type(await screen.findByLabelText('הודעת הלקוח'), 'שתי זוגיות')
     await user.click(screen.getByRole('button', { name: 'בניית הזמנה מההודעה' }))
 
@@ -1397,6 +1398,21 @@ describe('OrderEditorScreen', () => {
 
   // The form is meant to shrink as it fills: whatever is still open on the
   // screen is what the order still needs. Lin asked for this shape (2026-09-15).
+  it('fills a known hotel from three letters, with no search click', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByRole('heading', { name: 'הזמנה חדשה' })
+
+    await user.type(screen.getByLabelText('שם מלון / יעד'), 'atlan')
+    await user.click(screen.getByRole('button', { name: /Atlantis The Palm/ }))
+
+    expect((screen.getByLabelText('כתובת מלאה') as HTMLTextAreaElement | HTMLInputElement).value)
+      .toContain('Palm Jumeirah')
+    // Picking from the list stops the suggestions; no second list appears.
+    expect(screen.queryByLabelText('מלונות מוכרים')).toBeNull()
+  })
+
   it('marks every part in the top strip: a dot for what is missing, a check for what is ready', async () => {
     mockedUseStore.mockReturnValue(queryResult())
     const user = userEvent.setup()
