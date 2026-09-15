@@ -17,6 +17,10 @@ export const LegacyOrderSchema = z
     status: z.string().optional(),
     group: z.string().optional(),
     meals: NumberLikeSchema.optional(),
+    // Diner packages beyond the couple meal (package-rules.ts): an extra diner
+    // joining a couple meal, and a person eating alone. Absent on old orders.
+    addons: NumberLikeSchema.optional(),
+    solos: NumberLikeSchema.optional(),
     aricha: NumberLikeSchema.optional(),
     challot: NumberLikeSchema.optional(),
     salads: z.record(z.string(), z.unknown()).optional(),

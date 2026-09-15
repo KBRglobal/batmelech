@@ -15,6 +15,10 @@ const { normalizeWhatsAppInput } = require('../ai/whatsapp-chat');
 const { isWritesFrozen, recordOrderCreated } = require('./mey-audited-actions');
 const { resolveReviewItemQuantities } = require('../domain/resolve-review-items');
 const { LUNCH_MENU } = require('../domain/lunch-menu');
+const {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+} = require('../domain/package-rules');
 
 const MAX_ATTEMPTS = 5;
 const MAX_CONVERSATION_LENGTH = 24000;
@@ -82,6 +86,18 @@ function buildIntakeCatalog(state) {
   add('meal:couple', 'ארוחה זוגית', 'couple_meal', {
     aliases: ['זוגית', 'ארוחה לזוג'],
     price: usd(menu.couplePrice),
+  });
+  // The two other package kinds (Lin, 2026-09-15): an extra person joining
+  // a couple meal, and one person eating alone. Ids and categories mirror
+  // the panel's buildAIOrderCatalog; the stored order gets them as the
+  // integer fields `addons` / `solos` next to `meals`.
+  add('meal:addon', 'סועד נוסף', 'addon_diner', {
+    aliases: ['עוד סועד', 'אדם שלישי', 'סועד שלישי', 'אדם נוסף', 'עוד אדם'],
+    price: usd(menu.addonDinerPrice) ?? ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT / 100,
+  });
+  add('meal:solo', 'סועד בודד', 'solo_diner', {
+    aliases: ['אדם אחד', 'סועד יחיד', 'ארוחה ליחיד', 'ארוחה לאדם אחד', 'ליחיד'],
+    price: usd(menu.soloDinerPrice) ?? SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT / 100,
   });
   add('selection:challahs', 'חלות', 'challahs', { aliases: ['חלה'], price: usd(menu.challahPrice) });
 
@@ -189,14 +205,14 @@ function summaryLines(review, resolvedQuantities) {
   }));
 }
 
-// Builds the structured order fields (meals/challot/salads/firsts/mains/
-// sides/desserts) directly in the legacy store shape — the same shape
+// Builds the structured order fields (meals/addons/solos/challot/salads/
+// firsts/mains/sides/desserts) directly in the legacy store shape — the same shape
 // serializeOrderDraft produces for the panel — so an order מיי creates
 // looks, to every other reader of the store, exactly like one the panel
 // or the public site created.
 function buildStructuredOrderFields(catalogById, resolvedQuantities, lunchTargetById = new Map()) {
   const fields = {
-    meals: 0, challot: 0, salads: {}, firsts: {}, mains: {}, sides: {}, desserts: {},
+    meals: 0, addons: 0, solos: 0, challot: 0, salads: {}, firsts: {}, mains: {}, sides: {}, desserts: {},
     extras: {}, lunch: {},
   };
   // A lunch add-on (מפרום) only counts once its dish is in the order, so
@@ -206,6 +222,8 @@ function buildStructuredOrderFields(catalogById, resolvedQuantities, lunchTarget
     const catalogItem = catalogById.get(catalogItemId);
     if (!catalogItem) continue;
     if (catalogItem.category === 'couple_meal') fields.meals = quantity;
+    else if (catalogItem.category === 'addon_diner') fields.addons = quantity;
+    else if (catalogItem.category === 'solo_diner') fields.solos = quantity;
     else if (catalogItem.category === 'challahs') fields.challot = quantity;
     else if (catalogItem.category === 'salad') fields.salads[catalogItem.name] = { o: quantity, p: 0 };
     else if (catalogItem.category === 'first') fields.firsts[catalogItem.name] = quantity;

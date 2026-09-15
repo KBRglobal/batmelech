@@ -7,6 +7,10 @@ import {
 } from './fish-pricing.ts'
 import { canonicalizeChargeName, isAutomaticChargeName } from './order-total.ts'
 import {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+} from './package-rules.ts'
+import {
   PositiveDecimalQuantitySchema,
   StableCatalogIdSchema,
   validateRecipeDefinition,
@@ -97,6 +101,10 @@ export interface LunchItem {
 
 export interface SettingsCatalog {
   readonly couplePriceMinorUnits: number
+  /** סועד נוסף — stored as menu.addonDinerPrice (USD). */
+  readonly addonDinerMinorUnits: number
+  /** סועד בודד — stored as menu.soloDinerPrice (USD). */
+  readonly soloDinerMinorUnits: number
   readonly extraChallahMinorUnits: number
   readonly includedChallahs: number
   readonly saladBlockMinorUnits: number
@@ -413,6 +421,8 @@ function cloneCatalog(catalog: SettingsCatalog): SettingsCatalog {
 
 export const DEFAULT_SETTINGS_CATALOG: SettingsCatalog = {
   couplePriceMinorUnits: 23_000,
+  addonDinerMinorUnits: ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  soloDinerMinorUnits: SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
   extraChallahMinorUnits: 1_000,
   includedChallahs: 2,
   saladBlockMinorUnits: AUTHORITATIVE_ALLOWANCES.saladBlockMinorUnits,
@@ -1166,6 +1176,8 @@ export function validateSettingsCatalog(catalog: SettingsCatalog): readonly Cata
   const ids = new Set<string>()
   const prices: Array<readonly [string, number]> = [
     ['couplePriceMinorUnits', catalog.couplePriceMinorUnits],
+    ['addonDinerMinorUnits', catalog.addonDinerMinorUnits],
+    ['soloDinerMinorUnits', catalog.soloDinerMinorUnits],
     ['extraChallahMinorUnits', catalog.extraChallahMinorUnits],
     ['saladBlockMinorUnits', catalog.saladBlockMinorUnits],
     ['saladRemainderMinorUnits', catalog.saladRemainderMinorUnits],
@@ -1278,6 +1290,18 @@ export function loadSettingsCatalog(store: Readonly<LegacyStore>): CatalogResult
       menu.couplePrice,
       DEFAULT_SETTINGS_CATALOG.couplePriceMinorUnits,
       'couplePrice',
+      warnings,
+    ),
+    addonDinerMinorUnits: parsePrice(
+      menu.addonDinerPrice,
+      DEFAULT_SETTINGS_CATALOG.addonDinerMinorUnits,
+      'addonDinerPrice',
+      warnings,
+    ),
+    soloDinerMinorUnits: parsePrice(
+      menu.soloDinerPrice,
+      DEFAULT_SETTINGS_CATALOG.soloDinerMinorUnits,
+      'soloDinerPrice',
       warnings,
     ),
     extraChallahMinorUnits: parsePrice(
@@ -1787,6 +1811,8 @@ export function applyCatalogToStore(
     }),
     lunchSides: catalog.lunchSides.map((item) => item.name),
     couplePrice: decimalFromMinorUnits(catalog.couplePriceMinorUnits),
+    addonDinerPrice: decimalFromMinorUnits(catalog.addonDinerMinorUnits),
+    soloDinerPrice: decimalFromMinorUnits(catalog.soloDinerMinorUnits),
     challahPrice: decimalFromMinorUnits(catalog.extraChallahMinorUnits),
     includedChallot: catalog.includedChallahs,
     includedSalads: AUTHORITATIVE_ALLOWANCES.includedSaladsPerCouple,
@@ -1864,6 +1890,8 @@ export function updateCatalogCorePrice(
   catalog: SettingsCatalog,
   field:
     | 'couplePriceMinorUnits'
+    | 'addonDinerMinorUnits'
+    | 'soloDinerMinorUnits'
     | 'extraChallahMinorUnits'
     | 'saladBlockMinorUnits'
     | 'saladRemainderMinorUnits'

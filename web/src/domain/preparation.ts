@@ -5,6 +5,7 @@ import {
   StableCatalogIdSchema,
   type DecimalQuantity,
 } from './recipes.ts'
+import { packageAllowances } from './package-rules.ts'
 import type { LegacyOrder } from './store.ts'
 
 export const PREPARATION_ITEM_CATEGORIES = [
@@ -215,6 +216,12 @@ export interface PreparationDateGroup {
   readonly serviceDate: string
   readonly orderCount: number
   readonly meals: number
+  /** סועד נוסף — extra diners joining a couple meal. */
+  readonly addons: number
+  /** סועד בודד — diners eating alone. */
+  readonly solos: number
+  /** Salads the packages call for (a box per couple/solo, half per addon). */
+  readonly packageSalads: number
   readonly aricha: number
   readonly challot: number
   readonly finance: PreparationFinanceSummary
@@ -293,6 +300,9 @@ interface MutableDateGroup {
   serviceDate: string
   orderCount: number
   meals: number
+  addons: number
+  solos: number
+  packageSalads: number
   aricha: number
   challot: number
   finance: MutableFinanceSummary
@@ -1278,6 +1288,9 @@ function createMutableDateGroup(serviceDate: string): MutableDateGroup {
     serviceDate,
     orderCount: 0,
     meals: 0,
+    addons: 0,
+    solos: 0,
+    packageSalads: 0,
     aricha: 0,
     challot: 0,
     finance: createMutableFinanceSummary(),
@@ -1354,6 +1367,9 @@ function finalizeGroup(group: MutableDateGroup): PreparationDateGroup {
     serviceDate: group.serviceDate,
     orderCount: group.orderCount,
     meals: group.meals,
+    addons: group.addons,
+    solos: group.solos,
+    packageSalads: group.packageSalads,
     aricha: group.aricha,
     challot: group.challot,
     finance: finalizeFinance(group.finance),
@@ -1450,12 +1466,23 @@ export function buildPreparationPlan(
 
     const nextOrderCount = checkedCountAdd(group.orderCount, 1, context, 'orderCount')
     if (nextOrderCount !== null) group.orderCount = nextOrderCount
-    for (const field of ['meals', 'aricha', 'challot'] as const) {
+    const orderDiners = { couples: 0, addons: 0, solos: 0 }
+    for (const field of ['meals', 'addons', 'solos', 'aricha', 'challot'] as const) {
       const quantity = readCount(order[field], context, field)
       if (quantity === null) continue
+      if (field === 'meals') orderDiners.couples = quantity
+      else if (field === 'addons') orderDiners.addons = quantity
+      else if (field === 'solos') orderDiners.solos = quantity
       const next = checkedCountAdd(group[field], quantity, context, field)
       if (next !== null) group[field] = next
     }
+    const nextPackageSalads = checkedCountAdd(
+      group.packageSalads,
+      packageAllowances(orderDiners).salads,
+      context,
+      'packageSalads',
+    )
+    if (nextPackageSalads !== null) group.packageSalads = nextPackageSalads
 
     addSalads(group, order.salads, context, catalogIndex)
     addStandardCategory(group, 'firsts', order.firsts, order.firstsNotes, context, catalogIndex)

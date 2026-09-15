@@ -77,7 +77,7 @@ test('knowledge block carries business facts and the live catalog, never admin b
   const knowledge = buildKnowledgeBlock({ menu: MENU });
   // Fixed business facts.
   assert.match(knowledge, /kosher home kitchen in Dubai/u);
-  assert.match(knowledge, /Dubai \$15, Abu Dhabi \$55/u);
+  assert.match(knowledge, /Dubai delivery is INCLUDED in the price of every Shabbat package[^\n]*Abu Dhabi delivery is \$55/u);
   assert.match(knowledge, /Self-pickup is free/u);
   assert.match(knowledge, /cash, bank transfer, Bit, or PayBox/u);
   assert.match(knowledge, /\+971 58 628 8776/u);
@@ -86,7 +86,9 @@ test('knowledge block carries business facts and the live catalog, never admin b
   assert.match(knowledge, /24 hours before/u);
   assert.match(knowledge, /mehadrin/u);
   // Package rules — including how many fish a couple package includes.
-  assert.match(knowledge, /package for two \(מארז שבת זוגי יוקרתי\) costs \$250/u);
+  assert.match(knowledge, /package for two \(מארז שבת זוגי יוקרתי, "ארוחה זוגית"\) costs \$250 and INCLUDES Dubai delivery/u);
+  assert.match(knowledge, /add-on diner \(סועד נוסף\) costs \$149/u);
+  assert.match(knowledge, /solo diner \(סועד בודד\) costs \$169/u);
   assert.match(knowledge, /2 fillets, one per person/u);
   assert.match(knowledge, /extra challah \$10 each/u);
   // Live catalog projection: dish names, priced extras, lunch.
@@ -228,6 +230,6 @@ test('route degrades to business facts when state is unavailable', async () => {
   const ok = await withServer(router, (post) => post(USER_QUESTION));
   assert.equal(ok.status, 200);
   assert.equal(ok.data.reply, 'still here');
-  assert.match(received.knowledge, /Dubai \$15, Abu Dhabi \$55/u);
+  assert.match(received.knowledge, /Dubai delivery is INCLUDED in the price of every Shabbat package[^\n]*Abu Dhabi delivery is \$55/u);
   assert.doesNotMatch(received.knowledge, /\$250/u);
 });

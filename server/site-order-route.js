@@ -10,9 +10,24 @@ const { rateLimit } = require('express-rate-limit');
 const { z } = require('zod');
 const { checkSubmissionWindow } = require('./delivery-windows');
 const { getShabbatOrChagStatus } = require('./shabbat-calendar');
+const {
+  ADDON_DINER_LINE_NAME,
+  SOLO_DINER_LINE_NAME,
+  deliveryFeeMinorUnits,
+  menuPrices,
+} = require('./domain/order-pricing');
 
 const MAX_ATTEMPTS = 5;
 const CANONICAL_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+
+// How the site's cart lines map onto the panel's stored order fields. The
+// couple package line is the site's own (customer-site/src/pages/shabbat-order.tsx,
+// id 'shabbat-package'); the two diner lines carry the exact names the
+// pricing domain uses, so the panel, the site and this route agree by name.
+const COUPLE_PACKAGE_LINE_ID = 'shabbat-package';
+const COUPLE_PACKAGE_LINE_NAMES = new Set(['מארז שבת זוגי יוקרתי', 'ארוחה זוגית']);
+const DELIVERY_LINE_ID = 'delivery';
+const DELIVERY_LINE_NAME_PATTERN = /^משלוח/u;
 
 // Mirrors server/hotels/hotel-search-route.js: a checkout may only hand back a
 // hotel that route could have produced.
@@ -72,6 +87,72 @@ const OrderSubmissionSchema = z.object({
   total: z.number().finite().nonnegative().max(1_000_000),
 });
 
+function isCoupleLine(line) {
+  return line.id === COUPLE_PACKAGE_LINE_ID || COUPLE_PACKAGE_LINE_NAMES.has(line.name);
+}
+
+function isDeliveryLine(line) {
+  return line.id === DELIVERY_LINE_ID || DELIVERY_LINE_NAME_PATTERN.test(line.name);
+}
+
+function lineMinorUnits(line) {
+  return Math.round(line.unitPrice * 100) * line.qty;
+}
+
+// The package counts a site order carries: couple packages, add-on diners
+// (סועד נוסף) and solo diners (סועד בודד) — the same three integers the panel
+// stores next to each other on every order.
+function packageCounts(lines) {
+  const counts = { meals: 0, addons: 0, solos: 0 };
+  for (const line of lines) {
+    if (isCoupleLine(line)) counts.meals += line.qty;
+    else if (line.name === ADDON_DINER_LINE_NAME) counts.addons += line.qty;
+    else if (line.name === SOLO_DINER_LINE_NAME) counts.solos += line.qty;
+  }
+  return counts;
+}
+
+// Server-side check of what the site priced: the two diner lines must carry
+// the menu price, and the total must equal the lines plus the delivery fee
+// the kitchen would charge (Dubai delivery is included with any package,
+// Abu Dhabi is always charged, pickup is free). The site may send delivery
+// as its own line or fold it into the total — both are accepted, as long as
+// the customer saw the number the kitchen will ask for.
+function verifySubmissionTotals(submission, menu) {
+  const prices = menuPrices(menu);
+  const counts = packageCounts(submission.lines);
+  for (const line of submission.lines) {
+    const expectedUnit =
+      line.name === ADDON_DINER_LINE_NAME
+        ? prices.addonDinerPriceMinorUnits
+        : line.name === SOLO_DINER_LINE_NAME
+          ? prices.soloDinerPriceMinorUnits
+          : null;
+    if (expectedUnit !== null && Math.round(line.unitPrice * 100) !== expectedUnit) {
+      return { ok: false, error: 'price_mismatch', line: line.name };
+    }
+  }
+  const isPickup = submission.customer.fulfillment === 'pickup';
+  const expectedDelivery = deliveryFeeMinorUnits({
+    zone: submission.customer.zone,
+    hasPackage: counts.meals + counts.addons + counts.solos > 0,
+    pickup: isPickup,
+  });
+  const deliveryLines = submission.lines.filter(isDeliveryLine);
+  const sentDelivery = deliveryLines.reduce((sum, line) => sum + lineMinorUnits(line), 0);
+  if (deliveryLines.length > 0 && sentDelivery !== expectedDelivery) {
+    return { ok: false, error: 'delivery_mismatch', expectedDeliveryMinorUnits: expectedDelivery };
+  }
+  const itemsMinorUnits = submission.lines
+    .filter((line) => !isDeliveryLine(line))
+    .reduce((sum, line) => sum + lineMinorUnits(line), 0);
+  const expectedTotal = itemsMinorUnits + expectedDelivery;
+  if (Math.round(submission.total * 100) !== expectedTotal) {
+    return { ok: false, error: 'total_mismatch', expectedTotalMinorUnits: expectedTotal };
+  }
+  return { ok: true };
+}
+
 function dubaiDateString(now) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(now);
 }
@@ -98,6 +179,7 @@ function orderId(now) {
 }
 
 function buildLegacyOrder(submission, now) {
+  const counts = packageCounts(submission.lines);
   const itemsText = submission.lines
     .map((line) => {
       const noteText = line.note ? ` (${line.note})` : '';
@@ -143,6 +225,11 @@ function buildLegacyOrder(submission, now) {
       : {}),
     status: 'חדשה',
     source: 'site',
+    // The panel's own package fields, so a site order counts its diners the
+    // same way a staff-entered one does (forecasts, kitchen board, pricing).
+    ...(counts.meals > 0 ? { meals: counts.meals } : {}),
+    ...(counts.addons > 0 ? { addons: counts.addons } : {}),
+    ...(counts.solos > 0 ? { solos: counts.solos } : {}),
     notes,
     total: submission.total,
     payMethod: '',
@@ -226,6 +313,14 @@ function createSiteOrderRouter({ repository, logger = console, clock = () => new
             ok: false,
             error: 'phone_blocked',
             message: 'מספר הטלפון הזה אינו יכול לבצע הזמנות כרגע. נשמח לעזור בוואטסאפ.',
+          });
+        }
+        const verified = verifySubmissionTotals(parsed.data, current.data.menu);
+        if (!verified.ok) {
+          return response.status(400).json({
+            ok: false,
+            error: verified.error,
+            message: 'המחירים בעגלה אינם תואמים למחירון העדכני. רעננו את הדף ונסו שוב.',
           });
         }
         const totalMinorUnits = Math.round(parsed.data.total * 100);

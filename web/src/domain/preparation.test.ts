@@ -172,8 +172,23 @@ describe('buildPreparationPlan', () => {
     expect(dateGroup(result, '2026-08-22')).toMatchObject({
       orderCount: 1,
       meals: 1,
+      addons: 0,
+      solos: 0,
+      packageSalads: 12,
       categories: { mains: { Stew: 2 } },
     })
+  })
+
+  it('counts addon and solo diners and the salads their packages call for', () => {
+    const orders: LegacyOrder[] = [
+      { id: 'couple-plus', date: '2026-08-15', name: 'A', meals: '1', addons: 1 },
+      { id: 'solo', date: '2026-08-15', name: 'B', meals: 0, solos: '1' },
+      { id: 'old', date: '2026-08-15', name: 'C', meals: 1 },
+    ]
+    const result = buildPreparationPlan(orders, CATALOG)
+    expect(result.warnings).toEqual([])
+    // 12 (couple) + 6 (addon) + 12 (solo) + 12 (old couple order without the keys)
+    expect(dateGroup(result, '2026-08-15')).toMatchObject({ meals: 2, addons: 1, solos: 1, packageSalads: 42 })
   })
 
   it('aggregates every legacy food category, gifts, lunch choices, extras, custom rows, and notes with order identity', () => {

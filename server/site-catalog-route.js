@@ -8,6 +8,10 @@
 
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
+const {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+} = require('./domain/package-rules');
 
 const CATEGORY_KEYS = ['salads', 'firsts', 'mains', 'sides', 'desserts'];
 const MAX_TEXT_LENGTH = 240;
@@ -116,6 +120,10 @@ function createSiteCatalogRouter({ repository, logger = console }) {
       response.set('Cache-Control', 'public, max-age=60');
       return response.status(200).json({
         couplePriceUsd: usd(menu.couplePrice),
+        // The two extra diner kinds (Lin, 2026-09-15) always carry a price:
+        // the contract defaults stand in until the panel stores its own.
+        addonDinerPriceUsd: usd(menu.addonDinerPrice) ?? ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT / 100,
+        soloDinerPriceUsd: usd(menu.soloDinerPrice) ?? SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT / 100,
         challahPriceUsd: usd(menu.challahPrice),
         categories: projectCategories(menu),
         extras: projectExtras(menu),

@@ -1,4 +1,5 @@
 import { checkedAdd } from './money.ts'
+import { packageAllowances, type DinerCounts } from './package-rules.ts'
 import type { LegacyOrder, LegacyStore } from './store.ts'
 
 const DEFAULT_LOCALE = 'he-IL'
@@ -41,6 +42,10 @@ export type OrdersCapacity =
 
 export interface OrdersSummaryChips {
   readonly meals: number | null
+  /** סועד נוסף — extra diners joining a couple meal. */
+  readonly addons: number | null
+  /** סועד בודד — diners eating alone. */
+  readonly solos: number | null
   readonly orderedSalads: number | null
   readonly complimentarySalads: number | null
   readonly distinctExtras: number | null
@@ -492,6 +497,8 @@ function summaryChips(
 ): OrdersSummaryChips {
   return {
     meals: parseCount(order.meals, order, 'meals', warnings),
+    addons: parseCount(order.addons, order, 'addons', warnings),
+    solos: parseCount(order.solos, order, 'solos', warnings),
     orderedSalads: selectedRecordCount(order.salads, 'o', order, 'salads', warnings),
     complimentarySalads: selectedRecordCount(order.salads, 'p', order, 'salads', warnings),
     distinctExtras: distinctExtrasCount(order, warnings),
@@ -515,6 +522,24 @@ function positiveSelectionLines(
     lines.push(`${safeKey(name)}${quantity > 1 ? ` ×${quantity}` : ''}${note ? ` (${note})` : ''}`)
   }
   return lines
+}
+
+/** The order's diner packages as stored (`meals`, `addons`, `solos`), zero-safe for old orders. */
+export function orderDinerCounts(order: Readonly<LegacyOrder>): DinerCounts {
+  return {
+    couples: displayQuantity(order.meals),
+    addons: displayQuantity(order.addons),
+    solos: displayQuantity(order.solos),
+  }
+}
+
+/** "זוגית ×1 + סועד נוסף ×1" — the packages an order holds, or '' when it has none. */
+export function formatDinerSummary(counts: DinerCounts): string {
+  const parts: string[] = []
+  if (counts.couples > 0) parts.push(`זוגית ×${counts.couples}`)
+  if (counts.addons > 0) parts.push(`סועד נוסף ×${counts.addons}`)
+  if (counts.solos > 0) parts.push(`סועד בודד ×${counts.solos}`)
+  return parts.join(' + ')
 }
 
 function displayQuantity(value: unknown): number {
@@ -580,8 +605,10 @@ export function formatLegacyOrderText(order: Readonly<LegacyOrder>, locale = DEF
   if (order.pickup !== true && text(order.address)) lines.push(`כתובת: ${text(order.address)}`)
   if (text(order.group)) lines.push(`קבוצה: ${text(order.group)}`)
 
-  const meals = displayQuantity(order.meals)
-  if (meals > 0) lines.push(`ארוחה זוגית ×${meals}`)
+  const diners = orderDinerCounts(order)
+  if (diners.couples > 0) lines.push(`ארוחה זוגית ×${diners.couples}`)
+  if (diners.addons > 0) lines.push(`סועד נוסף ×${diners.addons}`)
+  if (diners.solos > 0) lines.push(`סועד בודד ×${diners.solos}`)
 
   const orderedSalads = positiveSelectionLines(order.salads, 'o')
   const giftSalads = positiveSelectionLines(order.salads, 'p').map((line) => `${line} — פינוק`)
@@ -721,8 +748,15 @@ export function buildBonFields(order: Readonly<LegacyOrder>): readonly BonField[
   )
   push('קבוצה', text(order.group))
 
-  const meals = displayQuantity(order.meals)
-  if (meals > 0) push('ארוחה זוגית', `×${meals}`)
+  const diners = orderDinerCounts(order)
+  if (diners.couples > 0) push('ארוחה זוגית', `×${diners.couples}`)
+  if (diners.addons > 0) push('סועד נוסף', `×${diners.addons}`)
+  if (diners.solos > 0) push('סועד בודד', `×${diners.solos}`)
+  // The salad count the kitchen packs comes from the packages (a box per
+  // couple or solo, half a box per addon), not from the stored selection.
+  if (diners.addons > 0 || diners.solos > 0) {
+    push('סלטים בחבילה', `${packageAllowances(diners).salads} יחידות`)
+  }
   const tableSettings = displayQuantity(order.aricha)
   if (tableSettings > 0) push('עריכה', tableSettings === 1 ? 'סועד אחד' : `${tableSettings} סועדים`)
   const challahs = displayQuantity(order.challot)

@@ -26,6 +26,36 @@ export const DELIVERY_ZONE_LABELS: Readonly<Record<DeliveryZone, string>> = {
   'abu-dhabi': 'אבו דאבי',
 }
 
+/** Cart line ids of the Shabbat package family. Any of them in the cart
+ *  makes Dubai delivery included (owner rule, 2026-09-15); Abu Dhabi keeps
+ *  its fee and pickup stays free. */
+export const SHABBAT_PACKAGE_LINE_ID = 'shabbat-package'
+export const ADDON_DINER_LINE_ID = 'shabbat-addon-diner'
+export const SOLO_DINER_LINE_ID = 'shabbat-solo-diner'
+/** Canonical Hebrew line names — what the kitchen and the order route read. */
+export const ADDON_DINER_NAME_HE = 'סועד נוסף'
+export const SOLO_DINER_NAME_HE = 'סועד בודד'
+export const FALLBACK_ADDON_DINER_PRICE_USD = 149
+export const FALLBACK_SOLO_DINER_PRICE_USD = 169
+
+const PACKAGE_LINE_IDS: ReadonlySet<string> = new Set([SHABBAT_PACKAGE_LINE_ID, ADDON_DINER_LINE_ID, SOLO_DINER_LINE_ID])
+
+export function hasShabbatPackage(lines: readonly Pick<CartLine, 'id' | 'name'>[]): boolean {
+  return lines.some((l) => PACKAGE_LINE_IDS.has(l.id) || l.name === ADDON_DINER_NAME_HE || l.name === SOLO_DINER_NAME_HE)
+}
+
+/** The delivery fee the customer pays, in USD: 0 for pickup and for Dubai
+ *  when a Shabbat package (couple / add-on diner / solo diner) is in the cart. */
+export function deliveryFeeUsd(
+  lines: readonly Pick<CartLine, 'id' | 'name'>[],
+  fulfillment: Fulfillment,
+  zone: DeliveryZone,
+): number {
+  if (fulfillment === 'pickup') return 0
+  if (zone === 'dubai' && hasShabbatPackage(lines)) return 0
+  return DELIVERY_FEES_USD[zone]
+}
+
 export type AddressMode = 'hotel' | 'free'
 
 /** One result from /api/hotels/search, kept only while the order is being placed. */

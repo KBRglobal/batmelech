@@ -31,6 +31,8 @@ test('catalog projects names, prices, and item photos, never the raw menu object
     orders: [],
     menu: {
       couplePrice: 230,
+      addonDinerPrice: 150,
+      soloDinerPrice: 170,
       challahPrice: 10,
       salads: ['טחינה', 'מטבוחה פיקנטית'],
       mains: ['קציצות בשר'],
@@ -64,6 +66,8 @@ test('catalog projects names, prices, and item photos, never the raw menu object
     assert.match(response.headers.get('cache-control') ?? '', /max-age=60/);
 
     assert.equal(body.couplePriceUsd, 230);
+    assert.equal(body.addonDinerPriceUsd, 150);
+    assert.equal(body.soloDinerPriceUsd, 170);
     assert.equal(body.challahPriceUsd, 10);
     assert.deepEqual(body.categories.salads[0], {
       name: 'טחינה',
@@ -100,6 +104,9 @@ test('catalog stays well-formed and null-priced on a missing or malformed menu',
   await withServer(fakeRepository({ orders: [] }), async (base) => {
     const body = await (await fetch(`${base}/api/site/catalog`)).json();
     assert.equal(body.couplePriceUsd, null);
+    // The two diner kinds always carry a price: the contract defaults.
+    assert.equal(body.addonDinerPriceUsd, 149);
+    assert.equal(body.soloDinerPriceUsd, 169);
     assert.deepEqual(body.categories.salads, []);
     assert.deepEqual(body.extras, []);
     assert.deepEqual(body.lunch, []);
@@ -109,6 +116,8 @@ test('catalog stays well-formed and null-priced on a missing or malformed menu',
     orders: [],
     menu: {
       couplePrice: 'not-a-number',
+      addonDinerPrice: -5,
+      soloDinerPrice: 'x',
       salads: ['', 42, 'אמיתי'],
       extras: [{ name: '', price: 5 }, { name: 'תקין', price: -3 }, 'junk'],
       lunch: [{ key: '' }, 'junk'],
@@ -118,6 +127,8 @@ test('catalog stays well-formed and null-priced on a missing or malformed menu',
   await withServer(malformed, async (base) => {
     const body = await (await fetch(`${base}/api/site/catalog`)).json();
     assert.equal(body.couplePriceUsd, null);
+    assert.equal(body.addonDinerPriceUsd, 149);
+    assert.equal(body.soloDinerPriceUsd, 169);
     assert.deepEqual(body.categories.salads, [{ name: 'אמיתי', description: '', imageUrl: null }]);
     assert.deepEqual(body.extras, [{ name: 'תקין', priceUsd: null, description: '', imageUrl: null }]);
     assert.deepEqual(body.lunch, []);

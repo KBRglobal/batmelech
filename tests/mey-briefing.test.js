@@ -8,7 +8,7 @@ const { buildBriefing, comingFriday } = require('../server/telegram/mey-briefing
 function state() {
   return {
     settings: { orderingOpen: true, out: ['טחינה'], siteBanner: 'סגורים בסוכות', meyNotes: [{ text: 'קטי תמיד רוצה חריף', by: 'לין', date: '2026-09-01' }] },
-    menu: { couplePrice: 230, challahPrice: 10, extras: [{ name: 'מארז הבדלה', price: 20 }] },
+    menu: { couplePrice: 230, addonDinerPrice: 150, challahPrice: 10, extras: [{ name: 'מארז הבדלה', price: 20 }] },
     customerMeta: { '0501112233': { notes: 'אוהבת לא חריף' } },
     orders: [
       { id: 'a', date: '2026-09-07', name: 'רותי', place: 'Atlantis The Palm', time: '17:00', total: '230', status: 'מוכנה', paid: 'לא', phone: '0501112233' },
@@ -36,7 +36,10 @@ test('the briefing carries today, the coming Friday, debts, platas, prices and s
   assert.match(briefing, /דנה — Five Palm, בלי שעה, 460\.00\$ .* שולם/u);
   assert.match(briefing, /חובות פתוחים: 2 לקוחות, סה"כ 378\.00\$/u);
   assert.match(briefing, /פלטות בחוץ: 1 \(טוני\)/u);
-  assert.match(briefing, /ארוחה זוגית 230\$ \/ 844\.68 דירהם/u);
+  assert.match(briefing, /ארוחה זוגית 230\$ \/ 844\.68 דירהם כולל משלוח בדובאי/u);
+  assert.match(briefing, /סועד נוסף 150\$ \/ [\d.]+ דירהם — מצטרף לארוחה זוגית ומקבל חצי מהכל \(פילה דג אחד, חצי עיקרית, חצי תוספת, חצי מנת קינוח, חלה אחת, 6 סלטים\)/u);
+  assert.match(briefing, /סועד בודד 169\$ \/ [\d.]+ דירהם כולל משלוח בדובאי — לאדם אחד לבד \(פילה דג אחד, חצי עיקרית, חצי תוספת, חצי מנת קינוח, 2 חלות ומארז 12 הסלטים המלא\)/u, 'the solo price falls back to the contract default');
+  assert.match(briefing, /משלוח דובאי כלול בכל מארז \(בהזמנה בלי מארז 15\$ [^)]*\), אבו דאבי 55\$/u);
   assert.match(briefing, /מארז הבדלה 20\$ \/ 73\.45 דירהם/u);
   assert.match(briefing, /בגט\/חלת שניצל ישראלי: בבגט 25\$ \/ 91\.81 דירהם/u);
   assert.match(briefing, /קטי תמיד רוצה חריף \(לין, 2026-09-01\)/u);
@@ -49,6 +52,8 @@ test('an empty business still produces a coherent briefing', () => {
   assert.match(briefing, /חובות פתוחים: אין/u);
   assert.match(briefing, /פלטות בחוץ: אין/u);
   assert.match(briefing, /ארוחה זוגית 230\$ \/ 844\.68 דירהם/u, 'default prices when the menu has none');
+  assert.match(briefing, /סועד נוסף 149\$/u);
+  assert.match(briefing, /סועד בודד 169\$/u);
 });
 
 test('debtors in the briefing are ranked by what they owe, not by what they paid', () => {

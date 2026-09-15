@@ -13,7 +13,14 @@
 // or order data, audit logs, blocked phones, internal ids.
 
 const { orderingStatus } = require('../business-actions');
-const { SALAD_BOX_ITEMS } = require('../domain/package-rules');
+const {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  ADDON_DINER_SALADS,
+  SALAD_BOX_ITEMS,
+  SALAD_BOX_SIZE,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+} = require('../domain/package-rules');
+const { DELIVERY_PRICE_MINOR_UNITS } = require('../domain/order-pricing');
 
 const MAX_TEXT_LENGTH = 240;
 const MAX_ITEMS = 500;
@@ -29,7 +36,11 @@ const CATEGORY_LABELS = Object.freeze({
 // Fallbacks mirror the public site's hardcoded values
 // (customer-site/src/pages/shabbat-order.tsx, cart-context.tsx). Live state
 // overrides them wherever the panel carries a value.
-const FALLBACK_COUPLE_PRICE_USD = 230;
+const FALLBACK_COUPLE_PRICE_USD = 299;
+const FALLBACK_ADDON_DINER_PRICE_USD = ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT / 100;
+const FALLBACK_SOLO_DINER_PRICE_USD = SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT / 100;
+const DUBAI_DELIVERY_USD = DELIVERY_PRICE_MINOR_UNITS.dubai / 100;
+const ABU_DHABI_DELIVERY_USD = DELIVERY_PRICE_MINOR_UNITS['abu-dhabi'] / 100;
 const FALLBACK_CHALLAH_PRICE_USD = 10;
 const FALLBACK_INCLUDED_CHALLOT = 2;
 const SITE_EXTRA_FIRST_USD = 30;
@@ -43,7 +54,7 @@ const BUSINESS_FACTS = [
   'Website: https://www.batmelech.ae — in Hebrew, English and French. Instagram: @bat_melech_kitchen.',
   'Ordering happens on the website or by WhatsApp at +971 58 628 8776. This chat cannot place, confirm, or change orders.',
   'No payment is taken on the website. Payment is on delivery: cash, bank transfer, Bit, or PayBox. All prices are in US dollars (USD).',
-  'Delivery fee: Dubai $15, Abu Dhabi $55. Self-pickup is free. Delivery goes to any hotel or address anywhere in Dubai or Abu Dhabi (with room number for hotels), hot, in sealed tamper-evident thermal coolers. The fee depends only on the emirate, never on the specific hotel or neighborhood — every hotel in Dubai (Palm Jumeirah, Dubai Marina, Downtown, JBR and so on) is the Dubai fee, and every hotel in Abu Dhabi is the Abu Dhabi fee.',
+  `Delivery fee: Dubai delivery is INCLUDED in the price of every Shabbat package (couple package, add-on diner or solo diner); an order with no package at all (weekday dishes or extras only) pays $${DUBAI_DELIVERY_USD} for Dubai delivery. Abu Dhabi delivery is $${ABU_DHABI_DELIVERY_USD} on every order. Self-pickup is free. Delivery goes to any hotel or address anywhere in Dubai or Abu Dhabi (with room number for hotels), hot, in sealed tamper-evident thermal coolers. The fee depends only on the emirate, never on the specific hotel or neighborhood — every hotel in Dubai (Palm Jumeirah, Dubai Marina, Downtown, JBR and so on) is the Dubai fee, and every hotel in Abu Dhabi is the Abu Dhabi fee.`,
   'Shabbat orders must be placed by Thursday at 6:00 PM. Cancellation is possible up to 24 hours before the delivery time.',
   'Kashrut: strictly kosher mehadrin. All cooking happens in a dedicated, separate kosher kitchen with complete separation of utensils, surfaces and ovens. Meat is glatt (chalak) with mehadrin certification; all ingredients come from certified suppliers only, under the supervision of leading rabbis. The kashrut certificate is shown on the site. For kashrut questions beyond this, ask on WhatsApp.',
   'The kitchen keeps Shabbat: the site closes automatically from candle lighting until havdalah (Dubai times) on Shabbat and holidays, and reopens right after.',
@@ -161,20 +172,26 @@ function dishIngredients(data) {
 
 function packageLines(menu) {
   const couplePrice = usd(menu.couplePrice) ?? FALLBACK_COUPLE_PRICE_USD;
+  const addonDinerPrice = usd(menu.addonDinerPrice) ?? FALLBACK_ADDON_DINER_PRICE_USD;
+  const soloDinerPrice = usd(menu.soloDinerPrice) ?? FALLBACK_SOLO_DINER_PRICE_USD;
   const challahPrice = usd(menu.challahPrice) ?? FALLBACK_CHALLAH_PRICE_USD;
   const includedChallot =
     typeof menu.includedChallot === 'number' && Number.isFinite(menu.includedChallot) && menu.includedChallot >= 0
       ? menu.includedChallot
       : FALLBACK_INCLUDED_CHALLOT;
   return [
-    `The premium Shabbat package for two (מארז שבת זוגי יוקרתי) costs $${couplePrice}.`,
-    'Each package includes: the fixed box of 12 house salads (מארז 12 סלטים — the same 12 for everyone, no choosing: ' +
+    `There are exactly three ways to order Shabbat food: the couple package, the add-on diner and the solo diner.`,
+    `1. The premium Shabbat package for two (מארז שבת זוגי יוקרתי, "ארוחה זוגית") costs $${couplePrice} and INCLUDES Dubai delivery.`,
+    `2. An add-on diner (סועד נוסף) costs $${addonDinerPrice} and joins a couple package as a third, fourth... person; it cannot be ordered without a couple package. An add-on diner gets half of everything: 1 fish fillet, half a main course, half a side, one dessert half-portion (one soufflé, or half a baklava portion), 1 challah and ${ADDON_DINER_SALADS} salads. Dubai delivery is already included with the package it joins.`,
+    `3. A solo diner (סועד בודד) costs $${soloDinerPrice} and INCLUDES Dubai delivery — for one person eating alone: 1 fish fillet, half a main course, half a side, one dessert half-portion, 2 challot and the full ${SALAD_BOX_SIZE}-salad box.`,
+    `Abu Dhabi delivery is $${ABU_DHABI_DELIVERY_USD} on top of any of the three. Example: a couple plus one guest in Dubai = one couple package ($${couplePrice}) + one add-on diner ($${addonDinerPrice}) = $${couplePrice + addonDinerPrice}, delivery included; two people = one couple package; one person = one solo diner; four people = two couple packages.`,
+    'Each couple package includes: the fixed box of 12 house salads (מארז 12 סלטים — the same 12 for everyone, no choosing: ' +
       `${SALAD_BOX_ITEMS.join(', ')}), one first course, one main course, one side, one dessert (pareve), and ` +
       `${includedChallot} challot. The box is included with every package for two; an additional box, or a box ordered on its own without a package, costs $60 (menu extra "מארז 12 סלטים").`,
     'The first course of a package is a pair of fresh sea-bream fish fillets — 2 fillets, one per person — in chraime or Moroccan sauce, or a portion of Moroccan fish patties (קציצות דגים). So a package for two includes 2 fish fillets.',
     'The dessert portion of a package is two chocolate soufflés or one baklava portion.',
     `Beyond what is included: extra fish fillet unit $${SITE_EXTRA_FIRST_USD}, extra main course $${SITE_EXTRA_MAIN_USD}, extra challah $${challahPrice} each. Salads are not sold separately and cannot be swapped — the box is fixed.`,
-    'There is no separate group pricing and no minimum order: a large or group order is simply priced as the matching number of couple packages plus extras.',
+    'There is no separate group pricing and no minimum order: a large or group order is simply priced as the matching number of couple packages, plus an add-on diner for each extra person, plus extras.',
     'Table setting service ("סט עריכה", $10 per person) includes per person: 2 plates, 2 spoons, 2 forks and 2 knives.',
     'Shabbat extras (the à la carte page) can be ordered freely with no package required.',
   ];

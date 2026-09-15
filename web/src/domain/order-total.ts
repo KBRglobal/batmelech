@@ -33,6 +33,14 @@ export interface ChargeLineInput {
 export interface OrderTotalInput {
   readonly coupleMeals: unknown
   readonly coupleMealUnitPriceMinorUnits: unknown
+  /** Extra diners joining a couple meal (סועד נוסף). Default 0. */
+  readonly addonDiners?: unknown
+  readonly addonDinerUnitPriceMinorUnits?: unknown
+  /** Diners eating alone with no couple meal (סועד בודד). Default 0. */
+  readonly soloDiners?: unknown
+  readonly soloDinerUnitPriceMinorUnits?: unknown
+  /** Included fish units for the whole package; defaults to coupleMeals × 2. */
+  readonly includedFishUnits?: unknown
   readonly fishQuantities: unknown
   readonly orderedSalads: unknown
   readonly giftSalads?: unknown
@@ -43,7 +51,7 @@ export interface OrderTotalInput {
 }
 
 export interface OrderTotalLine {
-  readonly kind: 'couple-meal' | 'fish-surcharge' | 'salad-surcharge' | 'manual'
+  readonly kind: 'couple-meal' | 'addon-diner' | 'solo-diner' | 'fish-surcharge' | 'salad-surcharge' | 'manual'
   readonly name: string
   readonly quantity: number
   readonly unitPriceMinorUnits: number
@@ -67,6 +75,8 @@ export interface OrderTotalResult {
 }
 
 const COUPLE_MEAL_LINE_NAME = 'ארוחה זוגית'
+export const ADDON_DINER_LINE_NAME = 'סועד נוסף'
+export const SOLO_DINER_LINE_NAME = 'סועד בודד'
 const FISH_SURCHARGE_LINE_NAME = 'פילה דג אקסטרה'
 const SALAD_SURCHARGE_LINE_NAME = 'סלטים אקסטרה'
 const SUPPORTED_CHARGE_SOURCES = new Set<ChargeSource>([
@@ -146,6 +156,11 @@ function buildLine(
 export function calculateOrderTotal({
   coupleMeals,
   coupleMealUnitPriceMinorUnits,
+  addonDiners = 0,
+  addonDinerUnitPriceMinorUnits = 0,
+  soloDiners = 0,
+  soloDinerUnitPriceMinorUnits = 0,
+  includedFishUnits,
   fishQuantities,
   orderedSalads,
   giftSalads = 0,
@@ -158,6 +173,16 @@ export function calculateOrderTotal({
   const mealPrice = requireNonNegativeSafeInteger(
     coupleMealUnitPriceMinorUnits,
     'couple meal unit price minor units',
+  )
+  const addons = requireNonNegativeSafeInteger(addonDiners, 'addon diners')
+  const addonPrice = requireNonNegativeSafeInteger(
+    addonDinerUnitPriceMinorUnits,
+    'addon diner unit price minor units',
+  )
+  const solos = requireNonNegativeSafeInteger(soloDiners, 'solo diners')
+  const soloPrice = requireNonNegativeSafeInteger(
+    soloDinerUnitPriceMinorUnits,
+    'solo diner unit price minor units',
   )
   const filletPrice = requireNonNegativeSafeInteger(
     extraFilletPriceMinorUnits,
@@ -172,6 +197,7 @@ export function calculateOrderTotal({
     coupleMeals: meals,
     quantities: fishQuantities,
     extraFilletPriceMinorUnits: filletPrice,
+    ...(includedFishUnits === undefined ? {} : { includedUnits: includedFishUnits }),
   })
   const salads = calculateSaladPricing({
     coupleMeals: meals,
@@ -185,6 +211,14 @@ export function calculateOrderTotal({
 
   if (meals > 0) {
     lines.push(buildLine('couple-meal', COUPLE_MEAL_LINE_NAME, meals, mealPrice))
+  }
+
+  if (addons > 0) {
+    lines.push(buildLine('addon-diner', ADDON_DINER_LINE_NAME, addons, addonPrice))
+  }
+
+  if (solos > 0) {
+    lines.push(buildLine('solo-diner', SOLO_DINER_LINE_NAME, solos, soloPrice))
   }
 
   if (fish.extraUnits > 0) {

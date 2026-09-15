@@ -18,6 +18,7 @@ import {
   renameCatalogExtra,
   renameCatalogItem,
   resolvePreparationCatalog,
+  updateCatalogCorePrice,
   recipeTargets,
   splitAllergens,
   updateCatalogExtraAllergens,
@@ -44,6 +45,8 @@ describe('settings catalog', () => {
 
     expect(result.warnings).toEqual([])
     expect(result.catalog.couplePriceMinorUnits).toBe(23_000)
+    expect(result.catalog.addonDinerMinorUnits).toBe(14_900)
+    expect(result.catalog.soloDinerMinorUnits).toBe(16_900)
     expect(result.catalog.extraChallahMinorUnits).toBe(1_000)
     expect(result.catalog.includedChallahs).toBe(2)
     expect(Object.fromEntries(Object.entries(result.catalog.categories).map(([key, rows]) => [key, rows.length]))).toEqual({
@@ -285,12 +288,28 @@ describe('settings catalog', () => {
     expect((saved as Record<string, unknown>).preserved).toEqual({ exact: true })
     expect((saved as Record<string, unknown>).menu).toMatchObject({
       couplePrice: 230,
+      addonDinerPrice: 149,
+      soloDinerPrice: 169,
       challahPrice: 10,
       includedFish: 2,
       fishExtraPrice: 30,
       saladBlockPrice: 25,
       saladUnitPrice: 7,
     })
+  })
+
+  it('round-trips the addon and solo diner prices through menu.addonDinerPrice / menu.soloDinerPrice', () => {
+    const edited = updateCatalogCorePrice(
+      updateCatalogCorePrice(DEFAULT_SETTINGS_CATALOG, 'addonDinerMinorUnits', 12_050),
+      'soloDinerMinorUnits',
+      15_000,
+    )
+    const saved = applyCatalogToStore(EMPTY_STORE, edited)
+    expect((saved as Record<string, unknown>).menu).toMatchObject({ addonDinerPrice: 120.5, soloDinerPrice: 150 })
+    const reloaded = loadSettingsCatalog(saved)
+    expect(reloaded.warnings).toEqual([])
+    expect(reloaded.catalog).toMatchObject({ addonDinerMinorUnits: 12_050, soloDinerMinorUnits: 15_000 })
+    expect(loadSettingsCatalog({ orders: [], menu: { addonDinerPrice: 'bad' } }).catalog.addonDinerMinorUnits).toBe(14_900)
   })
 
   it('round-trips a dish photo and description through save and reload, and clears them cleanly', () => {

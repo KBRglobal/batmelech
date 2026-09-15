@@ -1,9 +1,9 @@
 'use strict';
 
 const {
-  FISH_UNITS_INCLUDED_PER_MEAL,
   classifyDessertKind,
-  defaultDessertPortionsForMeals,
+  dessertHalfUnitsPerPortion,
+  packageAllowances,
 } = require('./package-rules');
 
 // Server-side twin of resolveReviewItemQuantities in
@@ -28,13 +28,29 @@ function resolveReviewItemQuantities(reviewItems, catalogById, currentMeals) {
   const statedMeals = reviewItems.find(
     (item) => categoryOf(item.catalogItemId) === 'couple_meal' && item.quantity !== null,
   )?.quantity;
-  const assumedMeals = statedMeals ?? (hasSelections ? Math.max(currentMeals, 1) : currentMeals);
+  // The other two package kinds (add-on diner joining a couple meal, solo
+  // diner alone): a named one with no digit is one diner. A solo diner with
+  // dishes listed is NOT evidence of a couple meal, so the "at least one
+  // meal once a dish is named" assumption only applies when neither is named.
+  const dinerCount = (category) => {
+    const item = reviewItems.find((row) => categoryOf(row.catalogItemId) === category);
+    return item ? item.quantity ?? 1 : 0;
+  };
+  const addons = dinerCount('addon_diner');
+  const solos = dinerCount('solo_diner');
+  const assumedMeals = statedMeals ??
+    (hasSelections && addons + solos === 0 ? Math.max(currentMeals, 1) : currentMeals);
+  const allowances = packageAllowances({ couples: assumedMeals, addons, solos });
 
   const defaultQuantityFor = (category, name) => {
     if (category === 'couple_meal') return assumedMeals;
-    if (category === 'first') return assumedMeals * FISH_UNITS_INCLUDED_PER_MEAL;
+    if (category === 'addon_diner' || category === 'solo_diner') return 1;
+    if (category === 'first') return allowances.fishUnits;
     if (category === 'salad' || category === 'main' || category === 'side') return 1;
-    if (category === 'dessert') return defaultDessertPortionsForMeals(classifyDessertKind(name), assumedMeals);
+    if (category === 'dessert') {
+      const perPortion = dessertHalfUnitsPerPortion(classifyDessertKind(name));
+      return perPortion === 0 ? 0 : Math.max(1, Math.floor(allowances.dessertHalfUnits / perPortion));
+    }
     if (category === 'extra') return 1;
     // A weekday lunch dish is a standalone plate: naming it IS ordering one
     // of it. Leaving it unresolved dropped the dish out of the order

@@ -29,6 +29,34 @@ function orderInput(overrides: Partial<OrderTotalInput> = {}): OrderTotalInput {
 }
 
 describe('calculateOrderTotal', () => {
+  it('adds addon and solo diner lines and honours a package-wide fish allowance', () => {
+    const result = calculateOrderTotal(
+      orderInput({
+        coupleMeals: 1,
+        addonDiners: 1,
+        addonDinerUnitPriceMinorUnits: 14_900,
+        soloDiners: 2,
+        soloDinerUnitPriceMinorUnits: 16_900,
+        includedFishUnits: 5,
+        fishQuantities: { [MOROCCAN_FILLET_NAME]: 6 },
+      }),
+    )
+
+    expect(result.fish).toEqual(expect.objectContaining({ selectedUnits: 6, includedUnits: 5, extraUnits: 1 }))
+    expect(result.lines).toEqual([
+      expect.objectContaining({ kind: 'couple-meal', name: 'ארוחה זוגית', quantity: 1, amountMinorUnits: COUPLE_MEAL_PRICE_MINOR_UNITS }),
+      expect.objectContaining({ kind: 'addon-diner', name: 'סועד נוסף', quantity: 1, unitPriceMinorUnits: 14_900, amountMinorUnits: 14_900 }),
+      expect.objectContaining({ kind: 'solo-diner', name: 'סועד בודד', quantity: 2, unitPriceMinorUnits: 16_900, amountMinorUnits: 33_800 }),
+      expect.objectContaining({ kind: 'fish-surcharge', quantity: 1, amountMinorUnits: 3_000 }),
+    ])
+    expect(result.totalMinorUnits).toBe(COUPLE_MEAL_PRICE_MINOR_UNITS + 14_900 + 33_800 + 3_000)
+
+    const none = calculateOrderTotal(orderInput({ coupleMeals: 1 }))
+    expect(none.lines.some((line) => line.kind === 'addon-diner' || line.kind === 'solo-diner')).toBe(false)
+    expect(() => calculateOrderTotal(orderInput({ addonDiners: -1 }))).toThrow()
+    expect(() => calculateOrderTotal(orderInput({ soloDiners: 1, soloDinerUnitPriceMinorUnits: 1.5 }))).toThrow()
+  })
+
   it('uses the mixed fish and salad allowances inside one couple-meal total', () => {
     const result = calculateOrderTotal(
       orderInput({

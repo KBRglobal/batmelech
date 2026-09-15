@@ -289,6 +289,9 @@ test('uses official Responses structured output and preserves every review findi
   assert.match(request.input[0].content, /Never invent a quantity/i);
   assert.match(request.input[0].content, /Never invent or calculate a price/i);
   assert.match(request.input[0].content, /isPaidExtra/i);
+  assert.match(request.input[0].content, /ADD-ON DINER \("סועד נוסף", category addon_diner\)[^\n]*"עוד סועד" \/ "אדם שלישי"/u);
+  assert.match(request.input[0].content, /SOLO DINER \("סועד בודד", category solo_diner\)[^\n]*"אדם אחד" \/ "לבד"/u);
+  assert.match(request.input[0].content, /N=3 is one couple meal plus one add-on diner/u);
   assert.match(request.input[1].content, /קוסקוסס כמו ענן/);
 });
 
@@ -1351,6 +1354,23 @@ const coupleMealCatalog = [
     currency: null,
   },
 ];
+
+// The two other package kinds reach the draft through the same grounding
+// gate as every dish: the quoted words must identify the catalog item.
+test('add-on and solo diner phrasings match their catalog items, a couple meal never does', () => {
+  const addon = { name: 'סועד נוסף', aliases: ['עוד סועד', 'אדם שלישי', 'סועד שלישי', 'אדם נוסף', 'עוד אדם'] };
+  const solo = { name: 'סועד בודד', aliases: ['אדם אחד', 'סועד יחיד', 'ארוחה ליחיד', 'ארוחה לאדם אחד', 'ליחיד'] };
+  for (const quote of ['סועד נוסף', 'עוד סועד אחד', 'אדם שלישי', 'ועוד אדם']) {
+    assert.equal(sourceTextMatchesCatalogItem(quote, addon), true, `${quote} should be an add-on diner`);
+  }
+  for (const quote of ['סועד בודד', 'ארוחה לאדם אחד', 'ליחיד']) {
+    assert.equal(sourceTextMatchesCatalogItem(quote, solo), true, `${quote} should be a solo diner`);
+  }
+  const couple = { name: 'ארוחה זוגית', aliases: ['זוגית', 'ארוחה לזוג'] };
+  assert.equal(sourceTextMatchesCatalogItem('סועד נוסף', couple), false);
+  assert.equal(sourceTextMatchesCatalogItem('סועד בודד', couple), false);
+  assert.equal(sourceTextMatchesCatalogItem('זוגית אחת', addon), false);
+});
 
 test('corrects a couple-meal count the provider quoted correctly but miscounted', async () => {
   const message = 'טוב קודם כל אני רוצה לשריין ארוחת שבת ל 2 זוגות. דגים מרוקאים';

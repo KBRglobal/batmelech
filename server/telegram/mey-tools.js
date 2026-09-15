@@ -555,6 +555,8 @@ function summarizeOrder(order) {
     status: order.status,
     source: typeof order.source === 'string' ? order.source : null,
     coupleMeals: Number(order.meals) || 0,
+    addonDiners: Number(order.addons) || 0,
+    soloDiners: Number(order.solos) || 0,
     dishes: dishes.map((dish) => ({ name: dish.name, quantity: dish.quantity, course: dish.course })),
     total: order.total,
     totalMinorUnits: money.totalMinorUnits,

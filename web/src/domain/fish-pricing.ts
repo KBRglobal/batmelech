@@ -21,6 +21,12 @@ export interface FishPricingInput {
   readonly coupleMeals: unknown
   readonly quantities: unknown
   readonly extraFilletPriceMinorUnits?: unknown
+  /**
+   * The included fish units for the whole package (couples + addon/solo
+   * diners, see packageAllowances). When given it replaces the plain
+   * coupleMeals × 2 computation.
+   */
+  readonly includedUnits?: unknown
 }
 
 export interface FishPricingResult {
@@ -49,6 +55,7 @@ export function calculateFishPricing({
   coupleMeals,
   quantities,
   extraFilletPriceMinorUnits = EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS,
+  includedUnits: includedUnitsOverride,
 }: FishPricingInput): FishPricingResult {
   const extraFilletPrice = requireNonNegativeSafeInteger(
     extraFilletPriceMinorUnits,
@@ -62,11 +69,13 @@ export function calculateFishPricing({
     const itemUnits = checkedMultiply(quantity, unitWeight, `${itemName} units`)
     selectedUnits = checkedAdd(selectedUnits, itemUnits, 'selected fish units')
   }
-  const includedUnits = checkedMultiply(
-    requireNonNegativeSafeInteger(coupleMeals, 'couple meals'),
-    FILLET_UNITS_PER_COUPLE_MEAL,
-    'included fish units',
-  )
+  const includedUnits = includedUnitsOverride === undefined
+    ? checkedMultiply(
+        requireNonNegativeSafeInteger(coupleMeals, 'couple meals'),
+        FILLET_UNITS_PER_COUPLE_MEAL,
+        'included fish units',
+      )
+    : requireNonNegativeSafeInteger(includedUnitsOverride, 'included fish units')
   const extraUnits = Math.max(0, selectedUnits - includedUnits)
   const surchargeMinorUnits = checkedMultiply(
     extraUnits,

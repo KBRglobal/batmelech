@@ -6,7 +6,10 @@ import {
   DEFAULT_MENU_CATEGORIES,
   HOTEL_OPTIONS,
   applyAIReviewToDraft,
+  applyAddonDinerQuantity,
   applyCoupleMealQuantity,
+  applySoloDinerQuantity,
+  DELIVERY_INCLUDED_LINE_NAME,
   applyHotelNavigationInput,
   applyOrderDraftToStore,
   applyHotelSelection,
@@ -951,24 +954,143 @@ describe('deterministic draft pricing and allowances', () => {
     expect(stalePlates.result?.totalMinorUnits).toBe(7_000)
   })
 
-  it('adds exactly one delivery charge and no charge for pickup', () => {
+  it('includes Dubai delivery in any package, and charges it only when the order holds no package', () => {
     const menu = buildOrderEditorMenu(emptyStore)
-    const delivery = calculateOrderDraftPricing(draftWith({ pickup: false }), menu)
+    const couple = calculateOrderDraftPricing(draftWith({ pickup: false }), menu)
     const pickup = calculateOrderDraftPricing(draftWith({ pickup: true }), menu)
+    const noPackage = calculateOrderDraftPricing(
+      draftWith({ pickup: false, meals: 0, challot: 0, custom: [{ name: 'פריט', quantity: 1, unitPrice: '10', note: '' }] }),
+      menu,
+    )
+    const solo = calculateOrderDraftPricing(draftWith({ pickup: false, meals: 0, solos: 1, challot: 2 }), menu)
 
-    expect(delivery.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 1_500 }))
-    expect(delivery.result?.totalMinorUnits).toBe(24_500)
+    expect(couple.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: DELIVERY_INCLUDED_LINE_NAME, amountMinorUnits: 0 }))
+    expect(couple.result?.lines).not.toContainEqual(expect.objectContaining({ name: 'משלוח' }))
+    expect(couple.result?.totalMinorUnits).toBe(23_000)
+    expect(pickup.result?.lines.some((line) => line.source === 'delivery')).toBe(false)
     expect(pickup.result?.totalMinorUnits).toBe(23_000)
+    expect(noPackage.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 1_500 }))
+    expect(noPackage.result?.totalMinorUnits).toBe(2_500)
+    expect(solo.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: DELIVERY_INCLUDED_LINE_NAME, amountMinorUnits: 0 }))
+    expect(solo.result?.totalMinorUnits).toBe(16_900)
   })
 
-  it('prices delivery by zone: Dubai at $15, Abu Dhabi at $55', () => {
+  it('keeps the Abu Dhabi fee at $55 even with a package', () => {
     const menu = buildOrderEditorMenu(emptyStore)
-    const dubai = calculateOrderDraftPricing(draftWith({ pickup: false, deliveryZone: 'dubai' }), menu)
     const abuDhabi = calculateOrderDraftPricing(draftWith({ pickup: false, deliveryZone: 'abu-dhabi' }), menu)
 
-    expect(dubai.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 1_500 }))
     expect(abuDhabi.result?.lines).toContainEqual(expect.objectContaining({ source: 'delivery', name: 'משלוח', amountMinorUnits: 5_500 }))
     expect(abuDhabi.result?.totalMinorUnits).toBe(28_500)
+  })
+
+  it('prices addon and solo diners as their own lines from the menu prices', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    expect(menu.addonDinerPriceMinorUnits).toBe(14_900)
+    expect(menu.soloDinerPriceMinorUnits).toBe(16_900)
+
+    const addon = calculateOrderDraftPricing(draftWith({ meals: 1, addons: 1, challot: 3 }), menu)
+    expect(addon.result?.lines).toContainEqual(expect.objectContaining({ kind: 'addon-diner', name: 'סועד נוסף', quantity: 1, unitPriceMinorUnits: 14_900, amountMinorUnits: 14_900 }))
+    expect(addon.result?.totalMinorUnits).toBe(23_000 + 14_900)
+    expect(addon.issues.filter((issue) => issue.code === 'DINER_MIX')).toEqual([])
+
+    const solo = calculateOrderDraftPricing(draftWith({ meals: 0, solos: 2, challot: 4 }), menu)
+    expect(solo.result?.lines).toContainEqual(expect.objectContaining({ kind: 'solo-diner', name: 'סועד בודד', quantity: 2, unitPriceMinorUnits: 16_900, amountMinorUnits: 33_800 }))
+    expect(solo.result?.lines.some((line) => line.kind === 'couple-meal')).toBe(false)
+    expect(solo.result?.totalMinorUnits).toBe(33_800)
+
+    const configured = buildOrderEditorMenu({ orders: [], menu: { addonDinerPrice: 120, soloDinerPrice: 150.5 } })
+    expect(configured.addonDinerPriceMinorUnits).toBe(12_000)
+    expect(configured.soloDinerPriceMinorUnits).toBe(15_050)
+  })
+
+  it('warns, without blocking, about a solo diner next to a couple meal or an addon with no couple meal', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const soloWithCouple = calculateOrderDraftPricing(draftWith({ meals: 1, solos: 1, challot: 4 }), menu)
+    const addonAlone = calculateOrderDraftPricing(draftWith({ meals: 0, addons: 1, challot: 1 }), menu)
+
+    expect(soloWithCouple.issues).toContainEqual(expect.objectContaining({ code: 'DINER_MIX', blocking: false }))
+    expect(soloWithCouple.issues.some((issue) => issue.blocking)).toBe(false)
+    expect(addonAlone.issues).toContainEqual(expect.objectContaining({ code: 'DINER_MIX', blocking: false }))
+    expect(addonAlone.issues.some((issue) => issue.blocking)).toBe(false)
+  })
+
+  it('grows every allowance with addon and solo diners: fish, mains in half-units, desserts, challot', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    // 1 couple + 1 addon: 3 fish units, 3 main half-units, 3 dessert half-units, 3 challot.
+    const draft = draftWith({
+      meals: 1,
+      addons: 1,
+      challot: 3,
+      firsts: { 'פילה דג ברוטב מרוקאי': 3 },
+      mains: { 'קציצות בשר ברוטב אדום עשיר': 2 },
+      sides: { 'אורז לבן': 1 },
+      desserts: { 'סופלה שוקולד': 3 },
+    })
+    const pricing = calculateOrderDraftPricing(draft, menu)
+    expect(pricing.result?.fish).toMatchObject({ selectedUnits: 3, includedUnits: 3, extraUnits: 0 })
+    expect(pricing.dessert).toMatchObject({ selectedHalfUnits: 3, includedHalfUnits: 3, excessHalfUnits: 0 })
+    expect(pricing.issues.some((issue) => issue.blocking)).toBe(false)
+    // 2 whole mains = 4 half-units against 3 included: one extra half-unit at half the extra-main price.
+    expect(pricing.result?.lines).toContainEqual(expect.objectContaining({
+      name: 'חצי עיקרית נוספת',
+      quantity: 1,
+      unitPriceMinorUnits: 5_000,
+      amountMinorUnits: 5_000,
+    }))
+    expect(pricing.result?.lines.some((line) => line.name === 'עיקרית נוספת')).toBe(false)
+    expect(pricing.result?.lines.some((line) => line.name === 'חלות נוספות')).toBe(false)
+    expect(pricing.result?.totalMinorUnits).toBe(23_000 + 14_900 + 5_000)
+
+    // Three mains (6 half-units) against 3: one whole extra plus one half.
+    const threeMains = calculateOrderDraftPricing({ ...draft, mains: { 'קציצות בשר ברוטב אדום עשיר': 3 } }, menu)
+    expect(threeMains.result?.lines).toContainEqual(expect.objectContaining({ name: 'עיקרית נוספת', quantity: 1, amountMinorUnits: 10_000 }))
+    expect(threeMains.result?.lines).toContainEqual(expect.objectContaining({ name: 'חצי עיקרית נוספת', quantity: 1, amountMinorUnits: 5_000 }))
+
+    // An odd extra-main price is rounded to whole cents for the half.
+    const oddPrice = { ...menu, extraMainPriceMinorUnits: 10_001 }
+    expect(calculateOrderDraftPricing(draft, oddPrice).result?.lines).toContainEqual(expect.objectContaining({ name: 'חצי עיקרית נוספת', unitPriceMinorUnits: 5_001 }))
+
+    // Two sides (4 half-units) against 3 still block: no side price exists.
+    const sideOverage = calculateOrderDraftPricing({ ...draft, sides: { 'אורז לבן': 2 } }, menu)
+    expect(sideOverage.issues).toContainEqual(expect.objectContaining({ code: 'SIDE_OVERAGE', blocking: true }))
+
+    // A fourth challah is beyond the 3 included and priced as before.
+    const extraChallah = calculateOrderDraftPricing({ ...draft, challot: 4 }, menu)
+    expect(extraChallah.result?.lines).toContainEqual(expect.objectContaining({ name: 'חלות נוספות', quantity: 1, amountMinorUnits: 1_000 }))
+
+    // A solo diner alone: 1 fish unit, 1 main half-unit, 2 challot included.
+    const solo = calculateOrderDraftPricing(
+      draftWith({ meals: 0, solos: 1, challot: 2, firsts: { 'פילה דג ברוטב מרוקאי': 2 }, mains: { 'קציצות בשר ברוטב אדום עשיר': 1 } }),
+      menu,
+    )
+    expect(solo.result?.fish).toMatchObject({ includedUnits: 1, extraUnits: 1 })
+    expect(solo.result?.lines).toContainEqual(expect.objectContaining({ name: 'חצי עיקרית נוספת', quantity: 1 }))
+    expect(solo.result?.lines.some((line) => line.name === 'חלות נוספות')).toBe(false)
+  })
+
+  it('keeps challot in step with the diner steppers until the operator overrides them', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const base = draftWith({ meals: 1, challot: 2 })
+    const withAddon = applyAddonDinerQuantity(base, menu, 1)
+    expect(withAddon).toMatchObject({ meals: 1, addons: 1, challot: 3 })
+    const withSolo = applySoloDinerQuantity(applyCoupleMealQuantity(withAddon, menu, 0), menu, 1)
+    expect(withSolo).toMatchObject({ meals: 0, addons: 1, solos: 1, challot: 3 })
+    expect(applyAddonDinerQuantity(withSolo, menu, 0)).toMatchObject({ addons: 0, solos: 1, challot: 2 })
+
+    const overridden = applyAddonDinerQuantity({ ...base, challot: 5 }, menu, 2)
+    expect(overridden).toMatchObject({ addons: 2, challot: 5 })
+  })
+
+  it('stores addons and solos next to meals and reads old orders without them as zero', () => {
+    const menu = buildOrderEditorMenu(emptyStore)
+    const legacy = createOrderDraftFromLegacy({ id: 'old', meals: 2 } as LegacyOrder, menu)
+    expect(legacy).toMatchObject({ meals: 2, addons: 0, solos: 0 })
+
+    const stored = serializeOrderDraft({ ...draftWith({ meals: 1, addons: 1, solos: 0 }), name: 'לקוחה', total: '379.00' }, 'order-1')
+    expect(stored).toMatchObject({ meals: 1, addons: 1, solos: 0 })
+    expect(createOrderDraftFromLegacy(stored, menu)).toMatchObject({ meals: 1, addons: 1, solos: 0 })
+    expect(createOrderDraftFromLegacy({ ...stored, addons: '3', solos: '1' }, menu)).toMatchObject({ addons: 3, solos: 1 })
+    expect(legacyOrderEditIssue({ id: 'bad', addons: -1 } as unknown as LegacyOrder)).not.toBeNull()
   })
 
   it('auto-prices an extra Shabbat main course, and still blocks unpriced side overage', () => {

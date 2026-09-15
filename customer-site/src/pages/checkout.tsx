@@ -4,7 +4,16 @@ import { Link } from 'react-router'
 import { CurrencyNote } from '../components/currency-note'
 import { PageHero } from '../components/page-hero'
 import { Footer } from '../components/footer'
-import { DELIVERY_FEES_USD, useCart, type CartLine, type CustomerDetails, type DeliveryZone, type SelectedHotel } from '../cart-context'
+import {
+  DELIVERY_FEES_USD,
+  deliveryFeeUsd,
+  hasShabbatPackage,
+  useCart,
+  type CartLine,
+  type CustomerDetails,
+  type DeliveryZone,
+  type SelectedHotel,
+} from '../cart-context'
 import { useSiteStatus } from '../site-status-context'
 import { buildOrderMessage, deliveryAddressText, selectedHotel, waLink } from '../whatsapp'
 import { useLocale, type Locale } from '../locale-context'
@@ -36,6 +45,8 @@ const HE = {
   pickupLine: 'איסוף עצמי',
   deliveryLine: 'משלוח',
   freeOfCharge: 'ללא עלות',
+  /** Dubai delivery line when a Shabbat package is in the cart. */
+  deliveryIncluded: 'כלול',
   totalDue: 'סה"כ לתשלום',
   fulfillmentTitle: 'איך תרצו לקבל את ההזמנה',
   delivery: 'משלוח',
@@ -122,6 +133,7 @@ export const COPY: Record<Locale, typeof HE> = {
     pickupLine: 'Pickup',
     deliveryLine: 'Delivery',
     freeOfCharge: 'Free',
+    deliveryIncluded: 'Included',
     totalDue: 'Total due',
     fulfillmentTitle: 'How would you like to receive your order?',
     delivery: 'Delivery',
@@ -194,6 +206,7 @@ export const COPY: Record<Locale, typeof HE> = {
     pickupLine: 'Retrait sur place',
     deliveryLine: 'Livraison',
     freeOfCharge: 'Gratuit',
+    deliveryIncluded: 'Incluse',
     totalDue: 'Total à payer',
     fulfillmentTitle: 'Comment souhaitez-vous recevoir votre commande ?',
     delivery: 'Livraison',
@@ -300,6 +313,7 @@ function localizedOrderMessage(
   lines: CartLine[],
   customer: CustomerDetails,
   total: number,
+  deliveryFee: number,
   locale: Locale,
   t: typeof HE,
 ) {
@@ -309,10 +323,15 @@ function localizedOrderMessage(
     const label = display === l.name ? l.name : `${display} (${l.name})`
     return `• ${label} x${l.qty} — $${l.unitPrice * l.qty}${l.note ? ` (${l.note})` : ''}`
   })
+  const feeRow =
+    customer.fulfillment === 'pickup'
+      ? undefined
+      : `• ${t.deliveryLine} (${t.zones[customer.zone]}) — ${deliveryFee === 0 ? t.deliveryIncluded : `$${deliveryFee}`}`
   const rows = [
     t.waHeader,
     '',
     ...itemRows,
+    feeRow,
     '',
     `${t.waTotal}: $${total} USD`,
     '',
@@ -337,8 +356,12 @@ export function Checkout() {
   const t = COPY[locale]
   const isPickup = customer.fulfillment === 'pickup'
   const isSelectedDateClosed = closedDates.includes(customer.date)
-  const deliveryFee = DELIVERY_FEES_USD[customer.zone]
-  const total = lines.length ? subtotal + (isPickup ? 0 : deliveryFee) : 0
+  // A Shabbat package (couple / add-on diner / solo diner) includes Dubai
+  // delivery; Abu Dhabi keeps its fee and pickup stays free.
+  const packageInCart = hasShabbatPackage(lines)
+  const deliveryFee = deliveryFeeUsd(lines, customer.fulfillment, customer.zone)
+  const deliveryIncluded = !isPickup && customer.zone === 'dubai' && packageInCart
+  const total = lines.length ? subtotal + deliveryFee : 0
   const totalMinorUnits = Math.round(total * 100)
   const minAbuDhabi = minOrderAbuDhabiMinorUnits
   const belowMin =
@@ -444,6 +467,8 @@ export function Checkout() {
               : {}),
           },
           lines: lines.map((line) => ({ id: line.id, name: line.name, unitPrice: line.unitPrice, qty: line.qty, note: line.note })),
+          // USD. 0 for pickup and for Dubai when a Shabbat package is present.
+          deliveryFee,
           total,
         }),
       })
@@ -471,8 +496,8 @@ export function Checkout() {
 
   const orderMessage =
     locale === 'he'
-      ? buildOrderMessage(lines, customer, total)
-      : localizedOrderMessage(lines, customer, total, locale, t)
+      ? buildOrderMessage(lines, customer, total, deliveryFee)
+      : localizedOrderMessage(lines, customer, total, deliveryFee, locale, t)
 
   // Address means different things per mode (free address vs room number), so
   // switching starts that field clean.
@@ -539,7 +564,7 @@ export function Checkout() {
             </div>
             <div className="flex justify-between text-sm font-bold text-[#3B151A]/60">
               <span>{isPickup ? t.pickupLine : `${t.deliveryLine} (${t.zones[customer.zone]})`}</span>
-              <span>{isPickup ? t.freeOfCharge : `$${deliveryFee}`}</span>
+              <span>{isPickup ? t.freeOfCharge : deliveryIncluded ? t.deliveryIncluded : `$${deliveryFee}`}</span>
             </div>
             <div className="flex justify-between text-2xl font-black pt-4">
               <span>{t.totalDue}</span>
@@ -590,7 +615,7 @@ export function Checkout() {
                     customer.zone === zone ? 'border-[#F5A83A] bg-[#F5A83A]/5' : 'border-[#EDB2C1]/30 bg-white'
                   }`}
                 >
-                  {t.zones[zone]} (${DELIVERY_FEES_USD[zone]})
+                  {t.zones[zone]} ({zone === 'dubai' && packageInCart ? t.deliveryIncluded : `$${DELIVERY_FEES_USD[zone]}`})
                 </button>
               ))}
             </div>

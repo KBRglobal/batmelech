@@ -53,6 +53,7 @@ const HE = {
     },
   ],
   deliveryDubai: 'משלוח לדובאי',
+  deliveryDubaiPackage: 'כלול במארז השבת',
   deliveryAbuDhabi: 'משלוח לאבו דאבי',
   deliveryPickup: 'איסוף עצמי',
   deliveryPickupFree: 'חינם',
@@ -96,6 +97,7 @@ export const COPY: Record<Locale, typeof HE> = {
       },
     ],
     deliveryDubai: 'Delivery to Dubai',
+    deliveryDubaiPackage: 'included with the Shabbat box',
     deliveryAbuDhabi: 'Delivery to Abu Dhabi',
     deliveryPickup: 'Self-pickup',
     deliveryPickupFree: 'Free',
@@ -136,6 +138,7 @@ export const COPY: Record<Locale, typeof HE> = {
       },
     ],
     deliveryDubai: 'Livraison à Dubaï',
+    deliveryDubaiPackage: 'incluse avec le coffret Chabbat',
     deliveryAbuDhabi: 'Livraison à Abou Dhabi',
     deliveryPickup: 'Retrait sur place',
     deliveryPickupFree: 'Gratuit',
@@ -193,7 +196,7 @@ export function HowItWorks() {
                     <div className="flex flex-wrap gap-3 mt-5">
                       <span className="flex items-center gap-2 bg-[#F7ECE6] rounded-full px-5 py-2.5 font-black text-sm">
                         <Icon icon="ph:map-pin-fill" className="text-[#F5A83A]" />
-                        {t.deliveryDubai} — ${DELIVERY_FEES_USD.dubai}
+                        {t.deliveryDubai} — ${DELIVERY_FEES_USD.dubai} · {t.deliveryDubaiPackage}
                       </span>
                       <span className="flex items-center gap-2 bg-[#F7ECE6] rounded-full px-5 py-2.5 font-black text-sm">
                         <Icon icon="ph:map-pin-fill" className="text-[#F5A83A]" />

@@ -16,7 +16,10 @@ import {
   CANONICAL_ORDER_ID_PATTERN,
   HOTEL_OPTIONS,
   applyAIReviewToDraft,
+  applyAddonDinerQuantity,
   applyCoupleMealQuantity,
+  applySoloDinerQuantity,
+  draftAllowances,
   applyHotelDestinationInput,
   applyHotelNavigationInput,
   applyHotelSelection,
@@ -1133,6 +1136,8 @@ function draftDeltaLines(base: OrderDraft, next: OrderDraft): readonly string[] 
     if (before !== after) lines.push(`${label}: ${before} ← ${after}`)
   }
   numeric('ארוחות זוגיות', base.meals, next.meals)
+  numeric('סועד נוסף', base.addons, next.addons)
+  numeric('סועד בודד', base.solos, next.solos)
   numeric('חלות', base.challot, next.challot)
   const records: readonly [string, Readonly<Record<string, number>>, Readonly<Record<string, number>>][] = [
     ['סלטים', Object.fromEntries(Object.entries(base.salads).map(([name, value]) => [name, value.ordered])), Object.fromEntries(Object.entries(next.salads).map(([name, value]) => [name, value.ordered]))],
@@ -1187,6 +1192,8 @@ function createOrderImportBaseDraft(draft: OrderDraft): OrderDraft {
     id: null,
     status: 'מתעניין',
     meals: 0,
+    addons: 0,
+    solos: 0,
     aricha: 0,
     challot: 0,
     salads: saladBoxSelections(),
@@ -1349,6 +1356,19 @@ function OrderEditorContent({
     markShabbatSelectionChanged()
     onDraftChange(applyCoupleMealQuantity(draft, menu, meals))
   }
+
+  const updateAddons = (addons: number) => {
+    markShabbatSelectionChanged()
+    onDraftChange(applyAddonDinerQuantity(draft, menu, addons))
+  }
+
+  const updateSolos = (solos: number) => {
+    markShabbatSelectionChanged()
+    onDraftChange(applySoloDinerQuantity(draft, menu, solos))
+  }
+
+  const allowances = draftAllowances(draft)
+  const dinerMixWarnings = pricing.issues.filter((issue) => issue.code === 'DINER_MIX')
 
   const updateChallahs = (challot: number) => {
     markShabbatSelectionChanged()
@@ -1849,9 +1869,17 @@ function OrderEditorContent({
         <Section id="meal" title="הרכב ההזמנה">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <QuantityStepper label="ארוחות זוגיות" value={draft.meals} onChange={updateMeals} />
+            <QuantityStepper label="סועד נוסף" value={draft.addons} onChange={updateAddons} />
+            <QuantityStepper label="סועד בודד" value={draft.solos} onChange={updateSolos} />
             <QuantityStepper label="עריכה לכמה אנשים" value={draft.aricha} onChange={(aricha) => patch({ aricha })} />
             <QuantityStepper label="חלות" value={draft.challot} onChange={updateChallahs} />
           </div>
+          <p className="text-xs font-bold text-muted-foreground">
+            סועד נוסף ({formatUsdMinorUnits(menu.addonDinerPriceMinorUnits)}) מצטרף לארוחה זוגית ומקבל חצי מהכל. סועד בודד ({formatUsdMinorUnits(menu.soloDinerPriceMinorUnits)}) אוכל לבד, בלי זוגית בהזמנה. משלוח בדובאי כלול בכל חבילה.
+          </p>
+          {dinerMixWarnings.map((issue, index) => (
+            <p key={`diner-mix-${index}`} role="status" className="rounded-xl bg-amber-50 p-3 text-xs font-black text-amber-900">{issue.message}</p>
+          ))}
         </Section>
 
         <Section id="salads" title="סלטים" summary={`מארז ${SALAD_BOX_SIZE} סלטים · כלול`} collapsible>
@@ -1869,7 +1897,7 @@ function OrderEditorContent({
           )}
         </Section>
 
-        <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${draft.meals * 2} יחידות`} collapsible>
+        <Section id="firsts" title="מנה ראשונה — דגים" summary={`${pricing.result?.fish.selectedUnits ?? '—'}/${allowances.fishUnits} יחידות`} collapsible>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-bold leading-6 text-amber-900">
             בכל זוגית כלולות שתי יחידות פילה. מנת קציצות דגים שווה לשתי יחידות. כל יחידה מעבר לכלול מחויבת ב־30$.
           </div>
@@ -2345,7 +2373,7 @@ export function OrderEditorScreen() {
       return
     }
     const base = createOrderDraft(menu)
-    const zeroBaseline = { ...base, meals: 0, challot: 0 }
+    const zeroBaseline = { ...base, meals: 0, addons: 0, solos: 0, challot: 0 }
     const nextDraft = reviewHandoff?.draft ?? (
       reviewHandoff
         ? applyAIReviewToDraft(zeroBaseline, reviewHandoff.review, buildAIOrderCatalog(menu).targetsById, menu)

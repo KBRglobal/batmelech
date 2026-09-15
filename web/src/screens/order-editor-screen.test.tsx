@@ -364,8 +364,29 @@ describe('OrderEditorScreen', () => {
     // A side overage still has no confirmed price, so it still blocks.
     await user.click(screen.getByRole('button', { name: 'הוספה לאורז לבן' }))
     await user.click(screen.getByRole('button', { name: 'הוספה לאורז לבן' }))
-    expect(screen.getByText(/יותר תוספות שבת ממספר הארוחות/)).toBeTruthy()
+    expect(screen.getByText(/יותר תוספות שבת ממה שכלול/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('adds an addon diner from the meal make-up: its own price line, one more challah, warning only when the mix is odd', async () => {
+    mockedUseStore.mockReturnValue(queryResult())
+    const user = userEvent.setup()
+    renderEditor()
+    await user.type(await screen.findByLabelText('שם מלא'), 'לקוחה')
+
+    await user.click(screen.getByRole('button', { name: 'הוספה לסועד נוסף' }))
+    expect(screen.getByLabelText('כמות סועד נוסף').textContent).toBe('1')
+    expect(screen.getByLabelText('כמות חלות').textContent).toBe('3')
+    expect(screen.getByText('סועד נוסף ×1')).toBeTruthy()
+    // $230 couple + $149 addon, Dubai delivery included.
+    expect(screen.getAllByText('$379.00').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/סועד נוסף מצטרף לארוחה זוגית/)).toBeNull()
+
+    // A solo diner next to a couple meal is an odd mix: a warning, never a block.
+    await user.click(screen.getByRole('button', { name: 'הוספה לסועד בודד' }))
+    expect(screen.getByLabelText('כמות חלות').textContent).toBe('5')
+    expect(screen.getAllByText(/סועד בודד מיועד להזמנה בלי ארוחה זוגית/).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
   })
 
   it('synchronizes challahs with meal changes until the operator overrides the challah quantity', async () => {
@@ -565,19 +586,21 @@ describe('OrderEditorScreen', () => {
     await user.click(screen.getByRole('button', { name: 'הוספה לסוכריות בקלוואה' }))
 
     // Salads are the fixed box now — nothing to click and nothing to pay.
-    expect(screen.getAllByText('$275.00').length).toBeGreaterThan(0)
+    // Dubai delivery is part of the couple package, so it adds nothing.
+    expect(screen.getAllByText('$260.00').length).toBeGreaterThan(0)
     expect(screen.getByText('$30.00')).toBeTruthy()
+    expect(screen.getByText('משלוח בדובאי — כלול ×1')).toBeTruthy()
     // The suggested price IS the default: the total follows the computed
     // price with no extra click, and saving opens immediately.
-    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('275.00')
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('260.00')
     expect(screen.getByRole('button', { name: 'שמירת ההזמנה' }).hasAttribute('disabled')).toBe(false)
 
     // As long as the operator never typed a price, changes keep following.
     await user.click(screen.getByRole('button', { name: 'הוספת פריט חופשי' }))
     await user.type(screen.getByLabelText('שם פריט חופשי 1'), 'פריט אמיתי')
     await user.type(screen.getByLabelText('מחיר פריט חופשי 1'), '0.10')
-    expect(screen.getAllByText('$275.10').length).toBeGreaterThan(0)
-    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('275.10')
+    expect(screen.getAllByText('$260.10').length).toBeGreaterThan(0)
+    expect((screen.getByLabelText('סך לתשלום') as HTMLInputElement).value).toBe('260.10')
     expect(screen.queryByText('סך התשלום שונה מהמחיר המחושב — התאמה ידנית.')).toBeNull()
 
     // A typed manual price sticks and shows the mismatch note, still savable.
@@ -1345,6 +1368,11 @@ describe('OrderEditorScreen', () => {
     expect(at('פרטי לקוח ומשלוח')).toBeLessThan(at('הרכב ההזמנה'))
     expect(at('הרכב ההזמנה')).toBeLessThan(at('סלטים'))
     expect(screen.getByRole('button', { name: 'הוספה לחלות' })).toBeTruthy()
+    // The diner steppers (Lin, 2026-09-15) sit inside the meal make-up section.
+    const mealSection = screen.getByRole('heading', { level: 2, name: 'הרכב ההזמנה' }).closest('section')!
+    expect(within(mealSection).getByLabelText('כמות ארוחות זוגיות').textContent).toBe('1')
+    expect(within(mealSection).getByLabelText('כמות סועד נוסף').textContent).toBe('0')
+    expect(within(mealSection).getByLabelText('כמות סועד בודד').textContent).toBe('0')
     // Every box salad is listed, none has a stepper.
     for (const name of SALAD_BOX_ITEMS) expect(screen.getByText(name)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /הוספה ל.* הוזמן/ })).toBeNull()
@@ -1364,7 +1392,7 @@ describe('OrderEditorScreen', () => {
           orders: [{
             id: 'order-123e4567-e89b-42d3-a456-426614174001',
             name: 'לקוחה חדשה',
-            total: '245.00',
+            total: '230.00',
           }],
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
@@ -1396,7 +1424,10 @@ describe('OrderEditorScreen', () => {
     expect(command.localState.orders[0]).toMatchObject({
       id: 'order-123e4567-e89b-42d3-a456-426614174001',
       name: 'לקוחה חדשה',
-      total: '245.00',
+      total: '230.00',
+      meals: 1,
+      addons: 0,
+      solos: 0,
     })
     expect(screen.getByTestId('location').textContent).toBe(`${APP_ROUTES.orders}|null`)
     uuidSpy.mockRestore()

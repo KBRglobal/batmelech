@@ -476,6 +476,9 @@ function DatePreparation({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Metric label="זוגיות" value={String(group.meals)} />
+        {group.addons > 0 && <Metric label="סועד נוסף" value={String(group.addons)} />}
+        {group.solos > 0 && <Metric label="סועד בודד" value={String(group.solos)} />}
+        {(group.addons > 0 || group.solos > 0) && <Metric label="סלטים בחבילות" value={String(group.packageSalads)} />}
         <Metric label="עריכות" value={String(group.aricha)} />
         <Metric label="חלות" value={String(group.challot)} />
         <Metric

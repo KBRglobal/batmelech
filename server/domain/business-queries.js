@@ -214,6 +214,8 @@ function fullOrder(order) {
     status: orderStatus(order) || null,
     source: text(order.source) || null,
     coupleMeals: countOf(order.meals),
+    addonDiners: countOf(order.addons),
+    soloDiners: countOf(order.solos),
     challahs: countOf(order.challot),
     dishes: orderDishes(order),
     money: orderMoney(order),

@@ -333,6 +333,88 @@ test('resolves a couple-meal order into the same structured fields the panel wou
   assert.match(saved.notes, /סופלה שוקולד x4/u);
 });
 
+test('buildIntakeCatalog carries the add-on and solo diner items at the menu or contract price', () => {
+  const withPrices = buildIntakeCatalog({ menu: { ...menuState().menu, addonDinerPrice: 150, soloDinerPrice: 170 } });
+  const addon = withPrices.items.find((item) => item.id === 'meal:addon');
+  const solo = withPrices.items.find((item) => item.id === 'meal:solo');
+  assert.equal(addon.name, 'סועד נוסף');
+  assert.equal(addon.category, 'addon_diner');
+  assert.ok(addon.aliases.includes('אדם שלישי'));
+  assert.equal(addon.price, 150);
+  assert.equal(solo.name, 'סועד בודד');
+  assert.equal(solo.category, 'solo_diner');
+  assert.ok(solo.aliases.includes('אדם אחד'));
+  assert.equal(solo.price, 170);
+
+  const defaults = buildIntakeCatalog(menuState());
+  assert.equal(defaults.items.find((item) => item.id === 'meal:addon').price, 149);
+  assert.equal(defaults.items.find((item) => item.id === 'meal:solo').price, 169);
+  assert.equal(defaults.priceById.get('meal:solo'), 169);
+});
+
+function dinerIntake(repository, items) {
+  return createWhatsAppIntake({
+    repository,
+    reviewOrderIntake: async ({ catalog }) => {
+      const byName = new Map(catalog.map((item) => [item.name, item]));
+      return reviewFixture({
+        draft: {
+          customerName: 'לקוח',
+          customerPhone: null,
+          serviceDate: null,
+          serviceTime: null,
+          fulfillmentMethod: 'unknown',
+          deliveryLocation: null,
+          items: items.map(([name, quantity, sourceText]) => ({
+            catalogItemId: byName.get(name).id,
+            catalogItemName: name,
+            category: byName.get(name).category,
+            quantity,
+            sourceText,
+            confidence: 0.9,
+          })),
+          notes: [],
+        },
+        unknownItems: [],
+        missingFields: [],
+      });
+    },
+    logger: silentLogger,
+  });
+}
+
+test('a couple meal plus an add-on diner is stored as meals + addons, with allowances for three', async () => {
+  const repository = fakeRepository(menuState());
+  const intake = dinerIntake(repository, [
+    ['ארוחה זוגית', 1, 'זוגית אחת'],
+    ['סועד נוסף', null, 'ועוד סועד'],
+    ['פילה דג ברוטב מרוקאי', null, 'דג מרוקאי'],
+  ]);
+  const result = await intake.intake('זוגית אחת ועוד סועד, דג מרוקאי');
+  assert.equal(result.ok, true);
+  const saved = repository._current().orders[0];
+  assert.equal(saved.meals, 1);
+  assert.equal(saved.addons, 1, 'an add-on diner named with no digit is one diner');
+  assert.equal(saved.solos, 0);
+  // 2 fish units for the couple + 1 for the add-on diner, per packageAllowances.
+  assert.equal(saved.firsts['פילה דג ברוטב מרוקאי'], 3);
+});
+
+test('a solo diner alone is stored as solos and never invents a couple meal', async () => {
+  const repository = fakeRepository(menuState());
+  const intake = dinerIntake(repository, [
+    ['סועד בודד', 1, 'סועד בודד'],
+    ['פילה דג ברוטב מרוקאי', null, 'דג מרוקאי'],
+  ]);
+  const result = await intake.intake('סועד בודד, דג מרוקאי');
+  assert.equal(result.ok, true);
+  const saved = repository._current().orders[0];
+  assert.equal(saved.meals, 0, 'dishes next to a solo diner are not evidence of a couple meal');
+  assert.equal(saved.addons, 0);
+  assert.equal(saved.solos, 1);
+  assert.equal(saved.firsts['פילה דג ברוטב מרוקאי'], 1, 'a solo diner gets one fish fillet');
+});
+
 test('intake respects the emergency freeze and reports pipeline failures', async () => {
   const frozenRepository = fakeRepository({ ...menuState(), settings: { meyWritesFrozen: true } });
   const intake = createWhatsAppIntake({

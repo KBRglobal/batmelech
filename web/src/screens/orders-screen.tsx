@@ -115,6 +115,8 @@ const MISSING_FIELD_LABELS: Readonly<Record<OrdersMissingField, string>> = {
 function summaryLabels(summary: OrdersSummaryChips): string[] {
   const labels: string[] = []
   if (summary.meals !== null && summary.meals > 0) labels.push(`זוגית ×${summary.meals}`)
+  if (summary.addons !== null && summary.addons > 0) labels.push(`סועד נוסף ×${summary.addons}`)
+  if (summary.solos !== null && summary.solos > 0) labels.push(`סועד בודד ×${summary.solos}`)
   if (summary.orderedSalads !== null && summary.orderedSalads > 0) {
     labels.push(`${summary.orderedSalads} סלטים`)
   }

@@ -49,23 +49,30 @@ async function withServer(repository, run, clock = () => WEEKDAY) {
   }
 }
 
-function submission(customer) {
-  return {
-    customer: {
-      name: 'לינה',
-      phone: '+971500000000',
-      fulfillment: 'delivery',
-      date: '2026-08-20',
-      time: '18:30',
-      ...customer,
-    },
-    lines: [{ id: 'mtbucha', name: 'מטבוחה', unitPrice: 12, qty: 2 }],
-    total: 39,
+const DELIVERY_FEE_USD = { dubai: 15, 'abu-dhabi': 55 };
+
+// A cart of one extra (no package), priced the way the site prices it: the
+// lines plus the zone's delivery fee, nothing for a pickup.
+function submission(customer, lines = [{ id: 'mtbucha', name: 'מטבוחה', unitPrice: 12, qty: 2 }]) {
+  const resolved = {
+    name: 'לינה',
+    phone: '+971500000000',
+    fulfillment: 'delivery',
+    zone: 'dubai',
+    date: '2026-08-20',
+    time: '18:30',
+    ...customer,
   };
+  const subtotal = lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
+  const fee = resolved.fulfillment === 'pickup' ? 0 : DELIVERY_FEE_USD[resolved.zone];
+  return { customer: resolved, lines, total: subtotal + fee };
 }
 
 function abuDhabiOrder(total) {
-  return { ...submission({ zone: 'abu-dhabi', address: 'בניין באבו דאבי' }), total };
+  return submission(
+    { zone: 'abu-dhabi', address: 'בניין באבו דאבי' },
+    [{ id: 'x', name: 'מגש בשרים', unitPrice: total - DELIVERY_FEE_USD['abu-dhabi'], qty: 1 }],
+  );
 }
 
 function postOrder(origin, body) {
@@ -455,7 +462,7 @@ test('intake rejects an Abu Dhabi order below the configured minimum', async () 
     settings: { minOrderAbuDhabiMinorUnits: 12_000 },
   });
   await withServer(repository, async (origin) => {
-    const response = await postOrder(origin, abuDhabiOrder(39));
+    const response = await postOrder(origin, abuDhabiOrder(60));
     assert.equal(response.status, 403);
     const body = await response.json();
     assert.equal(body.ok, false);
@@ -492,4 +499,154 @@ test('intake accepts orders on Chanukah and on chol hamoed Sukkot', async () => 
       () => new Date(at),
     );
   }
+});
+
+// --- the diner model (Lin, 2026-09-15) ----------------------------------------
+
+const COUPLE_LINE = Object.freeze({ id: 'shabbat-package', name: 'מארז שבת זוגי יוקרתי', unitPrice: 299, qty: 1 });
+const ADDON_LINE = Object.freeze({ id: 'addon-diner', name: 'סועד נוסף', unitPrice: 149, qty: 1 });
+const SOLO_LINE = Object.freeze({ id: 'solo-diner', name: 'סועד בודד', unitPrice: 169, qty: 1 });
+
+function dinerRepository(menu = {}) {
+  const saved = [];
+  return {
+    saved,
+    async loadState() {
+      return { data: { orders: [], settings: {}, menu }, revision: 1, hash: 'h' };
+    },
+    async saveState({ localState }) {
+      saved.push(localState);
+      return { ok: true };
+    },
+  };
+}
+
+function packageOrder(customer, lines, total) {
+  return { ...submission(customer, lines), total };
+}
+
+test('a couple package with an add-on diner is stored as meals + addons, Dubai delivery included', async () => {
+  const repository = dinerRepository({ couplePrice: 299, addonDinerPrice: 149, soloDinerPrice: 169 });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(
+      origin,
+      packageOrder({ address: 'מרינה, בניין 7' }, [COUPLE_LINE, { ...ADDON_LINE, qty: 2 }], 299 + 2 * 149),
+    );
+    assert.equal(response.status, 201, await response.text());
+    const [order] = repository.saved.at(-1).orders;
+    assert.equal(order.meals, 1);
+    assert.equal(order.addons, 2);
+    assert.equal(order.solos, undefined);
+    assert.equal(order.total, 597);
+  });
+});
+
+test('a solo diner alone is stored as solos with Dubai delivery included', async () => {
+  const repository = dinerRepository({ couplePrice: 299, addonDinerPrice: 149, soloDinerPrice: 169 });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, packageOrder({ address: 'מרינה, בניין 7' }, [SOLO_LINE], 169));
+    assert.equal(response.status, 201, await response.text());
+    const [order] = repository.saved.at(-1).orders;
+    assert.equal(order.meals, undefined);
+    assert.equal(order.addons, undefined);
+    assert.equal(order.solos, 1);
+  });
+});
+
+test('the site may send the delivery as its own zero line once a package is in the cart', async () => {
+  const repository = dinerRepository({ couplePrice: 299, addonDinerPrice: 149, soloDinerPrice: 169 });
+  await withServer(repository, async (origin) => {
+    const zeroDubai = await postOrder(
+      origin,
+      packageOrder(
+        { address: 'מרינה, בניין 7' },
+        [COUPLE_LINE, { id: 'delivery', name: 'משלוח בדובאי', unitPrice: 0, qty: 1 }],
+        299,
+      ),
+    );
+    assert.equal(zeroDubai.status, 201, await zeroDubai.text());
+
+    const chargedDubai = await postOrder(
+      origin,
+      packageOrder(
+        { address: 'מרינה, בניין 7' },
+        [COUPLE_LINE, { id: 'delivery', name: 'משלוח בדובאי', unitPrice: 15, qty: 1 }],
+        314,
+      ),
+    );
+    assert.equal(chargedDubai.status, 400);
+    assert.equal((await chargedDubai.json()).error, 'delivery_mismatch');
+  });
+});
+
+test('a package order that still charges the old Dubai fee in its total is refused', async () => {
+  const repository = dinerRepository({ couplePrice: 299, addonDinerPrice: 149, soloDinerPrice: 169 });
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, packageOrder({ address: 'מרינה, בניין 7' }, [COUPLE_LINE], 299 + 15));
+    assert.equal(response.status, 400);
+    const body = await response.json();
+    assert.equal(body.error, 'total_mismatch');
+    assert.equal(repository.saved.length, 0);
+  });
+});
+
+test('Abu Dhabi delivery is still charged on a package order', async () => {
+  const repository = dinerRepository({ couplePrice: 299, addonDinerPrice: 149, soloDinerPrice: 169 });
+  await withServer(repository, async (origin) => {
+    const charged = await postOrder(
+      origin,
+      packageOrder({ zone: 'abu-dhabi', address: 'בניין באבו דאבי' }, [COUPLE_LINE, ADDON_LINE], 299 + 149 + 55),
+    );
+    assert.equal(charged.status, 201, await charged.text());
+    const notCharged = await postOrder(
+      origin,
+      packageOrder({ zone: 'abu-dhabi', address: 'בניין באבו דאבי' }, [COUPLE_LINE, ADDON_LINE], 299 + 149),
+    );
+    assert.equal(notCharged.status, 400);
+  });
+});
+
+test('an order without any package still pays Dubai delivery, and a pickup pays none', async () => {
+  const repository = dinerRepository({ couplePrice: 299 });
+  await withServer(repository, async (origin) => {
+    const charged = await postOrder(origin, submission({ address: 'מרינה, בניין 7' }));
+    assert.equal(charged.status, 201);
+    const [order] = repository.saved.at(-1).orders;
+    assert.equal(order.meals, undefined);
+    assert.equal(order.addons, undefined);
+    assert.equal(order.solos, undefined);
+
+    const notCharged = await postOrder(origin, { ...submission({ address: 'מרינה, בניין 7' }), total: 24 });
+    assert.equal(notCharged.status, 400);
+
+    const pickup = await postOrder(origin, packageOrder({ fulfillment: 'pickup' }, [SOLO_LINE, ADDON_LINE], 169 + 149));
+    assert.equal(pickup.status, 201, await pickup.text());
+  });
+});
+
+test('a diner line priced differently from the menu is refused', async () => {
+  const repository = dinerRepository({ couplePrice: 299, addonDinerPrice: 160, soloDinerPrice: 169 });
+  await withServer(repository, async (origin) => {
+    const stale = await postOrder(origin, packageOrder({ address: 'מרינה, בניין 7' }, [COUPLE_LINE, ADDON_LINE], 299 + 149));
+    assert.equal(stale.status, 400);
+    assert.equal((await stale.json()).error, 'price_mismatch');
+
+    const current = await postOrder(
+      origin,
+      packageOrder({ address: 'מרינה, בניין 7' }, [COUPLE_LINE, { ...ADDON_LINE, unitPrice: 160 }], 299 + 160),
+    );
+    assert.equal(current.status, 201, await current.text());
+    assert.equal(repository.saved.length, 1);
+  });
+});
+
+test('the diner prices default to the contract values when the menu carries none', async () => {
+  const repository = dinerRepository({});
+  await withServer(repository, async (origin) => {
+    const response = await postOrder(origin, packageOrder({ address: 'מרינה, בניין 7' }, [ADDON_LINE, SOLO_LINE], 149 + 169));
+    assert.equal(response.status, 201, await response.text());
+    const [order] = repository.saved.at(-1).orders;
+    assert.equal(order.addons, 1);
+    assert.equal(order.solos, 1);
+  });
 });

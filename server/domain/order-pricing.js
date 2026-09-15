@@ -6,31 +6,39 @@
 // gets the same answer here as in the order editor:
 //
 //   couple meals x couple price
-//   + fish fillets beyond 2 per meal (a fish-cake portion counts as 2)
-//   + salads beyond 4 per meal (blocks of 4, then singles)
+//   + add-on diners x add-on diner price, solo diners x solo diner price
+//     (the diner model of package-rules.js, Lin 2026-09-15)
+//   + fish fillets beyond the package allowance (a fish-cake portion counts as 2)
+//   + salads: never priced since the fixed 12-salad box
 //   + Shabbat extras at their menu price, custom items at their own price
 //   + lunch plates by variant, excess lunch sides, lunch add-ons
-//   + extra challot beyond 2 per meal, extra mains beyond 1 per meal,
-//     extra dessert half-units
-//   + delivery (Dubai 15$, Abu Dhabi 55$, free or pickup 0)
+//   + extra challot beyond the allowance, extra mains beyond the allowance
+//     in half-units (a whole main = 2 half-units, an odd half-unit costs
+//     half the extra-main price), extra dessert half-units
+//   + delivery (Dubai 15$ unless the order carries any package — then
+//     included; Abu Dhabi 55$ always; free or pickup 0)
 //
 // The stored total always wins (a manually set price is the price — Moshe,
 // 2026-08-18); when it differs from the computed lines the gap is reported
 // as its own line, never hidden.
 
 const {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
   BAKLAVA_HALF_UNITS_PER_PORTION,
-  DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
   FISH_UNITS_INCLUDED_PER_MEAL,
-  MAINS_INCLUDED_PER_MEAL,
+  HALF_UNITS_PER_MAIN,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
   SOUFFLE_HALF_UNITS_PER_PORTION,
   classifyDessertKind,
+  packageAllowances,
 } = require('./package-rules');
 const { LUNCH_MENU } = require('./lunch-menu');
 const { parseMoneyMinorUnits } = require('./business-queries');
 
 const DEFAULTS = Object.freeze({
   couplePriceMinorUnits: 23_000,
+  addonDinerPriceMinorUnits: ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  soloDinerPriceMinorUnits: SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
   challahPriceMinorUnits: 1_000,
   includedChallot: 2,
   saladBlockPriceMinorUnits: 2_500,
@@ -41,6 +49,11 @@ const DEFAULTS = Object.freeze({
 });
 const FISH_CAKE_PORTION_NAME = 'קציצות דגים ברוטב מרוקאי';
 const DELIVERY_PRICE_MINOR_UNITS = Object.freeze({ dubai: 1_500, 'abu-dhabi': 5_500 });
+// The line names the customer site, the panel and this breakdown all use for
+// the two extra diner kinds — one spelling everywhere, so a site order's
+// lines can be verified and mapped without guessing.
+const ADDON_DINER_LINE_NAME = 'סועד נוסף';
+const SOLO_DINER_LINE_NAME = 'סועד בודד';
 
 // The panel's lunch variants carry side rules the shared catalog does not.
 const LUNCH_SIDE_RULES = Object.freeze({
@@ -74,6 +87,8 @@ function menuPrices(menu) {
   const m = isRecord(menu) ? menu : {};
   return {
     couplePriceMinorUnits: dollarsToMinorUnits(m.couplePrice, DEFAULTS.couplePriceMinorUnits),
+    addonDinerPriceMinorUnits: dollarsToMinorUnits(m.addonDinerPrice, DEFAULTS.addonDinerPriceMinorUnits),
+    soloDinerPriceMinorUnits: dollarsToMinorUnits(m.soloDinerPrice, DEFAULTS.soloDinerPriceMinorUnits),
     challahPriceMinorUnits: dollarsToMinorUnits(m.challahPrice, DEFAULTS.challahPriceMinorUnits),
     includedChallot: Number.isInteger(m.includedChallot) && m.includedChallot >= 0 ? m.includedChallot : DEFAULTS.includedChallot,
     saladBlockPriceMinorUnits: dollarsToMinorUnits(m.saladBlockPrice, DEFAULTS.saladBlockPriceMinorUnits),
@@ -168,6 +183,18 @@ function lunchLines(order, prices, warnings) {
 }
 
 /**
+ * The delivery fee for a zone given whether the order carries any package
+ * (couple meal, add-on diner or solo diner). Dubai delivery is part of every
+ * package price; Abu Dhabi is always charged; pickup and free delivery are 0.
+ */
+function deliveryFeeMinorUnits({ zone, hasPackage, pickup = false, freeDelivery = false }) {
+  if (pickup === true || freeDelivery === true) return 0;
+  const resolvedZone = zone === 'abu-dhabi' ? 'abu-dhabi' : 'dubai';
+  if (resolvedZone === 'dubai' && hasPackage) return 0;
+  return DELIVERY_PRICE_MINOR_UNITS[resolvedZone];
+}
+
+/**
  * The priced lines of one order plus how they compare to the stored total.
  * Never throws on odd data: unknown prices become warnings, not zeros.
  */
@@ -176,15 +203,20 @@ function orderPriceBreakdown(order, menu) {
   const warnings = [];
   const lines = [];
   const meals = count(order.meals);
+  const addons = count(order.addons);
+  const solos = count(order.solos);
+  const allowances = packageAllowances({ couples: meals, addons, solos });
 
   if (meals > 0) lines.push(line('ארוחה זוגית', meals, prices.couplePriceMinorUnits, 'couple-meal'));
+  if (addons > 0) lines.push(line(ADDON_DINER_LINE_NAME, addons, prices.addonDinerPriceMinorUnits, 'addon-diner'));
+  if (solos > 0) lines.push(line(SOLO_DINER_LINE_NAME, solos, prices.soloDinerPriceMinorUnits, 'solo-diner'));
 
   // fish
   let fishUnits = 0;
   for (const [name, value] of Object.entries(isRecord(order.firsts) ? order.firsts : {})) {
     fishUnits += dishCount(value) * (name === FISH_CAKE_PORTION_NAME ? FISH_UNITS_INCLUDED_PER_MEAL : 1);
   }
-  const extraFish = Math.max(0, fishUnits - meals * FISH_UNITS_INCLUDED_PER_MEAL);
+  const extraFish = Math.max(0, fishUnits - allowances.fishUnits);
   if (extraFish > 0) lines.push(line('פילה דג אקסטרה', extraFish, prices.fishExtraPriceMinorUnits, 'fish-surcharge'));
 
   // Salads: since 2026-09-15 every order includes the fixed 12-salad box and
@@ -221,24 +253,36 @@ function orderPriceBreakdown(order, menu) {
   // delivery
   if (order.pickup !== true) {
     const zone = order.deliveryZone === 'abu-dhabi' ? 'abu-dhabi' : 'dubai';
-    const fee = order.freeDelivery === true ? 0 : DELIVERY_PRICE_MINOR_UNITS[zone];
+    const fee = deliveryFeeMinorUnits({
+      zone,
+      hasPackage: allowances.deliveryIncluded,
+      freeDelivery: order.freeDelivery === true,
+    });
     lines.push(line(zone === 'abu-dhabi' ? 'משלוח לאבו דאבי' : 'משלוח בדובאי', 1, fee, 'delivery'));
   }
 
-  // challot / mains / desserts beyond the package
-  const extraChallot = Math.max(0, count(order.challot) - meals * prices.includedChallot);
+  // challot / mains / desserts beyond the package. The menu's includedChallot
+  // setting governs the couple part of the challah allowance (2 by default);
+  // add-on and solo diners keep the fixed counts of package-rules.js.
+  const includedChallot = allowances.challot + meals * (prices.includedChallot - 2);
+  const extraChallot = Math.max(0, count(order.challot) - includedChallot);
   if (extraChallot > 0) lines.push(line('חלות נוספות', extraChallot, prices.challahPriceMinorUnits, 'other'));
   let mains = 0;
   for (const value of Object.values(isRecord(order.mains) ? order.mains : {})) mains += dishCount(value);
-  const extraMains = Math.max(0, mains - meals * MAINS_INCLUDED_PER_MEAL);
+  const extraMainHalfUnits = Math.max(0, mains * HALF_UNITS_PER_MAIN - allowances.mainHalfUnits);
+  const extraMains = Math.floor(extraMainHalfUnits / HALF_UNITS_PER_MAIN);
+  const extraHalfMains = extraMainHalfUnits % HALF_UNITS_PER_MAIN;
   if (extraMains > 0) lines.push(line('עיקרית נוספת', extraMains, prices.mainExtraPriceMinorUnits, 'other'));
+  if (extraHalfMains > 0) {
+    lines.push(line('חצי עיקרית נוספת', extraHalfMains, Math.round(prices.mainExtraPriceMinorUnits / HALF_UNITS_PER_MAIN), 'other'));
+  }
   let dessertHalfUnits = 0;
   for (const [name, value] of Object.entries(isRecord(order.desserts) ? order.desserts : {})) {
     const kind = classifyDessertKind(name);
     const perPortion = kind === 'souffle' ? SOUFFLE_HALF_UNITS_PER_PORTION : kind === 'baklava' ? BAKLAVA_HALF_UNITS_PER_PORTION : 0;
     dessertHalfUnits += dishCount(value) * perPortion;
   }
-  const extraDessert = Math.max(0, dessertHalfUnits - meals * DESSERT_HALF_UNITS_INCLUDED_PER_MEAL);
+  const extraDessert = Math.max(0, dessertHalfUnits - allowances.dessertHalfUnits);
   if (extraDessert > 0 && prices.dessertExtraPriceMinorUnits > 0) {
     lines.push(line('קינוח נוסף', extraDessert, prices.dessertExtraPriceMinorUnits, 'other'));
   }
@@ -272,4 +316,11 @@ function orderPriceBreakdown(order, menu) {
   };
 }
 
-module.exports = { DELIVERY_PRICE_MINOR_UNITS, orderPriceBreakdown };
+module.exports = {
+  ADDON_DINER_LINE_NAME,
+  DELIVERY_PRICE_MINOR_UNITS,
+  SOLO_DINER_LINE_NAME,
+  deliveryFeeMinorUnits,
+  menuPrices,
+  orderPriceBreakdown,
+};

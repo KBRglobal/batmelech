@@ -28,6 +28,10 @@ export type CatalogCategoryKey = 'salads' | 'firsts' | 'mains' | 'sides' | 'dess
 
 export type SiteCatalog = {
   couplePriceUsd: number | null
+  /** A third/fourth diner joining a couple package — half of everything. */
+  addonDinerPriceUsd: number | null
+  /** One person alone, no couple package — Dubai delivery included. */
+  soloDinerPriceUsd: number | null
   challahPriceUsd: number | null
   categories: Record<CatalogCategoryKey, CatalogDish[]>
   extras: CatalogExtra[]
@@ -111,6 +115,8 @@ function parseCatalog(value: unknown): SiteCatalog | null {
     .filter((item): item is CatalogLunchItem => item !== null)
   return {
     couplePriceUsd: usd(body.couplePriceUsd),
+    addonDinerPriceUsd: usd(body.addonDinerPriceUsd),
+    soloDinerPriceUsd: usd(body.soloDinerPriceUsd),
     challahPriceUsd: usd(body.challahPriceUsd),
     categories,
     extras,

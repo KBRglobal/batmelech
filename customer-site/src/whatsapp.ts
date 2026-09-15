@@ -14,13 +14,22 @@ export function deliveryAddressText(customer: CustomerDetails) {
   return [hotel.name, customer.address].filter(Boolean).join(' — ')
 }
 
-export function buildOrderMessage(lines: CartLine[], customer: CustomerDetails, total: number) {
+/**
+ * @param deliveryFeeUsd the fee inside `total` — 0 means Dubai delivery is
+ *   included by a Shabbat package; omitted keeps the message without a fee row.
+ */
+export function buildOrderMessage(lines: CartLine[], customer: CustomerDetails, total: number, deliveryFeeUsd?: number) {
   const hotel = selectedHotel(customer)
   const itemRows = lines.map((l) => `• ${l.name} x${l.qty} — $${l.unitPrice * l.qty}${l.note ? ` (${l.note})` : ''}`)
+  const feeRow =
+    deliveryFeeUsd === undefined || customer.fulfillment === 'pickup'
+      ? undefined
+      : `• משלוח (${DELIVERY_ZONE_LABELS[customer.zone]}) — ${deliveryFeeUsd === 0 ? 'כלול' : `$${deliveryFeeUsd}`}`
   const rows = [
     'הזמנה חדשה מהאתר — מטעמי בת מלך',
     '',
     ...itemRows,
+    feeRow,
     '',
     `סה"כ: $${total} USD`,
     '',

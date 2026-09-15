@@ -36,6 +36,8 @@ const KITCHEN_ORDER_FIELDS = [
   'place',
   'pickup',
   'meals',
+  'addons',
+  'solos',
   'aricha',
   'challot',
   'salads',

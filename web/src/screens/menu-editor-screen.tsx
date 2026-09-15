@@ -721,6 +721,16 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
             onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'couplePriceMinorUnits', next))}
           />
           <PriceField
+            label="מחיר סועד נוסף (מצטרף לזוגית)"
+            value={current.addonDinerMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'addonDinerMinorUnits', next))}
+          />
+          <PriceField
+            label="מחיר סועד בודד (בלי זוגית)"
+            value={current.soloDinerMinorUnits}
+            onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'soloDinerMinorUnits', next))}
+          />
+          <PriceField
             label="מחיר חלה נוספת"
             value={current.extraChallahMinorUnits}
             onCommit={(next) => onUpdate((catalog) => updateCatalogCorePrice(catalog, 'extraChallahMinorUnits', next))}
@@ -752,6 +762,7 @@ export function MenuEditorScreen({ onSave }: { onSave?: StoreSaveHandler }) {
           <p>בכל ארוחה זוגית כלולים שני פילטים, בכל שילוב של מרוקאי וחריימה. מנת קציצות דגים אחת שווה למנת דג זוגית מלאה.</p>
           <p className="mt-2">סלטים: 4 כלולים בכל ארוחה זוגית, מעבר לזה נגבה לפי הבלוק/הסלט הבודד שמוגדרים למעלה.</p>
           <p className="mt-2">קינוח: 2 סופלה או מנת סוכריות בקלוואה אחת לכל זוגית, מעבר לזה נגבה לפי המחיר שמוגדר למעלה.</p>
+          <p className="mt-2">סועד נוסף מצטרף לזוגית ומקבל חצי מהכל: יחידת דג, חצי עיקרית, חצי תוספת, קינוח אחד, חלה ו־6 סלטים. סועד בודד (בלי זוגית) מקבל אותו דבר עם 2 חלות ומארז סלטים מלא. משלוח בדובאי כלול בכל חבילה.</p>
         </div>
       </section>
 

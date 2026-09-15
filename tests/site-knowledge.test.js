@@ -42,6 +42,8 @@ function fullState() {
     },
     menu: {
       couplePrice: 240,
+      addonDinerPrice: 150,
+      soloDinerPrice: 170,
       challahPrice: 12,
       includedChallot: 2,
       salads: ['טחינה', 'מטבוחה פיקנטית'],
@@ -86,8 +88,12 @@ function fullState() {
 test('knowledge covers package rules, live status, windows, holidays and dish meta', () => {
   const knowledge = buildSiteKnowledge(fullState(), { today: '2026-08-19' });
 
-  // Package rules with live overrides.
-  assert.match(knowledge, /costs \$240/u);
+  // Package rules with live overrides: the three ways to order.
+  assert.match(knowledge, /package for two[^\n]*costs \$240 and INCLUDES Dubai delivery/u);
+  assert.match(knowledge, /add-on diner \(סועד נוסף\) costs \$150 and joins a couple package[^\n]*1 fish fillet, half a main course, half a side, one dessert half-portion[^\n]*1 challah and 6 salads/u);
+  assert.match(knowledge, /solo diner \(סועד בודד\) costs \$170 and INCLUDES Dubai delivery[^\n]*1 fish fillet, half a main course, half a side, one dessert half-portion, 2 challot and the full 12-salad box/u);
+  assert.match(knowledge, /Abu Dhabi delivery is \$55 on top of any of the three/u);
+  assert.match(knowledge, /one couple package \(\$240\) \+ one add-on diner \(\$150\) = \$390/u);
   assert.match(knowledge, /2 challot/u);
   assert.match(knowledge, /2 fillets, one per person/u);
   assert.match(knowledge, /extra challah \$12 each/u);
@@ -140,8 +146,10 @@ test('closed ordering is reported with its reopen date', () => {
 
 test('empty state still yields the fixed business facts and package fallbacks', () => {
   const knowledge = buildSiteKnowledge({}, { today: '2026-08-19' });
-  assert.match(knowledge, /Dubai \$15, Abu Dhabi \$55/u);
-  assert.match(knowledge, /costs \$230/u);
+  assert.match(knowledge, /Dubai delivery is INCLUDED in the price of every Shabbat package[^\n]*pays \$15 for Dubai delivery\. Abu Dhabi delivery is \$55 on every order/u);
+  assert.match(knowledge, /costs \$299 and INCLUDES Dubai delivery/u);
+  assert.match(knowledge, /add-on diner \(סועד נוסף\) costs \$149/u);
+  assert.match(knowledge, /solo diner \(סועד בודד\) costs \$169/u);
   assert.match(knowledge, /Thursday at 6:00 PM/u);
   assert.doesNotMatch(knowledge, /Holiday menus/u);
 });

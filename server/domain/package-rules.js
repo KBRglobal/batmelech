@@ -36,6 +36,33 @@ const DESSERT_HALF_UNITS_INCLUDED_PER_MEAL = 2;
 // Dessert portions are not equal size: one soufflé serves one person, one
 // baklava portion serves two (it's a larger, shared portion) — so a soufflé
 // counts as 1 half-unit and a baklava portion counts as 2.
+// Diner model (Lin, 2026-09-15) — mirror of web/src/domain/package-rules.ts.
+// couple = 2 diners ($299 incl. Dubai delivery); addon = an extra diner on an
+// order with a couple meal ($149, half of everything, 6 salads, 1 challah);
+// solo = one person alone ($169 incl. delivery, half main/side, 1 fish unit,
+// 1 dessert half-unit, 2 challot and the full 12-salad box).
+const ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT = 14_900;
+const SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT = 16_900;
+const ADDON_DINER_SALADS = 6;
+const SOLO_DINER_SALADS = SALAD_BOX_SIZE;
+const HALF_UNITS_PER_MAIN = 2;
+const HALF_UNITS_PER_SIDE = 2;
+function packageAllowances({ couples, addons, solos }) {
+  const c = Math.max(0, Math.floor(Number(couples) || 0));
+  const a = Math.max(0, Math.floor(Number(addons) || 0));
+  const s = Math.max(0, Math.floor(Number(solos) || 0));
+  const diners = 2 * c + a + s;
+  return {
+    diners,
+    fishUnits: diners * (FISH_UNITS_INCLUDED_PER_MEAL / 2),
+    mainHalfUnits: diners,
+    sideHalfUnits: diners,
+    dessertHalfUnits: diners * (DESSERT_HALF_UNITS_INCLUDED_PER_MEAL / 2),
+    challot: 2 * c + a + 2 * s,
+    salads: SALAD_BOX_SIZE * c + ADDON_DINER_SALADS * a + SOLO_DINER_SALADS * s,
+    deliveryIncluded: diners > 0,
+  };
+}
 const SOUFFLE_HALF_UNITS_PER_PORTION = 1;
 const BAKLAVA_HALF_UNITS_PER_PORTION = 2;
 
@@ -63,6 +90,13 @@ function defaultDessertPortionsForMeals(kind, meals) {
 }
 
 module.exports = {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  ADDON_DINER_SALADS,
+  SOLO_DINER_SALADS,
+  HALF_UNITS_PER_MAIN,
+  HALF_UNITS_PER_SIDE,
+  packageAllowances,
   SALAD_BOX_ITEMS,
   SALAD_BOX_SIZE,
   FISH_UNITS_INCLUDED_PER_MEAL,

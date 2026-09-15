@@ -4,6 +4,8 @@ import {
   bonPaymentFields,
   bonServiceDate,
   buildBonFields,
+  formatDinerSummary,
+  orderDinerCounts,
   buildOrdersDashboard,
   buildWhatsAppOrderHref,
   formatLegacyOrderText,
@@ -241,6 +243,8 @@ describe('buildOrdersDashboard', () => {
     )
     expect(groupOrders(result.upcomingGroups[0]!)[0]?.summary).toEqual({
       meals: 2,
+      addons: 0,
+      solos: 0,
       orderedSalads: 5,
       complimentarySalads: 1,
       distinctExtras: 3,
@@ -638,5 +642,29 @@ describe('buildBonFields', () => {
         { label: 'שולם', value: 'מקדמה', notes: [] },
       ])
     expect(bonPaymentFields({ id: 'bon-7' })).toEqual([{ label: 'שולם', value: 'לא', notes: [] }])
+  })
+
+  it('shows addon and solo diners with the salad count their packages call for', () => {
+    const order = { id: 'bon-8', name: 'לקוחה', meals: 1, addons: 1, solos: '0' }
+    expect(orderDinerCounts(order)).toEqual({ couples: 1, addons: 1, solos: 0 })
+    expect(formatDinerSummary(orderDinerCounts(order))).toBe('זוגית ×1 + סועד נוסף ×1')
+    expect(formatDinerSummary(orderDinerCounts({ id: 'old', meals: 2 }))).toBe('זוגית ×2')
+    expect(formatDinerSummary(orderDinerCounts({ id: 'none' }))).toBe('')
+
+    const fields = buildBonFields(order)
+    expect(fields).toEqual(expect.arrayContaining([
+      { label: 'ארוחה זוגית', value: '×1', notes: [] },
+      { label: 'סועד נוסף', value: '×1', notes: [] },
+      { label: 'סלטים בחבילה', value: '18 יחידות', notes: [] },
+    ]))
+    expect(fields.some((field) => field.label === 'סועד בודד')).toBe(false)
+
+    const solo = buildBonFields({ id: 'bon-9', name: 'לבד', meals: 0, solos: 1 })
+    expect(solo).toEqual(expect.arrayContaining([
+      { label: 'סועד בודד', value: '×1', notes: [] },
+      { label: 'סלטים בחבילה', value: '12 יחידות', notes: [] },
+    ]))
+    expect(solo.some((field) => field.label === 'ארוחה זוגית')).toBe(false)
+    expect(formatLegacyOrderText({ id: 'text', name: 'לקוחה', meals: 1, addons: 2 })).toContain('סועד נוסף ×2')
   })
 })

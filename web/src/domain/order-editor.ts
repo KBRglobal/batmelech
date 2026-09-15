@@ -1,15 +1,19 @@
 import { z } from 'zod'
 import { EXTRA_FILLET_UNIT_PRICE_MINOR_UNITS } from './fish-pricing.ts'
 import {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
   BAKLAVA_HALF_UNITS_PER_PORTION,
   classifyDessertKind,
-  DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
   FISH_UNITS_INCLUDED_PER_MEAL,
-  MAINS_INCLUDED_PER_MEAL,
+  HALF_UNITS_PER_MAIN,
+  HALF_UNITS_PER_SIDE,
   SALAD_BOX_ITEMS,
-  SIDES_INCLUDED_PER_MEAL,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
   SOUFFLE_HALF_UNITS_PER_PORTION,
   defaultDessertPortionsForMeals,
+  packageAllowances,
+  type DinerCounts,
+  type PackageAllowances,
 } from './package-rules.ts'
 import { parseLegacyUsdAmount } from './customers-finance.ts'
 import { checkedAdd, checkedMultiply, requireNonNegativeSafeInteger } from './money.ts'
@@ -114,6 +118,11 @@ const DELIVERY_PRICE_MINOR_UNITS: Readonly<Record<DeliveryZone, number>> = {
   'abu-dhabi': 5_500,
 }
 
+/** The delivery line when a package already covers Dubai delivery (amount 0). */
+export const DELIVERY_INCLUDED_LINE_NAME = 'משלוח בדובאי — כלול'
+export const EXTRA_MAIN_LINE_NAME = 'עיקרית נוספת'
+export const EXTRA_HALF_MAIN_LINE_NAME = 'חצי עיקרית נוספת'
+
 function isDeliveryZone(value: unknown): value is DeliveryZone {
   return value === 'dubai' || value === 'abu-dhabi'
 }
@@ -152,6 +161,10 @@ export interface OrderEditorMenu {
   readonly lunch: readonly LunchItem[]
   readonly lunchSides: readonly string[]
   readonly couplePriceMinorUnits: number
+  /** סועד נוסף — an extra diner joining a couple meal (menu.addonDinerPrice). */
+  readonly addonDinerPriceMinorUnits: number
+  /** סועד בודד — one person eating alone, no couple meal (menu.soloDinerPrice). */
+  readonly soloDinerPriceMinorUnits: number
   readonly challahPriceMinorUnits: number
   readonly includedChallahs: number
   readonly saladBlockPriceMinorUnits: number
@@ -490,6 +503,10 @@ export interface OrderDraft extends Record<string, unknown> {
   readonly status: string
   readonly group: string
   readonly meals: number
+  /** Extra diners joining a couple meal (סועד נוסף). Stored as `addons`. */
+  readonly addons: number
+  /** Diners eating alone, no couple meal (סועד בודד). Stored as `solos`. */
+  readonly solos: number
   readonly aricha: number
   readonly challot: number
   readonly salads: Readonly<Record<string, SaladDraftSelection>>
@@ -602,7 +619,7 @@ function isSafeHttpsUrl(value: unknown): boolean {
 }
 
 export function legacyOrderEditIssue(order: LegacyOrder): string | null {
-  if (![order.meals, order.aricha, order.challot].every((value) => value === undefined || isValidLegacyCount(value))) {
+  if (![order.meals, order.addons, order.solos, order.aricha, order.challot].every((value) => value === undefined || isValidLegacyCount(value))) {
     return 'אחת מכמויות הבסיס נשמרה בפורמט שלא ניתן לערוך בלי לשנות אותה.'
   }
   if (![order.firsts, order.mains, order.sides, order.desserts].every(hasValidQuantityMap)) {
@@ -924,6 +941,14 @@ export function buildOrderEditorMenu(store: LegacyStore): OrderEditorMenu {
       rawMenu.couplePrice,
       DEFAULT_COUPLE_PRICE_MINOR_UNITS,
     ),
+    addonDinerPriceMinorUnits: dollarsNumberToMinorUnits(
+      rawMenu.addonDinerPrice,
+      ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+    ),
+    soloDinerPriceMinorUnits: dollarsNumberToMinorUnits(
+      rawMenu.soloDinerPrice,
+      SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+    ),
     challahPriceMinorUnits: dollarsNumberToMinorUnits(
       rawMenu.challahPrice,
       DEFAULT_CHALLAH_PRICE_MINOR_UNITS,
@@ -1001,6 +1026,8 @@ export function createOrderDraft(menu: OrderEditorMenu, now: Date = new Date()):
     status: 'חדשה',
     group: '',
     meals: 1,
+    addons: 0,
+    solos: 0,
     aricha: 0,
     challot: menu.includedChallahs,
     salads: saladBoxSelections(),
@@ -1061,6 +1088,8 @@ export function createOrderDraftFromLegacy(
     status: text(order.status) || 'חדשה',
     group: text(order.group),
     meals: countOrFallback(order.meals, defaults.meals),
+    addons: countOrFallback(order.addons, 0),
+    solos: countOrFallback(order.solos, 0),
     aricha: countOrFallback(order.aricha, defaults.aricha),
     challot: countOrFallback(order.challot, defaults.challot),
     salads: normalizeSalads(order.salads),
@@ -1214,11 +1243,7 @@ export function calculateDessertAllowance(draft: OrderDraft): DessertAllowance {
     checkedMultiply(baklavaQuantity, BAKLAVA_HALF_UNITS_PER_PORTION, 'baklava allowance units'),
     'dessert allowance units',
   )
-  const includedHalfUnits = checkedMultiply(
-    draft.meals,
-    DESSERT_HALF_UNITS_INCLUDED_PER_MEAL,
-    'included dessert units',
-  )
+  const includedHalfUnits = draftAllowances(draft).dessertHalfUnits
   return {
     souffleQuantity,
     baklavaQuantity,
@@ -1247,6 +1272,7 @@ export interface DraftIssue {
     | 'DESSERT_OVERAGE'
     | 'DESSERT_UNCLASSIFIED'
     | 'UNPRICED_EXTRA'
+    | 'DINER_MIX'
     | 'PRICING_ERROR'
   readonly message: string
   readonly blocking: boolean
@@ -1288,6 +1314,8 @@ export function classifyDraftSelectionMode(draft: OrderDraft): DraftSelectionMod
   )
   const hasShabbat =
     draft.meals > 0 ||
+    draft.addons > 0 ||
+    draft.solos > 0 ||
     draft.challot > 0 ||
     recordHasPositiveQuantity(draft.firsts) ||
     recordHasPositiveQuantity(draft.mains) ||
@@ -1300,30 +1328,99 @@ export function classifyDraftSelectionMode(draft: OrderDraft): DraftSelectionMod
   return 'empty'
 }
 
-export function applyCoupleMealQuantity(
+export function draftDinerCounts(draft: Pick<OrderDraft, 'meals' | 'addons' | 'solos'>): DinerCounts {
+  return { couples: draft.meals, addons: draft.addons, solos: draft.solos }
+}
+
+/** What the order's packages include (package-rules.ts), for the draft's diner counts. */
+export function draftAllowances(draft: Pick<OrderDraft, 'meals' | 'addons' | 'solos'>): PackageAllowances {
+  return packageAllowances(draftDinerCounts(draft))
+}
+
+/**
+ * Challot the order gets for free: the (configurable) per-couple amount from
+ * the menu, plus the fixed addon/solo allowance from package-rules.ts.
+ */
+export function includedChallot(menu: OrderEditorMenu, counts: DinerCounts): number {
+  const perCouple = checkedMultiply(menu.includedChallahs, counts.couples, 'included couple challahs')
+  const perDiner = packageAllowances({ couples: 0, addons: counts.addons, solos: counts.solos }).challot
+  return checkedAdd(perCouple, perDiner, 'included challahs')
+}
+
+/**
+ * Changes one or more diner counters and keeps the challah counter in step
+ * while it still equals the automatic allowance — an operator override of
+ * the challot is never touched.
+ */
+export function applyDinerCounts(
   draft: OrderDraft,
   menu: OrderEditorMenu,
-  meals: number,
+  next: Partial<DinerCounts>,
 ): OrderDraft {
-  const nextMeals = requireNonNegativeSafeInteger(meals, 'couple meals')
-  const previousAutomaticChallahs = checkedMultiply(
-    menu.includedChallahs,
-    draft.meals,
-    'previous automatic challahs',
-  )
-  const nextAutomaticChallahs = checkedMultiply(
-    menu.includedChallahs,
-    nextMeals,
-    'next automatic challahs',
-  )
+  const nextCounts: DinerCounts = {
+    couples: requireNonNegativeSafeInteger(next.couples ?? draft.meals, 'couple meals'),
+    addons: requireNonNegativeSafeInteger(next.addons ?? draft.addons, 'addon diners'),
+    solos: requireNonNegativeSafeInteger(next.solos ?? draft.solos, 'solo diners'),
+  }
+  const previousAutomaticChallahs = includedChallot(menu, draftDinerCounts(draft))
+  const nextAutomaticChallahs = includedChallot(menu, nextCounts)
   return {
     ...draft,
-    meals: nextMeals,
+    meals: nextCounts.couples,
+    addons: nextCounts.addons,
+    solos: nextCounts.solos,
     challot:
       draft.challot === previousAutomaticChallahs
         ? nextAutomaticChallahs
         : draft.challot,
   }
+}
+
+export function applyCoupleMealQuantity(
+  draft: OrderDraft,
+  menu: OrderEditorMenu,
+  meals: number,
+): OrderDraft {
+  return applyDinerCounts(draft, menu, { couples: meals })
+}
+
+export function applyAddonDinerQuantity(
+  draft: OrderDraft,
+  menu: OrderEditorMenu,
+  addons: number,
+): OrderDraft {
+  return applyDinerCounts(draft, menu, { addons })
+}
+
+export function applySoloDinerQuantity(
+  draft: OrderDraft,
+  menu: OrderEditorMenu,
+  solos: number,
+): OrderDraft {
+  return applyDinerCounts(draft, menu, { solos })
+}
+
+/**
+ * Non-blocking operator hints about an odd diner mix: a solo diner is the
+ * package for an order WITHOUT a couple meal, an addon diner only joins one.
+ */
+export function dinerMixIssues(draft: Pick<OrderDraft, 'meals' | 'addons' | 'solos'>): DraftIssue[] {
+  const issues: DraftIssue[] = []
+  if (draft.solos > 0 && draft.meals > 0) {
+    issues.push({
+      code: 'DINER_MIX',
+      message: 'סועד בודד מיועד להזמנה בלי ארוחה זוגית. כשיש זוגית בהזמנה, בדרך כלל בוחרים סועד נוסף במקום.',
+      blocking: false,
+    })
+  }
+  if (draft.addons > 0 && draft.meals === 0) {
+    issues.push({
+      code: 'DINER_MIX',
+      message: 'סועד נוסף מצטרף לארוחה זוגית. בלי זוגית בהזמנה, בדרך כלל בוחרים סועד בודד במקום.',
+      blocking: false,
+    })
+  }
+  return issues
 }
 
 export function calculateOrderDraftPricing(
@@ -1345,18 +1442,36 @@ export function calculateOrderDraftPricing(
     })
   }
 
-  // Extra mains beyond the meal's included one are now a confirmed, priced
-  // upsell ($100/unit, like fish and salads) — not a blocked state. Sides
-  // stay blocked below: no confirmed extra-side price exists yet.
-  const includedMains = checkedMultiply(draft.meals, MAINS_INCLUDED_PER_MEAL, 'included mains')
-  const selectedMains = sumCounts(Object.values(draft.mains), 'selected mains')
-  const extraMains = Math.max(0, selectedMains - includedMains)
-  const includedSides = checkedMultiply(draft.meals, SIDES_INCLUDED_PER_MEAL, 'included sides')
-  const selectedSides = sumCounts(Object.values(draft.sides), 'selected Shabbat sides')
-  if (selectedSides > includedSides) {
+  issues.push(...dinerMixIssues(draft))
+
+  // Everything the packages include comes from one place (package-rules.ts):
+  // couples, addon diners and solo diners each add their share. Mains and
+  // sides are counted in HALF units because an addon/solo diner gets half a
+  // portion — a whole main on the form is HALF_UNITS_PER_MAIN half-units.
+  const allowances = draftAllowances(draft)
+
+  // Extra mains beyond the included allowance are a confirmed, priced upsell
+  // ($100/whole unit, like fish) — not a blocked state. An odd half-unit of
+  // overage (1 couple + 1 addon choosing 2 mains) is priced at half the
+  // extra-main price. Sides stay blocked below: no confirmed extra-side
+  // price exists yet.
+  const selectedMainHalfUnits = checkedMultiply(
+    sumCounts(Object.values(draft.mains), 'selected mains'),
+    HALF_UNITS_PER_MAIN,
+    'selected main half-units',
+  )
+  const extraMainHalfUnits = Math.max(0, selectedMainHalfUnits - allowances.mainHalfUnits)
+  const extraMains = Math.floor(extraMainHalfUnits / HALF_UNITS_PER_MAIN)
+  const extraHalfMains = extraMainHalfUnits % HALF_UNITS_PER_MAIN
+  const selectedSideHalfUnits = checkedMultiply(
+    sumCounts(Object.values(draft.sides), 'selected Shabbat sides'),
+    HALF_UNITS_PER_SIDE,
+    'selected side half-units',
+  )
+  if (selectedSideHalfUnits > allowances.sideHalfUnits) {
     issues.push({
       code: 'SIDE_OVERAGE',
-      message: 'נבחרו יותר תוספות שבת ממספר הארוחות הזוגיות. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.',
+      message: 'נבחרו יותר תוספות שבת ממה שכלול בחבילות שבהזמנה. אין מחיר מאושר לחריגה ולכן אי אפשר לשמור.',
       blocking: true,
     })
   }
@@ -1545,19 +1660,20 @@ export function calculateOrderDraftPricing(
   }
 
   if (!draft.pickup) {
+    // Dubai delivery is part of every package (couple, addon, solo — Lin,
+    // 2026-09-15): the line stays visible so the operator sees it is
+    // covered, but it adds nothing. Abu Dhabi keeps its own fee.
+    const deliveryIncluded = draft.deliveryZone === 'dubai' && allowances.deliveryIncluded
     chargeLines.push({
       source: 'delivery',
-      name: DELIVERY_EXTRA_NAME,
+      name: deliveryIncluded ? DELIVERY_INCLUDED_LINE_NAME : DELIVERY_EXTRA_NAME,
       quantity: 1,
-      unitPriceMinorUnits: draft.freeDelivery ? 0 : DELIVERY_PRICE_MINOR_UNITS[draft.deliveryZone],
+      unitPriceMinorUnits:
+        draft.freeDelivery || deliveryIncluded ? 0 : DELIVERY_PRICE_MINOR_UNITS[draft.deliveryZone],
     })
   }
 
-  const includedChallahs = checkedMultiply(
-    menu.includedChallahs,
-    draft.meals,
-    'included challahs',
-  )
+  const includedChallahs = includedChallot(menu, draftDinerCounts(draft))
   const extraChallahs = Math.max(0, draft.challot - includedChallahs)
   if (extraChallahs > 0) {
     chargeLines.push({
@@ -1571,9 +1687,17 @@ export function calculateOrderDraftPricing(
   if (extraMains > 0) {
     chargeLines.push({
       source: 'other',
-      name: 'עיקרית נוספת',
+      name: EXTRA_MAIN_LINE_NAME,
       quantity: extraMains,
       unitPriceMinorUnits: menu.extraMainPriceMinorUnits,
+    })
+  }
+  if (extraHalfMains > 0) {
+    chargeLines.push({
+      source: 'other',
+      name: EXTRA_HALF_MAIN_LINE_NAME,
+      quantity: extraHalfMains,
+      unitPriceMinorUnits: Math.round(menu.extraMainPriceMinorUnits / HALF_UNITS_PER_MAIN),
     })
   }
 
@@ -1612,6 +1736,11 @@ export function calculateOrderDraftPricing(
       result: calculateOrderTotal({
         coupleMeals: draft.meals,
         coupleMealUnitPriceMinorUnits: menu.couplePriceMinorUnits,
+        addonDiners: draft.addons,
+        addonDinerUnitPriceMinorUnits: menu.addonDinerPriceMinorUnits,
+        soloDiners: draft.solos,
+        soloDinerUnitPriceMinorUnits: menu.soloDinerPriceMinorUnits,
+        includedFishUnits: allowances.fishUnits,
         fishQuantities: draft.firsts,
         orderedSalads,
         giftSalads,
@@ -1685,6 +1814,8 @@ export function demotePriceAvailabilityIssues(
 export function orderPricingFingerprint(draft: OrderDraft): string {
   return JSON.stringify({
     meals: draft.meals,
+    addons: draft.addons,
+    solos: draft.solos,
     challot: draft.challot,
     pickup: draft.pickup,
     deliveryZone: draft.deliveryZone,
@@ -1922,6 +2053,8 @@ export function serializeOrderDraft(draft: OrderDraft, orderId: string): LegacyO
     status: draft.status,
     group: draft.group,
     meals: draft.meals,
+    addons: draft.addons,
+    solos: draft.solos,
     aricha: draft.aricha,
     challot: draft.challot,
     salads: serializeSalads(draft.salads),

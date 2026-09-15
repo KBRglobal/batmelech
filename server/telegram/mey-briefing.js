@@ -9,7 +9,12 @@
 
 const { customerLedger, financialSummary, orderMoney, ordersOf, parseMoneyMinorUnits } = require('../domain/business-queries');
 const { DELIVERY_PRICE_MINOR_UNITS } = require('../domain/order-pricing');
-const { SALAD_BOX_SIZE } = require('../domain/package-rules');
+const {
+  ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT,
+  ADDON_DINER_SALADS,
+  SALAD_BOX_SIZE,
+  SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT,
+} = require('../domain/package-rules');
 const { LUNCH_MENU } = require('../domain/lunch-menu');
 const { aedLabel, usdLabel } = require('../domain/money-labels');
 const { orderingStatus } = require('../business-actions');
@@ -61,10 +66,13 @@ function orderLine(order) {
 function priceLines(menu) {
   const m = isRecord(menu) ? menu : {};
   const lines = [
-    `ארוחה זוגית ${dollars(m.couplePrice, 23_000)} (כוללת מארז קבוע של ${SALAD_BOX_SIZE} סלטים, 2 פילה דג, עיקרית, תוספת, קינוח, ${Number.isInteger(m.includedChallot) ? m.includedChallot : 2} חלות); ` +
-      `חלה נוספת ${dollars(m.challahPrice, 1_000)}; סלטים לא נמכרים בנפרד; ` +
+    `שלוש אפשרויות הזמנה לשבת: ` +
+      `ארוחה זוגית ${dollars(m.couplePrice, 23_000)} כולל משלוח בדובאי (מארז קבוע של ${SALAD_BOX_SIZE} סלטים, 2 פילה דג, עיקרית, תוספת, קינוח, ${Number.isInteger(m.includedChallot) ? m.includedChallot : 2} חלות); ` +
+      `סועד נוסף ${dollars(m.addonDinerPrice, ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT)} — מצטרף לארוחה זוגית ומקבל חצי מהכל (פילה דג אחד, חצי עיקרית, חצי תוספת, חצי מנת קינוח, חלה אחת, ${ADDON_DINER_SALADS} סלטים); ` +
+      `סועד בודד ${dollars(m.soloDinerPrice, SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT)} כולל משלוח בדובאי — לאדם אחד לבד (פילה דג אחד, חצי עיקרית, חצי תוספת, חצי מנת קינוח, 2 חלות ומארז ${SALAD_BOX_SIZE} הסלטים המלא).`,
+    `חלה נוספת ${dollars(m.challahPrice, 1_000)}; סלטים לא נמכרים בנפרד; ` +
       `פילה דג נוסף ${dollars(m.fishExtraPrice, 3_000)}; עיקרית נוספת ${dollars(m.mainExtraPrice, 10_000)}; ` +
-      `משלוח דובאי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS.dubai)}, אבו דאבי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS['abu-dhabi'])}, איסוף עצמי חינם.`,
+      `משלוח דובאי כלול בכל מארז (בהזמנה בלי מארז ${dollars(null, DELIVERY_PRICE_MINOR_UNITS.dubai)}), אבו דאבי ${dollars(null, DELIVERY_PRICE_MINOR_UNITS['abu-dhabi'])} תמיד, איסוף עצמי חינם.`,
   ];
   const extras = (Array.isArray(m.extras) ? m.extras : [])
     .filter((row) => isRecord(row) && text(row.name) !== '')

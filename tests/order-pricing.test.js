@@ -3,7 +3,13 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { orderPriceBreakdown } = require('../server/domain/order-pricing');
+const {
+  ADDON_DINER_LINE_NAME,
+  SOLO_DINER_LINE_NAME,
+  deliveryFeeMinorUnits,
+  menuPrices,
+  orderPriceBreakdown,
+} = require('../server/domain/order-pricing');
 
 const MENU = {
   couplePrice: 230,
@@ -50,10 +56,10 @@ test("Toni's real order: two schnitzel challot, extras, a salad (free since the 
   assert.deepEqual(breakdown.warnings, []);
 });
 
-test('a couple meal with its included fish, salads and challot costs the couple price plus delivery', () => {
+test('a couple meal with its included fish, salads and challot costs the couple price; Dubai delivery is included', () => {
   const breakdown = orderPriceBreakdown(
     {
-      total: '245',
+      total: '230',
       meals: 1,
       challot: 2,
       firsts: { 'פילה דג ברוטב חריימה': 2 },
@@ -65,8 +71,115 @@ test('a couple meal with its included fish, salads and challot costs the couple 
     },
     MENU,
   );
-  assert.equal(breakdown.computedTotalMinorUnits, 24_500);
+  assert.equal(amounts(breakdown)['משלוח בדובאי'], 0, 'Dubai delivery is part of the package price');
+  assert.equal(breakdown.computedTotalMinorUnits, 23_000);
   assert.equal(breakdown.matchesStoredTotal, true);
+});
+
+// --- the diner model (Lin, 2026-09-15): couple + add-on diner + solo diner ---
+
+test('an add-on diner is its own line at the menu price and widens every allowance by half', () => {
+  const breakdown = orderPriceBreakdown(
+    {
+      total: '389',
+      meals: 1,
+      addons: 1,
+      challot: 3,
+      firsts: { 'פילה דג ברוטב חריימה': 3 },
+      mains: { 'קציצות בשר ברוטב אדום עשיר': 1, 'תבשיל עוף מרוקאי עם חומוסים': 1 },
+      sides: { 'אורז לבן': 2 },
+      desserts: { 'סופלה שוקולד': 3 },
+      pickup: false,
+      deliveryZone: 'dubai',
+    },
+    { ...MENU, addonDinerPrice: 149 },
+  );
+  const byName = amounts(breakdown);
+  assert.equal(byName['ארוחה זוגית'], 23_000);
+  assert.equal(byName['סועד נוסף'], 14_900);
+  assert.equal(breakdown.lines.find((row) => row.name === 'סועד נוסף').kind, 'addon-diner');
+  assert.equal(byName['פילה דג אקסטרה'], undefined, '3 fillets = 2 for the couple + 1 for the add-on diner');
+  assert.equal(byName['חלות נוספות'], undefined, '3 challot = 2 + 1');
+  assert.equal(byName['עיקרית נוספת'], undefined, '2 mains = 4 half-units; 3 are included');
+  assert.equal(byName['חצי עיקרית נוספת'], 5_000, 'the fourth half-unit costs half the extra-main price');
+  assert.equal(byName['משלוח בדובאי'], 0);
+  assert.equal(breakdown.computedTotalMinorUnits, 23_000 + 14_900 + 5_000);
+  assert.equal(breakdown.matchesStoredTotal, false);
+});
+
+test('a solo diner alone pays the solo price with Dubai delivery included and one fish fillet', () => {
+  const breakdown = orderPriceBreakdown(
+    {
+      total: '169',
+      solos: 1,
+      challot: 2,
+      firsts: { 'פילה דג ברוטב מרוקאי': 1 },
+      mains: { 'קציצות בשר ברוטב אדום עשיר': 1 },
+      desserts: { 'סופלה שוקולד': 1 },
+      pickup: false,
+      deliveryZone: 'dubai',
+    },
+    { ...MENU, soloDinerPrice: 169, mainExtraPrice: 100 },
+  );
+  const byName = amounts(breakdown);
+  assert.equal(byName['ארוחה זוגית'], undefined);
+  assert.equal(byName['סועד בודד'], 16_900);
+  assert.equal(breakdown.lines.find((row) => row.name === 'סועד בודד').kind, 'solo-diner');
+  assert.equal(byName['פילה דג אקסטרה'], undefined);
+  assert.equal(byName['חלות נוספות'], undefined, 'a solo diner gets 2 challot');
+  assert.equal(byName['חצי עיקרית נוספת'], 5_000, 'a whole main for a solo diner is half a main beyond the allowance');
+  assert.equal(byName['משלוח בדובאי'], 0);
+  assert.equal(breakdown.computedTotalMinorUnits, 16_900 + 5_000);
+});
+
+test('the diner prices fall back to the contract defaults when the menu carries none', () => {
+  const breakdown = orderPriceBreakdown({ total: '0', meals: 1, addons: 2, solos: 1, pickup: true }, MENU);
+  const byName = amounts(breakdown);
+  assert.equal(byName['סועד נוסף'], 2 * 14_900);
+  assert.equal(byName['סועד בודד'], 16_900);
+});
+
+test('main overage is priced in half-units: a whole extra main, then half of it', () => {
+  const twoExtraHalves = orderPriceBreakdown(
+    { total: '0', meals: 1, mains: { 'א': 2 }, pickup: true },
+    { ...MENU, mainExtraPrice: 100 },
+  );
+  assert.equal(amounts(twoExtraHalves)['עיקרית נוספת'], 10_000);
+  assert.equal(amounts(twoExtraHalves)['חצי עיקרית נוספת'], undefined);
+
+  const threeExtraHalves = orderPriceBreakdown(
+    { total: '0', meals: 1, addons: 1, mains: { 'א': 3 }, pickup: true },
+    { ...MENU, mainExtraPrice: 100 },
+  );
+  assert.equal(amounts(threeExtraHalves)['עיקרית נוספת'], 10_000, '6 half-units - 3 included = 3: one whole main...');
+  assert.equal(amounts(threeExtraHalves)['חצי עיקרית נוספת'], 5_000, '...and one half');
+});
+
+test('Dubai delivery is included with any package but charged without; Abu Dhabi is always charged', () => {
+  const noPackage = orderPriceBreakdown({ total: '0', extras: { 'קוסקוס': { q: 1 } }, deliveryZone: 'dubai' }, MENU);
+  assert.equal(amounts(noPackage)['משלוח בדובאי'], 1_500);
+  for (const order of [{ meals: 1 }, { addons: 1 }, { solos: 1 }]) {
+    const withPackage = orderPriceBreakdown({ total: '0', ...order, deliveryZone: 'dubai' }, MENU);
+    assert.equal(amounts(withPackage)['משלוח בדובאי'], 0, `${JSON.stringify(order)} includes Dubai delivery`);
+    const abuDhabi = orderPriceBreakdown({ total: '0', ...order, deliveryZone: 'abu-dhabi' }, MENU);
+    assert.equal(amounts(abuDhabi)['משלוח לאבו דאבי'], 5_500, `${JSON.stringify(order)} still pays Abu Dhabi`);
+  }
+});
+
+test('deliveryFeeMinorUnits and menuPrices are exposed for the site intake', () => {
+  assert.equal(deliveryFeeMinorUnits({ zone: 'dubai', hasPackage: false }), 1_500);
+  assert.equal(deliveryFeeMinorUnits({ zone: 'dubai', hasPackage: true }), 0);
+  assert.equal(deliveryFeeMinorUnits({ zone: 'abu-dhabi', hasPackage: true }), 5_500);
+  assert.equal(deliveryFeeMinorUnits({ zone: 'abu-dhabi', hasPackage: false, pickup: true }), 0);
+  assert.equal(deliveryFeeMinorUnits({ zone: 'abu-dhabi', hasPackage: false, freeDelivery: true }), 0);
+  const prices = menuPrices({ couplePrice: 299, addonDinerPrice: 150, soloDinerPrice: '170' });
+  assert.equal(prices.couplePriceMinorUnits, 29_900);
+  assert.equal(prices.addonDinerPriceMinorUnits, 15_000);
+  assert.equal(prices.soloDinerPriceMinorUnits, 17_000);
+  assert.equal(menuPrices({}).addonDinerPriceMinorUnits, 14_900);
+  assert.equal(menuPrices(null).soloDinerPriceMinorUnits, 16_900);
+  assert.equal(ADDON_DINER_LINE_NAME, 'סועד נוסף');
+  assert.equal(SOLO_DINER_LINE_NAME, 'סועד בודד');
 });
 
 test('fish cakes count as two fillets, extra salads cost nothing, Abu Dhabi costs 55$', () => {

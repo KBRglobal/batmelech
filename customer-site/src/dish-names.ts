@@ -104,6 +104,9 @@ export const DISH_NAMES: Readonly<Record<string, DishTranslation>> = {
 
   // --- Core package items ---
   'ארוחה זוגית': { en: 'Shabbat Meal for Two', fr: 'Repas de Chabbat pour deux' },
+  'סועד נוסף': { en: 'Additional Diner', fr: 'Convive supplémentaire' },
+  'סועד בודד': { en: 'Solo Diner', fr: 'Convive solo' },
+  'מנות נוספות במארז': { en: 'Extra Courses in the Box', fr: 'Plats supplémentaires du coffret' },
   'חלות': { en: 'Challahs', fr: 'Hallot' },
   'חלה': { en: 'Challah', fr: 'Halla' },
 

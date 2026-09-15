@@ -42,6 +42,66 @@ export const DESSERT_HALF_UNITS_INCLUDED_PER_MEAL = 2
 // Dessert portions are not equal size: one soufflé serves one person, one
 // baklava portion serves two (it's a larger, shared portion) — so a soufflé
 // counts as 1 half-unit and a baklava portion counts as 2.
+// ---------------------------------------------------------------------------
+// Diner model (Lin, 2026-09-15). The single source of truth for who eats what.
+//
+//   couple  — the couple meal (ארוחה זוגית): 2 diners. Price lives in the menu
+//             settings (couplePrice, $299) and INCLUDES Dubai delivery.
+//   addon   — an extra diner joining an order that has a couple meal
+//             (סועד נוסף): $149 (menu.addonDinerPrice), half of everything:
+//             1 fish unit, half a main, half a side, 1 dessert half-unit,
+//             1 challah, 6 salads (half a box).
+//   solo    — one person eating alone, no couple meal in the order
+//             (סועד בודד): $169 (menu.soloDinerPrice), includes delivery:
+//             1 fish unit, half a main, half a side, 1 dessert half-unit,
+//             2 challot and the FULL 12-salad box.
+//
+// Mains and sides are counted in HALF units here so a diner's allowance is a
+// whole number; a "main" on the order form (a portion for two) is 2 half-units.
+// ---------------------------------------------------------------------------
+export const ADDON_DINER_PRICE_MINOR_UNITS_DEFAULT = 14_900
+export const SOLO_DINER_PRICE_MINOR_UNITS_DEFAULT = 16_900
+export const ADDON_DINER_SALADS = 6
+export const SOLO_DINER_SALADS = SALAD_BOX_SIZE
+export const HALF_UNITS_PER_MAIN = 2
+export const HALF_UNITS_PER_SIDE = 2
+
+export interface DinerCounts {
+  readonly couples: number
+  readonly addons: number
+  readonly solos: number
+}
+
+export interface PackageAllowances {
+  readonly diners: number
+  readonly fishUnits: number
+  readonly mainHalfUnits: number
+  readonly sideHalfUnits: number
+  readonly dessertHalfUnits: number
+  readonly challot: number
+  /** Salads the kitchen prepares for the order; never priced. */
+  readonly salads: number
+  /** Dubai delivery is included whenever the order holds any package. */
+  readonly deliveryIncluded: boolean
+}
+
+export function packageAllowances({ couples, addons, solos }: DinerCounts): PackageAllowances {
+  const c = Math.max(0, Math.floor(couples))
+  const a = Math.max(0, Math.floor(addons))
+  const s = Math.max(0, Math.floor(solos))
+  const diners = 2 * c + a + s
+  return {
+    diners,
+    fishUnits: diners * (FISH_UNITS_INCLUDED_PER_MEAL / 2),
+    mainHalfUnits: diners,
+    sideHalfUnits: diners,
+    dessertHalfUnits: diners * (DESSERT_HALF_UNITS_INCLUDED_PER_MEAL / 2),
+    challot: 2 * c + a + 2 * s,
+    salads: SALAD_BOX_SIZE * c + ADDON_DINER_SALADS * a + SOLO_DINER_SALADS * s,
+    deliveryIncluded: diners > 0,
+  }
+}
+
 export const SOUFFLE_HALF_UNITS_PER_PORTION = 1
 export const BAKLAVA_HALF_UNITS_PER_PORTION = 2
 
