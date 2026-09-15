@@ -60,7 +60,7 @@ describe('RecipesScreen', () => {
     mockedUseStore.mockReturnValue(queryResult())
     render(<RecipesScreen />)
 
-    expect(screen.getByText('יש מתכון ל־0 מתוך 64 מנות')).toBeTruthy()
+    expect(screen.getByText('יש מתכון ל־0 מתוך 65 מנות')).toBeTruthy()
     expect(screen.getByText(/מנה בלי מתכון לא נכנסת לרשימת הקניות/)).toBeTruthy()
     expect(screen.getByText('קוסקוס עננים')).toBeTruthy()
     expect(screen.getByText('בגט טוניסאי אותנטי')).toBeTruthy()
@@ -291,7 +291,7 @@ describe('RecipesScreen', () => {
     const user = userEvent.setup()
     render(<RecipesScreen autosaveDelayMs={NO_AUTOSAVE} />)
 
-    expect(screen.getByText('יש מתכון ל־1 מתוך 64 מנות')).toBeTruthy()
+    expect(screen.getByText('יש מתכון ל־1 מתוך 65 מנות')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'עריכת מתכון' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'רק בלי מתכון' }))
