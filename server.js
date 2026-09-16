@@ -329,12 +329,22 @@ app.get('/sitemap.xml', (_request, response) => {
   response.sendFile(path.join(contentRoot, 'site', 'sitemap.xml'));
 });
 
-// The file exists under site/ but only ever answered at /site/llms.txt, so the
-// address every AI crawler actually asks for returned the 404 page.
-app.get('/llms.txt', (_request, response) => {
-  response.type('text/plain');
-  response.sendFile(path.join(contentRoot, 'site', 'llms.txt'));
-});
+// These files live in the built site/ but browsers and crawlers ask for them at
+// the root, where they used to hit the 404 page: the icon a tab and a phone
+// home screen show, and the two text files AI crawlers read.
+const SITE_ROOT_FILES = {
+  '/llms.txt': ['llms.txt', 'text/plain; charset=utf-8'],
+  '/llms-full.txt': ['llms-full.txt', 'text/plain; charset=utf-8'],
+  '/favicon.ico': ['favicon.ico', 'image/x-icon'],
+  '/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'],
+  '/apple-touch-icon-precomposed.png': ['apple-touch-icon.png', 'image/png'],
+};
+for (const [route, [file, type]] of Object.entries(SITE_ROOT_FILES)) {
+  app.get(route, (_request, response) => {
+    response.type(type);
+    response.sendFile(path.join(contentRoot, 'site', file));
+  });
+}
 
 app.get('/robots.txt', (_request, response) => {
   response.type('text/plain').send([
@@ -345,7 +355,12 @@ app.get('/robots.txt', (_request, response) => {
     'Disallow: /kitchen',
     'Disallow: /t',
     'Disallow: /calendar',
+    '',
+    '# The kitchen wants to be quoted: every AI crawler gets the whole public',
+    '# site, and llms.txt / llms-full.txt state the facts in one place.',
     'Sitemap: https://www.batmelech.ae/sitemap.xml',
+    'Llms: https://www.batmelech.ae/llms.txt',
+    'Llms-full: https://www.batmelech.ae/llms-full.txt',
   ].join('\n') + '\n');
 });
 

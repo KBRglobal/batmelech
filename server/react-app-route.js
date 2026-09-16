@@ -7,16 +7,19 @@ const path = require('node:path');
 // Hosts the built public site actually reaches (verified against site/assets):
 // Google Fonts for the Assistant/Playfair stylesheets and font files, the R2
 // bucket for imagery, and the Iconify API mirrors the icon runtime fetches
-// icon data from. 'unsafe-inline' is required for style-src because React and
-// Iconify both set inline styles; script-src stays strict.
+// icon data from, plus Cloudflare's cookieless visitor counter, which the
+// proxy injects into the page. 'unsafe-inline' is required for style-src
+// because React and Iconify both set inline styles; script-src stays strict.
 const PUBLIC_SITE_SECURITY_HEADERS = Object.freeze({
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self'",
+    // Cloudflare injects its cookieless visitor counter on the proxied domain;
+    // without it in the policy the browser blocks the script it was served.
+    "script-src 'self' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev",
-    "connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com",
+    "connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://cloudflareinsights.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

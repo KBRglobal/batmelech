@@ -322,7 +322,7 @@ export function ShabbatExtras() {
         </div>
       </PageHero>
 
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-12 space-y-24 md:space-y-40">
+      <main id="main" className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-12 space-y-24 md:space-y-40">
         <div>
           <CurrencyNote className="mb-12 md:mb-16" />
           <SectionIntro icon="ph:leaf-fill" iconBg="light" n={1} title={t.saladsTitle} quote={t.saladsQuote} note={t.saladsNote} />

@@ -40,7 +40,7 @@ export function NotFound() {
         image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ZEd1RfEEqbe.jpeg"
         imageAlt={t.heroAlt}
       />
-      <main className="max-w-3xl mx-auto px-6 py-20 text-center">
+      <main id="main" className="max-w-3xl mx-auto px-6 py-20 text-center">
         <Link
           to={href('/')}
           className="bg-[#3B151A] text-white px-10 py-5 rounded-full font-black text-lg hover:bg-[#F5A83A] transition-all shadow-xl inline-flex items-center gap-3"

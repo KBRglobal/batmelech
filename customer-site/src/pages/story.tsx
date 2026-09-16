@@ -71,7 +71,7 @@ export function Story() {
         imageAlt={t.heroAlt}
       />
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 py-24 pb-32 -mt-24">
+      <main id="main" className="relative z-10 max-w-5xl mx-auto px-6 py-24 pb-32 -mt-24">
         <div className="bg-white rounded-[3rem] md:rounded-[5rem] p-6 md:p-24 shadow-2xl border border-[#EDB2C1]/30">
           <div className="flex flex-col md:flex-row gap-16 md:gap-20 items-start">
             <div className="md:w-1/3 md:sticky md:top-10 w-full">

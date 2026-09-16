@@ -299,7 +299,7 @@ export function Home() {
         </div>
       </PageHero>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pb-16 md:pb-32">
+      <main id="main" className="relative z-10 max-w-7xl mx-auto px-6 pb-16 md:pb-32">
         <HolidayMenuSection />
         <section id="story" ref={storyReveal.ref} className={`mb-20 md:mb-32 scroll-mt-24 pt-20 md:pt-32 text-center ${storyReveal.className}`}>
           <div className="max-w-4xl mx-auto">

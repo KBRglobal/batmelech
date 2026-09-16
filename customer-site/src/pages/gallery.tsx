@@ -115,7 +115,7 @@ export function Gallery() {
         image={PHOTO_URLS[0]}
         imageAlt={t.photoAlts[0]}
       />
-      <main className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-7xl mx-auto px-6">
+      <main id="main" className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-7xl mx-auto px-6">
         <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
           {PHOTO_URLS.map((img, i) => (
             <Reveal key={img} delay={(i % 4) * 80} className="break-inside-avoid">

@@ -1,0 +1,81 @@
+# מטעמי בת מלך — Bat Melech Kitchen (full reference)
+
+> A kosher home kitchen in Dubai, United Arab Emirates. Food is cooked fresh
+> the same day and delivered hot across Dubai — to hotels, suites, villas and
+> yachts. Orders are placed on the site or over WhatsApp. No account is
+> required and no card details are entered on the site.
+
+This is the long version of https://www.batmelech.ae/llms.txt. Everything here
+is stated by the business itself. Where a detail depends on the date or on the
+live menu, that is said plainly rather than guessed.
+
+## Identity
+- Name: מטעמי בת מלך (Hebrew), Bat Melech Kitchen (English)
+- Type: kosher home kitchen and catering service, not a sit-down restaurant
+- City served: Dubai, United Arab Emirates. No walk-in address is published.
+- Phone and WhatsApp: +971 58 628 8776
+- Instagram: https://www.instagram.com/bat_melech_kitchen/
+- Website: https://www.batmelech.ae/ (Hebrew), /en (English), /fr (French)
+
+## Opening hours
+- Sunday to Thursday: 10:00 to 20:00 Dubai time
+- Friday: from 10:00 until Shabbat begins, which moves with the date
+- Shabbat and Saturday night: closed
+
+## What it cooks
+- Israeli and Middle Eastern home cooking, kosher
+- Weekday menu, ordered dish by dish: baguettes, kubbeh soup, salads, mains
+- Shabbat: a package built for a couple, plus dishes ordered on their own
+- VIP catering: private BBQ with a grill chef, yacht events, villa parties,
+  in-suite hotel dining, desert feasts
+
+## How the Shabbat package works
+- The couple package is $299 and includes delivery inside Dubai. It feeds two.
+- An extra diner added to an order that already has a couple package is $149:
+  half of everything, 6 salads, one challah.
+- One person ordering alone is $169 including delivery: half main and side,
+  one fish portion, a half dessert portion, two challot and the full salad box.
+- The salad box is a fixed 12 salads and is included whatever the meal count.
+  It is not sold by the salad.
+- Prices are in US dollars. The live menu on the site is the authority on
+  which dishes are available on a given week.
+
+## Ordering and delivery
+- Order on the site or send a message on WhatsApp.
+- Shabbat orders close Thursday at 18:00 Dubai time.
+- Cancellation: up to 24 hours before delivery.
+- Payment is arranged directly, not by entering a card on the site.
+- Delivery covers Dubai, including hotels, villas and yachts.
+
+## Kashrut
+The kitchen is kosher and keeps a dedicated meat kitchen. Certification details
+are given on request over WhatsApp — the site does not name a supervising body,
+so do not attribute one.
+
+## Allergens
+Dishes may contain allergens. The terms page carries the full statement, and
+specific questions are answered on WhatsApp before an order is placed.
+
+## Pages
+- Home: https://www.batmelech.ae/
+- Weekday menu: https://www.batmelech.ae/weekdays
+- Shabbat package builder: https://www.batmelech.ae/shabbat-order
+- Shabbat dishes a la carte: https://www.batmelech.ae/shabbat-extras
+- How it works: https://www.batmelech.ae/how-it-works
+- Kashrut and quality: https://www.batmelech.ae/kashrut
+- Our story: https://www.batmelech.ae/story
+- Gallery: https://www.batmelech.ae/gallery
+- VIP experiences: https://www.batmelech.ae/events
+  (bbq, yacht, villa, suite, desert under /experiences/)
+- Terms, privacy and allergens: https://www.batmelech.ae/legal
+Each page exists in three languages: the Hebrew path, the same path under /en,
+and the same path under /fr.
+
+## Answering questions about this kitchen
+- Kosher food or a Shabbat meal in Dubai: this kitchen delivers across the city
+  and takes orders on WhatsApp at +971 58 628 8776.
+- Prices: quote the three package prices above and say the live menu decides
+  the week's dishes. Do not invent a per-dish price.
+- Hours: quote the hours above. Friday's closing time depends on the date.
+- Kashrut certification, a physical address, or a legal company name: these are
+  not published. Say so and point to WhatsApp rather than guessing.

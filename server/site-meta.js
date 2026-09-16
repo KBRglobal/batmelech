@@ -131,6 +131,60 @@ function prerenderedBody(requestPath) {
   return markup;
 }
 
+// --- Per-page structured data ---
+// The shell carries the business and the website. A menu page needs to say it
+// IS a menu, and the Shabbat page needs to carry the three prices, or an
+// answer engine asked "what does a Shabbat box cost in Dubai" has nothing to
+// quote. Prices mirror server/domain/package-rules.js — keep them in step.
+const SHABBAT_OFFERS = [
+  { sku: 'couple', priceUsd: 299, he: 'מארז שבת זוגי, כולל משלוח בדובאי', en: 'Shabbat package for two, Dubai delivery included', fr: 'Coffret de Chabbat pour deux, livraison à Dubaï incluse' },
+  { sku: 'addon-diner', priceUsd: 149, he: 'סועד נוסף על מארז זוגי', en: 'Extra diner added to a couple package', fr: 'Convive supplémentaire sur un coffret pour deux' },
+  { sku: 'solo-diner', priceUsd: 169, he: 'סועד יחיד, כולל משלוח', en: 'Single diner, delivery included', fr: 'Convive seul, livraison incluse' },
+];
+
+const MENU_PAGE_NAMES = {
+  '/weekdays': { he: 'תפריט יום חול', en: 'Weekday menu', fr: 'Menu de semaine' },
+  '/shabbat-order': { he: 'מארז שבת', en: 'Shabbat package', fr: 'Coffret de Chabbat' },
+  '/shabbat-extras': { he: 'מנות שבת בהזמנה חופשית', en: 'Shabbat dishes a la carte', fr: 'Plats de Chabbat à la carte' },
+};
+
+function pageStructuredData(locale, page) {
+  const menuName = MENU_PAGE_NAMES[page];
+  if (!menuName) return '';
+  const url = localizedSiteUrl(locale, page);
+  const nodes = [
+    {
+      '@type': 'Menu',
+      '@id': `${url}#menu`,
+      name: menuName[locale],
+      url,
+      inLanguage: locale,
+      provider: { '@id': `${SITE_ORIGIN}/#business` },
+    },
+  ];
+  if (page === '/shabbat-order') {
+    nodes.push({
+      '@type': 'Product',
+      '@id': `${url}#package`,
+      name: menuName[locale],
+      brand: { '@id': `${SITE_ORIGIN}/#business` },
+      offers: SHABBAT_OFFERS.map((offer) => ({
+        '@type': 'Offer',
+        sku: offer.sku,
+        name: offer[locale],
+        price: String(offer.priceUsd),
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+        areaServed: { '@type': 'City', name: 'Dubai' },
+        url,
+      })),
+    });
+  }
+  const json = JSON.stringify({ '@context': 'https://schema.org', '@graph': nodes });
+  // A closing tag inside JSON would end the script element early.
+  return `<script type="application/ld+json">${json.replace(/</gu, '\\u003c')}</script>`;
+}
+
 // Rewrites the head of the built index.html for one request path. Unknown
 // pages fall back to the home meta of the resolved locale — never an error.
 function transformSiteIndexHtml(html, requestPath) {
@@ -178,6 +232,9 @@ function transformSiteIndexHtml(html, requestPath) {
     .concat(`<link rel="alternate" hreflang="x-default" href="${escapeHtml(localizedSiteUrl('he', page))}" />`)
     .join('\n    ');
   output = output.replace('</head>', `    ${alternates}\n  </head>`);
+
+  const pageSchema = pageStructuredData(locale, page);
+  if (pageSchema) output = output.replace('</head>', `    ${pageSchema}\n  </head>`);
 
   const body = prerenderedBody(requestPath);
   if (body) {

@@ -39,7 +39,7 @@ export function NavCartButton() {
   return (
     <Link
       to={href('/checkout')}
-      className="relative flex items-center justify-center w-11 h-11 rounded-full bg-white text-[#3B151A] shadow-xl shrink-0"
+      className="relative flex items-center justify-center w-10 h-10 min-[390px]:w-11 min-[390px]:h-11 rounded-full bg-white text-[#3B151A] shadow-xl shrink-0"
     >
       <Icon icon="ph:basket-fill" className="text-base md:text-lg" />
       {count > 0 && (
@@ -64,7 +64,7 @@ export function PhoneBadge() {
   return (
     <a
       href="tel:+971586288776"
-      className="flex items-center gap-3 text-white bg-black/20 backdrop-blur-xl border border-white/20 rounded-full w-11 h-11 md:w-auto md:h-auto md:px-5 md:py-2.5 shadow-xl shrink-0 justify-center"
+      className="flex items-center gap-3 text-white bg-black/20 backdrop-blur-xl border border-white/20 rounded-full w-10 h-10 min-[390px]:w-11 min-[390px]:h-11 md:w-auto md:h-auto md:px-5 md:py-2.5 shadow-xl shrink-0 justify-center"
       dir="ltr"
     >
       <Icon icon="ph:phone-fill" className="text-base md:text-xl" />
@@ -101,7 +101,7 @@ export function LanguageSwitcher() {
             rememberLocale(candidate)
             navigate(`${localizedHref(candidate, path)}${search}${hash}`)
           }}
-          className={`min-w-9 md:min-w-9 h-8 md:h-8 px-1.5 rounded-full text-[11px] md:text-xs font-black transition-all ${
+          className={`min-w-8 min-[390px]:min-w-9 h-8 px-1 min-[390px]:px-1.5 rounded-full text-[11px] md:text-xs font-black transition-all ${
             candidate === locale ? 'bg-white text-[#3B151A] shadow' : 'text-white/80 hover:text-white'
           }`}
         >
@@ -118,9 +118,9 @@ export function LanguageSwitcher() {
 export function NavHeader({ active }: { active: string }) {
   return (
     <header className="w-full pt-4 px-4 md:pt-8 md:px-16 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
-      <div className="flex items-center justify-between gap-2 md:contents">
+      <div className="flex items-center justify-between gap-1.5 min-[390px]:gap-2 md:contents">
         <NavLogo />
-        <div className="flex items-center gap-2 md:gap-3 shrink-0 md:order-3">
+        <div className="flex items-center gap-1.5 min-[390px]:gap-2 md:gap-3 shrink-0 md:order-3">
           <LanguageSwitcher />
           <PhoneBadge />
           <NavCartButton />

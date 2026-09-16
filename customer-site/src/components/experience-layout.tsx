@@ -44,7 +44,7 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
         imageAlt={pageTitle}
       />
 
-      <main className="relative max-w-7xl mx-auto px-6 pb-16 md:pb-32">
+      <main id="main" className="relative max-w-7xl mx-auto px-6 pb-16 md:pb-32">
         <section className="mb-16 md:mb-32 pt-12 md:pt-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="flex flex-col gap-4">

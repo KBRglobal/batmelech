@@ -5,7 +5,7 @@ import { FloatingCartBar } from './components/floating-cart-bar'
 import { SiteBanner } from './components/site-banner'
 import { ShabbatClosure } from './components/shabbat-closure'
 import { useSiteStatus } from './site-status-context'
-import { DeviceLocaleRedirect, LocaleLayout, canonicalPath, localizedHref, type Locale } from './locale-context'
+import { DeviceLocaleRedirect, LocaleLayout, canonicalPath, localizedHref, useLocale, type Locale } from './locale-context'
 import { Home } from './pages/home'
 import { Weekdays } from './pages/weekdays'
 import { Story } from './pages/story'
@@ -215,9 +215,31 @@ export default function App() {
   )
 }
 
+const SKIP_LABEL: Readonly<Record<Locale, string>> = {
+  he: 'דילוג לתוכן הראשי',
+  en: 'Skip to main content',
+  fr: 'Aller au contenu principal',
+}
+
+// Invisible until it has keyboard focus: someone tabbing through the page
+// lands here first and can jump past the header instead of walking the nav,
+// the language buttons and the cart on every single page.
+function SkipToContent() {
+  const { locale } = useLocale()
+  return (
+    <a
+      href="#main"
+      className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:start-3 focus:z-50 focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:text-sm focus:font-black focus:text-[#3B151A] focus:shadow-2xl focus:outline-none focus:ring-4 focus:ring-[#F5A83A]"
+    >
+      {SKIP_LABEL[locale]}
+    </a>
+  )
+}
+
 function LocaleOutlet({ showFloatingCart }: { readonly showFloatingCart: boolean }) {
   return (
     <>
+      <SkipToContent />
       <Outlet />
       {showFloatingCart && <FloatingCartBar />}
       <ConciergeChat />

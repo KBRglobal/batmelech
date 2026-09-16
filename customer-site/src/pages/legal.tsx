@@ -23,6 +23,7 @@ const HE = {
       'איננו מעבירים מידע לצד ג׳ ללא הסכמה מפורשת.',
       'המידע נשמר במערכות מאובטחות לצורך שיפור השירות.',
       'האתר אינו משתמש בעוגיות מעקב או פרסום — רק במה שנדרש כדי לשלוח את ההזמנה בוואטסאפ.',
+      'לספירת מבקרים אנונימית אנחנו משתמשים בשירות הסטטיסטיקה של קלאודפלייר, שאינו שותל עוגיות ואינו מזהה מי אתם.',
       'ניתן לבקש בכל עת לעיין, לתקן או למחוק את הפרטים שנשמרו — פנייה בטלפון או בוואטסאפ.',
     ],
   },
@@ -63,6 +64,7 @@ export const COPY: Record<Locale, typeof HE> = {
         'We do not share information with third parties without explicit consent.',
         'Information is stored in secure systems for the purpose of improving the service.',
         'The site does not use tracking or advertising cookies — only what is needed to send your order via WhatsApp.',
+        'For an anonymous visitor count we use Cloudflare\u2019s analytics, which sets no cookies and does not identify you.',
         'You may ask at any time to view, correct, or delete the details we keep — just reach out by phone or WhatsApp.',
       ],
     },
@@ -100,6 +102,7 @@ export const COPY: Record<Locale, typeof HE> = {
         'Nous ne transmettons aucune information à des tiers sans consentement explicite.',
         "Les informations sont conservées dans des systèmes sécurisés afin d'améliorer le service.",
         "Le site n'utilise pas de cookies de suivi ni de publicité — uniquement ce qui est nécessaire pour envoyer votre commande via WhatsApp.",
+        "Pour un comptage anonyme des visiteurs, nous utilisons les statistiques de Cloudflare, qui ne posent aucun cookie et ne vous identifient pas.",
         'Vous pouvez à tout moment demander à consulter, corriger ou supprimer les données conservées — par téléphone ou WhatsApp.',
       ],
     },
@@ -130,7 +133,7 @@ export function Legal() {
         image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ZEd1RfEEqbe.jpeg"
         imageAlt={t.heroAlt}
       />
-      <main className="max-w-4xl mx-auto px-6 py-8 md:py-16 pb-16 md:pb-24 space-y-10 md:space-y-16 text-start">
+      <main id="main" className="max-w-4xl mx-auto px-6 py-8 md:py-16 pb-16 md:pb-24 space-y-10 md:space-y-16 text-start">
         <section>
           <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">{t.terms.title}</h2>
           <div className="space-y-3 md:space-y-4 text-base md:text-lg font-medium text-[#3B151A]/80 leading-relaxed">

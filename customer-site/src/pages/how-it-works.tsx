@@ -167,7 +167,7 @@ export function HowItWorks() {
         imageAlt={t.heroImageAlt}
       />
 
-      <main className="max-w-5xl mx-auto px-6 pt-20">
+      <main id="main" className="max-w-5xl mx-auto px-6 pt-20">
         <Reveal>
           <div className="text-center mb-16">
             <span className="text-[#F5A83A] text-xs md:text-sm font-black uppercase tracking-[0.3em] md:tracking-[0.4em] block mb-4">

@@ -153,7 +153,7 @@ export function KashrutQuality() {
         image="https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/d31Kxj4sAHE.jpeg"
         imageAlt={t.heroAlt}
       />
-      <main className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-4xl mx-auto px-6">
+      <main id="main" className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-4xl mx-auto px-6">
         <section className="mb-14 md:mb-20 text-center">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-[#3B151A] rounded-full text-[#F5A83A] text-5xl mb-8 shadow-2xl">
             <Icon icon="ph:certificate-fill" />

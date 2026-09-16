@@ -553,7 +553,7 @@ export function ShabbatOrder() {
         imageAlt={t.heroImageAlt}
       />
 
-      <main className="max-w-5xl mx-auto px-6 pt-12 md:pt-20 space-y-12 md:space-y-20">
+      <main id="main" className="max-w-5xl mx-auto px-6 pt-12 md:pt-20 space-y-12 md:space-y-20">
         <div>
           <p className="max-w-2xl mx-auto text-center text-[#3B151A]/60 font-bold text-lg">
             {t.intro}

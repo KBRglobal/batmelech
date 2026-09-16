@@ -510,7 +510,7 @@ export function Checkout() {
     <div className="min-h-screen bg-[#F7ECE6] text-[#3B151A] font-sans selection:bg-[#EDB2C1]/30 pb-48" dir={dir}>
       <PageHero active="/checkout" size="compact" title={t.heroTitle} image={CHECKOUT_HERO_IMAGE} imageAlt={t.heroImageAlt} />
 
-      <main className="max-w-3xl mx-auto px-6 py-8 md:py-12 space-y-8 md:space-y-12">
+      <main id="main" className="max-w-3xl mx-auto px-6 py-8 md:py-12 space-y-8 md:space-y-12">
         <section className="bg-white rounded-[3rem] p-6 md:p-8 shadow-xl border border-[#EDB2C1]/20">
           <h2 className="text-2xl font-black font-heading mb-6 border-b border-[#EDB2C1]/10 pb-4 flex items-center gap-3">
             <Icon icon="ph:basket-fill" className="text-[#F5A83A]" />

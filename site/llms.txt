@@ -33,3 +33,7 @@ delivers across the city and takes orders on WhatsApp.
 - English (for American Jewish visitors): https://www.batmelech.ae/en
 - French (for French Jewish visitors): https://www.batmelech.ae/fr
 - The on-site concierge chat answers questions in any language.
+
+## Full reference
+- Long version with prices, hours, ordering rules and every page:
+  https://www.batmelech.ae/llms-full.txt

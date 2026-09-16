@@ -173,7 +173,7 @@ export function Events() {
         image={CARDS[0].img}
         imageAlt={t.cards[0].title}
       />
-      <main className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-7xl mx-auto px-6">
+      <main id="main" className="pt-10 md:pt-16 pb-16 md:pb-32 max-w-7xl mx-auto px-6">
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-16 md:mb-32">
           {CARDS.map((card, i) => (
             <Reveal key={card.to} delay={(i % 3) * 100}>

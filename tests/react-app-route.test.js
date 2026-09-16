@@ -112,7 +112,9 @@ test('the public site policy allows every host the built bundle loads', async (t
     }),
   );
 
-  assert.deepEqual(directives.get('script-src'), ["'self'"]);
+  // Only the site's own bundle and Cloudflare's cookieless visitor counter,
+  // which the proxy injects into the served page.
+  assert.deepEqual(directives.get('script-src'), ["'self'", 'https://static.cloudflareinsights.com']);
   assert.ok(directives.get('style-src').includes('https://fonts.googleapis.com'));
   assert.ok(directives.get('font-src').includes('https://fonts.gstatic.com'));
   assert.ok(directives.get('img-src').includes('https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev'));

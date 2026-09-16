@@ -175,7 +175,7 @@ export function Weekdays() {
         imageAlt={t.heroImageAlt}
       />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-12 md:py-20 pb-28 md:pb-32">
+      <main id="main" className="relative z-10 max-w-7xl mx-auto px-6 py-12 md:py-20 pb-28 md:pb-32">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-6xl font-black font-heading mb-6 tracking-tight">{t.menuHeading}</h2>
           <p className="max-w-2xl mx-auto text-[#3B151A]/60 font-bold text-lg mb-8">
