@@ -59,7 +59,7 @@ export function ExperienceLayout({ content }: { content: ExperienceContent }) {
               <div className="aspect-[4/5] rounded-[4rem] overflow-hidden shadow-2xl border-4 border-white">
                 <img src={content.heroImg} alt={pageTitle} className="w-full h-full object-cover" />
               </div>
-              <div className="absolute -bottom-10 -end-10 w-64 aspect-square rounded-[3rem] overflow-hidden border-8 border-white shadow-2xl">
+              <div className="absolute -bottom-10 end-0 w-64 aspect-square rounded-[3rem] overflow-hidden border-8 border-white shadow-2xl">
                 <img src={content.cornerImg} alt={pageTitle} className="w-full h-full object-cover" />
               </div>
             </div>
