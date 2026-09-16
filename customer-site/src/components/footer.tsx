@@ -12,6 +12,8 @@ const HE = {
   contactTitle: 'יצירת קשר',
   whatsappOrders: 'הזמנות בוואטסאפ',
   delivery: 'משלוחים ברחבי דובאי',
+  hoursTitle: 'שעות פעילות',
+  hours: ['ראשון עד חמישי, עד 20:00', 'שישי, עד כניסת שבת', 'שבת ומוצאי שבת סגור'],
   infoTitle: 'מידע',
   terms: 'תנאי שימוש',
   privacy: 'מדיניות פרטיות',
@@ -31,6 +33,8 @@ export const COPY: Record<Locale, typeof HE> = {
     contactTitle: 'Contact',
     whatsappOrders: 'Order on WhatsApp',
     delivery: 'Delivery across Dubai',
+    hoursTitle: 'Opening Hours',
+    hours: ['Sunday to Thursday, until 8:00 PM', 'Friday, until Shabbat begins', 'Shabbat and Saturday night closed'],
     infoTitle: 'Information',
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
@@ -47,6 +51,8 @@ export const COPY: Record<Locale, typeof HE> = {
     contactTitle: 'Contact',
     whatsappOrders: 'Commander sur WhatsApp',
     delivery: 'Livraison dans tout Dubaï',
+    hoursTitle: 'Heures d’ouverture',
+    hours: ['Du dimanche au jeudi, jusqu’à 20h00', 'Vendredi, jusqu’à l’entrée de Chabbat', 'Chabbat et samedi soir fermé'],
     infoTitle: 'Informations',
     terms: 'Conditions d’utilisation',
     privacy: 'Politique de confidentialité',
@@ -108,6 +114,13 @@ export function Footer({ className = '' }: { className?: string }) {
               <Icon icon="ph:map-pin-fill" />
               {t.delivery}
             </span>
+            <h4 className="font-black text-[#3B151A] mt-3 mb-1">{t.hoursTitle}</h4>
+            {t.hours.map((line) => (
+              <span key={line} className="flex items-center gap-2 text-[#3B151A]/60 font-bold text-sm">
+                <Icon icon="ph:clock-fill" />
+                {line}
+              </span>
+            ))}
           </div>
 
           <div className="flex flex-col gap-3">

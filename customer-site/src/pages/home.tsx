@@ -36,20 +36,9 @@ const EXPERIENCE_META = [
   },
 ]
 
-const TESTIMONIAL_META = [
-  {
-    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/ZEd1RfEEqbe.jpeg',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-  },
-  {
-    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/psq4DoJL0is.jpeg',
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-  },
-  {
-    img: 'https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev/site/gpJVV6ZvEfk.jpeg',
-    avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
-  },
-]
+// The "Wall of Love" section is out until real guests are quoted: the three
+// testimonials that stood here were written for the mockup and carried stock
+// portraits. Bring it back with real names, real words and real photos.
 
 const HE = {
   hero: {
@@ -118,28 +107,6 @@ const HE = {
       tag: 'Desert Safari',
       title: 'סעודת מדבר VIP',
       desc: 'בישול שטח יוקרתי בלב הדיונות. חוויה מדברית עם טעמי בית אמיתיים.',
-    },
-  ],
-  testimonialsSection: {
-    badge: 'The Wall of Love',
-    titleTop: 'מה אומרים',
-    titleAccent: 'האורחים שלנו?',
-  },
-  testimonials: [
-    {
-      quote: '"פשוט מושלם. האוכל הגיע חם, טרי ובטעם של הבית שכל כך היה חסר לנו."',
-      name: 'יובל דיין',
-      place: 'Palm Jumeirah Villa',
-    },
-    {
-      quote: '"חגגנו יום הולדת על יאכטה ולין הפיקה לנו אירוע קולינרי מדהים. הדגים היו ברמה של מישלן."',
-      name: 'מיכל אהרוני',
-      place: 'Yacht Party VIP',
-    },
-    {
-      quote: '"כאיש עסקים שנוסע הרבה לדובאי, למצוא אוכל כשר ואיכותי זה אתגר. השירות של בת מלך הציל אותי."',
-      name: 'דניאל כהן',
-      place: 'Business Dining',
     },
   ],
 }
@@ -215,28 +182,6 @@ export const COPY: Record<Locale, typeof HE> = {
         desc: 'Luxury open-fire cooking in the heart of the dunes. A desert experience with true home flavors.',
       },
     ],
-    testimonialsSection: {
-      badge: 'The Wall of Love',
-      titleTop: 'What Our',
-      titleAccent: 'Guests Are Saying',
-    },
-    testimonials: [
-      {
-        quote: '"Simply perfect. The food arrived hot, fresh, and with that taste of home we\'d been missing so much."',
-        name: 'Yuval Dayan',
-        place: 'Palm Jumeirah Villa',
-      },
-      {
-        quote: '"We celebrated a birthday on a yacht and Lynn produced an incredible culinary event for us. The fish was Michelin-level."',
-        name: 'Michal Aharoni',
-        place: 'Yacht Party VIP',
-      },
-      {
-        quote: '"As a businessman who travels to Dubai often, finding quality kosher food is a challenge. Bat Melech\'s service saved me."',
-        name: 'Daniel Cohen',
-        place: 'Business Dining',
-      },
-    ],
   },
   fr: {
     hero: {
@@ -307,28 +252,6 @@ export const COPY: Record<Locale, typeof HE> = {
         desc: 'Cuisine de plein air haut de gamme au cœur des dunes. Une expérience du désert aux vrais goûts de la maison.',
       },
     ],
-    testimonialsSection: {
-      badge: 'The Wall of Love',
-      titleTop: 'Ce que disent',
-      titleAccent: 'nos invités',
-    },
-    testimonials: [
-      {
-        quote: '« Tout simplement parfait. Les plats sont arrivés chauds, frais, avec ce goût de la maison qui nous manquait tant. »',
-        name: 'Yuval Dayan',
-        place: 'Palm Jumeirah Villa',
-      },
-      {
-        quote: "« Nous avons fêté un anniversaire sur un yacht et Lynn nous a organisé un événement culinaire époustouflant. Le poisson était digne d'un Michelin. »",
-        name: 'Michal Aharoni',
-        place: 'Yacht Party VIP',
-      },
-      {
-        quote: "« En tant qu'homme d'affaires souvent à Dubaï, trouver une cuisine casher de qualité est un vrai défi. Le service de Bat Melech m'a sauvé. »",
-        name: 'Daniel Cohen',
-        place: 'Business Dining',
-      },
-    ],
   },
 }
 
@@ -339,7 +262,6 @@ export function Home() {
   const shabbatReveal = useReveal<HTMLElement>()
   const weekdayReveal = useReveal<HTMLElement>()
   const experiencesReveal = useReveal<HTMLElement>()
-  const testimonialsReveal = useReveal<HTMLElement>()
 
   // Direction-dependent presentation: the promo gradients keep the dark side
   // behind the text (reading-start side), and arrows point "forward".
@@ -461,7 +383,9 @@ export function Home() {
           </div>
         </section>
 
-        <section id="experiences" ref={experiencesReveal.ref} className={`mb-32 scroll-mt-24 ${experiencesReveal.className}`}>
+        {/* Last section on the page now, so it carries no bottom margin of its
+            own — main's padding is the whole gap above the footer. */}
+        <section id="experiences" ref={experiencesReveal.ref} className={`scroll-mt-24 ${experiencesReveal.className}`}>
           <div className="mb-16 max-w-3xl">
             <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#3B151A] text-[#F5A83A] rounded-full text-xs font-black tracking-widest uppercase mb-6">
               <span>{t.experiencesSection.badge}</span>
@@ -505,45 +429,6 @@ export function Home() {
                 {t.experiencesSection.ideaCta} <Icon icon="ph:chat-circle-dots-fill" className="inline-block ms-2" />
               </a>
             </div>
-          </div>
-        </section>
-
-        <section id="testimonials" ref={testimonialsReveal.ref} className={`mb-16 scroll-mt-24 ${testimonialsReveal.className}`}>
-          <div className="flex flex-col items-center text-center mb-16">
-            <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#F5A83A]/10 text-[#F5A83A] rounded-full text-xs font-black tracking-widest uppercase mb-6">
-              <span>{t.testimonialsSection.badge}</span>
-            </div>
-            <h2 className="text-4xl md:text-8xl font-black font-heading leading-tight">
-              {t.testimonialsSection.titleTop} <br />
-              <span className="text-[#8D182C]">{t.testimonialsSection.titleAccent}</span>
-            </h2>
-          </div>
-          <div className="flex overflow-x-auto pb-16 hide-scrollbar -mx-6 px-6 gap-8">
-            {TESTIMONIAL_META.map((meta, i) => (
-              <div key={meta.img} className="shrink-0 w-[85vw] md:w-[28rem]">
-                <div className="bg-white rounded-[3.5rem] overflow-hidden shadow-2xl border-4 border-white transition-transform hover:-translate-y-2 duration-500">
-                  <div className="aspect-square relative">
-                    <img src={meta.img} alt={`${t.testimonials[i].name} - ${t.testimonials[i].place}`} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#3B151A]/80 to-transparent" />
-                    <div className="absolute bottom-8 start-8 end-8 text-white">
-                      <div className="flex gap-1 text-[#F5A83A] mb-3">
-                        {Array.from({ length: 5 }).map((_, s) => (
-                          <Icon key={s} icon="ph:star-fill" />
-                        ))}
-                      </div>
-                      <p className="text-lg font-bold leading-relaxed mb-6">{t.testimonials[i].quote}</p>
-                      <div className="flex items-center gap-3">
-                        <img src={meta.avatar} alt={t.testimonials[i].name} className="w-12 h-12 rounded-full border-2 border-white shadow-lg" />
-                        <div className="flex flex-col">
-                          <span className="font-black text-sm">{t.testimonials[i].name}</span>
-                          <span className="text-[10px] text-white/60 font-bold tracking-widest uppercase">{t.testimonials[i].place}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </section>
       </main>

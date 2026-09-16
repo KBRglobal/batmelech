@@ -28,18 +28,81 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="מטעמי בת מלך | אוכל ביתי כשר בדובאי" />
     <meta name="twitter:description" content="מטבח ביתי כשר בדובאי, מבושל טרי ומגיע חם אליכם." />
+    <!-- Only facts the business actually publishes: name, phone, city,
+         languages, the two channels it answers on and the menu pages. No
+         address, hours or ratings are claimed here, because none are public. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Restaurant",
-        "name": "מטעמי בת מלך",
-        "alternateName": "Bat Melech Kitchen",
-        "servesCuisine": ["Kosher", "Israeli", "Middle Eastern"],
-        "areaServed": { "@type": "City", "name": "Dubai" },
-        "telephone": "+971586288776",
-        "url": "https://www.batmelech.ae/",
-        "image": "https://www.batmelech.ae/assets/logo.jpg",
-        "priceRange": "$$"
+        "@graph": [
+          {
+            "@type": "Restaurant",
+            "@id": "https://www.batmelech.ae/#business",
+            "name": "מטעמי בת מלך",
+            "alternateName": ["Bat Melech Kitchen", "Bat Melech Dubai"],
+            "description": "מטבח ביתי כשר בדובאי. תפריט יום חול ומארזי שבת, מבושל טרי ומגיע חם אל המלון או הוילה.",
+            "servesCuisine": ["Kosher", "Israeli", "Middle Eastern"],
+            "keywords": "kosher food Dubai, kosher catering Dubai, Shabbat meals Dubai, אוכל כשר בדובאי, קייטרינג כשר דובאי, מארזי שבת בדובאי",
+            "areaServed": { "@type": "City", "name": "Dubai", "addressCountry": "AE" },
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Dubai",
+              "addressCountry": "AE"
+            },
+            "telephone": "+971586288776",
+            "url": "https://www.batmelech.ae/",
+            "openingHoursSpecification": [
+              {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
+                "opens": "10:00",
+                "closes": "20:00"
+              },
+              {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": "Friday",
+                "opens": "10:00",
+                "closes": "17:00",
+                "description": "פתוח עד כניסת שבת, שמשתנה לפי התאריך. 17:00 הוא הזמן שתמיד לפניה."
+              },
+              {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": "Saturday",
+                "opens": "00:00",
+                "closes": "00:00"
+              }
+            ],
+            "image": [
+              "https://www.batmelech.ae/assets/logo.jpg",
+              "https://www.batmelech.ae/assets/kubbe-selek-real.jpg"
+            ],
+            "logo": "https://www.batmelech.ae/assets/logo.jpg",
+            "priceRange": "$$",
+            "availableLanguage": ["he", "en", "fr"],
+            "hasMenu": [
+              "https://www.batmelech.ae/weekdays",
+              "https://www.batmelech.ae/shabbat-order",
+              "https://www.batmelech.ae/shabbat-extras"
+            ],
+            "sameAs": [
+              "https://www.instagram.com/bat_melech_kitchen/",
+              "https://wa.me/971586288776"
+            ],
+            "potentialAction": {
+              "@type": "OrderAction",
+              "target": "https://www.batmelech.ae/shabbat-order",
+              "deliveryMethod": "http://purl.org/goodrelations/v1#DeliveryModeOwnFleet"
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.batmelech.ae/#website",
+            "url": "https://www.batmelech.ae/",
+            "name": "מטעמי בת מלך",
+            "inLanguage": ["he", "en", "fr"],
+            "publisher": { "@id": "https://www.batmelech.ae/#business" }
+          }
+        ]
       }
     </script>
   </head>

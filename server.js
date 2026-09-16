@@ -296,6 +296,19 @@ const SITE_PAGE_NAMES = [
 const SITE_PAGE_REGEX = new RegExp(
   `^/(?:en|fr)?/?$|^/(?:(?:en|fr)/)?(?:${SITE_PAGE_NAMES.join('|')})(?:/|$)`
 );
+// One address per page. The canonical tags and the sitemap all say www, but
+// the bare domain answered every public URL with a 200 of its own, so each
+// page existed twice for search engines and neither copy collected the full
+// signal. Public pages on the bare domain now point at the www one; staff and
+// hidden paths are left alone so nothing they use changes.
+const CANONICAL_HOST = 'www.batmelech.ae';
+const CANONICAL_FILES = new Set(['/sitemap.xml', '/robots.txt', '/llms.txt']);
+app.use((request, response, next) => {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return next();
+  if (request.hostname !== 'batmelech.ae') return next();
+  if (!SITE_PAGE_REGEX.test(request.path) && !CANONICAL_FILES.has(request.path)) return next();
+  return response.redirect(301, `https://${CANONICAL_HOST}${request.originalUrl}`);
+});
 // Old bookmarked/shared links used '/kosher'; keep them working.
 app.get(/^\/(?:(en|fr)\/)?kosher\/?$/, (request, response) => {
   const locale = request.params[0];
@@ -314,6 +327,13 @@ app.use((request, response, next) => {
 
 app.get('/sitemap.xml', (_request, response) => {
   response.sendFile(path.join(contentRoot, 'site', 'sitemap.xml'));
+});
+
+// The file exists under site/ but only ever answered at /site/llms.txt, so the
+// address every AI crawler actually asks for returned the 404 page.
+app.get('/llms.txt', (_request, response) => {
+  response.type('text/plain');
+  response.sendFile(path.join(contentRoot, 'site', 'llms.txt'));
 });
 
 app.get('/robots.txt', (_request, response) => {

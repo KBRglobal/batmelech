@@ -5,17 +5,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 // Hosts the built public site actually reaches (verified against site/assets):
-// Google Fonts for the Assistant/Playfair stylesheets and font files, Supabase
-// storage and randomuser.me for imagery, and the Iconify API mirrors the icon
-// runtime fetches icon data from. 'unsafe-inline' is required for style-src
-// because React and Iconify both set inline styles; script-src stays strict.
+// Google Fonts for the Assistant/Playfair stylesheets and font files, the R2
+// bucket for imagery, and the Iconify API mirrors the icon runtime fetches
+// icon data from. 'unsafe-inline' is required for style-src because React and
+// Iconify both set inline styles; script-src stays strict.
 const PUBLIC_SITE_SECURITY_HEADERS = Object.freeze({
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev https://randomuser.me",
+    "img-src 'self' data: https://pub-2521c260422949cc8bddbf72e06e0716.r2.dev",
     "connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",

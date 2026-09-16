@@ -56,29 +56,17 @@ function storedLocale(): Locale | null {
   }
 }
 
-function deviceLocale(): Locale {
-  const languages = Array.isArray(navigator.languages) && navigator.languages.length > 0
-    ? navigator.languages
-    : [navigator.language]
-  for (const language of languages) {
-    const code = String(language || '').toLowerCase()
-    if (code.startsWith('he') || code.startsWith('iw')) return 'he'
-    if (code.startsWith('en')) return 'en'
-    if (code.startsWith('fr')) return 'fr'
-  }
-  return 'he'
-}
-
-// First visit to the Hebrew root with no remembered choice: follow the
-// device language. An explicit choice (the language button) always wins and
-// is remembered; deep links into /en or /fr are respected as-is.
+// A Hebrew URL always serves Hebrew. Only a visitor who picked a language
+// with the language button before (remembered choice) is sent on to it; a
+// first visit — and every crawler, which carries no storage — stays on the
+// Hebrew page it asked for. Auto-switching by device language used to send
+// Googlebot (en-US) from every Hebrew URL to /en, so the Hebrew site never
+// existed for search. Language stays one click away in the header.
 export function DeviceLocaleRedirect() {
   const { pathname, search, hash } = useLocation()
   const remembered = storedLocale()
-  const target = remembered ?? deviceLocale()
-  if (target === 'he') return null
-  if (remembered === null) rememberLocale(target)
-  return <Navigate to={`${localizedHref(target, pathname)}${search}${hash}`} replace />
+  if (remembered === null || remembered === 'he') return null
+  return <Navigate to={`${localizedHref(remembered, pathname)}${search}${hash}`} replace />
 }
 
 export function LocaleLayout({ locale, children }: { readonly locale: Locale; readonly children?: ReactNode }) {

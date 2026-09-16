@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
+
 // Server-side SEO for the customer site: the served index.html gets the
 // correct per-page, per-locale <title>, description, OpenGraph/Twitter tags,
 // canonical, hreflang alternates and <html lang/dir> BEFORE any JavaScript
@@ -99,6 +102,35 @@ function localizedSiteUrl(locale, page) {
   return `${SITE_ORIGIN}${prefix}${suffix}`;
 }
 
+// --- Prerendered page bodies (scripts/prerender-site.mjs) ---
+// Without these the served document is an empty <div id="root">, so a crawler
+// that does not run the bundle indexes a blank page. The stored markup is the
+// same page the visitor sees; React replaces it on boot.
+const PRERENDER_DIR = path.join(__dirname, '..', 'site', 'prerender');
+const prerenderCache = new Map();
+
+// "/en/experiences/yacht" -> "en_experiences_yacht"; "/" -> "index"
+function prerenderSlug(requestPath) {
+  const trimmed = String(requestPath || '/').replace(/^\/+|\/+$/gu, '');
+  if (trimmed === '') return 'index';
+  if (!/^[a-z0-9/_-]+$/iu.test(trimmed)) return null;
+  return trimmed.replace(/\//gu, '_');
+}
+
+function prerenderedBody(requestPath) {
+  const slug = prerenderSlug(requestPath);
+  if (slug === null) return '';
+  if (prerenderCache.has(slug)) return prerenderCache.get(slug);
+  let markup = '';
+  try {
+    markup = fs.readFileSync(path.join(PRERENDER_DIR, `${slug}.html`), 'utf8');
+  } catch {
+    markup = '';
+  }
+  prerenderCache.set(slug, markup);
+  return markup;
+}
+
 // Rewrites the head of the built index.html for one request path. Unknown
 // pages fall back to the home meta of the resolved locale — never an error.
 function transformSiteIndexHtml(html, requestPath) {
@@ -146,7 +178,12 @@ function transformSiteIndexHtml(html, requestPath) {
     .concat(`<link rel="alternate" hreflang="x-default" href="${escapeHtml(localizedSiteUrl('he', page))}" />`)
     .join('\n    ');
   output = output.replace('</head>', `    ${alternates}\n  </head>`);
+
+  const body = prerenderedBody(requestPath);
+  if (body) {
+    output = output.replace('<div id="root"></div>', `<div id="root">${body}</div>`);
+  }
   return output;
 }
 
-module.exports = { PAGE_META, parseSitePath, transformSiteIndexHtml };
+module.exports = { PAGE_META, parseSitePath, transformSiteIndexHtml, prerenderedBody };
