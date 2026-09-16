@@ -147,7 +147,7 @@ function displayDish(hebrewName: string, locale: Locale): string {
 
 const HE = {
   heroBadge: 'The Shabbat Experience',
-  heroTitle: ['מארז שבת', 'זוגי יוקרתי'] as [string, string],
+  heroTitle: ['מארז שבת כשר', 'בדובאי, לזוג'] as [string, string],
   heroSubtitle: 'הרכיבו לעצמכם את מארז הקידוש המושלם - כשר, טרי ומגיע עד אליכם.',
   heroImageAlt: 'מארז שבת זוגי יוקרתי כשר בדובאי - מטעמי בת מלך',
   intro: 'ארוחת שבת כשרה בדובאי, מבושלת טרי ומגיעה עד אליכם — מארז 12 סלטים, מנה ראשונה, עיקרית, תוספת וקינוח למארז זוגי מלא. המשלוח בדובאי כלול במחיר.',
@@ -216,7 +216,7 @@ export const COPY: Record<Locale, typeof HE> = {
   he: HE,
   en: {
     heroBadge: 'The Shabbat Experience',
-    heroTitle: ['Premium Shabbat', 'Box for Two'],
+    heroTitle: ['Kosher Shabbat Meals', 'in Dubai, for Two'],
     heroSubtitle: 'Build your perfect Shabbat table — kosher, freshly cooked, and delivered to your door.',
     heroImageAlt: 'Premium kosher Shabbat box for two in Dubai — Bat Melech Delights',
     intro: 'A complete kosher Shabbat dinner in Dubai, cooked fresh and delivered to you — a box of 12 salads, a first course, a main, a side, and dessert in one full box for two. Delivery in Dubai is included in the price.',
@@ -284,7 +284,7 @@ export const COPY: Record<Locale, typeof HE> = {
   },
   fr: {
     heroBadge: "L'expérience Chabbat",
-    heroTitle: ['Coffret Chabbat', 'Prestige pour deux'],
+    heroTitle: ['Coffret de Chabbat casher', 'à Dubaï, pour deux'],
     heroSubtitle: 'Composez votre table de Chabbat idéale — casher, cuisinée le jour même et livrée jusque chez vous.',
     heroImageAlt: 'Coffret Chabbat prestige casher pour deux à Dubaï — Bat Melech',
     intro: "Un dîner de Chabbat casher complet à Dubaï, cuisiné frais et livré chez vous — un coffret de 12 salades, une entrée, un plat, un accompagnement et un dessert dans un coffret pour deux. La livraison à Dubaï est incluse dans le prix.",

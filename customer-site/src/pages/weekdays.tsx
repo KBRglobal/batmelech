@@ -66,7 +66,7 @@ const MENU: MenuItem[] = [
 
 const HE = {
   heroBadge: 'Fresh Every Single Day',
-  heroTitle: ['מטעמי', 'יום חול'] as [string, string],
+  heroTitle: ['משלוח אוכל כשר', 'בדובאי, כל יום'] as [string, string],
   heroSubtitle: 'הטעם של הבית מחכה לכם בכל יום בשבוע. כשר, טרי ומבושל באהבה - במיוחד עבורכם בדובאי.',
   heroImageAlt: 'תפריט יום חול כשר וטרי - מטעמי בת מלך דובאי',
   menuHeading: 'התפריט היומי שלנו',
@@ -98,7 +98,7 @@ export const COPY: Record<Locale, typeof HE> = {
   he: HE,
   en: {
     heroBadge: 'Fresh Every Single Day',
-    heroTitle: ['Weekday', 'Delights'],
+    heroTitle: ['Kosher Food Delivery', 'in Dubai, Every Day'],
     heroSubtitle: 'The taste of home, every day of the week. Kosher, fresh, and cooked with love — just for you in Dubai.',
     heroImageAlt: 'Fresh kosher weekday menu — Bat Melech Delights, Dubai',
     menuHeading: 'Our Daily Menu',
@@ -127,7 +127,7 @@ export const COPY: Record<Locale, typeof HE> = {
   },
   fr: {
     heroBadge: 'Frais chaque jour',
-    heroTitle: ['Délices de', 'semaine'],
+    heroTitle: ['Livraison casher', 'à Dubaï, chaque jour'],
     heroSubtitle: 'Le goût de la maison, tous les jours de la semaine. Casher, frais et cuisiné avec amour — pour vous, à Dubaï.',
     heroImageAlt: 'Menu de semaine casher et frais — Bat Melech, Dubaï',
     menuHeading: 'Notre menu du jour',

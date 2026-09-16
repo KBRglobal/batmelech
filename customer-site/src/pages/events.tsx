@@ -35,7 +35,7 @@ const CARDS = [
 
 const HE = {
   heroBadge: 'Exclusive VIP Experiences',
-  heroTitle: ['חוויות קולינריות', 'VIP בדובאי'] as [string, string],
+  heroTitle: ['קייטרינג כשר בדובאי', 'לאירועים פרטיים'] as [string, string],
   heroSubtitle:
     'אנחנו מביאים את השף ואת האוכל הכי טוב בדובאי – בדיוק לאן שאתם נמצאים. גלו את מגוון האפשרויות שלנו לאירועים פרטיים ויוקרתיים.',
   cards: [
@@ -78,7 +78,7 @@ export const COPY: Record<Locale, typeof HE> = {
   he: HE,
   en: {
     heroBadge: 'Exclusive VIP Experiences',
-    heroTitle: ['VIP Culinary', 'Experiences in Dubai'],
+    heroTitle: ['Kosher Catering in Dubai', 'for Private Events'],
     heroSubtitle:
       'We bring the chef and the finest kosher dining in Dubai right to wherever you are. Explore our collection of private, luxury event experiences.',
     cards: [
@@ -118,7 +118,7 @@ export const COPY: Record<Locale, typeof HE> = {
   },
   fr: {
     heroBadge: 'Exclusive VIP Experiences',
-    heroTitle: ['Expériences Culinaires', 'VIP à Dubaï'],
+    heroTitle: ['Traiteur casher à Dubaï', 'pour événements privés'],
     heroSubtitle:
       'Nous amenons le chef et la meilleure cuisine cachère de Dubaï exactement là où vous êtes. Découvrez notre gamme d’expériences pour vos événements privés et prestigieux.',
     cards: [

@@ -17,7 +17,7 @@ live menu, that is said plainly rather than guessed.
 - Registered office: Office M_08, Naif, Deira, Dubai, United Arab Emirates.
   This is the licensed address, not a walk-in shop — the kitchen delivers.
 - Type: kosher home kitchen and catering service, not a sit-down restaurant
-- City served: Dubai, United Arab Emirates
+- Area served: the United Arab Emirates, Dubai above all
 - Phone and WhatsApp: +971 58 628 8776
 - Instagram: https://www.instagram.com/bat_melech_kitchen/
 - Website: https://www.batmelech.ae/ (Hebrew), /en (English), /fr (French)
@@ -49,13 +49,27 @@ live menu, that is said plainly rather than guessed.
 - Order on the site or send a message on WhatsApp.
 - Shabbat orders close Thursday at 18:00 Dubai time.
 - Cancellation: up to 24 hours before delivery.
-- Payment is arranged directly, not by entering a card on the site.
-- Delivery covers Dubai, including hotels, villas and yachts.
+- Payment: cash and credit cards, arranged directly — no card is entered on
+  the site.
+- Delivery covers the whole United Arab Emirates, Dubai above all: hotels,
+  villas and yachts. Inside Dubai the price is fixed. Outside Dubai there is a
+  distance surcharge, agreed before the order is confirmed — never quote a
+  figure for it.
 
 ## Kashrut
-The kitchen is kosher and keeps a dedicated meat kitchen. Certification details
-are given on request over WhatsApp — the site does not name a supervising body,
-so do not attribute one.
+Supervised by Rabbi Paz Kaulin, a certified kashrut supervisor, on an ongoing
+basis. The certificate is issued to Lin Asolin, Bat Melech Kitchen UAE, and
+runs from August 2026 to August 2027; it is displayed in full at
+https://www.batmelech.ae/kashrut
+- A mehadrin MEAT kitchen. No dairy is made or served.
+- Cooking follows the Beit Yosef standard; meat is Beit Yosef chalak, chicken
+  is mehadrin.
+- Every ingredient is checked and approved by the supervisor himself.
+- All baking is pat yisrael, flours sifted, challah separated over 1.200 kg.
+- Vegetables and leaves cleaned and inspected; berries and goji frozen only;
+  fish with scales.
+- Closed on Shabbat and Israeli festivals. No chametz-that-passed-Pesach
+  concern and no chadash concern.
 
 ## Allergens
 Dishes may contain allergens. The terms page carries the full statement, and
@@ -84,5 +98,6 @@ and the same path under /fr.
 - Hours: quote the hours above. Friday's closing time depends on the date.
 - Legal company name, licence number or registered office: quote the Identity
   section above; they are published on the site.
-- Kashrut certification body: not published. Say so and point to WhatsApp
-  rather than naming a supervising authority.
+- Kashrut: quote the Kashrut section above, including the supervisor's name
+  and the certificate dates. Do not describe the kitchen as dairy or parve —
+  it is a mehadrin meat kitchen.

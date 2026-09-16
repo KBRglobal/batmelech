@@ -315,4 +315,25 @@
     <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/experiences/desert"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/experiences/desert"/>
   </url>
+  <url>
+    <loc>https://www.batmelech.ae/accessibility</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/accessibility"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/en/accessibility</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/accessibility"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/fr/accessibility</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/accessibility"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/accessibility"/>
+  </url>
 </urlset>

@@ -45,7 +45,7 @@ const EXPERIENCE_META = [
 const HE = {
   hero: {
     badge: 'Authentic Home Kitchen',
-    title: ['הטעם של הבית', 'בלב דובאי'],
+    title: ['אוכל כשר בדובאי', 'בטעם של הבית'],
     subtitle: 'אוכל ישראלי שורשי, טרי בכל יום, מבושל עם כל הלב. האיכות המוכרת מישראל - עכשיו בחופשה שלכם.',
     imageAlt: 'אוכל ביתי כשר מוגש בדובאי - מטעמי בת מלך',
     ctaShabbat: 'הרכיבו חבילת קידוש מושלמת',
@@ -132,7 +132,7 @@ export const COPY: Record<Locale, typeof HE> = {
   en: {
     hero: {
       badge: 'Authentic Home Kitchen',
-      title: ['The Taste of Home', 'in the Heart of Dubai'],
+      title: ['Kosher Food in Dubai', 'That Tastes Like Home'],
       subtitle: 'Authentic Israeli home cooking, fresh every day, made with all our heart. The quality you know from Israel — now on your vacation.',
       imageAlt: 'Kosher home-cooked food served in Dubai — Bat Melech',
       ctaShabbat: 'Build Your Perfect Shabbat Package',
@@ -216,7 +216,7 @@ export const COPY: Record<Locale, typeof HE> = {
   fr: {
     hero: {
       badge: 'Authentic Home Kitchen',
-      title: ['Le goût de la maison', 'au cœur de Dubaï'],
+      title: ['Cuisine casher à Dubaï', 'au goût de la maison'],
       subtitle: "Une cuisine israélienne authentique, fraîche chaque jour, préparée avec tout notre cœur. La qualité que vous connaissez d'Israël — maintenant pendant vos vacances.",
       imageAlt: 'Cuisine casher faite maison servie à Dubaï — Bat Melech',
       ctaShabbat: 'Composez votre formule de Chabbat parfaite',

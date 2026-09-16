@@ -11,7 +11,8 @@ const HE = {
     items: [
       'הזמנות לשבת יש לבצע עד יום חמישי בשעה 18:00.',
       'הביטול אפשרי עד 24 שעות לפני מועד האספקה.',
-      'התשלום מתבצע במעמד ההזמנה או באיסוף, בהתאם לסיכום מראש.',
+      'התשלום מתבצע במעמד ההזמנה או באיסוף, בהתאם לסיכום מראש. מקבלים מזומן וכרטיס אשראי.',
+      'משלוחים בכל איחוד האמירויות. בתוך דובאי המחיר קבוע; מחוץ לדובאי יש תוספת לפי המרחק, שמסוכמת מראש לפני שההזמנה נסגרת.',
       'אנו עושים את מירב המאמצים לספק אוכל טרי ואיכותי, אך האחריות על צריכת המזון היא על הלקוח.',
     ],
   },
@@ -55,7 +56,8 @@ export const COPY: Record<Locale, typeof HE> = {
       items: [
         'Shabbat orders must be placed by Thursday at 6:00 PM.',
         'Cancellation is possible up to 24 hours before the delivery time.',
-        'Payment is made at the time of ordering or at pickup, as agreed in advance.',
+        'Payment is made at the time of ordering or at pickup, as agreed in advance. We accept cash and credit cards.',
+        'We deliver across the United Arab Emirates. Inside Dubai the price is fixed; outside Dubai there is a distance surcharge, agreed with you before the order is confirmed.',
         'We make every effort to provide fresh, quality food, but responsibility for consuming the food rests with the customer.',
       ],
     },
@@ -96,7 +98,8 @@ export const COPY: Record<Locale, typeof HE> = {
       items: [
         'Les commandes pour Chabbat doivent être passées au plus tard le jeudi à 18h00.',
         "L'annulation est possible jusqu'à 24 heures avant la livraison prévue.",
-        'Le paiement est effectué au moment de la commande ou au retrait, selon accord préalable.',
+        'Le paiement est effectué au moment de la commande ou au retrait, selon accord préalable. Nous acceptons les espèces et la carte bancaire.',
+        'Nous livrons dans tous les Émirats arabes unis. À Dubaï le prix est fixe ; en dehors de Dubaï un supplément kilométrique s’applique, convenu avant la validation de la commande.',
         'Nous mettons tout en œuvre pour fournir une cuisine fraîche et de qualité, mais la responsabilité de la consommation incombe au client.',
       ],
     },

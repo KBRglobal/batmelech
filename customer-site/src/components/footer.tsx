@@ -11,7 +11,7 @@ const HE = {
   quickLinks: ['בית', 'תפריט יום חול', 'שבת קודש', 'חיזוקים לסופ״ש', 'אירועים', 'גלריה', 'כשרות', 'עלינו'],
   contactTitle: 'יצירת קשר',
   whatsappOrders: 'הזמנות בוואטסאפ',
-  delivery: 'משלוחים ברחבי דובאי',
+  delivery: 'משלוחים בדובאי ובכל האמירויות',
   hoursTitle: 'שעות פעילות',
   hours: ['ראשון עד חמישי, עד 20:00', 'שישי, עד כניסת שבת', 'שבת ומוצאי שבת סגור'],
   infoTitle: 'מידע',
@@ -19,6 +19,7 @@ const HE = {
   privacy: 'מדיניות פרטיות',
   allergies: 'מידע על אלרגיות',
   kashrutLink: 'כשרות ואיכות',
+  accessibility: 'הצהרת נגישות',
   rights: 'מטעמי בת מלך דובאי. כל הזכויות שמורות.',
   allergens: 'המזון עשוי להכיל אלרגנים. הפרטים המלאים בעמוד תנאי השימוש.',
   legalEntity: 'Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
@@ -35,7 +36,7 @@ export const COPY: Record<Locale, typeof HE> = {
     quickLinks: ['Home', 'Weekday Menu', 'Shabbat', 'Shabbat Extras', 'Events', 'Gallery', 'Kashrut', 'Our Story'],
     contactTitle: 'Contact',
     whatsappOrders: 'Order on WhatsApp',
-    delivery: 'Delivery across Dubai',
+    delivery: 'Delivery in Dubai and across the UAE',
     hoursTitle: 'Opening Hours',
     hours: ['Sunday to Thursday, until 8:00 PM', 'Friday, until Shabbat begins', 'Shabbat and Saturday night closed'],
     infoTitle: 'Information',
@@ -43,6 +44,7 @@ export const COPY: Record<Locale, typeof HE> = {
     privacy: 'Privacy Policy',
     allergies: 'Allergy Information',
     kashrutLink: 'Kashrut & Quality',
+    accessibility: 'Accessibility Statement',
     rights: 'Bat Melech Dubai. All rights reserved.',
     allergens: 'Food may contain allergens. Full details on the Terms of Service page.',
     legalEntity: 'Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
@@ -56,7 +58,7 @@ export const COPY: Record<Locale, typeof HE> = {
     quickLinks: ['Accueil', 'Menu de semaine', 'Chabbat', 'Suppléments', 'Événements', 'Galerie', 'Cacherout', 'Notre histoire'],
     contactTitle: 'Contact',
     whatsappOrders: 'Commander sur WhatsApp',
-    delivery: 'Livraison dans tout Dubaï',
+    delivery: 'Livraison à Dubaï et dans tous les Émirats',
     hoursTitle: 'Heures d’ouverture',
     hours: ['Du dimanche au jeudi, jusqu’à 20h00', 'Vendredi, jusqu’à l’entrée de Chabbat', 'Chabbat et samedi soir fermé'],
     infoTitle: 'Informations',
@@ -64,6 +66,7 @@ export const COPY: Record<Locale, typeof HE> = {
     privacy: 'Politique de confidentialité',
     allergies: 'Informations allergènes',
     kashrutLink: 'Cacherout et qualité',
+    accessibility: 'Déclaration d’accessibilité',
     rights: 'Bat Melech Dubaï. Tous droits réservés.',
     allergens: 'Les plats peuvent contenir des allergènes. Détails complets sur la page des conditions d’utilisation.',
     legalEntity: 'Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
@@ -146,6 +149,9 @@ export function Footer({ className = '' }: { className?: string }) {
             </Link>
             <Link to={href('/kashrut')} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">
               {t.kashrutLink}
+            </Link>
+            <Link to={href('/accessibility')} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">
+              {t.accessibility}
             </Link>
           </div>
         </div>

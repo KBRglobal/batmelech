@@ -5,42 +5,60 @@ import { useLocale, type Locale } from '../locale-context'
 
 const HE = {
   badge: 'Kashrut & Premium Quality',
-  title: ['כשרות', 'ואיכות'],
+  title: ['כשרות בדובאי', 'ואיך היא נשמרת'],
   heroAlt: 'כשרות מהודרת - מטעמי בת מלך דובאי',
   intro:
-    'אנחנו מבינים שנושא הכשרות הוא הקריטי ביותר עבורכם. לכן, אנו מקפידים על הסטנדרטים המחמירים ביותר, תוך עבודה צמודה עם גופי הכשרות המוכרים והמוערכים ביותר באיחוד האמירויות.',
-  certificateAlt: 'תעודת כשרות של מטעמי בת מלך',
+    'המטבח שלנו בדובאי עובד תחת אישור פיקוח שוטף של הרב פז קולין, משגיח כשרות מוסמך. זהו מטבח בשרי למהדרין, והבישול לפי שיטת בית יוסף. התעודה המלאה כאן למטה, בתוקף עד אוגוסט 2027.',
+  certificateAlt: 'אישור פיקוח כשרות של מטעמי בת מלך בדובאי, חתום על ידי הרב פז קולין',
   cards: [
     {
-      title: 'גופי כשרות',
-      body: 'אנו עובדים תחת פיקוח הדוק ובהשגחת רבנים מובילים. כל חומרי הגלם נרכשים מספקים מורשים בלבד.',
+      icon: 'ph:seal-check-fill',
+      title: 'ההשגחה',
+      body: 'אישור פיקוח על שם לין אסולין, Bat Melech Kitchen UAE, מטעם הרב פז קולין, משגיח כשרות מוסמך. הפיקוח שוטף ולא חד פעמי.',
     },
     {
-      title: 'מטבח נפרד',
-      body: 'כל הבישולים מתבצעים במטבח כשר ייעודי ומבודד, עם הפרדה מוחלטת של כלים, משטחי עבודה ותנורים.',
+      icon: 'ph:chef-hat-fill',
+      title: 'מטבח בשרי למהדרין',
+      body: 'הבישול לפי שיטת בית יוסף, הבשר חלק בית יוסף והעוף מהדרין. זהו מטבח בשרי בלבד, בלי מוצרי חלב.',
     },
     {
+      icon: 'ph:leaf-fill',
       title: 'חומרי גלם',
-      body: 'אנו משתמשים בירקות איכותיים, בשר "חלק" בכשרות מהודרת, ומוצרי חלב מוקפדים. כל מוצר עובר בדיקה דקדקנית.',
+      body: 'כל חומרי הגלם נבדקים ומאושרים על ידי המשגיח עצמו. ירקות ועלים מנוקים ונבדקים, פירות יער וגוג׳י קפואים בלבד, ודגים עם קשקשים.',
     },
     {
-      title: 'משלוח מבוקר',
-      body: 'המזון נשלח בצידניות תרמיות אטומות וחתומות, כדי להבטיח את הטמפרטורה, הטריות והכשרות עד לרגע ההגעה אליכם.',
+      icon: 'ph:bread-fill',
+      title: 'אפייה והפרשת חלה',
+      body: 'כל המאפים פת ישראל, והקמחים מנופים בנפה. מפרישים חלה מכל בצק שעולה על 1.200 קילו.',
+    },
+    {
+      icon: 'ph:moon-stars-fill',
+      title: 'שבת ומועדים',
+      body: 'המקום סגור בשבתות ובמועדי ישראל. אין במטבח חשש חמץ שעבר עליו הפסח ואין חשש חדש.',
+    },
+    {
+      icon: 'ph:truck-fill',
+      title: 'משלוח חתום',
+      body: 'המזון יוצא בצידניות תרמיות אטומות וחתומות, כדי לשמור על הטמפרטורה, הטריות והכשרות עד הרגע שהוא מגיע אליכם.',
     },
   ],
   faqTitle: 'שאלות נפוצות על הכשרות',
   faq: [
     {
       q: 'האם כל התפריט כשר?',
-      a: 'כן. כל המנות שלנו מוכנות במטבח כשר ייעודי בדובאי, בהשגחת רבנים ובכשרות מהודרת, ללא יוצא מן הכלל.',
+      a: 'כן. כל המנות מוכנות במטבח בשרי למהדרין בדובאי, תחת אישור הפיקוח של הרב פז קולין. אין יוצא מן הכלל.',
+    },
+    {
+      q: 'באיזו כשרות הבשר והעוף?',
+      a: 'הבשר חלק בית יוסף והעוף מהדרין, והבישול עצמו לפי שיטת בית יוסף.',
+    },
+    {
+      q: 'עד מתי התעודה בתוקף?',
+      a: 'האישור הנוכחי בתוקף מאוגוסט 2026 עד אוגוסט 2027, ומתחדש. התעודה המלאה מוצגת בעמוד הזה.',
     },
     {
       q: 'איך נשמרת הכשרות במשלוח?',
-      a: 'המזון נשלח בצידניות תרמיות אטומות וחתומות, כדי לשמור על הטמפרטורה, הטריות והכשרות עד לרגע ההגעה אליכם, בכל רחבי דובאי.',
-    },
-    {
-      q: 'מאיפה מגיעים חומרי הגלם?',
-      a: 'כל חומרי הגלם נרכשים מספקים מורשים בלבד - ירקות איכותיים, בשר "חלק" בכשרות מהודרת ומוצרי חלב מוקפדים, העוברים בדיקה דקדקנית.',
+      a: 'המזון נשלח בצידניות תרמיות אטומות וחתומות, בדובאי ובכל האמירויות, כדי לשמור על הטמפרטורה, הטריות והכשרות עד הרגע שהוא מגיע אליכם.',
     },
   ],
   quote: '"השקט הנפשי שלכם הוא המשימה שלנו"',
@@ -52,91 +70,127 @@ export const COPY: Record<Locale, typeof HE> = {
   he: HE,
   en: {
     badge: 'Kashrut & Premium Quality',
-    title: ['Kashrut', '& Quality'],
+    title: ['Kashrut in Dubai', 'and How It Is Kept'],
     heroAlt: 'Mehadrin kashrut — Bat Melech Dubai',
     intro:
-      "We understand that kashrut is the most critical thing for you. That's why we hold ourselves to the strictest standards, working closely with the most recognized and respected kashrut authorities in the UAE.",
-    certificateAlt: 'Bat Melech kashrut certificate',
+      'Our Dubai kitchen works under the ongoing supervision of Rabbi Paz Kaulin, a certified kashrut supervisor. It is a mehadrin meat kitchen, cooking to the Beit Yosef standard. The full certificate is below, valid through August 2027.',
+    certificateAlt: 'Kashrut supervision certificate for Bat Melech in Dubai, signed by Rabbi Paz Kaulin',
     cards: [
       {
-        title: 'Kashrut Supervision',
-        body: 'We operate under close supervision and the hashgacha of leading rabbis. All ingredients are purchased from certified suppliers only.',
+        icon: 'ph:seal-check-fill',
+        title: 'The supervision',
+        body: 'A supervision certificate issued to Lin Asolin, Bat Melech Kitchen UAE, by Rabbi Paz Kaulin, a certified kashrut supervisor. The supervision is ongoing, not a one-off visit.',
       },
       {
-        title: 'A Dedicated Kitchen',
-        body: 'All cooking takes place in a dedicated, separate kosher kitchen, with complete separation of utensils, work surfaces, and ovens.',
+        icon: 'ph:chef-hat-fill',
+        title: 'A mehadrin meat kitchen',
+        body: 'Cooking follows the Beit Yosef standard, the meat is Beit Yosef chalak and the chicken is mehadrin. This is a meat kitchen only — no dairy products.',
       },
       {
+        icon: 'ph:leaf-fill',
         title: 'Ingredients',
-        body: 'We use quality vegetables, glatt ("chalak") meat with mehadrin certification, and carefully selected dairy products. Every item is meticulously checked.',
+        body: 'Every ingredient is checked and approved by the supervisor himself. Vegetables and leaves are cleaned and inspected, berries and goji are frozen only, and fish carry scales.',
       },
       {
-        title: 'Controlled Delivery',
-        body: 'Food is delivered in sealed, tamper-evident thermal coolers, guaranteeing temperature, freshness, and kashrut until the moment it reaches you.',
+        icon: 'ph:bread-fill',
+        title: 'Baking and challah',
+        body: 'All baking is pat yisrael and the flours are sifted. Challah is separated from any dough over 1.200 kg.',
+      },
+      {
+        icon: 'ph:moon-stars-fill',
+        title: 'Shabbat and festivals',
+        body: 'The place is closed on Shabbat and Israeli festivals. There is no concern of chametz that passed over Pesach, and none of chadash.',
+      },
+      {
+        icon: 'ph:truck-fill',
+        title: 'Sealed delivery',
+        body: 'Food leaves in sealed thermal boxes, to hold the temperature, the freshness and the kashrut until the moment it reaches you.',
       },
     ],
-    faqTitle: 'Kashrut FAQ',
+    faqTitle: 'Kashrut questions people ask',
     faq: [
       {
-        q: 'Is the entire menu kosher?',
-        a: 'Yes. Every one of our dishes is prepared in a dedicated kosher kitchen in Dubai, under rabbinic supervision and mehadrin kashrut — no exceptions.',
+        q: 'Is the whole menu kosher?',
+        a: 'Yes. Every dish is prepared in a mehadrin meat kitchen in Dubai under Rabbi Paz Kaulin\'s supervision certificate. Without exception.',
       },
       {
-        q: 'How is kashrut maintained during delivery?',
-        a: 'Food is delivered in sealed, tamper-evident thermal coolers, preserving temperature, freshness, and kashrut until the moment it reaches you, anywhere in Dubai.',
+        q: 'What certification do the meat and chicken carry?',
+        a: 'The meat is Beit Yosef chalak and the chicken is mehadrin; the cooking itself follows the Beit Yosef standard.',
       },
       {
-        q: 'Where do the ingredients come from?',
-        a: 'All ingredients are purchased from certified suppliers only — quality vegetables, glatt ("chalak") meat with mehadrin certification, and carefully selected dairy products, all meticulously checked.',
+        q: 'How long is the certificate valid?',
+        a: 'The current certificate runs from August 2026 to August 2027 and is renewed. The full certificate is shown on this page.',
+      },
+      {
+        q: 'How is kashrut kept during delivery?',
+        a: 'Food travels in sealed thermal boxes, in Dubai and across the UAE, holding the temperature, the freshness and the kashrut until it reaches you.',
       },
     ],
     quote: '"Your peace of mind is our mission"',
-    outroBody: "Have specific questions about our kashrut? We're here to answer everything.",
-    outroCta: 'Ask About Kashrut on WhatsApp',
+    outroBody: 'Specific questions about kashrut? We are here to answer all of them.',
+    outroCta: 'Ask about kashrut on WhatsApp',
   },
   fr: {
     badge: 'Kashrut & Premium Quality',
-    title: ['Cacherout', 'et qualité'],
+    title: ['Cacherout à Dubaï', 'et comment elle est tenue'],
     heroAlt: 'Cacherout mehadrin — Bat Melech Dubaï',
     intro:
-      "Nous savons que la cacherout est pour vous le point le plus essentiel. C'est pourquoi nous respectons les normes les plus strictes, en travaillant en étroite collaboration avec les organismes de cacherout les plus reconnus et respectés des Émirats.",
-    certificateAlt: 'Certificat de cacherout de Bat Melech',
+      'Notre cuisine à Dubaï travaille sous la supervision continue du rabbin Paz Kaulin, superviseur de cacherout agréé. C’est une cuisine carnée mehadrin, la cuisson suivant la méthode Beit Yossef. Le certificat complet est ci-dessous, valable jusqu’en août 2027.',
+    certificateAlt: 'Certificat de supervision cachère de Bat Melech à Dubaï, signé par le rabbin Paz Kaulin',
     cards: [
       {
-        title: 'Surveillance rabbinique',
-        body: "Nous travaillons sous un contrôle rigoureux et la surveillance de rabbanim de premier plan. Toutes les matières premières proviennent exclusivement de fournisseurs agréés.",
+        icon: 'ph:seal-check-fill',
+        title: 'La supervision',
+        body: 'Un certificat de supervision délivré à Lin Asolin, Bat Melech Kitchen UAE, par le rabbin Paz Kaulin, superviseur de cacherout agréé. La supervision est continue, pas une visite unique.',
       },
       {
-        title: 'Une cuisine dédiée',
-        body: "Toute la cuisine se fait dans une cuisine casher dédiée et isolée, avec une séparation totale des ustensiles, des plans de travail et des fours.",
+        icon: 'ph:chef-hat-fill',
+        title: 'Une cuisine carnée mehadrin',
+        body: 'La cuisson suit la méthode Beit Yossef, la viande est halak Beit Yossef et la volaille mehadrin. C’est une cuisine carnée uniquement, sans produits laitiers.',
       },
       {
+        icon: 'ph:leaf-fill',
         title: 'Matières premières',
-        body: "Nous utilisons des légumes de qualité, de la viande « halak » avec une cacherout mehadrin et des produits laitiers rigoureusement sélectionnés. Chaque produit est minutieusement contrôlé.",
+        body: 'Chaque ingrédient est contrôlé et approuvé par le superviseur lui-même. Légumes et feuilles nettoyés et vérifiés, fruits rouges et baies de goji surgelés uniquement, poissons à écailles.',
       },
       {
-        title: 'Livraison contrôlée',
-        body: "Les plats sont livrés dans des glacières thermiques hermétiques et scellées, afin de garantir la température, la fraîcheur et la cacherout jusqu'à leur arrivée chez vous.",
+        icon: 'ph:bread-fill',
+        title: 'Pâtisserie et hafrachat challah',
+        body: 'Toute la boulangerie est pat yisrael et les farines sont tamisées. La challah est prélevée sur toute pâte de plus de 1,200 kg.',
+      },
+      {
+        icon: 'ph:moon-stars-fill',
+        title: 'Chabbat et fêtes',
+        body: 'Le lieu est fermé le Chabbat et les jours de fête. Aucun risque de hametz ayant passé Pessah, ni de hadach.',
+      },
+      {
+        icon: 'ph:truck-fill',
+        title: 'Livraison scellée',
+        body: 'Les plats partent dans des glacières thermiques scellées, pour préserver la température, la fraîcheur et la cacherout jusqu’à votre porte.',
       },
     ],
     faqTitle: 'Questions fréquentes sur la cacherout',
     faq: [
       {
         q: 'Tout le menu est-il casher ?',
-        a: "Oui. Tous nos plats sont préparés dans une cuisine casher dédiée à Dubaï, sous surveillance rabbinique et avec une cacherout mehadrin, sans aucune exception.",
+        a: 'Oui. Chaque plat est préparé dans une cuisine carnée mehadrin à Dubaï, sous le certificat de supervision du rabbin Paz Kaulin. Sans exception.',
+      },
+      {
+        q: 'Quelle cacherout pour la viande et la volaille ?',
+        a: 'La viande est halak Beit Yossef et la volaille mehadrin ; la cuisson elle-même suit la méthode Beit Yossef.',
+      },
+      {
+        q: 'Jusqu’à quand le certificat est-il valable ?',
+        a: 'Le certificat actuel court d’août 2026 à août 2027 et se renouvelle. Il est affiché en entier sur cette page.',
       },
       {
         q: 'Comment la cacherout est-elle préservée pendant la livraison ?',
-        a: "Les plats sont livrés dans des glacières thermiques hermétiques et scellées, afin de préserver la température, la fraîcheur et la cacherout jusqu'à leur arrivée chez vous, partout à Dubaï.",
-      },
-      {
-        q: "D'où viennent les matières premières ?",
-        a: "Toutes les matières premières proviennent exclusivement de fournisseurs agréés — des légumes de qualité, de la viande « halak » avec une cacherout mehadrin et des produits laitiers rigoureusement sélectionnés, tous minutieusement contrôlés.",
+        a: 'Les plats voyagent dans des glacières scellées, à Dubaï et dans tous les Émirats, préservant température, fraîcheur et cacherout jusqu’à vous.',
       },
     ],
-    quote: "« Votre tranquillité d'esprit est notre mission »",
-    outroBody: 'Vous avez des questions précises sur la cacherout ? Nous sommes là pour répondre à tout.',
-    outroCta: 'Questions cacherout sur WhatsApp',
+    quote: '"Votre tranquillité d’esprit est notre mission"',
+    outroBody: 'Des questions précises sur la cacherout ? Nous sommes là pour y répondre.',
+    outroCta: 'Poser une question sur WhatsApp',
   },
 }
 
@@ -172,18 +226,11 @@ export function KashrutQuality() {
             />
           </a>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-start">
-            <InfoCard icon="ph:seal-check-fill" title={t.cards[0].title}>
-              {t.cards[0].body}
-            </InfoCard>
-            <InfoCard icon="ph:chef-hat-fill" title={t.cards[1].title}>
-              {t.cards[1].body}
-            </InfoCard>
-            <InfoCard icon="ph:leaf-fill" title={t.cards[2].title}>
-              {t.cards[2].body}
-            </InfoCard>
-            <InfoCard icon="ph:truck-fill" title={t.cards[3].title}>
-              {t.cards[3].body}
-            </InfoCard>
+            {t.cards.map((card) => (
+              <InfoCard key={card.title} icon={card.icon} title={card.title}>
+                {card.body}
+              </InfoCard>
+            ))}
           </div>
         </section>
         <section className="mb-20 space-y-8">

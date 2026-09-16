@@ -13,6 +13,7 @@ import { ShabbatOrder } from './pages/shabbat-order'
 import { ShabbatExtras } from './pages/shabbat-extras'
 import { Checkout } from './pages/checkout'
 import { Legal } from './pages/legal'
+import { Accessibility } from './pages/accessibility'
 import { KashrutQuality } from './pages/kashrut-quality'
 import { Gallery } from './pages/gallery'
 import { HowItWorks } from './pages/how-it-works'
@@ -33,58 +34,61 @@ interface PageMeta {
 // source of truth; English speaks to American Jews, French to French Jews).
 const PAGE_META: Readonly<Record<Locale, Record<string, PageMeta>>> = {
   he: {
-    '/': { title: 'מטעמי בת מלך | אוכל ביתי כשר בדובאי', description: 'מטבח ביתי כשר בדובאי. תפריט יום חול ומארזי שבת יוקרתיים, מבושל טרי ומגיע חם אליכם.' },
-    '/weekdays': { title: 'מטעמי יום חול | מטעמי בת מלך', description: 'תפריט יום חול טרי - בגטים, קובה, סלטים ועוד. משלוח כשר בכל רחבי דובאי.' },
-    '/shabbat-order': { title: 'מטעמי שבת קודש | מטעמי בת מלך', description: 'הרכיבו מארז שבת זוגי יוקרתי - סלטים, ראשונות, עיקריות ועוד. כשר וטרי, מגיע עד אליכם.' },
-    '/shabbat-extras': { title: 'חיזוקים לסופ״ש | מטעמי בת מלך', description: 'מנות שבת מלכותיות בהזמנה חופשית, בלי שום התחייבות למארז - כשר וטרי, מגיע עד אליכם.' },
+    '/': { title: 'אוכל כשר בדובאי — משלוח מארזי שבת ואוכל ביתי | מטעמי בת מלך', description: 'מטבח ביתי כשר בדובאי. מארזי שבת ותפריט יום חול, מבושל טרי ומגיע חם למלון, לוילה או ליאכטה. משלוחים בכל האמירויות.' },
+    '/weekdays': { title: 'משלוח אוכל כשר בדובאי — תפריט יום חול | מטעמי בת מלך', description: 'תפריט יום חול טרי: בגטים, קובה, סלטים ומנות עיקריות. משלוח כשר בדובאי ובכל האמירויות.' },
+    '/shabbat-order': { title: 'מארז שבת כשר בדובאי — הזמנה ומשלוח | מטעמי בת מלך', description: 'מארז שבת זוגי עם 12 סלטים, דגים, עיקריות וקינוח. כשר, מבושל טרי, מגיע חם עד אליכם. הזמנות עד חמישי ב-18:00.' },
+    '/shabbat-extras': { title: 'מנות שבת כשרות בדובאי להזמנה בודדת | מטעמי בת מלך', description: 'מנות שבת להזמנה חופשית בלי מארז — חמין, דגים, קוגלים ועוד. כשר וטרי, מגיע עד אליכם בדובאי.' },
     '/checkout': { title: 'סיכום הזמנה | מטעמי בת מלך', description: 'סיכום ההזמנה ופרטי המשלוח.' },
-    '/story': { title: 'הסיפור שלנו | מטעמי בת מלך', description: 'הסיפור מאחורי מטעמי בת מלך - מטבח ביתי כשר בדובאי.' },
-    '/legal': { title: 'תנאי שימוש ופרטיות | מטעמי בת מלך', description: 'תנאי שימוש, מדיניות פרטיות והצהרת אלרגיות.' },
-    '/kashrut': { title: 'כשרות ואיכות | מטעמי בת מלך', description: 'הסטנדרטים המחמירים של הכשרות שלנו בדובאי.' },
-    '/gallery': { title: 'גלריה | מטעמי בת מלך', description: 'תמונות מהאירועים והמנות של מטעמי בת מלך.' },
-    '/how-it-works': { title: 'איך זה עובד | מטעמי בת מלך', description: 'מהתפריט ועד דלת המלון — בוחרים, מזמינים באתר או בוואטסאפ, אנחנו מבשלים טרי ומגיעים חם. התשלום רק במסירה.' },
-    '/events': { title: 'חוויות קולינריות VIP | מטעמי בת מלך', description: 'BBQ פרטי, אירועי יאכטה, מסיבות בוילה, ארוחות בסוויטה וסעודות מדבר.' },
-    '/experiences/bbq': { title: 'שף מנגליסט VIP | מטעמי בת מלך', description: 'חוויית BBQ פרטית עם שף מנגליסט בדובאי.' },
-    '/experiences/yacht': { title: 'אירועים על יאכטה | מטעמי בת מלך', description: 'קייטרינג כשר יוקרתי ליאכטות בדובאי.' },
-    '/experiences/villa': { title: 'מסיבות בוילה | מטעמי בת מלך', description: 'קייטרינג מלא למסיבות ואירועים בוילות בדובאי.' },
-    '/experiences/suite': { title: 'ארוחות בסוויטה | מטעמי בת מלך', description: 'ארוחות שף פרטיות ואינטימיות בסוויטות מלון.' },
-    '/experiences/desert': { title: 'סעודת מדבר VIP | מטעמי בת מלך', description: 'סעודת גורמה כשרה בלב מדבר דובאי.' },
+    '/story': { title: 'מי אנחנו — מטבח כשר ישראלי בדובאי | מטעמי בת מלך', description: 'הסיפור של לין, המטבח הביתי הכשר שעבר מישראל לדובאי.' },
+    '/legal': { title: 'תנאי שימוש ופרטיות | מטעמי בת מלך', description: 'תנאי שימוש, מדיניות פרטיות, אלרגנים ופרטי החברה.' },
+    '/accessibility': { title: 'הצהרת נגישות | מטעמי בת מלך', description: 'מה נגיש באתר, מה עוד לא, ואיך לדווח על בעיה.' },
+    '/kashrut': { title: 'כשרות — אוכל כשר בהשגחה בדובאי | מטעמי בת מלך', description: 'איך נשמרת הכשרות במטבח: מטבח ייעודי, חומרי גלם ותהליכי עבודה.' },
+    '/gallery': { title: 'גלריה — אוכל כשר ואירועים בדובאי | מטעמי בת מלך', description: 'תמונות אמיתיות ממנות, ממארזי שבת ומאירועים שהפקנו בדובאי.' },
+    '/how-it-works': { title: 'איך מזמינים אוכל כשר בדובאי | מטעמי בת מלך', description: 'בוחרים מהתפריט, מזמינים באתר או בוואטסאפ, אנחנו מבשלים טרי ומגיעים חם עד הדלת.' },
+    '/events': { title: 'קייטרינג כשר בדובאי לאירועים פרטיים | מטעמי בת מלך', description: 'קייטרינג כשר לאירועים בדובאי: מנגל פרטי, יאכטה, וילה, סוויטה ומדבר.' },
+    '/experiences/bbq': { title: 'שף על האש בדובאי — מנגל כשר לאירוע | מטעמי בת מלך', description: 'שף מנגליסט מגיע אליכם עם בשרים כשרים וסלטים טריים.' },
+    '/experiences/yacht': { title: 'קייטרינג כשר ליאכטה בדובאי | מטעמי בת מלך', description: 'ארוחות ואירועים כשרים על יאכטה, עם הגשה מלאה.' },
+    '/experiences/villa': { title: 'קייטרינג כשר לוילה בדובאי | מטעמי בת מלך', description: 'קייטרינג מלא למסיבות ואירועים בוילות בדובאי.' },
+    '/experiences/suite': { title: 'שף פרטי בסוויטה בדובאי — ארוחה כשרה | מטעמי בת מלך', description: 'ארוחת שף פרטית בסוויטת המלון שלכם, כשרה ומוגשת.' },
+    '/experiences/desert': { title: 'סעודת מדבר כשרה בדובאי | מטעמי בת מלך', description: 'סעודה כשרה בלב הדיונות, עם בישול שטח והגשה.' },
   },
   en: {
-    '/': { title: 'Bat Melech Kitchen | Kosher Homemade Food in Dubai', description: 'A kosher home kitchen in Dubai. Fresh weekday menu and elegant Shabbat packages, cooked fresh and delivered hot to your hotel.' },
-    '/weekdays': { title: 'Weekday Menu | Bat Melech Kitchen', description: 'Fresh weekday favorites - baguettes, kubbeh soup, salads and more. Kosher delivery across Dubai.' },
-    '/shabbat-order': { title: 'Shabbat Menu | Bat Melech Kitchen', description: 'Build your Shabbat package for two - salads, fish courses, mains and more. Kosher, fresh, delivered to you.' },
-    '/shabbat-extras': { title: 'Shabbat Extras | Bat Melech Kitchen', description: 'Royal Shabbat dishes a la carte, no package required - kosher and fresh, delivered to you.' },
+    '/': { title: 'Kosher Food Delivery in Dubai — Shabbat Meals | Bat Melech', description: 'A kosher home kitchen in Dubai. Shabbat packages and a weekday menu, cooked fresh and delivered hot to your hotel, villa or yacht. Delivery across the UAE.' },
+    '/weekdays': { title: 'Kosher Food Delivery Dubai — Weekday Menu | Bat Melech', description: 'Fresh weekday dishes: baguettes, kubbeh soup, salads and mains. Kosher delivery in Dubai and across the UAE.' },
+    '/shabbat-order': { title: 'Kosher Shabbat Meals in Dubai — Order & Delivery | Bat Melech', description: 'A Shabbat package for two with 12 salads, fish, mains and dessert. Kosher, cooked fresh, delivered hot. Orders close Thursday 18:00.' },
+    '/shabbat-extras': { title: 'Kosher Shabbat Dishes in Dubai, A La Carte | Bat Melech', description: 'Shabbat dishes ordered on their own, no package required — cholent, fish, kugels and more, delivered across Dubai.' },
     '/checkout': { title: 'Your Order | Bat Melech Kitchen', description: 'Order summary and delivery details.' },
-    '/story': { title: 'Our Story | Bat Melech Kitchen', description: 'The story behind Bat Melech - a kosher home kitchen in Dubai.' },
-    '/legal': { title: 'Terms & Privacy | Bat Melech Kitchen', description: 'Terms of use, privacy policy and allergy notice.' },
-    '/kashrut': { title: 'Kashrut & Quality | Bat Melech Kitchen', description: 'Our strict kashrut standards in Dubai.' },
-    '/gallery': { title: 'Gallery | Bat Melech Kitchen', description: 'Photos from Bat Melech events and dishes.' },
-    '/how-it-works': { title: 'How It Works | Bat Melech Kitchen', description: 'From the menu to your hotel door — browse, order on the site or WhatsApp, we cook fresh that day and deliver hot. Pay on delivery.' },
-    '/events': { title: 'VIP Culinary Experiences | Bat Melech Kitchen', description: 'Private BBQ, yacht events, villa parties, in-suite dining and desert feasts.' },
-    '/experiences/bbq': { title: 'Private BBQ Chef | Bat Melech Kitchen', description: 'A private kosher BBQ experience with a grill chef in Dubai.' },
-    '/experiences/yacht': { title: 'Yacht Events | Bat Melech Kitchen', description: 'Luxury kosher catering for yachts in Dubai.' },
-    '/experiences/villa': { title: 'Villa Parties | Bat Melech Kitchen', description: 'Full kosher catering for villa parties and events in Dubai.' },
-    '/experiences/suite': { title: 'In-Suite Dining | Bat Melech Kitchen', description: 'Private, intimate chef dinners in hotel suites.' },
-    '/experiences/desert': { title: 'VIP Desert Feast | Bat Melech Kitchen', description: 'A kosher gourmet feast in the heart of the Dubai desert.' },
+    '/story': { title: 'About Us — An Israeli Kosher Kitchen in Dubai | Bat Melech', description: 'Lynn\'s story: the kosher home kitchen that moved from Israel to Dubai.' },
+    '/legal': { title: 'Terms & Privacy | Bat Melech Kitchen', description: 'Terms of use, privacy policy, allergens and company details.' },
+    '/accessibility': { title: 'Accessibility Statement | Bat Melech Kitchen', description: 'What this site does for accessibility, what is unfinished, and how to report a problem.' },
+    '/kashrut': { title: 'Kashrut — Supervised Kosher Food in Dubai | Bat Melech', description: 'How kashrut is kept in the kitchen: a dedicated kitchen, ingredients and working practice.' },
+    '/gallery': { title: 'Gallery — Kosher Food & Events in Dubai | Bat Melech', description: 'Real photos of dishes, Shabbat packages and events we catered in Dubai.' },
+    '/how-it-works': { title: 'How to Order Kosher Food in Dubai | Bat Melech', description: 'Choose from the menu, order on the site or WhatsApp, we cook fresh that day and deliver hot to your door.' },
+    '/events': { title: 'Kosher Catering in Dubai for Private Events | Bat Melech', description: 'Kosher catering for events in Dubai: private BBQ, yacht, villa, hotel suite and desert.' },
+    '/experiences/bbq': { title: 'Private Kosher BBQ Chef in Dubai | Bat Melech', description: 'A grill chef comes to you with kosher meats and fresh salads.' },
+    '/experiences/yacht': { title: 'Kosher Catering for Yachts in Dubai | Bat Melech', description: 'Kosher meals and events on a yacht, fully served.' },
+    '/experiences/villa': { title: 'Kosher Catering for Villa Parties in Dubai | Bat Melech', description: 'Full kosher catering for parties and events in Dubai villas.' },
+    '/experiences/suite': { title: 'Private Kosher Chef, Hotel Suite Dubai | Bat Melech', description: 'A private chef dinner in your hotel suite, kosher and served.' },
+    '/experiences/desert': { title: 'Kosher Desert Feast in Dubai | Bat Melech', description: 'A kosher feast in the heart of the dunes, cooked on site and served.' },
   },
   fr: {
-    '/': { title: 'Bat Melech | Cuisine casher maison à Dubaï', description: 'Une cuisine familiale casher à Dubaï. Menu de semaine et coffrets de Chabbat raffinés, cuisinés frais et livrés chauds à votre hôtel.' },
-    '/weekdays': { title: 'Menu de semaine | Bat Melech', description: 'Les plats frais de la semaine - baguettes, soupe de kubés, salades et plus. Livraison casher dans tout Dubaï.' },
-    '/shabbat-order': { title: 'Menu de Chabbat | Bat Melech', description: 'Composez votre coffret de Chabbat pour deux - salades, poissons, plats et plus. Casher, frais, livré chez vous.' },
-    '/shabbat-extras': { title: 'Suppléments Chabbat | Bat Melech', description: 'Plats de Chabbat royaux à la carte, sans coffret obligatoire - casher et frais, livrés chez vous.' },
+    '/': { title: 'Traiteur casher à Dubaï — repas de Chabbat | Bat Melech', description: 'Une cuisine familiale cachère à Dubaï. Coffrets de Chabbat et menu de semaine, cuisinés frais et livrés chauds à votre hôtel, villa ou yacht. Livraison dans tous les Émirats.' },
+    '/weekdays': { title: 'Livraison de repas cachers à Dubaï — menu semaine | Bat Melech', description: 'Les plats frais de la semaine : baguettes, soupe de kubés, salades et plats. Livraison cachère à Dubaï et dans tous les Émirats.' },
+    '/shabbat-order': { title: 'Coffret de Chabbat casher à Dubaï — commande | Bat Melech', description: 'Un coffret de Chabbat pour deux : 12 salades, poisson, plats et dessert. Casher, cuisiné frais, livré chaud. Commandes jusqu’au jeudi 18h00.' },
+    '/shabbat-extras': { title: 'Plats de Chabbat cachers à Dubaï, à la carte | Bat Melech', description: 'Des plats de Chabbat commandés seuls, sans coffret : hamin, poissons, kugels et plus, livrés à Dubaï.' },
     '/checkout': { title: 'Votre commande | Bat Melech', description: 'Récapitulatif de commande et informations de livraison.' },
-    '/story': { title: 'Notre histoire | Bat Melech', description: "L'histoire de Bat Melech - une cuisine familiale casher à Dubaï." },
-    '/legal': { title: 'Conditions et confidentialité | Bat Melech', description: "Conditions d'utilisation, politique de confidentialité et allergènes." },
-    '/kashrut': { title: 'Cacherout et qualité | Bat Melech', description: 'Nos standards stricts de cacherout à Dubaï.' },
-    '/gallery': { title: 'Galerie | Bat Melech', description: 'Photos des événements et des plats de Bat Melech.' },
-    '/how-it-works': { title: 'Comment ça marche | Bat Melech', description: 'Du menu à la porte de votre hôtel — choisissez, commandez sur le site ou par WhatsApp, nous cuisinons frais le jour même et livrons chaud. Paiement à la livraison.' },
-    '/events': { title: 'Expériences culinaires VIP | Bat Melech', description: 'BBQ privé, événements sur yacht, soirées en villa, dîners en suite et festins dans le désert.' },
-    '/experiences/bbq': { title: 'Chef BBQ privé | Bat Melech', description: 'Une expérience BBQ casher privée avec un chef grillades à Dubaï.' },
-    '/experiences/yacht': { title: 'Événements sur yacht | Bat Melech', description: 'Traiteur casher de luxe pour yachts à Dubaï.' },
-    '/experiences/villa': { title: 'Soirées en villa | Bat Melech', description: 'Traiteur casher complet pour fêtes et événements en villa à Dubaï.' },
-    '/experiences/suite': { title: 'Dîner en suite | Bat Melech', description: "Dîners de chef privés et intimes en suite d'hôtel." },
-    '/experiences/desert': { title: 'Festin du désert VIP | Bat Melech', description: 'Un festin gastronomique casher au cœur du désert de Dubaï.' },
+    '/story': { title: 'Qui sommes-nous — cuisine casher israélienne à Dubaï | Bat Melech', description: 'L\'histoire de Lynn : la cuisine familiale cachère passée d\'Israël à Dubaï.' },
+    '/legal': { title: 'Conditions et confidentialité | Bat Melech', description: 'Conditions d\'utilisation, confidentialité, allergènes et informations légales.' },
+    '/accessibility': { title: 'Déclaration d’accessibilité | Bat Melech', description: 'Ce que ce site fait pour l’accessibilité, ce qui reste à faire, et comment signaler un problème.' },
+    '/kashrut': { title: 'Cacherout — cuisine casher supervisée à Dubaï | Bat Melech', description: 'Comment la cacherout est tenue en cuisine : cuisine dédiée, ingrédients et méthodes.' },
+    '/gallery': { title: 'Galerie — cuisine casher et événements à Dubaï | Bat Melech', description: 'De vraies photos de plats, de coffrets de Chabbat et d’événements à Dubaï.' },
+    '/how-it-works': { title: 'Comment commander casher à Dubaï | Bat Melech', description: 'Choisissez au menu, commandez sur le site ou par WhatsApp, nous cuisinons frais et livrons chaud.' },
+    '/events': { title: 'Traiteur casher à Dubaï pour événements privés | Bat Melech', description: 'Traiteur casher pour vos événements à Dubaï : BBQ privé, yacht, villa, suite et désert.' },
+    '/experiences/bbq': { title: 'Chef BBQ casher privé à Dubaï | Bat Melech', description: 'Un chef grillades vient chez vous avec viandes cachères et salades fraîches.' },
+    '/experiences/yacht': { title: 'Traiteur casher pour yacht à Dubaï | Bat Melech', description: 'Repas et événements cachers sur un yacht, entièrement servis.' },
+    '/experiences/villa': { title: 'Traiteur casher pour villa à Dubaï | Bat Melech', description: 'Traiteur casher complet pour fêtes et événements en villa à Dubaï.' },
+    '/experiences/suite': { title: 'Chef privé casher en suite à Dubaï | Bat Melech', description: 'Un dîner de chef privé dans votre suite, casher et servi.' },
+    '/experiences/desert': { title: 'Festin casher dans le désert de Dubaï | Bat Melech', description: 'Un festin casher au cœur des dunes, cuisiné sur place et servi.' },
   },
 }
 
@@ -112,6 +116,7 @@ function localeRoutes() {
       <Route path="shabbat-extras" element={<ShabbatExtras />} />
       <Route path="checkout" element={<Checkout />} />
       <Route path="legal" element={<Legal />} />
+      <Route path="accessibility" element={<Accessibility />} />
       <Route path="kashrut" element={<KashrutQuality />} />
       <Route path="gallery" element={<Gallery />} />
       <Route path="events" element={<Events />} />
