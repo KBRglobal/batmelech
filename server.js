@@ -333,6 +333,10 @@ app.get('/sitemap.xml', (_request, response) => {
 // the root, where they used to hit the 404 page: the icon a tab and a phone
 // home screen show, and the two text files AI crawlers read.
 const SITE_ROOT_FILES = {
+  // Google checks for this exact file at the root to confirm the site is ours.
+  // It is the property's verification token — leaving it in place keeps Search
+  // Console connected, so it stays until Google itself says otherwise.
+  '/googleefa22317e4a181fd.html': ['googleefa22317e4a181fd.html', 'text/html; charset=utf-8'],
   '/llms.txt': ['llms.txt', 'text/plain; charset=utf-8'],
   '/llms-full.txt': ['llms-full.txt', 'text/plain; charset=utf-8'],
   '/favicon.ico': ['favicon.ico', 'image/x-icon'],
