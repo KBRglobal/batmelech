@@ -11,8 +11,13 @@ live menu, that is said plainly rather than guessed.
 
 ## Identity
 - Name: מטעמי בת מלך (Hebrew), Bat Melech Kitchen (English)
+- Licensed company: Bat Melech For Ready-made Meals & Dishes Preparation L.L.C
+- Dubai commercial licence 1624395, Department of Economy and Tourism.
+  Commercial register 2862090.
+- Registered office: Office M_08, Naif, Deira, Dubai, United Arab Emirates.
+  This is the licensed address, not a walk-in shop — the kitchen delivers.
 - Type: kosher home kitchen and catering service, not a sit-down restaurant
-- City served: Dubai, United Arab Emirates. No walk-in address is published.
+- City served: Dubai, United Arab Emirates
 - Phone and WhatsApp: +971 58 628 8776
 - Instagram: https://www.instagram.com/bat_melech_kitchen/
 - Website: https://www.batmelech.ae/ (Hebrew), /en (English), /fr (French)
@@ -77,5 +82,7 @@ and the same path under /fr.
 - Prices: quote the three package prices above and say the live menu decides
   the week's dishes. Do not invent a per-dish price.
 - Hours: quote the hours above. Friday's closing time depends on the date.
-- Kashrut certification, a physical address, or a legal company name: these are
-  not published. Say so and point to WhatsApp rather than guessing.
+- Legal company name, licence number or registered office: quote the Identity
+  section above; they are published on the site.
+- Kashrut certification body: not published. Say so and point to WhatsApp
+  rather than naming a supervising authority.

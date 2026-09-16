@@ -30,6 +30,9 @@ const HE = {
   general: {
     title: 'כללי',
     items: [
+      'העסק שעומד מאחורי האתר: Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
+      'רישיון מסחרי מספר 1624395, שהונפק על ידי מחלקת הכלכלה והתיירות של דובאי. מספר רישום בפנקס החברות 2862090.',
+      'משרד רשום: Office M_08, Naif, Deira, Dubai, United Arab Emirates',
       'תנאים אלה כפופים לחוקי איחוד האמירויות הערביות.',
       'אנו רשאים לעדכן את התנאים מעת לעת; הגרסה המעודכנת תמיד מתפרסמת בעמוד זה.',
       'אנו שומרים לעצמנו את הזכות לסרב לקבל הזמנה, לרבות בשל אזור משלוח שאינו בטווח השירות.',
@@ -71,6 +74,9 @@ export const COPY: Record<Locale, typeof HE> = {
     general: {
       title: 'General',
       items: [
+        'The business behind this site: Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
+        'Commercial licence 1624395, issued by the Department of Economy and Tourism, Dubai. Register number 2862090.',
+        'Registered office: Office M_08, Naif, Deira, Dubai, United Arab Emirates',
         'These terms are governed by the laws of the United Arab Emirates.',
         'We may update these terms from time to time; the current version is always published on this page.',
         'We reserve the right to decline an order, including when the delivery area is outside our service range.',
@@ -109,6 +115,9 @@ export const COPY: Record<Locale, typeof HE> = {
     general: {
       title: 'Dispositions générales',
       items: [
+        "L'entreprise derrière ce site : Bat Melech For Ready-made Meals & Dishes Preparation L.L.C",
+        'Licence commerciale 1624395, délivrée par le Department of Economy and Tourism de Dubaï. Numéro de registre 2862090.',
+        'Siège social : Office M_08, Naif, Deira, Dubaï, Émirats arabes unis',
         'Les présentes conditions sont régies par les lois des Émirats arabes unis.',
         'Nous pouvons mettre à jour ces conditions de temps à autre ; la version en vigueur est toujours publiée sur cette page.',
         "Nous nous réservons le droit de refuser une commande, notamment lorsque la zone de livraison est hors de notre périmètre de service.",

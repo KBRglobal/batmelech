@@ -21,6 +21,9 @@ const HE = {
   kashrutLink: 'כשרות ואיכות',
   rights: 'מטעמי בת מלך דובאי. כל הזכויות שמורות.',
   allergens: 'המזון עשוי להכיל אלרגנים. הפרטים המלאים בעמוד תנאי השימוש.',
+  legalEntity: 'Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
+  legalDetails: 'רישיון מסחרי 1624395, מחלקת הכלכלה והתיירות של דובאי',
+  legalAddress: 'Office M_08, Naif, Deira, Dubai, UAE',
 }
 
 export const COPY: Record<Locale, typeof HE> = {
@@ -42,6 +45,9 @@ export const COPY: Record<Locale, typeof HE> = {
     kashrutLink: 'Kashrut & Quality',
     rights: 'Bat Melech Dubai. All rights reserved.',
     allergens: 'Food may contain allergens. Full details on the Terms of Service page.',
+    legalEntity: 'Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
+    legalDetails: 'Commercial licence 1624395, Department of Economy and Tourism, Dubai',
+    legalAddress: 'Office M_08, Naif, Deira, Dubai, UAE',
   },
   fr: {
     logoAlt: 'Bat Melech',
@@ -60,6 +66,9 @@ export const COPY: Record<Locale, typeof HE> = {
     kashrutLink: 'Cacherout et qualité',
     rights: 'Bat Melech Dubaï. Tous droits réservés.',
     allergens: 'Les plats peuvent contenir des allergènes. Détails complets sur la page des conditions d’utilisation.',
+    legalEntity: 'Bat Melech For Ready-made Meals & Dishes Preparation L.L.C',
+    legalDetails: 'Licence commerciale 1624395, Department of Economy and Tourism, Dubaï',
+    legalAddress: 'Office M_08, Naif, Deira, Dubai, UAE',
   },
 }
 
@@ -141,9 +150,16 @@ export function Footer({ className = '' }: { className?: string }) {
           </div>
         </div>
 
-        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-[#3B151A]/50 font-bold text-xs">
-          <span>© {new Date().getFullYear()} {t.rights}</span>
-          <span>{t.allergens}</span>
+        <div className="pt-8 flex flex-col gap-3 text-[#3B151A]/50 font-bold text-xs">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <span>© {new Date().getFullYear()} {t.rights}</span>
+            <span>{t.allergens}</span>
+          </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-1 md:gap-4 text-[#3B151A]/40">
+            <span dir="ltr">{t.legalEntity}</span>
+            <span>{t.legalDetails}</span>
+            <span dir="ltr">{t.legalAddress}</span>
+          </div>
         </div>
       </div>
     </footer>
