@@ -36,9 +36,11 @@ const EXPERIENCE_META = [
   },
 ]
 
-// The "Wall of Love" section is out until real guests are quoted: the three
-// testimonials that stood here were written for the mockup and carried stock
-// portraits. Bring it back with real names, real words and real photos.
+// Real messages guests sent after their delivery, in their own words. First
+// name and one initial, no photos: they wrote to the kitchen, not to the
+// internet, so nothing here identifies them beyond what they'd recognize.
+// The quotes are trimmed, never reworded; the Hebrew is what they actually
+// typed and the other locales are translations of it.
 
 const HE = {
   hero: {
@@ -108,6 +110,20 @@ const HE = {
       title: 'סעודת מדבר VIP',
       desc: 'בישול שטח יוקרתי בלב הדיונות. חוויה מדברית עם טעמי בית אמיתיים.',
     },
+  ],
+  guestsSection: {
+    badge: 'מה שכתבו לנו',
+    titleTop: 'מילים של',
+    titleAccent: 'אורחים אמיתיים',
+    note: 'הודעות שהגיעו אלינו אחרי המשלוח, בשם פרטי ובאות ראשונה של שם המשפחה.',
+  },
+  guests: [
+    { quote: 'זו הפעם ה-11 שלי בדובאי, והזמנתי מכל כך הרבה חברות. האוכל שלך היה טוב וטעים. כשאגיע להבא בטוח אזמין שוב.', name: 'רויטל ס.', context: 'ביקור אחד עשר בדובאי' },
+    { quote: 'השבת עברה מעולה. הכל היה מדהים ובשפע, היה לנו טעים ברמות, ולגמרי עשית לנו את השבת.', name: 'טוני ב.', context: 'מארז שבת' },
+    { quote: 'באמת שירות מהמם ואוכל טעים וטרי, והכל בשפע.', name: 'שירי ד.', context: 'משלוח בדובאי' },
+    { quote: 'תודה רבה על אוכל מושלם ובשפע, ועל חשיבה עד לפרטים הקטנים. גרמת לו להרגיש בבית.', name: 'שימרית ס.', context: 'הזמינה לבן הזוג' },
+    { quote: 'היה מעולה ומאוד מאוד טעים. בעלי לא הפסיק להגיד כמה האוכל טעים.', name: 'רוני מ.', context: 'מארז שבת' },
+    { quote: 'השבת עברה מעולה והאוכל היה טעים מאוד.', name: 'טליה ג.', context: 'שבת בדובאי' },
   ],
 }
 
@@ -182,6 +198,20 @@ export const COPY: Record<Locale, typeof HE> = {
         desc: 'Luxury open-fire cooking in the heart of the dunes. A desert experience with true home flavors.',
       },
     ],
+    guestsSection: {
+      badge: 'What guests wrote us',
+      titleTop: 'Words from',
+      titleAccent: 'Real Guests',
+      note: 'Messages sent to us after the delivery, translated from Hebrew. First name and the initial of the surname.',
+    },
+    guests: [
+      { quote: "This is my 11th time in Dubai, and I've ordered from so many companies. Your food was good and delicious. Next time I come I'll order again for sure.", name: 'Revital S.', context: 'Eleventh visit to Dubai' },
+      { quote: 'Shabbat was wonderful. Everything was amazing and there was plenty of it, it tasted incredible, and you completely made our Shabbat.', name: 'Tony B.', context: 'Shabbat package' },
+      { quote: 'Truly wonderful service, fresh and delicious food, and so much of it.', name: 'Shiri D.', context: 'Delivery in Dubai' },
+      { quote: 'Thank you for perfect food, plenty of it, and for thinking of every small detail. You made him feel at home.', name: 'Shimrit S.', context: 'Ordered for her partner' },
+      { quote: "It was excellent and so very tasty. My husband kept saying how good the food was.", name: 'Roni M.', context: 'Shabbat package' },
+      { quote: 'Shabbat was wonderful and the food was delicious.', name: 'Talia G.', context: 'Shabbat in Dubai' },
+    ],
   },
   fr: {
     hero: {
@@ -252,6 +282,20 @@ export const COPY: Record<Locale, typeof HE> = {
         desc: 'Cuisine de plein air haut de gamme au cœur des dunes. Une expérience du désert aux vrais goûts de la maison.',
       },
     ],
+    guestsSection: {
+      badge: 'Ce que nos clients nous ont écrit',
+      titleTop: 'Les mots de',
+      titleAccent: 'vrais clients',
+      note: 'Messages reçus après la livraison, traduits de l’hébreu. Prénom et initiale du nom de famille.',
+    },
+    guests: [
+      { quote: "C'est ma 11e fois à Dubaï et j'ai commandé chez tant d'entreprises. Votre cuisine était bonne et savoureuse. La prochaine fois, je recommanderai sans hésiter.", name: 'Revital S.', context: 'Onzième séjour à Dubaï' },
+      { quote: "Chabbat s'est merveilleusement passé. Tout était incroyable et en abondance, c'était délicieux, et vous avez vraiment fait notre Chabbat.", name: 'Tony B.', context: 'Coffret de Chabbat' },
+      { quote: 'Un service vraiment formidable, une cuisine fraîche et savoureuse, et tout en abondance.', name: 'Shiri D.', context: 'Livraison à Dubaï' },
+      { quote: "Merci pour ce repas parfait et abondant, et pour l'attention portée aux moindres détails. Vous lui avez donné l'impression d'être chez lui.", name: 'Shimrit S.', context: 'Commandé pour son conjoint' },
+      { quote: "C'était excellent et vraiment très bon. Mon mari n'arrêtait pas de dire à quel point c'était savoureux.", name: 'Roni M.', context: 'Coffret de Chabbat' },
+      { quote: "Chabbat s'est très bien passé et la cuisine était excellente.", name: 'Talia G.', context: 'Chabbat à Dubaï' },
+    ],
   },
 }
 
@@ -262,6 +306,7 @@ export function Home() {
   const shabbatReveal = useReveal<HTMLElement>()
   const weekdayReveal = useReveal<HTMLElement>()
   const experiencesReveal = useReveal<HTMLElement>()
+  const guestsReveal = useReveal<HTMLElement>()
 
   // Direction-dependent presentation: the promo gradients keep the dark side
   // behind the text (reading-start side), and arrows point "forward".
@@ -429,6 +474,39 @@ export function Home() {
                 {t.experiencesSection.ideaCta} <Icon icon="ph:chat-circle-dots-fill" className="inline-block ms-2" />
               </a>
             </div>
+          </div>
+        </section>
+
+        <section id="guests" ref={guestsReveal.ref} className={`mt-24 md:mt-32 scroll-mt-24 ${guestsReveal.className}`}>
+          <div className="flex flex-col items-center text-center mb-12">
+            <div className="inline-flex items-center gap-3 px-6 py-2 bg-[#8D182C]/10 text-[#8D182C] rounded-full text-xs font-black tracking-widest uppercase mb-6">
+              <span>{t.guestsSection.badge}</span>
+            </div>
+            <h2 className="text-4xl md:text-7xl font-black font-heading leading-tight">
+              {t.guestsSection.titleTop} <br />
+              <span className="text-[#8D182C]">{t.guestsSection.titleAccent}</span>
+            </h2>
+            <p className="mt-5 text-sm font-bold text-[#3B151A]/50 max-w-md">{t.guestsSection.note}</p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {t.guests.map((guest) => (
+              <figure
+                key={guest.name + guest.context}
+                className="bg-white rounded-[2rem] p-8 shadow-xl border border-[#EDB2C1]/40 flex flex-col gap-5"
+              >
+                <Icon icon="ph:quotes-fill" className="text-3xl text-[#F5A83A] shrink-0 self-start" />
+                <blockquote className="text-lg font-bold leading-relaxed grow">{guest.quote}</blockquote>
+                <figcaption className="flex items-center gap-3 pt-4 border-t border-[#EDB2C1]/40">
+                  <span className="w-10 h-10 rounded-full bg-[#F7ECE6] text-[#8D182C] font-black flex items-center justify-center shrink-0">
+                    {guest.name.slice(0, 1)}
+                  </span>
+                  <span className="flex flex-col">
+                    <span className="font-black text-sm">{guest.name}</span>
+                    <span className="text-[11px] text-[#3B151A]/45 font-bold">{guest.context}</span>
+                  </span>
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </section>
       </main>
