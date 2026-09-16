@@ -3,7 +3,7 @@ import { Footer } from '../components/footer'
 import { useLocale, type Locale } from '../locale-context'
 
 const HE = {
-  title: ['תנאי שימוש', 'ופרטיות'],
+  title: ['תנאי', 'שימוש'],
   heroAlt: 'מטעמי בת מלך - מטבח ביתי כשר בדובאי',
   terms: {
     title: 'תנאי שימוש',
@@ -14,18 +14,6 @@ const HE = {
       'התשלום מתבצע במעמד ההזמנה או באיסוף, בהתאם לסיכום מראש. מקבלים מזומן וכרטיס אשראי.',
       'משלוחים בכל איחוד האמירויות. בתוך דובאי המחיר קבוע; מחוץ לדובאי יש תוספת לפי המרחק, שמסוכמת מראש לפני שההזמנה נסגרת.',
       'אנו עושים את מירב המאמצים לספק אוכל טרי ואיכותי, אך האחריות על צריכת המזון היא על הלקוח.',
-    ],
-  },
-  privacy: {
-    title: 'מדיניות פרטיות',
-    intro: 'אנו מכבדים את הפרטיות שלך:',
-    items: [
-      'הפרטים האישיים (שם, טלפון, כתובת) משמשים למטרת ביצוע ההזמנה והמשלוח בלבד.',
-      'איננו מעבירים מידע לצד ג׳ ללא הסכמה מפורשת.',
-      'המידע נשמר במערכות מאובטחות לצורך שיפור השירות.',
-      'האתר אינו משתמש בעוגיות מעקב או פרסום — רק במה שנדרש כדי לשלוח את ההזמנה בוואטסאפ.',
-      'לספירת מבקרים אנונימית אנחנו משתמשים בשירות הסטטיסטיקה של קלאודפלייר, שאינו שותל עוגיות ואינו מזהה מי אתם.',
-      'ניתן לבקש בכל עת לעיין, לתקן או למחוק את הפרטים שנשמרו — פנייה בטלפון או בוואטסאפ.',
     ],
   },
   general: {
@@ -48,7 +36,7 @@ const HE = {
 export const COPY: Record<Locale, typeof HE> = {
   he: HE,
   en: {
-    title: ['Terms of Use', '& Privacy'],
+    title: ['Terms of', 'Service'],
     heroAlt: 'Bat Melech — a kosher home kitchen in Dubai',
     terms: {
       title: 'Terms of Use',
@@ -59,18 +47,6 @@ export const COPY: Record<Locale, typeof HE> = {
         'Payment is made at the time of ordering or at pickup, as agreed in advance. We accept cash and credit cards.',
         'We deliver across the United Arab Emirates. Inside Dubai the price is fixed; outside Dubai there is a distance surcharge, agreed with you before the order is confirmed.',
         'We make every effort to provide fresh, quality food, but responsibility for consuming the food rests with the customer.',
-      ],
-    },
-    privacy: {
-      title: 'Privacy Policy',
-      intro: 'We respect your privacy:',
-      items: [
-        'Personal details (name, phone, address) are used solely to process your order and delivery.',
-        'We do not share information with third parties without explicit consent.',
-        'Information is stored in secure systems for the purpose of improving the service.',
-        'The site does not use tracking or advertising cookies — only what is needed to send your order via WhatsApp.',
-        'For an anonymous visitor count we use Cloudflare\u2019s analytics, which sets no cookies and does not identify you.',
-        'You may ask at any time to view, correct, or delete the details we keep — just reach out by phone or WhatsApp.',
       ],
     },
     general: {
@@ -90,7 +66,7 @@ export const COPY: Record<Locale, typeof HE> = {
     },
   },
   fr: {
-    title: ['Conditions', 'et confidentialité'],
+    title: ['Conditions', 'd’utilisation'],
     heroAlt: 'Bat Melech — une cuisine familiale casher à Dubaï',
     terms: {
       title: "Conditions d'utilisation",
@@ -101,18 +77,6 @@ export const COPY: Record<Locale, typeof HE> = {
         'Le paiement est effectué au moment de la commande ou au retrait, selon accord préalable. Nous acceptons les espèces et la carte bancaire.',
         'Nous livrons dans tous les Émirats arabes unis. À Dubaï le prix est fixe ; en dehors de Dubaï un supplément kilométrique s’applique, convenu avant la validation de la commande.',
         'Nous mettons tout en œuvre pour fournir une cuisine fraîche et de qualité, mais la responsabilité de la consommation incombe au client.',
-      ],
-    },
-    privacy: {
-      title: 'Politique de confidentialité',
-      intro: 'Nous respectons votre vie privée :',
-      items: [
-        'Les données personnelles (nom, téléphone, adresse) servent uniquement au traitement de la commande et à la livraison.',
-        'Nous ne transmettons aucune information à des tiers sans consentement explicite.',
-        "Les informations sont conservées dans des systèmes sécurisés afin d'améliorer le service.",
-        "Le site n'utilise pas de cookies de suivi ni de publicité — uniquement ce qui est nécessaire pour envoyer votre commande via WhatsApp.",
-        "Pour un comptage anonyme des visiteurs, nous utilisons les statistiques de Cloudflare, qui ne posent aucun cookie et ne vous identifient pas.",
-        'Vous pouvez à tout moment demander à consulter, corriger ou supprimer les données conservées — par téléphone ou WhatsApp.',
       ],
     },
     general: {
@@ -152,17 +116,6 @@ export function Legal() {
             <p>{t.terms.intro}</p>
             <ul className="list-disc ps-6 space-y-2">
               {t.terms.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        </section>
-        <section>
-          <h2 className="text-3xl font-black font-heading mb-6 border-b-4 border-[#F5A83A] inline-block">{t.privacy.title}</h2>
-          <div className="space-y-3 md:space-y-4 text-base md:text-lg font-medium text-[#3B151A]/80 leading-relaxed">
-            <p>{t.privacy.intro}</p>
-            <ul className="list-disc ps-6 space-y-2">
-              {t.privacy.items.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>

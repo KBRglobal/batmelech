@@ -291,7 +291,7 @@ if (pool) {
 // keeps falling through to the decoy gate.
 const SITE_PAGE_NAMES = [
   'weekdays', 'story', 'shabbat-order', 'shabbat-extras', 'checkout',
-  'legal', 'accessibility', 'kashrut', 'gallery', 'events', 'how-it-works', 'experiences',
+  'legal', 'accessibility', 'privacy', 'kashrut', 'gallery', 'events', 'how-it-works', 'experiences',
 ];
 const SITE_PAGE_REGEX = new RegExp(
   `^/(?:en|fr)?/?$|^/(?:(?:en|fr)/)?(?:${SITE_PAGE_NAMES.join('|')})(?:/|$)`

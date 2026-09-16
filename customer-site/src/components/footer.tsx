@@ -140,7 +140,7 @@ export function Footer({ className = '' }: { className?: string }) {
             <Link to={href('/legal')} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">
               {t.terms}
             </Link>
-            <Link to={href('/legal')} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">
+            <Link to={href('/privacy')} className="text-[#3B151A]/60 hover:text-[#F5A83A] font-bold text-sm w-fit">
               {t.privacy}
             </Link>
             <Link to={href('/legal')} className="flex items-center gap-2 text-[#8D182C] hover:text-[#F5A83A] font-bold text-sm w-fit">

@@ -336,4 +336,25 @@
     <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/accessibility"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/accessibility"/>
   </url>
+  <url>
+    <loc>https://www.batmelech.ae/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/privacy"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/en/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/privacy"/>
+  </url>
+  <url>
+    <loc>https://www.batmelech.ae/fr/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.batmelech.ae/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.batmelech.ae/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.batmelech.ae/fr/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.batmelech.ae/privacy"/>
+  </url>
 </urlset>
